@@ -1,0 +1,8 @@
+pandas>=2.3.3
+openpyxl>=3.1.0
+akshare>=1.13.50
+requests>=2.31.0
+PyMySQL>=1.1.2
+sqlalchemy>=2.0.45
+cryptography>=46.0.3
+wxpy>=0.3.9.8
