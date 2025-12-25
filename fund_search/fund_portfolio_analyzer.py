@@ -4,17 +4,18 @@
 基于AKShare数据源，提供多维度持仓相似度分析和组合优化建议
 """
 
-import akshare as ak
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 import logging
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 import warnings
+
+import akshare as ak
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 
 warnings.filterwarnings('ignore')
 
@@ -59,7 +60,7 @@ class FundDataFetcher:
         
         Args:
             fund_code: 基金代码，如'005827'
-            date: 报告期，如'2024-12-31'，None则自动获取最新
+            date: 报告期，如'2024年1季度'，None则自动获取最新
             
         Returns:
             DataFrame: 持仓数据，包含股票代码、名称、占比等
@@ -80,24 +81,51 @@ class FundDataFetcher:
             df['占净值比例'] = pd.to_numeric(df['占净值比例'], errors='coerce')
             df['持股数'] = pd.to_numeric(df['持股数'], errors='coerce')
             df['持仓市值'] = pd.to_numeric(df['持仓市值'], errors='coerce')
-            df['季度'] = pd.to_datetime(df['报告期'])
+            
+            # 从季度字符串中提取年份和季度信息，用于排序
+            def extract_quarter_info(quarter_str: str) -> Tuple[int, int]:
+                """从季度字符串提取年份和季度数字"""
+                try:
+                    import re
+                    match = re.search(r'(\d{4})年(\d)季度', str(quarter_str))
+                    if match:
+                        year = int(match.group(1))
+                        quarter = int(match.group(2))
+                        return year, quarter
+                    return 0, 0
+                except:
+                    return 0, 0
+            
+            # 添加排序用的季度信息
+            df['年份'] = df['季度'].apply(lambda x: extract_quarter_info(x)[0])
+            df['季度数'] = df['季度'].apply(lambda x: extract_quarter_info(x)[1])
             
             # 按日期筛选
             if date:
-                df = df[df['报告期'] == date]
+                df = df[df['季度'].str.contains(date, na=False)]
             
-            # 获取最新报告期
-            latest_date = df['报告期'].max()
-            holdings = df[df['报告期'] == latest_date].copy()
+            # 获取最新报告期（按年份和季度排序）
+            if not df.empty:
+                df_sorted = df.sort_values(['年份', '季度数'], ascending=False)
+                latest_quarter = df_sorted.iloc[0]['季度']
+                holdings = df_sorted[df_sorted['季度'] == latest_quarter].copy()
+                
+                # 删除辅助列
+                holdings = holdings.drop(columns=['年份', '季度数'], errors='ignore')
+            else:
+                holdings = pd.DataFrame()
             
             # 缓存数据
             self.holdings_cache[cache_key] = holdings
-            logging.info(f"✅ 成功获取 {fund_code} 数据：{len(holdings)} 只重仓股，报告期 {latest_date}")
+            if not holdings.empty:
+                logging.info(f"✅ 成功获取 {fund_code} 数据：{len(holdings)} 只重仓股，报告期 {latest_quarter}")
             
             return holdings
             
         except Exception as e:
             logging.error(f"❌ 获取 {fund_code} 数据失败: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             return pd.DataFrame()
     
     def get_stock_industry(self, stock_code: str) -> str:
