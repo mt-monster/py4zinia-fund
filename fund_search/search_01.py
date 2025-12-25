@@ -575,22 +575,216 @@ def analyze_funds():
     except Exception as e:
         print(f"\n分析基金收益率时出错: {str(e)}")
 
+# 定义基金绩效对比函数
+def compare_fund_performance():
+    """
+    对比前一天和今天的基金绩效变化
+    
+    返回：
+    DataFrame: 包含基金代码、名称、昨日收益率、今日收益率、变化值的对比数据
+    """
+    print("\n开始基金绩效对比分析...")
+    
+    try:
+        import pandas as pd
+        import pymysql
+        from sqlalchemy import create_engine
+        from datetime import date, timedelta
+        import warnings
+        warnings.filterwarnings('ignore', category=pymysql.Warning)
+        
+        # 数据库连接信息（与analyze_funds函数保持一致）
+        db_config = {
+            'host': 'localhost',
+            'user': 'root',
+            'password': 'root',
+            'database': 'fund_analysis',
+            'port': 3306,
+            'charset': 'utf8mb4'
+        }
+        
+        # 创建数据库连接
+        connection_string = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}?charset={db_config['charset']}"
+        engine = create_engine(connection_string)
+        
+        # 获取今日和昨日日期
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        print(f"对比日期：昨天({yesterday}) vs 今天({today})")
+        
+        # 查询今日和昨日的基金数据
+        query = f"""
+        SELECT * FROM fund_analysis_results 
+        WHERE analysis_date IN ('{yesterday}', '{today}')
+        ORDER BY fund_code, analysis_date
+        """
+        
+        df = pd.read_sql(query, engine)
+        
+        if df.empty:
+            print("未找到足够的数据进行对比")
+            return None
+        
+        # 按基金代码分组
+        fund_groups = df.groupby('fund_code')
+        
+        comparison_results = []
+        
+        for fund_code, group in fund_groups:
+            if len(group) < 2:
+                print(f"基金 {fund_code} 缺少完整的历史数据")
+                continue
+                
+            # 按日期排序
+            sorted_group = group.sort_values('analysis_date')
+            
+            # 获取昨日和今日数据
+            yesterday_data = sorted_group.iloc[0]
+            today_data = sorted_group.iloc[1]
+            
+            # 计算变化值
+            return_change = today_data['today_return'] - yesterday_data['today_return']
+            
+            comparison_results.append({
+                'fund_code': fund_code,
+                'fund_name': today_data['fund_name'],
+                'yesterday_return': yesterday_data['today_return'],
+                'today_return': today_data['today_return'],
+                'return_change': return_change,
+                'yesterday_status': yesterday_data['status_label'],
+                'today_status': today_data['status_label'],
+                'yesterday_operation': yesterday_data['operation_suggestion'],
+                'today_operation': today_data['operation_suggestion']
+            })
+        
+        if not comparison_results:
+            print("没有足够的基金数据进行完整对比")
+            return None
+        
+        comparison_df = pd.DataFrame(comparison_results)
+        
+        # 格式化显示
+        print("\n基金绩效对比结果：")
+        display_columns = ['fund_code', 'fund_name', 'yesterday_return', 'today_return', 'return_change', 'yesterday_status', 'today_status']
+        display_df = comparison_df.copy()
+        display_df['yesterday_return'] = display_df['yesterday_return'].map('{:.2f}%'.format)
+        display_df['today_return'] = display_df['today_return'].map('{:.2f}%'.format)
+        display_df['return_change'] = display_df['return_change'].map('{:.2f}%'.format)
+        print(display_df[display_columns])
+        
+        # 生成可视化图表
+        plot_performance_comparison(comparison_df)
+        
+        return comparison_df
+        
+    except ImportError:
+        print("缺少必要的依赖包，请安装: pip install PyMySQL sqlalchemy pandas")
+        return None
+    except Exception as e:
+        print(f"进行基金绩效对比时出错: {str(e)}")
+        return None
+
+# 定义可视化函数
+def plot_performance_comparison(comparison_df):
+    """
+    使用matplotlib创建基金绩效对比图表
+    
+    参数：
+    comparison_df: 包含基金绩效对比数据的DataFrame
+    """
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from datetime import date, timedelta
+        
+        # 设置中文显示
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        # 获取今日和昨日日期
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        # 创建图表
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [2, 1]})
+        fig.suptitle(f'基金绩效对比分析\n昨天({yesterday}) vs 今天({today})', fontsize=16, fontweight='bold')
+        
+        # 1. 柱状图对比昨日和今日收益率
+        n_funds = len(comparison_df)
+        indices = np.arange(n_funds)
+        width = 0.35
+        
+        ax1.bar(indices - width/2, comparison_df['yesterday_return'], width, label=f'昨日({yesterday})', alpha=0.8, color='#1f77b4')
+        ax1.bar(indices + width/2, comparison_df['today_return'], width, label=f'今日({today})', alpha=0.8, color='#ff7f0e')
+        
+        # 设置柱状图标签
+        ax1.set_ylabel('收益率 (%)')
+        ax1.set_title('基金每日收益率对比', fontweight='bold')
+        ax1.set_xticks(indices)
+        ax1.set_xticklabels(comparison_df['fund_code'], rotation=45, ha='right')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # 在柱子上添加数值标签
+        for i, (yesterday_val, today_val) in enumerate(zip(comparison_df['yesterday_return'], comparison_df['today_return'])):
+            ax1.text(i - width/2, yesterday_val + 0.05 * abs(yesterday_val), f'{yesterday_val:.2f}%', ha='center', va='bottom', fontsize=9)
+            ax1.text(i + width/2, today_val + 0.05 * abs(today_val), f'{today_val:.2f}%', ha='center', va='bottom', fontsize=9)
+        
+        # 2. 折线图显示收益率变化值
+        ax2.plot(indices, comparison_df['return_change'], marker='o', linewidth=2, markersize=8, color='#2ca02c')
+        
+        # 添加零基准线
+        ax2.axhline(y=0, color='black', linestyle='--', alpha=0.3)
+        
+        # 设置折线图标签
+        ax2.set_ylabel('收益率变化 (%)')
+        ax2.set_title('基金收益率变化趋势', fontweight='bold')
+        ax2.set_xticks(indices)
+        ax2.set_xticklabels(comparison_df['fund_code'], rotation=45, ha='right')
+        ax2.grid(True, alpha=0.3)
+        
+        # 在点上添加数值标签
+        for i, val in enumerate(comparison_df['return_change']):
+            ax2.text(i, val + 0.05 * abs(val), f'{val:.2f}%', ha='center', va='bottom', fontsize=9)
+        
+        # 3. 添加基金名称注释
+        fund_names = comparison_df['fund_name'].tolist()
+        ax1.text(1.02, 0.5, '基金名称:', transform=ax1.transAxes, fontweight='bold', ha='left', va='center')
+        for i, name in enumerate(fund_names):
+            ax1.text(1.02, 0.45 - i*0.05, f'{comparison_df.iloc[i, 0]}: {name}', transform=ax1.transAxes, ha='left', va='top')
+        
+        # 调整布局
+        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        
+        # 显示图表
+        plt.show()
+        
+    except ImportError:
+        print("缺少matplotlib依赖包，请安装: pip install matplotlib")
+    except Exception as e:
+        print(f"生成可视化图表时出错: {str(e)}")
+
 # 主程序入口
 if __name__ == "__main__":
+    import sys
+    
     try:
         # 立即执行一次基金分析
-        print("首次执行基金分析...")
+        print("执行基金分析...")
         analyze_funds()
         
-        # 设置每天下午2点40分执行
-        print("\n设置定时任务：每天下午2点40分执行基金分析...")
-        schedule.every().day.at("14:40").do(analyze_funds)
+        # 执行绩效对比
+        print("\n\n执行基金绩效对比分析...")
+        compare_fund_performance()
         
-        # 运行定时任务
-        while True:
-            schedule.run_pending()
-            time.sleep(60)  # 每分钟检查一次
-    except ImportError:
-        print("缺少schedule库，请安装：pip install schedule")
-        # 如果没有安装schedule库，直接执行一次
-        analyze_funds()
+        print("\n程序执行完成")
+    except ImportError as e:
+        print(f"缺少必要库: {e}")
+        print("请安装所需依赖: pip install pandas schedule pymysql sqlalchemy requests matplotlib akshare")
+    except KeyboardInterrupt:
+        print("\n程序已被用户终止")
+        sys.exit(0)
+    except Exception as e:
+        print(f"程序执行出错: {str(e)}")
+        sys.exit(1)
