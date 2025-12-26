@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>证券客户流失预警系统 - AI助手</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .btn-primary {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+        .btn-primary:hover {
+            background-color: #5568d3;
+            border-color: #5568d3;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-online {
+            background-color: #28a745;
+        }
+        .status-offline {
+            background-color: #dc3545;
+        }
+        .risk-high {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        .risk-medium {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        .risk-low {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+        .strategy-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- 页面头部 -->
+    <div class="header">
+        <div class="container">
+            <h1 class="display-4">
+                <i class="fa fa-line-chart" aria-hidden="true"></i>
+                证券客户流失预警系统
+            </h1>
+            <p class="lead">AI驱动的客户挽留策略生成助手</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 状态信息 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fa fa-server" aria-hidden="true"></i>
+                            系统状态
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>API服务器:</strong> 
+                                <span id="api-status">
+                                    <span class="status-indicator status-offline"></span>未连接
+                                </span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>模型状态:</strong> 
+                                <span id="model-status">未训练</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>客户总数:</strong> 
+                                <span id="customer-count">0</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>高风险客户:</strong> 
+                                <span id="high-risk-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能按钮区 -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fa fa-cogs" aria-hidden="true"></i>
+                            功能操作
+                        </h5>
+                        <div class="btn-group" role="group">
+                            <button id="check-health-btn" class="btn btn-secondary">
+                                <i class="fa fa-heartbeat" aria-hidden="true"></i>
+                                检查健康状态
+                            </button>
+                            <button id="train-model-btn" class="btn btn-primary">
+                                <i class="fa fa-refresh" aria-hidden="true"></i>
+                                训练模型
+                            </button>
+                            <button id="predict-risk-btn" class="btn btn-success">
+                                <i class="fa fa-search" aria-hidden="true"></i>
+                                预测流失风险
+                            </button>
+                            <button id="download-plans-btn" class="btn btn-info">
+                                <i class="fa fa-download" aria-hidden="true"></i>
+                                下载挽留计划
+                            </button>
+                            <button id="clear-results-btn" class="btn btn-danger">
+                                <i class="fa fa-trash" aria-hidden="true"></i>
+                                清空结果
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 加载指示器 -->
+        <div class="loading" id="loading-indicator">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2">正在处理，请稍候...</p>
+        </div>
+
+        <!-- 结果展示区 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fa fa-table" aria-hidden="true"></i>
+                            高风险客户挽留计划
+                        </h5>
+                        <div id="results-container">
+                            <p class="text-center text-muted">请点击"预测流失风险"按钮查看结果</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图表展示区 -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fa fa-bar-chart" aria-hidden="true"></i>
+                            SHAP特征重要性分析
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="image-container">
+                                    <img src="/securities_shap_bar.png" 
+                                         alt="SHAP特征重要性柱状图" class="img-fluid rounded" 
+                                         style="max-height: 400px; object-fit: contain;">
+                                    <div class="mt-2">
+                                        <h6 class="fw-bold">特征重要性柱状图</h6>
+                                        <p class="text-muted small">展示各特征对客户流失预测的影响程度，从左到右表示影响从大到小。</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="image-container">
+                                    <img src="/securities_shap_scatter.png" 
+                                         alt="SHAP特征重要性散点图" class="img-fluid rounded" 
+                                         style="max-height: 400px; object-fit: contain;">
+                                    <div class="mt-2">
+                                        <h6 class="fw-bold">特征重要性散点图</h6>
+                                        <p class="text-muted small">显示每个特征值对应的SHAP值，颜色表示另一个特征的影响，帮助理解特征间的交互关系。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-md-12">
+                                <div class="image-container">
+                                    <img src="/securities_shap_dependence.png" 
+                                         alt="SHAP特征依赖图" class="img-fluid rounded" 
+                                         style="max-height: 500px; object-fit: contain;">
+                                    <div class="mt-2">
+                                        <h6 class="fw-bold">特征依赖关系图</h6>
+                                        <p class="text-muted small">展示最关键的四个特征对客户流失风险的影响，直观显示特征值变化如何影响预测结果。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="footer mt-5 py-3 bg-light">
+        <div class="container">
+            <p class="text-center text-muted">© 2024 证券客户流失预警系统 - AI助手</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // API基础URL
+        const API_BASE_URL = 'http://localhost:5000/api';
+
+        // DOM元素
+        const apiStatusEl = document.getElementById('api-status');
+        const modelStatusEl = document.getElementById('model-status');
+        const customerCountEl = document.getElementById('customer-count');
+        const highRiskCountEl = document.getElementById('high-risk-count');
+        const resultsContainerEl = document.getElementById('results-container');
+        const loadingIndicatorEl = document.getElementById('loading-indicator');
+
+        // 按钮元素
+        const checkHealthBtn = document.getElementById('check-health-btn');
+        const trainModelBtn = document.getElementById('train-model-btn');
+        const predictRiskBtn = document.getElementById('predict-risk-btn');
+        const downloadPlansBtn = document.getElementById('download-plans-btn');
+        const clearResultsBtn = document.getElementById('clear-results-btn');
+
+        // 显示加载指示器
+        function showLoading() {
+            loadingIndicatorEl.style.display = 'block';
+        }
+
+        // 隐藏加载指示器
+        function hideLoading() {
+            loadingIndicatorEl.style.display = 'none';
+        }
+
+        // 更新API状态
+        function updateApiStatus(online) {
+            if (online) {
+                apiStatusEl.innerHTML = '<span class="status-indicator status-online"></span>已连接';
+            } else {
+                apiStatusEl.innerHTML = '<span class="status-indicator status-offline"></span>未连接';
+            }
+        }
+
+        // 检查健康状态
+        checkHealthBtn.addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await axios.get(`${API_BASE_URL}/health`);
+                if (response.data.status === 'ok') {
+                    updateApiStatus(true);
+                    alert('API服务器运行正常！');
+                }
+            } catch (error) {
+                updateApiStatus(false);
+                alert('API服务器连接失败！');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // 训练模型
+        trainModelBtn.addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await axios.post(`${API_BASE_URL}/train`);
+                if (response.data.status === 'success') {
+                    modelStatusEl.textContent = '已训练';
+                    customerCountEl.textContent = response.data.customer_count;
+                    // 刷新SHAP图像，避免缓存问题
+                    refreshShapImages();
+                    alert('模型训练完成！');
+                }
+            } catch (error) {
+                alert('模型训练失败：' + (error.response?.data?.message || error.message));
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // 刷新SHAP图像函数
+        function refreshShapImages() {
+            const timestamp = new Date().getTime();
+            // 更新所有SHAP图像的src，添加时间戳避免缓存
+            const shapImages = document.querySelectorAll('img[src*="securities_shap_"]');
+            shapImages.forEach(img => {
+                const originalSrc = img.src.split('?')[0];
+                img.src = `${originalSrc}?t=${timestamp}`;
+            });
+        }
+
+        // 预测流失风险
+        predictRiskBtn.addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await axios.post(`${API_BASE_URL}/predict`, { top_k: 30 });
+                if (response.data.status === 'success') {
+                    highRiskCountEl.textContent = response.data.plans_count;
+                    renderRetentionPlans(response.data.retention_plans);
+                }
+            } catch (error) {
+                alert('预测失败：' + (error.response?.data?.message || error.message));
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // 下载挽留计划
+        downloadPlansBtn.addEventListener('click', async () => {
+            showLoading();
+            try {
+                const response = await axios.get(`${API_BASE_URL}/plans/download`);
+                if (response.data.status === 'success') {
+                    // 这里可以实现下载Excel文件的功能
+                    alert('挽留计划数据获取成功！');
+                    console.log('挽留计划数据：', response.data.plans);
+                }
+            } catch (error) {
+                alert('下载失败：' + (error.response?.data?.message || error.message));
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // 清空结果
+        clearResultsBtn.addEventListener('click', () => {
+            resultsContainerEl.innerHTML = '<p class="text-center text-muted">请点击"预测流失风险"按钮查看结果</p>';
+            highRiskCountEl.textContent = '0';
+        });
+
+        // 渲染挽留计划
+        function renderRetentionPlans(plans) {
+            if (!plans || plans.length === 0) {
+                resultsContainerEl.innerHTML = '<p class="text-center text-muted">没有找到高风险客户</p>';
+                return;
+            }
+
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>客户ID</th>
+                                <th>风险等级</th>
+                                <th>流失概率</th>
+                                <th>执行优先级</th>
+                                <th>关键预警信号</th>
+                                <th>挽留策略</th>
+                                <th>预期效果</th>
+                                <th>执行期限</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            plans.forEach(plan => {
+                // 获取风险等级对应的样式
+                let riskClass = '';
+                switch (plan['风险等级']) {
+                    case '高':
+                        riskClass = 'risk-high';
+                        break;
+                    case '中':
+                        riskClass = 'risk-medium';
+                        break;
+                    case '低':
+                        riskClass = 'risk-low';
+                        break;
+                }
+
+                // 渲染挽留策略
+                let strategiesHtml = '';
+                if (Array.isArray(plan['挽留策略'])) {
+                    plan['挽留策略'].forEach((strategy, index) => {
+                        strategiesHtml += `<div class="strategy-item">${index + 1}. ${strategy}</div>`;
+                    });
+                } else {
+                    strategiesHtml = `<div class="strategy-item">${plan['挽留策略']}</div>`;
+                }
+
+                html += `
+                    <tr>
+                        <td>${plan['客户ID']}</td>
+                        <td><span class="${riskClass}">${plan['风险等级']}</span></td>
+                        <td>${plan['流失概率']}</td>
+                        <td>${plan['执行优先级']}</td>
+                        <td>${plan['关键预警信号']}</td>
+                        <td>${strategiesHtml}</td>
+                        <td>${plan['预期效果']}</td>
+                        <td>${plan['执行期限']}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            resultsContainerEl.innerHTML = html;
+        }
+
+        // 页面加载时自动检查API健康状态
+        window.addEventListener('load', () => {
+            axios.get(`${API_BASE_URL}/health`)
+                .then(response => {
+                    if (response.data.status === 'ok') {
+                        updateApiStatus(true);
+                    }
+                })
+                .catch(error => {
+                    updateApiStatus(false);
+                });
+        });
+    </script>
+</body>
+</html>
