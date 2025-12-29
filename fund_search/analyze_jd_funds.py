@@ -1,13 +1,15 @@
 # analyze_jd_funds.py
-"""分析京东金融Excel文件中的基金组合相似度"""
+"""分析京东金融Excel文件中的基金组合相似度，基于净值收益率计算相关系数矩阵"""
 
 import pandas as pd
 from pathlib import Path
-from fund_portfolio_analyzer import FundPortfolioAnalyzer, AnalysisConfig
-import sys
+import xlsxwriter
+from datetime import datetime, timedelta
+from fund_correlation import FundCorrelation
+
 
 def analyze_jd_fund_portfolio():
-    """分析京东金融Excel文件中的基金组合"""
+    """分析京东金融Excel文件中的基金组合，基于净值收益率计算相关系数矩阵"""
     
     # Excel文件路径
     excel_path = Path("京东金融.xlsx")
@@ -17,7 +19,7 @@ def analyze_jd_fund_portfolio():
         return
     
     print("="*60)
-    print("京东金融基金组合相似度分析")
+    print("京东金融基金组合相关性分析")
     print("="*60)
     
     # 读取Excel文件
@@ -26,11 +28,8 @@ def analyze_jd_fund_portfolio():
         持仓数据 = pd.read_excel(excel_path, sheet_name='持仓数据')
         
         print(f"✅ 成功读取数据")
-        print(f"数据形状: {持仓数据.shape[0]} 行 x {持仓数据.shape[1]} 列")
-        print(f"列名: {list(持仓数据.columns)}")
         
         # 提取基金代码和名称
-        # 检查可能的列名
         code_col = None
         name_col = None
         
@@ -65,93 +64,116 @@ def analyze_jd_fund_portfolio():
             print("❌ 未找到有效的基金代码")
             return
         
-        # 创建分析器
-        print("\n🔧 初始化分析器...")
-        config = AnalysisConfig(
-            top_n_holdings=50,
-            similarity_threshold=0.5  # 50%相似度阈值
-        )
-        analyzer = FundPortfolioAnalyzer(config)
+        # 设置时间范围（过去1年）
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+        print(f"\n📅 时间范围: {start_date} 至 {end_date}")
         
-        # 添加基金到分析池
-        print("\n📝 添加基金到分析池...")
-        for code in fund_codes:
-            name = fund_names.get(code, code)
-            analyzer.add_fund(code, name)
+        # 创建相关性分析器
+        print("\n🔧 初始化相关性分析器...")
+        correlation_analyzer = FundCorrelation(start_date=start_date, end_date=end_date)
         
-        # 加载持仓数据
-        print("\n📥 加载基金持仓数据（这可能需要一些时间）...")
-        analyzer.load_holdings()
-        
-        # 检查是否有有效数据
-        valid_funds = [code for code, df in analyzer.holdings_dict.items() if not df.empty]
-        if len(valid_funds) == 0:
-            print("\n❌ 未能获取到任何基金的有效持仓数据")
-            print("可能的原因：")
-            print("  1. 基金代码不正确")
-            print("  2. 网络连接问题")
-            print("  3. AKShare接口暂时不可用")
+        # 获取基金历史数据
+        print("\n� 获取基金历史净值数据（这可能需要一些时间）...")
+        if not correlation_analyzer.get_multiple_funds(fund_codes):
             return
         
-        print(f"\n✅ 成功获取 {len(valid_funds)}/{len(fund_codes)} 只基金的有效数据")
+        # 执行相关性分析 - 基于净值收益率
+        print("\n🔍 执行基于净值收益率的相关性分析...")
+        correlation_matrix = correlation_analyzer.calculate_correlation(method='pearson', based_on='returns')
         
-        if len(valid_funds) < len(fund_codes):
-            missing = [code for code in fund_codes if code not in valid_funds]
-            print(f"⚠️  以下基金数据缺失: {missing}")
-        
-        # 执行分析
-        print("\n🔍 执行相似度分析...")
-        methods = ['holdings', 'industry', 'composite']
-        results = analyzer.run_analysis(methods=methods)
-        
-        if not results:
+        if correlation_matrix is None:
             print("❌ 分析失败，没有生成结果")
             return
         
-        # 生成可视化
-        print("\n📈 生成可视化图表...")
+        # 检查共同日期数量是否满足要求（至少4条）
+        valid_fund_codes = list(correlation_matrix.columns)
+        if not valid_fund_codes:
+            print("❌ 没有有效的基金数据")
+            return
+        
+        # 构建合并后的数据框来检查共同日期数量
+        merged_df = None
+        for code in valid_fund_codes:
+            fund_data = correlation_analyzer.fund_data[code]
+            if merged_df is None:
+                merged_df = fund_data[['净值日期', '日收益率']].rename(columns={'日收益率': code})
+            else:
+                merged_df = merged_df.merge(fund_data[['净值日期', '日收益率']].rename(columns={'日收益率': code}), on='净值日期', how='inner')
+        
+        common_dates_count = len(merged_df)
+        print(f"\n📊 共同日期数量: {common_dates_count} 条")
+        
+        if common_dates_count < 4:
+            print(f"⚠️  共同日期数量不足4条，可能影响相关性分析结果")
+        
+        # 获取相关性矩阵
+        holdings_matrix = correlation_matrix
+        
+        # 将列名和索引名替换为中文基金名称
+        holdings_matrix.columns = [fund_names.get(code, code) for code in holdings_matrix.columns]
+        holdings_matrix.index = [fund_names.get(code, code) for code in holdings_matrix.index]
+        
+        print("\n" + "="*60)
+        print("相关性系数矩阵 (基于净值收益率)")
+        print("="*60)
+        print(holdings_matrix.round(4))
+        
+        # 将相关性系数矩阵保存到Excel文件
+        print("\n💾 保存相关性系数矩阵到Excel文件...")
         output_dir = Path("output/jd_fund_analysis")
         output_dir.mkdir(parents=True, exist_ok=True)
-        analyzer.visualize(save_path=str(output_dir))
+        excel_file = output_dir / "相关性系数矩阵.xlsx"
         
-        # 生成报告
-        print("\n📝 生成分析报告...")
-        report = analyzer.generate_report()
-        print(report)
+        # 使用xlsxwriter创建Excel文件
+        writer = pd.ExcelWriter(excel_file, engine='xlsxwriter')
         
-        # 保存结果
-        print("\n💾 保存分析结果...")
-        analyzer.save_results(str(output_dir))
+        # 将数据写入Excel
+        holdings_matrix.round(4).to_excel(writer, sheet_name='相似系数矩阵', index=True)
         
-        print(f"\n✅ 分析完成！结果已保存至: {output_dir.absolute()}")
+        # 获取工作簿和工作表对象
+        workbook = writer.book
+        worksheet = writer.sheets['相似系数矩阵']
         
-        # 生成简要总结
-        print("\n" + "="*60)
-        print("简要总结")
-        print("="*60)
+        # 定义红色渐变色格式
+        for row_idx in range(1, holdings_matrix.shape[0] + 2):
+            for col_idx in range(1, holdings_matrix.shape[1] + 2):
+                if row_idx == 1 or col_idx == 1:
+                    # 表头和索引列使用默认格式
+                    continue
+                    
+                # 获取单元格值
+                value = holdings_matrix.iloc[row_idx - 2, col_idx - 2] if row_idx > 1 and col_idx > 1 else 0
+                
+                # 计算红色深浅，值越大红色越深
+                intensity = int(value * 255)
+                intensity = max(50, min(255, intensity))  # 确保最小值为50，避免黑色背景
+                
+                # 创建填充格式
+                format_dict = {
+                    'bg_color': f'#{intensity:02X}0000',  # 红色渐变
+                    'font_color': '#FFFFFF' if intensity > 128 else '#000000',  # 根据背景色选择字体颜色
+                    'align': 'center',
+                    'valign': 'vcenter'
+                }
+                cell_format = workbook.add_format(format_dict)
+                
+                # 应用格式到单元格
+                worksheet.write(row_idx - 1, col_idx - 1, round(value, 4), cell_format)
         
-        if 'composite' in results:
-            matrix = results['composite']
-            funds = matrix.index.tolist()
-            
-            # 找出高相似度基金对
-            high_sim_pairs = []
-            for i in range(len(funds)):
-                for j in range(i+1, len(funds)):
-                    sim = matrix.iloc[i, j]
-                    if sim > 0.5:
-                        high_sim_pairs.append((funds[i], funds[j], sim))
-            
-            high_sim_pairs.sort(key=lambda x: x[2], reverse=True)
-            
-            if high_sim_pairs:
-                print("\n⚠️  高相似度基金对（建议优化组合）:")
-                for fund1, fund2, sim in high_sim_pairs[:10]:  # 只显示前10个
-                    name1 = analyzer.fund_names.get(fund1, fund1)
-                    name2 = analyzer.fund_names.get(fund2, fund2)
-                    print(f"  {fund1}({name1}) ↔ {fund2}({name2}): {sim:.2%}")
-            else:
-                print("\n✅ 未发现相似度 > 50% 的基金对，组合分散性良好")
+        # 设置列宽
+        for col_idx in range(holdings_matrix.shape[1] + 1):
+            worksheet.set_column(col_idx, col_idx, 12)
+        
+        # 设置行高
+        for row_idx in range(holdings_matrix.shape[0] + 1):
+            worksheet.set_row(row_idx, 30)
+        
+        # 关闭并保存文件
+        writer.close()
+        
+        print(f"✅ 相关性系数矩阵已保存至: {excel_file.absolute()}")
+        print(f"\n✅ 分析完成！")
         
     except FileNotFoundError:
         print(f"❌ 文件不存在: {excel_path.absolute()}")

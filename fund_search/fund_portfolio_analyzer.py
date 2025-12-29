@@ -13,6 +13,8 @@ import warnings
 
 import akshare as ak
 import matplotlib.pyplot as plt
+import matplotlib.ticker
+import matplotlib.font_manager
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -71,7 +73,7 @@ class FundDataFetcher:
             return self.holdings_cache[cache_key]
         
         try:
-            df = ak.fund_portfolio_hold_em(symbol=fund_code)
+            df = ak.fund_portfolio_hold_em(symbol=fund_code,date=date)
             
             if df.empty:
                 logging.warning(f"基金 {fund_code} 无持仓数据")
@@ -394,6 +396,9 @@ class FundPortfolioAnalyzer:
             method: 'all'表示显示所有，或指定特定方法名
             save_path: 保存路径，None则直接显示
         """
+        # 配置中文字体
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']  # 中文显示
+        plt.rcParams['axes.unicode_minus'] = False  # 负号显示
         if method == 'all':
             methods_to_plot = list(self.similarity_results.keys())
         else:
@@ -419,12 +424,18 @@ class FundPortfolioAnalyzer:
                 cmap='RdYlBu_r',
                 center=0.5,
                 linewidths=0.5,
-                cbar_kws={"shrink": 0.8},
+                cbar_kws={"shrink": 0.8, "format": matplotlib.ticker.FuncFormatter(lambda x, _: f'{x:.3f}')},
                 fmt='.3f',
                 xticklabels=labels,
                 yticklabels=labels,
                 square=True
             )
+            
+            # 确保colorbar也使用中文兼容字体
+            cbar = plt.gca().collections[0].colorbar
+            cbar.ax.yaxis.set_tick_params(labelsize=10)
+            for label in cbar.ax.get_yticklabels():
+                label.set_fontproperties(matplotlib.font_manager.FontProperties(family='SimHei', size=10))
             
             plt.title(f'基金持仓相似度分析 ({method_name})', fontsize=16, fontweight='bold', pad=20)
             plt.tight_layout()
@@ -585,7 +596,7 @@ def run_demo():
     
     # 加载数据
     print("\n📊 步骤1: 加载基金持仓数据...")
-    analyzer.load_holdings()
+    analyzer.load_holdings(target_date='2025')
     
     # 执行分析
     print("\n🔍 步骤2: 执行多维度相似度分析...")

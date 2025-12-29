@@ -31,6 +31,9 @@ def generate_wechat_message(result_df):
     df_display['prev_day_return'] = df_display['prev_day_return'].map('{:.2f}%'.format)
     df_display['comparison_value'] = df_display['comparison_value'].map('{:.2f}%'.format)
     
+    # 按照操作建议和执行金额排序
+    df_display = df_display.sort_values(by=['operation_suggestion', 'execution_amount'])
+    
     # 生成HTML消息
     message = f"<h2>📊 基金分析报告 - {date.today().strftime('%Y年%m月%d日')}</h2>\n"
     message += f"<h3>持仓基金收益率变化分析</h3>\n"
@@ -304,43 +307,44 @@ def analyze_funds():
     
     try:
         # 读取京东金融Excel文件中的持仓数据表
-        file_path = "d:/codes/py4zinia/fund_search/京东金融.xlsx"
+        file_path = "d:/codes/py4zinia/京东金融.xlsx"
         # 只读取名为'持仓数据'的工作表
-        持仓数据 = pd.read_excel(file_path, sheet_name='持仓数据')
+        position_data = pd.read_excel(file_path, sheet_name='持仓数据')
 
         # 获取持仓数据中的基金代码
-        fund_codes = 持仓数据['代码'].astype(str).tolist()
+        fund_codes = position_data['代码'].astype(str).tolist()
 
         # 批量获取所有持仓基金的实时数据
         all_fund_data = FundRealTime.get_realtime_batch(fund_codes)
 
         if all_fund_data.empty:
-            print("未能获取到任何基金的实时数据")
+            print("Failed to get real-time data for any funds")
             return
             
-        all_funds = []  # 存储所有基金数据，包括满足和不满足条件的
+        all_funds = []  # Store all fund data, including those that meet and don't meet the conditions
 
-        print(f"正在分析 {len(all_fund_data)} 只持仓基金...")
+        print(f"Analyzing {len(all_fund_data)} held funds...")
 
         for idx, row in all_fund_data.iterrows():
-            fund_code = row['基金代码']
-            fund_name = row['基金名称']
-            yesterday_nav = float(row['昨日净值'])  # 昨日净值
-            current_estimate = float(row['实时估值'])  # 当前估值
-            estimate_change_pct = float(row['涨跌(%)'])  # 估算涨跌百分比
+            # Get fund data from FundRealTime
+            fund_code = row['fund_code']
+            fund_name = row['fund_name']
+            yesterday_nav = float(row['yesterday_nav'])  # Yesterday NAV
+            current_estimate = float(row['current_estimate'])  # Current estimate
+            estimate_change_pct = float(row['change_percentage'])  # Estimated change percentage
 
             if yesterday_nav != 0:
-                # 计算当日收益率：(当前估值 - 昨日净值) / 昨日净值 * 100
+                # Calculate today's return rate: (Current estimate - Yesterday NAV) / Yesterday NAV * 100
                 today_return = (current_estimate - yesterday_nav) / yesterday_nav * 100
 
-                # 获取前一日实际收益率（使用akshare）
+                # Get previous day's actual return rate (using akshare)
                 try:
-                    # 使用akshare获取基金历史净值数据
+                    # Use akshare to get fund historical NAV data
                     fund_hist = ak.fund_open_fund_info_em(symbol=fund_code, indicator='单位净值走势')
                     if not fund_hist.empty:
-                        # 按日期排序确保最新数据在前
+                        # Sort by date to ensure latest data is first
                         fund_hist = fund_hist.sort_values('净值日期', ascending=False)
-                        # 获取前一天的实际收益率
+                        # Get previous day's actual return rate
                         prev_day_return = float(fund_hist.iloc[0]['日增长率'])
                     else:
                         # 如果无法获取历史数据，使用估算值
@@ -422,49 +426,6 @@ def analyze_funds():
             connection_string = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}?charset={db_config['charset']}"
             engine = create_engine(connection_string)
 
-            # 检查并更新数据库表结构，添加新字段
-            try:
-                # 连接数据库
-                conn = pymysql.connect(**db_config)
-                cursor = conn.cursor()
-                
-                # 检查字段是否存在，如果不存在则添加
-                fields_to_add = [
-                    ('fund_code', 'VARCHAR(20)'),
-                    ('fund_name', 'VARCHAR(100)'),
-                    ('yesterday_nav', 'FLOAT'),
-                    ('current_estimate', 'FLOAT'),
-                    ('today_return', 'FLOAT'),
-                    ('prev_day_return', 'FLOAT'),
-                    ('status_label', 'VARCHAR(50)'),
-                    ('is_buy', 'BOOLEAN'),
-                    ('redeem_amount', 'DECIMAL(10,2)'),
-                    ('comparison_value', 'FLOAT'),
-                    ('operation_suggestion', 'VARCHAR(100)'),
-                    ('execution_amount', 'VARCHAR(20)'),
-                    ('analysis_date', 'DATE'),
-                    ('buy_multiplier', 'FLOAT')
-                ]
-                
-                for field_name, field_type in fields_to_add:
-                    cursor.execute(f"SHOW COLUMNS FROM fund_analysis_results LIKE '{field_name}'")
-                    if cursor.fetchone() is None:
-                        cursor.execute(f"ALTER TABLE fund_analysis_results ADD COLUMN {field_name} {field_type}")
-                        print(f"已添加字段: {field_name}")
-                
-                # 检查是否有旧的中文字段需要删除
-                old_fields = ['基金代码', '基金名称', '昨日净值', '实时估值', '当日收益率', '前一日收益率', '状态标记', '是否买入', '赎回金额', '比较结果值']
-                for old_field in old_fields:
-                    cursor.execute(f"SHOW COLUMNS FROM fund_analysis_results LIKE '{old_field}'")
-                    if cursor.fetchone() is not None:
-                        cursor.execute(f"ALTER TABLE fund_analysis_results DROP COLUMN {old_field}")
-                        print(f"已删除旧字段: {old_field}")
-                
-                conn.commit()
-                cursor.close()
-                conn.close()
-            except Exception as e:
-                print(f"更新数据库表结构时出错: {str(e)}")
             
             # 将结果保存到数据库表中 - 使用upsert操作避免重复记录
             from sqlalchemy.types import String, Float, Boolean, DECIMAL, Date

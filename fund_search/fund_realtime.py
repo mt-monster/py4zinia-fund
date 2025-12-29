@@ -91,11 +91,11 @@ class FundRealTime:
             # 选择关键列并重命名
             columns_order = ['fundcode', 'name', 'dwjz', 'gsz', 'gszzl', 'jzrq', 'gztime']
             df = df[columns_order]
-            df.columns = ['基金代码', '基金名称', '昨日净值', '实时估值', '涨跌(%)', '净值日期', '估值时间']
+            df.columns = ['fund_code', 'fund_name', 'yesterday_nav', 'current_estimate', 'change_percentage', 'nav_date', 'estimate_time']
             # 转换数据类型
-            df['涨跌(%)'] = df['涨跌(%)'].astype(float)
-            df['昨日净值'] = df['昨日净值'].astype(float)
-            df['实时估值'] = df['实时估值'].astype(float)
+            df['change_percentage'] = df['change_percentage'].astype(float)
+            df['yesterday_nav'] = df['yesterday_nav'].astype(float)
+            df['current_estimate'] = df['current_estimate'].astype(float)
             return df
         return pd.DataFrame()
 
