@@ -90,7 +90,7 @@ if __name__ == "__main__":
     backtest = FundBacktestWithSearch01(
         base_amount=100,  # 基准定投金额：100元/次
         start_date='2023-01-01',  # 回测开始日期
-        end_date='2025-12-31'  # 回测结束日期
+        end_date='2025-12-30'  # 回测结束日期
     )
     
     # 5. 运行基金组合回测

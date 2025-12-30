@@ -93,6 +93,42 @@ class FundBacktest:
             print(f"获取基金 {fund_code} 历史数据时出错: {e}")
             return None
     
+    def get_hs300_history(self):
+        """
+        从akshare获取沪深300指数历史数据
+        
+        返回：
+        pandas.DataFrame, 沪深300指数历史数据，包含日期、收盘价、日增长率等字段
+        如果获取失败或数据为空，返回None
+        """
+        try:
+            # 从akshare获取沪深300指数历史数据
+            # 沪深300指数代码为 "000300"，使用股票指数数据接口
+            hs300_hist = ak.stock_zh_index_daily(symbol="sh000300")
+            
+            # 检查数据是否为空
+            if hs300_hist.empty:
+                print("沪深300指数没有获取到历史数据")
+                return None
+            
+            # 将日期字符串转换为datetime类型
+            hs300_hist['date'] = pd.to_datetime(hs300_hist['date'])
+            
+            # 过滤指定日期范围内的数据
+            hs300_hist = hs300_hist[(hs300_hist['date'] >= self.start_date) & (hs300_hist['date'] <= self.end_date)]
+            
+            # 计算日增长率（基于收盘价）
+            hs300_hist['pct_change'] = hs300_hist['close'].pct_change().fillna(0)
+            
+            # 重置索引，确保索引连续
+            hs300_hist = hs300_hist.reset_index(drop=True)
+            
+            return hs300_hist
+        except Exception as e:
+            # 捕获并打印异常信息
+            print(f"获取沪深300指数历史数据时出错: {e}")
+            return None
+    
     def get_investment_strategy(self, today_return, prev_day_return):
         """
         获取投资策略建议
@@ -352,10 +388,9 @@ class FundBacktest:
             print("没有基金数据可以进行组合回测")
             return None
         
-        # 合并所有基金的回测结果
+        # 合并所有基金的策略结果
         dates = None  # 基准日期序列
         portfolio_asset = []  # 组合策略总资产
-        benchmark_asset = []  # 组合基准总资产
         
         for i, (fund_code, result_df) in enumerate(fund_results.items()):
             if i == 0:
@@ -363,13 +398,42 @@ class FundBacktest:
                 dates = result_df['date']
                 # 初始化组合资产（基金资产 * 权重）
                 portfolio_asset = result_df['total_value_strategy'].values * weights[i]
-                benchmark_asset = result_df['total_value_benchmark'].values * weights[i]
             else:
                 # 对齐其他基金的日期序列到基准日期
                 aligned_df = result_df.set_index('date').reindex(dates).reset_index()
                 # 累加组合资产（考虑权重）
                 portfolio_asset += aligned_df['total_value_strategy'].fillna(0).values * weights[i]
-                benchmark_asset += aligned_df['total_value_benchmark'].fillna(0).values * weights[i]
+        
+        # 获取沪深300指数历史数据作为基准
+        hs300_hist = self.get_hs300_history()
+        
+        if hs300_hist is None:
+            # 如果获取沪深300数据失败，使用原有的基金基准方法
+            print("获取沪深300指数数据失败，使用基金基准方法")
+            # 重新初始化基准资产
+            benchmark_asset = []
+            for i, (fund_code, result_df) in enumerate(fund_results.items()):
+                if i == 0:
+                    benchmark_asset = result_df['total_value_benchmark'].values * weights[i]
+                else:
+                    aligned_df = result_df.set_index('date').reindex(dates).reset_index()
+                    benchmark_asset += aligned_df['total_value_benchmark'].fillna(0).values * weights[i]
+        else:
+            # 使用沪深300指数作为基准
+            print("使用沪深300指数作为回测基准")
+            # 对齐沪深300指数日期到基金组合日期
+            hs300_aligned = hs300_hist.set_index('date').reindex(dates).reset_index()
+            
+            # 初始化基准资产（与策略初始资产相同）
+            initial_asset = portfolio_asset[0]
+            # 计算基于沪深300指数的基准资产
+            hs300_returns = hs300_aligned['pct_change'].fillna(0)
+            benchmark_asset = [initial_asset]
+            
+            # 基于沪深300指数计算基准资产变化
+            for i in range(1, len(hs300_returns)):
+                # 基准资产 = 前一日资产 * (1 + 沪深300日收益率)
+                benchmark_asset.append(benchmark_asset[i-1] * (1 + hs300_returns.iloc[i]))
         
         # 创建组合回测结果DataFrame
         portfolio_result = pd.DataFrame({
@@ -432,7 +496,7 @@ class FundBacktest:
         max_dd_benchmark = max_drawdown(result_df['total_value_benchmark'].values)
         
         # 4. 夏普比率 = (年化超额收益) / (年化波动率)
-        risk_free_rate = 0.03  # 假设无风险利率为3%
+        risk_free_rate = 0.02  # 假设无风险利率为2%
         daily_risk_free = (1 + risk_free_rate) ** (1/365) - 1  # 日无风险利率
         
         # 计算超额收益（策略收益 - 无风险收益）
@@ -691,7 +755,7 @@ if __name__ == "__main__":
     backtester = FundBacktest(
         base_amount=100,  # 每天定投100元
         start_date='2020-01-01',  # 回测开始日期
-        end_date='2023-12-31'  # 回测结束日期
+        end_date='2023-12-29'  # 回测结束日期
     )
     
     # 示例1：回测单只基金
