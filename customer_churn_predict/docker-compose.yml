@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  churn-predict-agent:
+    build: .
+    container_name: churn-predict-agent
+    ports:
+      - "5000:5000"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}
+      - LLM_MODEL=${LLM_MODEL:-kimi-k2-thinking-251104}
+      - N_CUSTOMERS=${N_CUSTOMERS:-3000}
+      - N_WEEKS=${N_WEEKS:-12}
+      - ENABLE_LLM=${ENABLE_LLM:-true}
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

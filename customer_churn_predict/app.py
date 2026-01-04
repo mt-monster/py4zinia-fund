@@ -1,108 +1,164 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file, send_from_directory, render_template
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
 import json
 import pickle
 import os
-from churn_predict import (generate_securities_data, 
-                           feature_engineering_securities, 
-                           train_securities_churn_model, 
-                           batch_predict_and_generate_plan,
-                           shap_analysis_securities)
+from agent.core import ChurnPredictionAgent
+from tools import get_tools
+from config.settings import get_config
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, 
+            template_folder='templates',
+            static_folder='static')
 
 # 启用CORS支持
 CORS(app)
 
-# 全局变量，用于存储训练好的模型和数据
-model = None
-feature_df = None
-feature_cols = None
-scaler = None
-explainer = None
+# 初始化 Agent 和工具
+config = get_config()
+agent = ChurnPredictionAgent(config=config['llm'])
+tools = get_tools()
+
+# 注册工具到 Agent
+agent.register_tool('generate_data', tools.generate_data, '生成客户数据')
+agent.register_tool('feature_engineering', tools.feature_engineering, '进行特征工程')
+agent.register_tool('train_model', tools.train_model, '训练流失预测模型')
+agent.register_tool('predict_risk', tools.predict_risk, '预测客户流失风险')
+agent.register_tool('shap_analysis', tools.shap_analysis, '进行模型可解释性分析')
+agent.register_tool('generate_retention_plan', tools.generate_retention_plan, '生成挽留计划')
+agent.register_tool('generate_report', tools.generate_report, '生成分析报告')
+agent.register_tool('get_customer_info', tools.get_customer_info, '获取客户信息')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """健康检查接口"""
     return jsonify({'status': 'ok', 'message': 'API服务器运行正常'})
 
+@app.route('/api/agent/status', methods=['GET'])
+def agent_status():
+    """获取 Agent 状态"""
+    try:
+        status = agent.get_status()
+        return jsonify({
+            'status': 'success',
+            'agent_status': status
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/agent/chat', methods=['POST'])
+def agent_chat():
+    """Agent 对话接口"""
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+        
+        if not user_message:
+            return jsonify({'status': 'error', 'message': '消息不能为空'}), 400
+        
+        # 获取上下文（如果有）
+        context = data.get('context', {})
+        
+        # 调用 Agent
+        response = agent.chat(user_message, context)
+        
+        return jsonify(response)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/agent/memory', methods=['GET'])
+def get_agent_memory():
+    """获取 Agent 记忆"""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        memory_summary = agent.get_memory_summary(limit=limit)
+        return jsonify({
+            'status': 'success',
+            'memory': memory_summary,
+            'memory_count': len(agent.memory)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/agent/memory/clear', methods=['POST'])
+def clear_agent_memory():
+    """清空 Agent 记忆"""
+    try:
+        agent.clear_memory()
+        return jsonify({
+            'status': 'success',
+            'message': '记忆已清空'
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/train', methods=['POST'])
 def train_model():
-    """训练模型接口"""
-    global model, feature_df, feature_cols, scaler, explainer
-    
+    """训练模型接口（兼容旧接口，内部使用 Agent）"""
     try:
-        # 生成模拟数据
-        weekly_df = generate_securities_data(n_customers=3000, n_weeks=12)
+        data = request.get_json() or {}
+        n_customers = data.get('n_customers', config['data']['n_customers'])
+        n_weeks = data.get('n_weeks', config['data']['n_weeks'])
         
-        # 特征工程
-        feature_df = feature_engineering_securities(weekly_df)
+        # 使用 Agent 工具
+        result1 = tools.generate_data(n_customers=n_customers, n_weeks=n_weeks)
+        if result1['status'] != 'success':
+            return jsonify(result1), 500
         
-        # 训练模型
-        model, X_train, X_test, y_test, feature_cols, scaler = train_securities_churn_model(feature_df)
+        result2 = tools.feature_engineering()
+        if result2['status'] != 'success':
+            return jsonify(result2), 500
         
-        # 进行SHAP分析
-        explainer, _ = shap_analysis_securities(model, X_train, feature_cols)
+        result3 = tools.train_model()
+        if result3['status'] != 'success':
+            return jsonify(result3), 500
         
         return jsonify({
             'status': 'success',
             'message': '模型训练完成',
-            'customer_count': feature_df['customer_id'].nunique(),
-            'feature_count': len(feature_cols)
+            'customer_count': result1.get('customer_count', 0),
+            'feature_count': result2.get('feature_count', 0)
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/predict', methods=['POST'])
 def predict_risk():
-    """预测客户流失风险接口"""
-    global model, feature_df, feature_cols, scaler, explainer
-    
-    if model is None:
-        return jsonify({'status': 'error', 'message': '模型未训练，请先调用/train接口'}), 400
-    
+    """预测客户流失风险接口（兼容旧接口，内部使用 Agent）"""
     try:
+        if tools.model is None:
+            return jsonify({'status': 'error', 'message': '模型未训练，请先调用/train接口'}), 400
+        
         # 获取请求参数
-        data = request.get_json()
-        top_k = data.get('top_k', 30)
+        data = request.get_json() or {}
+        top_k = data.get('top_k', config['prediction']['top_k'])
         
-        # 批量预测并生成挽留计划
-        high_risk, action_df = batch_predict_and_generate_plan(
-            model, feature_df, feature_cols, scaler, explainer=explainer, top_k=top_k
-        )
+        # 使用 Agent 工具
+        result = tools.predict_risk(top_k=top_k)
         
-        # 转换为JSON可序列化格式
-        retention_plans = action_df.to_dict(orient='records')
+        if result['status'] != 'success':
+            return jsonify(result), 500
         
         return jsonify({
             'status': 'success',
-            'high_risk_count': len(high_risk),
-            'plans_count': len(retention_plans),
-            'retention_plans': retention_plans
+            'high_risk_count': result.get('high_risk_count', 0),
+            'plans_count': result.get('plans_count', 0),
+            'retention_plans': result.get('retention_plans', [])
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/customer/<customer_id>', methods=['GET'])
 def get_customer_info(customer_id):
-    """获取单个客户信息接口"""
-    global feature_df
-    
-    if feature_df is None:
-        return jsonify({'status': 'error', 'message': '数据未加载，请先调用/train接口'}), 400
-    
+    """获取单个客户信息接口（兼容旧接口，内部使用 Agent）"""
     try:
-        customer = feature_df[feature_df['customer_id'] == customer_id]
-        if customer.empty:
-            return jsonify({'status': 'error', 'message': '客户不存在'}), 404
-        
-        customer_info = customer.iloc[0].to_dict()
-        return jsonify({
-            'status': 'success',
-            'customer_info': customer_info
-        })
+        result = tools.get_customer_info(customer_id)
+        if result['status'] != 'success':
+            status_code = 404 if '不存在' in result.get('message', '') else 400
+            return jsonify(result), status_code
+        return jsonify(result)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -128,12 +184,27 @@ def download_plans():
 @app.route('/index.html')
 def serve_index():
     """提供前端页面"""
-    return send_file('index.html')
+    return render_template('index.html')
 
-@app.route('/<path:filename>')
+@app.route('/agent')
+@app.route('/agent.html')
+def serve_agent():
+    """提供 Agent 对话页面"""
+    return render_template('agent.html')
+
+@app.route('/static/<path:filename>')
 def serve_static(filename):
     """提供静态文件服务"""
-    return send_from_directory('.', filename)
+    return send_from_directory('static', filename)
+
+# 兼容旧路径的静态文件服务
+@app.route('/<path:filename>')
+def serve_legacy_static(filename):
+    """提供静态文件服务（兼容旧路径）"""
+    # 检查是否是图片文件
+    if filename.endswith(('.png', '.jpg', '.jpeg', '.gif', '.xlsx')):
+        return send_from_directory('.', filename)
+    return jsonify({'status': 'error', 'message': '文件不存在'}), 404
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)
