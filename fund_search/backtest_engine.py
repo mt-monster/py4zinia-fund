@@ -392,20 +392,50 @@ class FundBacktest:
         dates = None  # 基准日期序列
         portfolio_asset = []  # 组合策略总资产
         
-        for i, (fund_code, result_df) in enumerate(fund_results.items()):
-            if i == 0:
-                # 第一只基金作为基准日期序列
-                dates = result_df['date']
-                # 初始化组合资产（基金资产 * 权重）
-                portfolio_asset = result_df['total_value_strategy'].values * weights[i]
+        # 首先获取沪深300指数历史数据作为基准（优先使用）
+        hs300_hist = self.get_hs300_history()
+        
+        # 获取所有基金的日期范围
+        all_fund_dates = set()
+        for fund_code, result_df in fund_results.items():
+            all_fund_dates.update(result_df['date'].tolist())
+        
+        if hs300_hist is not None:
+            # 使用沪深300指数和基金数据的交集日期作为基准日期序列
+            print("使用沪深300指数日期作为基准日期序列")
+            hs300_dates = set(hs300_hist['date'].tolist())
+            # 计算日期交集
+            common_dates = sorted(list(all_fund_dates.intersection(hs300_dates)))
+            
+            if common_dates:
+                dates = pd.to_datetime(common_dates)
             else:
-                # 对齐其他基金的日期序列到基准日期
-                aligned_df = result_df.set_index('date').reindex(dates).reset_index()
+                # 如果没有交集，回退使用第一只基金的日期
+                print("沪深300指数与基金数据无日期交集，回退使用第一只基金日期作为基准")
+                for i, (fund_code, result_df) in enumerate(fund_results.items()):
+                    if i == 0:
+                        dates = result_df['date']
+                        break
+        else:
+            # 沪深300数据获取失败，回退使用第一只基金的日期作为基准
+            print("获取沪深300指数日期失败，回退使用第一只基金日期作为基准")
+            for i, (fund_code, result_df) in enumerate(fund_results.items()):
+                if i == 0:
+                    # 第一只基金作为基准日期序列
+                    dates = result_df['date']
+                    break
+        
+        # 基于基准日期序列计算组合资产
+        for i, (fund_code, result_df) in enumerate(fund_results.items()):
+            # 对齐基金的日期序列到基准日期
+            aligned_df = result_df.set_index('date').reindex(dates).reset_index()
+            
+            if i == 0:
+                # 初始化组合资产（基金资产 * 权重）
+                portfolio_asset = aligned_df['total_value_strategy'].fillna(0).values * weights[i]
+            else:
                 # 累加组合资产（考虑权重）
                 portfolio_asset += aligned_df['total_value_strategy'].fillna(0).values * weights[i]
-        
-        # 获取沪深300指数历史数据作为基准
-        hs300_hist = self.get_hs300_history()
         
         if hs300_hist is None:
             # 如果获取沪深300数据失败，使用原有的基金基准方法
@@ -497,15 +527,15 @@ class FundBacktest:
         
         # 4. 夏普比率 = (年化超额收益) / (年化波动率)
         risk_free_rate = 0.02  # 假设无风险利率为2%
-        daily_risk_free = (1 + risk_free_rate) ** (1/365) - 1  # 日无风险利率
+        daily_risk_free = (1 + risk_free_rate) ** (1/252) - 1  # 日无风险利率（使用252个交易日）
         
         # 计算超额收益（策略收益 - 无风险收益）
         excess_return_strategy = result_df['daily_return_strategy'] - daily_risk_free
         # 夏普比率 = 年化超额收益 / 年化波动率
-        sharpe_ratio_strategy = excess_return_strategy.mean() / excess_return_strategy.std() * np.sqrt(365) if excess_return_strategy.std() != 0 else 0
+        sharpe_ratio_strategy = excess_return_strategy.mean() / excess_return_strategy.std() * np.sqrt(252) if excess_return_strategy.std() != 0 else 0
         
         excess_return_benchmark = result_df['daily_return_benchmark'] - daily_risk_free
-        sharpe_ratio_benchmark = excess_return_benchmark.mean() / excess_return_benchmark.std() * np.sqrt(365) if excess_return_benchmark.std() != 0 else 0
+        sharpe_ratio_benchmark = excess_return_benchmark.mean() / excess_return_benchmark.std() * np.sqrt(252) if excess_return_benchmark.std() != 0 else 0
         
         # 5. 胜率 = 正收益天数 / 总交易天数
         win_rate_strategy = (result_df['daily_return_strategy'] > 0).mean()
@@ -538,12 +568,14 @@ class FundBacktest:
             downside_returns = returns[returns < 0]
             if len(downside_returns) == 0:
                 return 0
-            # 计算下行偏差
+            # 计算下行偏差（年化）
             downside_deviation = downside_returns.std() * np.sqrt(252)
             if downside_deviation == 0:
                 return 0
+            # 计算年化收益率
+            annual_return = (1 + returns.mean()) ** 252 - 1
             # 索提诺比率 = (年化收益 - 无风险利率) / 下行偏差
-            return (annual_return_strategy - risk_free_rate) / downside_deviation
+            return (annual_return - risk_free_rate) / downside_deviation
         
         sortino_ratio_strategy = sortino_ratio(result_df['daily_return_strategy'], risk_free_rate)
         sortino_ratio_benchmark = sortino_ratio(result_df['daily_return_benchmark'], risk_free_rate)
