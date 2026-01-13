@@ -1,0 +1,161 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "基本调试模式",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "FUND_POSITION_FILE_PATH": "d:/codes/py4zinia/pro2/fund_search/京东金融.xlsx",
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "指定Excel文件",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [
+        "--file",
+        "${workspaceFolder}/fund_search/京东金融.xlsx"
+      ],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "指定输出目录",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "FUND_POSITION_FILE_PATH": "d:/codes/py4zinia/pro2/fund_search/京东金融.xlsx",
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [
+        "--output",
+        "${workspaceFolder}/fund_search/reports"
+      ],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "测试模式",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [
+        "--test"
+      ],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "详细日志模式",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "FUND_POSITION_FILE_PATH": "d:/codes/py4zinia/pro2/fund_search/京东金融.xlsx",
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [
+        "--verbose"
+      ],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "完整配置调试",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/enhanced_main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "FUND_POSITION_FILE_PATH": "d:/codes/py4zinia/pro2/fund_search/京东金融.xlsx",
+        "DB_HOST": "localhost",
+        "DB_USER": "root",
+        "DB_PASSWORD": "root",
+        "DB_NAME": "fund_analysis",
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "args": [
+        "--file", "${workspaceFolder}/fund_search/京东金融.xlsx",
+        "--output", "${workspaceFolder}/fund_search/reports",
+        "--verbose"
+      ],
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "测试报告格式",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/test_new_report_format.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "env": {
+        "WECHAT_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a",
+        "EMAIL_TOKEN": "fb0dfd5592ed4eb19cd886d737b6cc6a"
+      },
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    },
+    {
+      "name": "测试API直接调用",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/fund_search/test_api_directly.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fund_search",
+      "stopOnEntry": false,
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe"
+    }
+  ]
+}
