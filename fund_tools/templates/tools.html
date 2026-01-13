@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量化小工具 - 西瓜量化</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        /* 顶部导航栏 */
+        .top-nav {
+            background-color: #1a56db;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-greeting {
+            margin-right: 15px;
+        }
+        
+        .nav-menu {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-menu span {
+            margin-right: 5px;
+        }
+        
+        /* 工具导航区 */
+        .tools-nav {
+            background-color: white;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-item {
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-item:hover {
+            background-color: #e9e9e9;
+        }
+        
+        /* 工具模块区 */
+        .tools-container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .tool-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .tool-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .tool-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a56db;
+        }
+        
+        /* 底部版权区 */
+        .footer {
+            margin-top: 40px;
+            background-color: #1a56db;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* 功能菜单 */
+        .function-menu {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 300px;
+            height: 100vh;
+            background-color: #1a56db;
+            color: white;
+            padding: 20px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .function-menu.active {
+            right: 0;
+        }
+        
+        .menu-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .menu-item {
+            padding: 10px 0;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .menu-item:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .menu-footer {
+            position: absolute;
+            bottom: 20px;
+            width: calc(100% - 40px);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .tools-nav {
+                grid-template-columns: 1fr;
+            }
+            
+            .tools-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="top-nav">
+        <div class="logo">西瓜量化小工具</div>
+        <div class="user-info">
+            <div class="user-greeting">Hi, Bysone</div>
+            <div class="nav-menu" onclick="toggleMenu()">
+                <span>功能导航</span>
+                <span>☰</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 工具导航区 -->
+    <div class="tools-nav">
+        <div class="nav-item">
+            <span>📅</span> A股日历
+        </div>
+        <div class="nav-item">
+            <span>📢</span> ETF公告
+        </div>
+        <div class="nav-item">
+            <span>📋</span> ETF列表
+        </div>
+    </div>
+    
+    <!-- 工具模块区 -->
+    <div class="tools-container">
+        <div class="tools-grid">
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>📊</span> 格雷厄姆指数
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>🌡️</span> 西瓜量化温度计
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>📈</span> 波动性计算器
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>🔄</span> 在线回测
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>🎯</span> 相关性筛选器
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>💼</span> 实盘账本
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>🔍</span> 相关性计算器一
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>💰</span> 复利计算器
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>🔎</span> 相关性计算器二
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-title">
+                    <span>📊</span> 内部收益计算器
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 底部版权区 -->
+    <div class="footer">
+        <div class="footer-content">
+            <p>本系统仅作学习研究之用，不作任何投资建议，不承担由此导致的任何责任！</p>
+            <p>风险提示 © Copyright 西瓜量化</p>
+        </div>
+    </div>
+    
+    <!-- 功能菜单 -->
+    <div class="function-menu" id="functionMenu">
+        <div class="menu-header">内置策略</div>
+        <div class="menu-item">策略排名</div>
+        <div class="menu-item">我的策略</div>
+        <div class="menu-item">组合排名</div>
+        <div class="menu-item">我的组合</div>
+        <a href="/tools" class="menu-item" style="color: white; text-decoration: none; display: block;">量化小工具</a>
+        <div class="menu-item">在线回测</div>
+        <div class="menu-item">关于我们</div>
+        <a href="/ledger" class="menu-item" style="color: white; text-decoration: none; display: block;">实盘账本</a>
+        <div class="menu-item">常见问题</div>
+        <div class="menu-item">个人资料</div>
+        <div class="menu-item">自动交易</div>
+        <div class="menu-item">指数跟投</div>
+        <div class="menu-footer">
+            <div class="menu-item">退出</div>
+        </div>
+    </div>
+    
+    <!-- 工具模态框 -->
+    <div id="toolModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">工具详情</h2>
+            <div id="modalBody">
+                <!-- 工具内容将动态加载 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 切换功能菜单
+        function toggleMenu() {
+            const menu = document.getElementById('functionMenu');
+            menu.classList.toggle('active');
+        }
+
+        // 工具卡片点击事件
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取所有工具卡片
+            const toolCards = document.querySelectorAll('.tool-card');
+            
+            toolCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const titleElement = this.querySelector('.tool-title');
+                    const titleText = titleElement.textContent.trim();
+                    
+                    // 根据工具标题打开相应的工具
+                    switch(titleText.replace(/^[^\u4e00-\u9fa5]*[\u4e00-\u9fa5]/, function(match) { 
+                        return match.slice(-1); 
+                    })) {
+                        case '格雷厄姆指数':
+                            openGrahamIndex();
+                            break;
+                        case '西瓜量化温度计':
+                            openWatermelonThermometer();
+                            break;
+                        case '波动性计算器':
+                            openVolatilityCalculator();
+                            break;
+                        case '相关性筛选器':
+                            openCorrelationFilter();
+                            break;
+                        case '复利计算器':
+                            openCompoundCalculator();
+                            break;
+                        case '相关性计算器一':
+                            openCorrelationCalculator1();
+                            break;
+                        case '相关性计算器二':
+                            openCorrelationCalculator2();
+                            break;
+                        case '内部收益计算器':
+                            openIRRcalculator();
+                            break;
+                        case '在线回测':
+                            alert('在线回测功能开发中...');
+                            break;
+                        case '实盘账本':
+                            window.location.href = '/ledger';
+                            break;
+                        default:
+                            alert('功能开发中...');
+                    }
+                });
+            });
+        });
+
+        // 显示模态框
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('toolModal').style.display = 'block';
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('toolModal').style.display = 'none';
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('toolModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // 格雷厄姆指数工具
+        function openGrahamIndex() {
+            const content = `
+                <div class="graham-index-tool">
+                    <div class="tool-info">
+                        <p>格雷厄姆指数是本杰明·格雷厄姆提出的一个评估股票市场整体估值水平的指标。</p>
+                        <p>计算公式：(盈利收益率 × 100) / (4.4 × 市净率)</p>
+                        <p>其中4.4为AAA级公司债券的收益率基准。</p>
+                    </div>
+                    <button onclick="calculateGrahamIndex()" class="calculate-btn">获取当前指数</button>
+                    <div id="grahamResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('格雷厄姆指数', content);
+        }
+
+        async function calculateGrahamIndex() {
+            try {
+                const response = await fetch('/api/graham-index');
+                const data = await response.json();
+                
+                document.getElementById('grahamResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>当前格雷厄姆指数: ${data.value}</h3>
+                        <p>市盈率 (P/E): ${data.pe_ratio}</p>
+                        <p>市净率 (P/B): ${data.pb_ratio}</p>
+                        <p>估值判断: <strong>${data.interpretation}</strong></p>
+                        <div class="valuation-explanation">
+                            <p><strong>指数解读：</strong></p>
+                            <ul>
+                                <li>指数 > 1: 市场被高估</li>
+                                <li>指数 < 1: 市场被低估</li>
+                                <li>指数 ≈ 1: 市场估值合理</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('grahamResult').innerHTML = `<p class="error">获取数据失败: ${error.message}</p>`;
+            }
+        }
+
+        // 西瓜量化温度计
+        function openWatermelonThermometer() {
+            const content = `
+                <div class="thermometer-tool">
+                    <div class="tool-info">
+                        <p>西瓜量化温度计是衡量市场情绪的综合指标。</p>
+                        <p>数值范围：0-100，数值越高表示市场情绪越乐观。</p>
+                    </div>
+                    <button onclick="getThermometerReading()" class="calculate-btn">获取当前温度</button>
+                    <div id="thermometerResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('西瓜量化温度计', content);
+        }
+
+        async function getThermometerReading() {
+            try {
+                const response = await fetch('/api/watermelon-thermometer');
+                const data = await response.json();
+                
+                document.getElementById('thermometerResult').innerHTML = `
+                    <div class="result-item">
+                        <div class="thermometer-display" style="background-color: ${data.color}; color: white; padding: 20px; border-radius: 10px; text-align: center; font-size: 24px;">
+                            <div>市场情绪温度</div>
+                            <div style="font-size: 48px; font-weight: bold;">${data.temperature}°C</div>
+                            <div>状态: ${data.status}</div>
+                        </div>
+                        <div class="status-explanation">
+                            <p><strong>状态解读：</strong></p>
+                            <ul>
+                                <li>冰点 (0-20°C): 市场极度悲观，可能是买入机会</li>
+                                <li>寒冷 (20-40°C): 市场较为悲观，谨慎观望</li>
+                                <li>温和 (40-60°C): 市场情绪平稳，正常操作</li>
+                                <li>炎热 (60-80°C): 市场较为乐观，注意风险</li>
+                                <li>过热 (80-100°C): 市场极度乐观，警惕回调</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('thermometerResult').innerHTML = `<p class="error">获取数据失败: ${error.message}</p>`;
+            }
+        }
+
+        // 波动性计算器
+        function openVolatilityCalculator() {
+            const content = `
+                <div class="volatility-calculator-tool">
+                    <div class="tool-info">
+                        <p>波动性是衡量资产价格变化幅度的指标，通常用标准差来表示。</p>
+                        <p>输入历史价格数据，计算年化波动率。</p>
+                    </div>
+                    <label for="priceInput">请输入价格数据（用逗号分隔）:</label>
+                    <input type="text" id="priceInput" placeholder="例如: 100,102,98,105,103" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button onclick="calculateVolatility()" class="calculate-btn">计算波动率</button>
+                    <div id="volatilityResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('波动性计算器', content);
+        }
+
+        async function calculateVolatility() {
+            const priceInput = document.getElementById('priceInput').value;
+            if (!priceInput) {
+                alert('请输入价格数据');
+                return;
+            }
+            
+            const prices = priceInput.split(',').map(price => parseFloat(price.trim())).filter(price => !isNaN(price));
+            
+            if (prices.length < 2) {
+                alert('至少需要2个价格数据点');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/volatility-calculator', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prices: prices })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('volatilityResult').innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                document.getElementById('volatilityResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>波动率分析结果</h3>
+                        <p>年化波动率: <strong>${data.volatility}%</strong></p>
+                        <p>平均收益率: ${data.avg_return}%</p>
+                        <div class="returns-section">
+                            <h4>各期收益率:</h4>
+                            <ul>
+                                ${data.returns.map((ret, idx) => `<li>第${idx + 1}期: ${ret}%</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="volatility-explanation">
+                            <p><strong>波动率解读：</strong></p>
+                            <ul>
+                                <li>低波动率 (< 15%): 风险较低，价格相对稳定</li>
+                                <li>中波动率 (15%-30%): 中等风险，价格有一定波动</li>
+                                <li>高波动率 (> 30%): 高风险，价格波动剧烈</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('volatilityResult').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 相关性筛选器
+        function openCorrelationFilter() {
+            const content = `
+                <div class="correlation-filter-tool">
+                    <div class="tool-info">
+                        <p>计算两个资产之间的相关系数，帮助您构建低相关性的投资组合。</p>
+                        <p>相关系数范围：-1 到 1，越接近0表示相关性越低。</p>
+                    </div>
+                    <label for="asset1Input">资产1数据（用逗号分隔）:</label>
+                    <input type="text" id="asset1Input" placeholder="例如: 100,102,98,105,103" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <label for="asset2Input">资产2数据（用逗号分隔）:</label>
+                    <input type="text" id="asset2Input" placeholder="例如: 200,210,195,208,205" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button onclick="calculateCorrelation()" class="calculate-btn">计算相关性</button>
+                    <div id="correlationResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('相关性筛选器', content);
+        }
+
+        async function calculateCorrelation() {
+            const asset1Input = document.getElementById('asset1Input').value;
+            const asset2Input = document.getElementById('asset2Input').value;
+            
+            if (!asset1Input || !asset2Input) {
+                alert('请输入两个资产的数据');
+                return;
+            }
+            
+            const asset1 = asset1Input.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            const asset2 = asset2Input.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            
+            if (asset1.length !== asset2.length || asset1.length < 2) {
+                alert('两个资产序列长度必须相同且至少有2个数据点');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/correlation-filter', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ asset1: asset1, asset2: asset2 })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('correlationResult').innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                document.getElementById('correlationResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>相关性分析结果</h3>
+                        <p>相关系数: <strong>${data.correlation}</strong></p>
+                        <p>相关程度: ${data.interpretation}</p>
+                        <div class="correlation-explanation">
+                            <p><strong>相关性解读：</strong></p>
+                            <ul>
+                                <li>强正相关 (> 0.7): 两个资产走势高度一致</li>
+                                <li>中等相关 (0.3-0.7): 两个资产有一定关联</li>
+                                <li>弱相关 (< 0.3): 两个资产几乎无关</li>
+                                <li>负相关 (< 0): 两个资产走势相反</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('correlationResult').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 复利计算器
+        function openCompoundCalculator() {
+            const content = `
+                <div class="compound-calculator-tool">
+                    <div class="tool-info">
+                        <p>复利是指在计算利息时，某一计息周期的利息是由本金加上先前周期所积累的利息总额来计算的计息方式。</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="principalInput">本金:</label>
+                        <input type="number" id="principalInput" placeholder="例如: 10000" min="0" step="any" style="width: 100%; padding: 8px; margin: 5px 0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="rateInput">年化收益率 (%):</label>
+                        <input type="number" id="rateInput" placeholder="例如: 8" min="0" step="any" style="width: 100%; padding: 8px; margin: 5px 0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="timeInput">投资年限:</label>
+                        <input type="number" id="timeInput" placeholder="例如: 10" min="0" step="any" style="width: 100%; padding: 8px; margin: 5px 0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="frequencyInput">复利频率 (每年复利次数):</label>
+                        <select id="frequencyInput" style="width: 100%; padding: 8px; margin: 5px 0;">
+                            <option value="1">每年一次</option>
+                            <option value="2">每半年一次</option>
+                            <option value="4">每季度一次</option>
+                            <option value="12">每月一次</option>
+                            <option value="365">每日一次</option>
+                        </select>
+                    </div>
+                    <button onclick="calculateCompound()" class="calculate-btn">计算复利</button>
+                    <div id="compoundResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('复利计算器', content);
+        }
+
+        async function calculateCompound() {
+            const principal = parseFloat(document.getElementById('principalInput').value);
+            const rate = parseFloat(document.getElementById('rateInput').value);
+            const time = parseFloat(document.getElementById('timeInput').value);
+            const frequency = parseInt(document.getElementById('frequencyInput').value);
+            
+            if (isNaN(principal) || isNaN(rate) || isNaN(time)) {
+                alert('请填写所有必填项');
+                return;
+            }
+            
+            if (principal <= 0 || rate < 0 || time <= 0) {
+                alert('本金和投资年限必须大于0，年化收益率不能小于0');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/compound-calculator', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        principal: principal, 
+                        rate: rate, 
+                        time: time, 
+                        frequency: frequency 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('compoundResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>复利计算结果</h3>
+                        <p>初始本金: ¥${principal.toLocaleString()}</p>
+                        <p>年化收益率: ${rate}%</p>
+                        <p>投资年限: ${time}年</p>
+                        <p>复利频率: ${frequency}次/年</p>
+                        <p>最终金额: <strong>¥${data.final_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></p>
+                        <p>累计收益: ¥${data.interest_earned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p>总收益率: ${data.total_return}%</p>
+                        <div class="compound-explanation">
+                            <p><strong>复利效应：</strong>复利被称为"世界第八大奇迹"，长期投资中复利效应会显著增加收益。</p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('compoundResult').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 相关性计算器一
+        function openCorrelationCalculator1() {
+            const content = `
+                <div class="correlation-calculator-tool">
+                    <div class="tool-info">
+                        <p>计算两组数据之间的皮尔逊相关系数。</p>
+                        <p>相关系数范围：-1 到 1，反映变量间的线性关系强度和方向。</p>
+                    </div>
+                    <label for="seriesAInput">序列A数据（用逗号分隔）:</label>
+                    <input type="text" id="seriesAInput" placeholder="例如: 1,2,3,4,5" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <label for="seriesBInput">序列B数据（用逗号分隔）:</label>
+                    <input type="text" id="seriesBInput" placeholder="例如: 2,4,6,8,10" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button onclick="calculateCorrelation1()" class="calculate-btn">计算相关系数</button>
+                    <div id="correlation1Result" class="result-section"></div>
+                </div>
+            `;
+            showModal('相关性计算器一', content);
+        }
+
+        async function calculateCorrelation1() {
+            const seriesAInput = document.getElementById('seriesAInput').value;
+            const seriesBInput = document.getElementById('seriesBInput').value;
+            
+            if (!seriesAInput || !seriesBInput) {
+                alert('请输入两个序列的数据');
+                return;
+            }
+            
+            const seriesA = seriesAInput.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            const seriesB = seriesBInput.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            
+            if (seriesA.length !== seriesB.length || seriesA.length < 2) {
+                alert('两个序列长度必须相同且至少有2个数据点');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/correlation-calculator-1', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ series_a: seriesA, series_b: seriesB })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('correlation1Result').innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                document.getElementById('correlation1Result').innerHTML = `
+                    <div class="result-item">
+                        <h3>相关性分析结果</h3>
+                        <p>相关系数: <strong>${data.correlation}</strong></p>
+                        <p>相关强度: ${data.strength}</p>
+                        <div class="correlation-details">
+                            <h4>数据详情:</h4>
+                            <p>序列A: [${seriesA.join(', ')}]</p>
+                            <p>序列B: [${seriesB.join(', ')}]</p>
+                            <p>数据点数: ${seriesA.length}</p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('correlation1Result').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 相关性计算器二
+        function openCorrelationCalculator2() {
+            const content = `
+                <div class="correlation-calculator-tool">
+                    <div class="tool-info">
+                        <p>另一种计算X与Y变量之间相关性的方法。</p>
+                        <p>相关系数范围：-1 到 1，正值表示正相关，负值表示负相关。</p>
+                    </div>
+                    <label for="xValuesInput">X值数据（用逗号分隔）:</label>
+                    <input type="text" id="xValuesInput" placeholder="例如: 1,2,3,4,5" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <label for="yValuesInput">Y值数据（用逗号分隔）:</label>
+                    <input type="text" id="yValuesInput" placeholder="例如: 2,4,6,8,10" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button onclick="calculateCorrelation2()" class="calculate-btn">计算相关性</button>
+                    <div id="correlation2Result" class="result-section"></div>
+                </div>
+            `;
+            showModal('相关性计算器二', content);
+        }
+
+        async function calculateCorrelation2() {
+            const xValuesInput = document.getElementById('xValuesInput').value;
+            const yValuesInput = document.getElementById('yValuesInput').value;
+            
+            if (!xValuesInput || !yValuesInput) {
+                alert('请输入X和Y的数据');
+                return;
+            }
+            
+            const xValues = xValuesInput.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            const yValues = yValuesInput.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            
+            if (xValues.length !== yValues.length || xValues.length < 2) {
+                alert('X和Y序列长度必须相同且至少有2个数据点');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/correlation-calculator-2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ x_values: xValues, y_values: yValues })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('correlation2Result').innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                document.getElementById('correlation2Result').innerHTML = `
+                    <div class="result-item">
+                        <h3>相关性分析结果</h3>
+                        <p>相关系数: <strong>${data.correlation}</strong></p>
+                        <p>相关方向: ${data.direction}</p>
+                        <div class="correlation-details">
+                            <h4>数据详情:</h4>
+                            <p>X值: [${xValues.join(', ')}]</p>
+                            <p>Y值: [${yValues.join(', ')}]</p>
+                            <p>数据点数: ${xValues.length}</p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('correlation2Result').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 内部收益计算器 (IRR)
+        function openIRRcalculator() {
+            const content = `
+                <div class="irr-calculator-tool">
+                    <div class="tool-info">
+                        <p>内部收益率(IRR)是使项目净现值(NPV)为零的折现率。</p>
+                        <p>用于评估投资项目的真实收益率，正值表示盈利，负值表示亏损。</p>
+                    </div>
+                    <label for="cashFlowsInput">现金流数据（用逗号分隔，负数表示支出，正数表示收入）:</label>
+                    <input type="text" id="cashFlowsInput" placeholder="例如: -1000,300,350,400,450" style="width: 100%; padding: 8px; margin: 10px 0;">
+                    <button onclick="calculateIRR()" class="calculate-btn">计算内部收益率</button>
+                    <div id="irrResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('内部收益计算器', content);
+        }
+
+        async function calculateIRR() {
+            const cashFlowsInput = document.getElementById('cashFlowsInput').value;
+            
+            if (!cashFlowsInput) {
+                alert('请输入现金流数据');
+                return;
+            }
+            
+            const cashFlows = cashFlowsInput.split(',').map(val => parseFloat(val.trim())).filter(val => !isNaN(val));
+            
+            if (cashFlows.length < 2) {
+                alert('至少需要2个现金流数据点');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/irr-calculator', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cash_flows: cashFlows })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('irrResult').innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+                
+                document.getElementById('irrResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>内部收益率计算结果</h3>
+                        <p>内部收益率(IRR): <strong>${data.irr}%</strong></p>
+                        <div class="cash-flows-details">
+                            <h4>现金流详情:</h4>
+                            <ul>
+                                ${cashFlows.map((cf, idx) => `<li>第${idx + 1}期: ${cf >= 0 ? '+' : ''}${cf}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div class="irr-explanation">
+                            <p><strong>IRR解读：</strong></p>
+                            <ul>
+                                <li>IRR > 0%: 投资项目盈利</li>
+                                <li>IRR < 0%: 投资项目亏损</li>
+                                <li>IRR越高，投资回报越好</li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('irrResult').innerHTML = `<p class="error">计算失败: ${error.message}</p>`;
+            }
+        }
+
+        // 导航项点击事件
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const navText = this.textContent.trim();
+                
+                if (navText.includes('A股日历')) {
+                    openChinaStockCalendar();
+                } else if (navText.includes('ETF公告')) {
+                    openETFAnnouncements();
+                } else if (navText.includes('ETF列表')) {
+                    openETFList();
+                }
+            });
+        });
+
+        // A股日历功能
+        function openChinaStockCalendar() {
+            const content = `
+                <div class="calendar-tool">
+                    <div class="tool-info">
+                        <p>A股交易日历，显示近期的开市和休市安排。</p>
+                    </div>
+                    <button onclick="loadCalendar()" class="calculate-btn">加载日历</button>
+                    <div id="calendarResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('A股日历', content);
+        }
+
+        async function loadCalendar() {
+            try {
+                const response = await fetch('/api/china-stock-calendar');
+                const data = await response.json();
+                
+                document.getElementById('calendarResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>当前日期: ${data.current_date}</h3>
+                        <table class="calendar-table">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>类型</th>
+                                    <th>说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.calendar.map(day => `
+                                    <tr class="${day.type}">
+                                        <td>${day.date}</td>
+                                        <td>${day.type === 'trading_day' ? '开市' : '休市'}</td>
+                                        <td>${day.description}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('calendarResult').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // ETF公告功能
+        function openETFAnnouncements() {
+            const content = `
+                <div class="announcements-tool">
+                    <div class="tool-info">
+                        <p>最新的ETF产品公告信息。</p>
+                    </div>
+                    <button onclick="loadAnnouncements()" class="calculate-btn">加载公告</button>
+                    <div id="announcementsResult" class="result-section"></div>
+                </div>
+            `;
+            showModal('ETF公告', content);
+        }
+
+        async function loadAnnouncements() {
+            try {
+                const response = await fetch('/api/etf-announcements');
+                const data = await response.json();
+                
+                document.getElementById('announcementsResult').innerHTML = `
+                    <div class="result-item">
+                        <h3>最新ETF公告</h3>
+                        <div class="announcements-list">
+                            ${data.announcements.map(announcement => `
+                                <div class="announcement-item">
+                                    <h4>${announcement.title}</h4>
+                                    <p>基金代码: ${announcement.fund_code}</p>
+                                    <p>公告类型: ${announcement.type}</p>
+                                    <p>发布日期: ${announcement.date}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('announcementsResult').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // ETF列表功能
+        function openETFList() {
+            const content = `
+                <div class="etf-list-tool">
+                    <!-- 标题和说明 -->
+                    <div class="tool-info">
+                        <h3>ETF列表</h3>
+                        <p>1. 本列表提供了ETF与指数、基金公司间的互查功能，可在搜索框中输入指数代码、指数名称、ETF代码、ETF名称、基金公司名称进行搜索；本表格同时还统计了ETF近期日均成交额等数据，方便大家追踪ETF。</p>
+                        <p>2. <span style="color: red;">●</span> 哪些ETF可以T+0？</p>
+                        <p>3. 数据更新至2026年1月9日15时30分(ETF上市交易1周左右收录，<a href="#">收录日志</a>)。</p>
+                    </div>
+                    
+                    <!-- 分类标签 -->
+                    <div class="etf-category-tabs">
+                        <button class="category-tab active" data-category="all">全部</button>
+                        <button class="category-tab" data-category="股票ETF">股票/期货/债券ETF</button>
+                        <button class="category-tab" data-category="黄金ETF">黄金ETF</button>
+                        <button class="category-tab" data-category="货币ETF">货币ETF</button>
+                    </div>
+                    
+                    <!-- 筛选标签 -->
+                    <div class="etf-subcategory-tabs">
+                        <button class="subcategory-tab active" data-subcategory="all">全部</button>
+                        <button class="subcategory-tab" data-subcategory="宽基">宽基</button>
+                        <button class="subcategory-tab" data-subcategory="行业">行业</button>
+                        <button class="subcategory-tab" data-subcategory="A股">A股</button>
+                        <button class="subcategory-tab" data-subcategory="QDII">QDII</button>
+                        <button class="subcategory-tab" data-subcategory="期货">期货</button>
+                        <button class="subcategory-tab" data-subcategory="债券">债券</button>
+                    </div>
+                    
+                    <!-- 筛选和搜索区 -->
+                    <div class="etf-filter-section">
+                        <div class="volume-filter">
+                            <label for="volumeMin">成交额</label>
+                            <input type="number" id="volumeMin" placeholder="0" style="width: 80px; padding: 5px; margin: 0 5px;">
+                            <span>万以上</span>
+                        </div>
+                        
+                        <div class="search-section">
+                            <input type="text" id="etfSearch" placeholder="搜索指数代码、名称、ETF代码、名称、基金公司" style="padding: 5px; margin-right: 10px; width: 300px;">
+                            <button onclick="loadETFList()" class="search-btn">搜索</button>
+                            <button onclick="resetFilters()" class="reset-btn">全部</button>
+                        </div>
+                        
+                        <div class="options-section">
+                            <label><input type="checkbox" id="onePerIndex">每指数仅显示1个ETF</label>
+                            <button onclick="selectColumns()" class="select-columns-btn">选择列</button>
+                        </div>
+                    </div>
+                    
+                    <!-- ETF列表结果 -->
+                    <div id="etfListResult" class="result-section etf-table-container"></div>
+                </div>
+            `;
+            showModal('ETF列表', content);
+            
+            // 初始化事件监听器
+            setTimeout(() => {
+                initETFTabEvents();
+                loadETFList();
+            }, 100);
+        }
+        
+        // 初始化ETF标签事件
+        function initETFTabEvents() {
+            // 分类标签点击事件
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // 移除所有活跃状态
+                    document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                    // 添加当前标签活跃状态
+                    this.classList.add('active');
+                    // 重新加载数据
+                    loadETFList();
+                });
+            });
+            
+            // 子分类标签点击事件
+            document.querySelectorAll('.subcategory-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // 移除所有活跃状态
+                    document.querySelectorAll('.subcategory-tab').forEach(t => t.classList.remove('active'));
+                    // 添加当前标签活跃状态
+                    this.classList.add('active');
+                    // 重新加载数据
+                    loadETFList();
+                });
+            });
+        }
+        
+        // 重置筛选条件
+        function resetFilters() {
+            document.getElementById('volumeMin').value = '';
+            document.getElementById('etfSearch').value = '';
+            document.getElementById('onePerIndex').checked = false;
+            
+            // 重置所有标签为活跃状态
+            document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.subcategory-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.category-tab[data-category="all"]').classList.add('active');
+            document.querySelector('.subcategory-tab[data-subcategory="all"]').classList.add('active');
+            
+            // 重新加载数据
+            loadETFList();
+        }
+        
+        // 选择列功能
+        function selectColumns() {
+            alert('选择列功能开发中...');
+        }
+        
+        // 当前页码和页面大小
+        let currentPage = 1;
+        const pageSize = 20;
+
+        // 加载ETF列表数据
+        async function loadETFList(page = 1) {
+            try {
+                // 获取当前筛选条件
+                const category = document.querySelector('.category-tab.active').dataset.category;
+                const subcategory = document.querySelector('.subcategory-tab.active').dataset.subcategory;
+                const volumeMin = document.getElementById('volumeMin').value;
+                const search = document.getElementById('etfSearch').value;
+                const onePerIndex = document.getElementById('onePerIndex').checked;
+                
+                // 构建请求URL，包含分页参数
+                let url = `/api/etf-list?page=${page}&page_size=${pageSize}&`;
+                url += `category=${encodeURIComponent(category)}&`;
+                url += `subcategory=${encodeURIComponent(subcategory)}&`;
+                if (volumeMin) url += `volume_min=${encodeURIComponent(volumeMin)}&`;
+                if (search) url += `search=${encodeURIComponent(search)}&`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                let etfs = data.etfs;
+                
+                // 每指数仅显示1个ETF
+                if (onePerIndex) {
+                    const seenIndexes = new Set();
+                    etfs = etfs.filter(etf => {
+                        if (seenIndexes.has(etf.index_code)) {
+                            return false;
+                        }
+                        seenIndexes.add(etf.index_code);
+                        return true;
+                    });
+                }
+                
+                // 更新当前页码
+                currentPage = page;
+                
+                document.getElementById('etfListResult').innerHTML = `
+                    <table class="etf-table reference-style">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>跟踪(指数代码)指数名称</th>
+                                <th>ETF代码</th>
+                                <th>ETF名称</th>
+                                <th>基金公司</th>
+                                <th>最新价</th>
+                                <th>20日均成交额[亿]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${etfs.map(etf => `
+                                <tr>
+                                    <td>${etf.rank}</td>
+                                    <td>
+                                        <div>${etf.index_code} <span class="index-link">${etf.index_name} ${etf.index_link}</span></div>
+                                    </td>
+                                    <td>${etf.etf_code}</td>
+                                    <td>
+                                        <span class="etf-link">${etf.etf_link}</span>
+                                    </td>
+                                    <td>${etf.fund_company}</td>
+                                    <td>${etf.latest_price}</td>
+                                    <td>${etf.avg_20d_volume}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="update-time">
+                        数据更新至: ${data.update_time}
+                    </div>
+                    <div class="pagination-controls">
+                        <button onclick="changePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''} id="prev-page">上一页</button>
+                        <span id="page-info">第 ${currentPage} 页，共 ${data.pagination.total_pages} 页，总计 ${data.pagination.total} 条记录</span>
+                        <button onclick="changePage(${currentPage + 1})" ${currentPage >= data.pagination.total_pages ? 'disabled' : ''} id="next-page">下一页</button>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('etfListResult').innerHTML = `<p class="error">加载失败: ${error.message}</p>`;
+            }
+        }
+
+        // 改变页码
+        function changePage(newPage) {
+            // 获取当前筛选条件
+            const totalPages = parseInt(document.querySelector('#page-info').textContent.match(/共 (\d+) 页/)[1]);
+            
+            if (newPage < 1 || newPage > totalPages) {
+                return; // 无效页码，直接返回
+            }
+            
+            loadETFList(newPage);
+        }
+    </script>
+    
+    <style>
+        /* 模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border: none;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .tool-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1a56db;
+        }
+        
+        .calculate-btn {
+            background-color: #1a56db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .calculate-btn:hover {
+            background-color: #0d3d9c;
+        }
+        
+        .result-section {
+            margin-top: 20px;
+        }
+        
+        .result-item {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        
+        .valuation-explanation, .status-explanation, .volatility-explanation, 
+        .correlation-explanation, .compound-explanation, .irr-explanation {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+        }
+        
+        .returns-section, .correlation-details, .cash-flows-details, .announcements-list {
+            margin-top: 15px;
+        }
+        
+        .calendar-table, .etf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .calendar-table th, .calendar-table td, .etf-table th, .etf-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        .calendar-table th, .etf-table th {
+            background-color: #f2f2f2;
+        }
+        
+        .calendar-table .trading_day {
+            background-color: #d4edda;
+        }
+        
+        .calendar-table .holiday {
+            background-color: #f8d7da;
+        }
+        
+        .etf-table .positive {
+            color: green;
+        }
+        
+        .etf-table .negative {
+            color: red;
+        }
+        
+        /* ETF列表样式 */
+        .etf-list-tool {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .etf-category-tabs, .etf-subcategory-tabs {
+            display: flex;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        
+        .category-tab, .subcategory-tab {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        
+        .category-tab:hover, .subcategory-tab:hover {
+            background-color: #e9e9e9;
+        }
+        
+        .category-tab.active, .subcategory-tab.active {
+            background-color: #1a56db;
+            color: white;
+            border-color: #1a56db;
+        }
+        
+        .etf-filter-section {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .volume-filter, .search-section, .options-section {
+            display: flex;
+            align-items: center;
+        }
+        
+        .search-btn, .reset-btn, .select-columns-btn {
+            background-color: #1a56db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            margin-right: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .reset-btn {
+            background-color: #6c757d;
+        }
+        
+        .select-columns-btn {
+            background-color: #28a745;
+        }
+        
+        .etf-table-container {
+            margin-top: 20px;
+        }
+        
+        .etf-table.reference-style {
+            font-size: 14px;
+            border: 1px solid #ddd;
+        }
+        
+        .etf-table.reference-style th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .etf-table.reference-style td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+        }
+        
+        .etf-table.reference-style tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .index-link {
+            color: #1a56db;
+            text-decoration: none;
+        }
+        
+        .etf-link {
+            color: #1a56db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .update-time {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+        }
+        
+        .etf-table.reference-style th:first-child, .etf-table.reference-style td:first-child {
+            width: 40px;
+            text-align: center;
+        }
+        
+        .etf-table.reference-style th:nth-child(2), .etf-table.reference-style td:nth-child(2) {
+            width: 200px;
+        }
+        
+        .etf-table.reference-style th:nth-child(3), .etf-table.reference-style td:nth-child(3),
+        .etf-table.reference-style th:nth-child(4), .etf-table.reference-style td:nth-child(4),
+        .etf-table.reference-style th:nth-child(5), .etf-table.reference-style td:nth-child(5) {
+            width: 120px;
+        }
+        
+        .etf-table.reference-style th:nth-child(6), .etf-table.reference-style td:nth-child(6),
+        .etf-table.reference-style th:nth-child(7), .etf-table.reference-style td:nth-child(7) {
+            width: 100px;
+            text-align: right;
+        }
+        
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+            gap: 15px;
+        }
+        
+        .pagination-controls button {
+            padding: 8px 15px;
+            background-color: #1a56db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .pagination-controls button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .pagination-controls #page-info {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .announcement-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+    </style>
+</body>
+</html>

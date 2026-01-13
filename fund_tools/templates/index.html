@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>西瓜量化 - 基金策略分析系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        /* 顶部导航栏 */
+        .top-nav {
+            background-color: #1a56db;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .user-greeting {
+            margin-right: 15px;
+        }
+        
+        .nav-menu {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-menu span {
+            margin-right: 5px;
+        }
+        
+        /* 功能导航区 */
+        .function-nav {
+            background-color: white;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .function-item {
+            text-align: center;
+            cursor: pointer;
+            padding: 15px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .function-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .function-item .icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .function-item .text {
+            font-size: 14px;
+        }
+        
+        /* 数据指标区 */
+        .metrics-area {
+            background-color: white;
+            padding: 20px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .metric-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .gauge {
+            width: 150px;
+            height: 75px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        /* 策略列表区 */
+        .strategy-list {
+            margin-top: 20px;
+        }
+        
+        .strategy-item {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        
+        .strategy-header {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #1a56db;
+        }
+        
+        .strategy-metrics {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .metric {
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .strategy-chart {
+            position: relative;
+            height: 300px;
+            margin-top: 15px;
+        }
+        
+        .create-btn {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background-color: #1a56db;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .create-btn:hover {
+            background-color: #1546b3;
+        }
+        
+        /* 功能菜单 */
+        .function-menu {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 300px;
+            height: 100vh;
+            background-color: #1a56db;
+            color: white;
+            padding: 20px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .function-menu.active {
+            right: 0;
+        }
+        
+        .menu-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .menu-item {
+            padding: 10px 0;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .menu-item:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        
+        .menu-footer {
+            position: absolute;
+            bottom: 20px;
+            width: calc(100% - 40px);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .function-nav {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .metrics-area {
+                grid-template-columns: 1fr;
+            }
+            
+            .strategy-metrics {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="top-nav">
+        <div class="logo">西瓜量化</div>
+        <div class="user-info">
+            <div class="user-greeting">Hi, Bysone</div>
+            <div class="nav-menu" onclick="toggleMenu()">
+                <span>功能导航</span>
+                <span>☰</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 功能导航区 -->
+    <div class="function-nav">
+        <div class="function-item">
+            <div class="icon">📊</div>
+            <div class="text">策略排名</div>
+        </div>
+        <div class="function-item">
+            <div class="icon">📋</div>
+            <div class="text">我的策略</div>
+        </div>
+        <div class="function-item">
+            <div class="icon">🔄</div>
+            <div class="text">在线回测</div>
+        </div>
+        <div class="function-item">
+            <div class="icon">🔧</div>
+            <div class="text">量化小工具</div>
+        </div>
+        <div class="function-item">
+            <div class="icon">📈</div>
+            <div class="text">组合排名</div>
+        </div>
+        <div class="function-item">
+            <div class="icon">🎯</div>
+            <div class="text">我的组合</div>
+        </div>
+        <a href="/ledger" class="function-item" style="text-decoration: none; color: inherit;">
+            <div class="icon">💼</div>
+            <div class="text">实盘账本</div>
+        </a>
+        <div class="function-item">
+            <div class="icon">📌</div>
+            <div class="text">指数跟投</div>
+        </div>
+    </div>
+    
+    <!-- 数据指标区 -->
+    <div class="metrics-area">
+        <div class="metric-card">
+            <div class="gauge">
+                <svg width="150" height="75" viewBox="0 0 150 75">
+                    <path d="M10,70 A65,65 0 0,1 140,70" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+                    <path d="M10,70 A65,65 0 0,1 140,70" fill="none" stroke="#1a56db" stroke-width="10" stroke-dasharray="130" stroke-dashoffset="70"/>
+                    <circle cx="80" cy="70" r="8" fill="#1a56db"/>
+                </svg>
+            </div>
+            <div class="metric-value">2.22</div>
+            <div class="metric-label">格雷厄姆指数</div>
+            <div class="metric-range">0 - 4</div>
+        </div>
+        <div class="metric-card">
+            <div class="gauge">
+                <svg width="150" height="75" viewBox="0 0 150 75">
+                    <path d="M10,70 A65,65 0 0,1 140,70" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+                    <path d="M10,70 A65,65 0 0,1 140,70" fill="none" stroke="#ff6b6b" stroke-width="10" stroke-dasharray="130" stroke-dashoffset="25"/>
+                    <circle cx="115" cy="70" r="8" fill="#ff6b6b"/>
+                </svg>
+            </div>
+            <div class="metric-value">63.27°C</div>
+            <div class="metric-label">西瓜量化温度计</div>
+            <div class="metric-range">0 - 100</div>
+        </div>
+    </div>
+    
+    <!-- 策略列表区 -->
+    <div class="strategy-list">
+        <!-- 策略1 -->
+        <div class="strategy-item">
+            <div class="strategy-header">精选策略B4: 莫基轮动及时拔四</div>
+            <div class="strategy-metrics">
+                <div class="metric">
+                    <div class="metric-label">年化收益</div>
+                    <div class="metric-value" style="color: #ff4757;">47.77%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">年均次数</div>
+                    <div class="metric-value">177</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最大回撤</div>
+                    <div class="metric-value" style="color: #2ed573;">-21.36%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最长回撤</div>
+                    <div class="metric-value">423天</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">云飞比率</div>
+                    <div class="metric-value">1.85</div>
+                </div>
+            </div>
+            <div class="strategy-chart">
+                <canvas id="chart1"></canvas>
+                <button class="create-btn">创建</button>
+            </div>
+        </div>
+        
+        <!-- 策略2 -->
+        <div class="strategy-item">
+            <div class="strategy-header">精选策略C2: 股债轮动低频二(下午50版)</div>
+            <div class="strategy-metrics">
+                <div class="metric">
+                    <div class="metric-label">年化收益</div>
+                    <div class="metric-value" style="color: #ff4757;">29.98%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">年均次数</div>
+                    <div class="metric-value">6</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最大回撤</div>
+                    <div class="metric-value" style="color: #2ed573;">-27.41%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最长回撤</div>
+                    <div class="metric-value">1167天</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">云飞比率</div>
+                    <div class="metric-value">0.78</div>
+                </div>
+            </div>
+            <div class="strategy-chart">
+                <canvas id="chart2"></canvas>
+                <button class="create-btn">创建</button>
+            </div>
+        </div>
+        
+        <!-- 策略3 -->
+        <div class="strategy-item">
+            <div class="strategy-header">精选策略L13063: 由云飞-18号(收盘版)</div>
+            <div class="strategy-metrics">
+                <div class="metric">
+                    <div class="metric-label">年化收益</div>
+                    <div class="metric-value" style="color: #ff4757;">27.38%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">年均次数</div>
+                    <div class="metric-value">4</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最大回撤</div>
+                    <div class="metric-value" style="color: #2ed573;">-20.6%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">最长回撤</div>
+                    <div class="metric-value">609天</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">云飞比率</div>
+                    <div class="metric-value">0.89</div>
+                </div>
+            </div>
+            <div class="strategy-chart">
+                <canvas id="chart3"></canvas>
+                <button class="create-btn">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 功能菜单 -->
+    <div class="function-menu" id="functionMenu">
+        <div class="menu-header">内置策略</div>
+        <div class="menu-item">策略排名</div>
+        <div class="menu-item">我的策略</div>
+        <div class="menu-item">组合排名</div>
+        <div class="menu-item">我的组合</div>
+        <a href="/tools" class="menu-item" style="color: white; text-decoration: none; display: block;">量化小工具</a>
+        <div class="menu-item">在线回测</div>
+        <div class="menu-item">关于我们</div>
+        <a href="/ledger" class="menu-item" style="color: white; text-decoration: none; display: block;">实盘账本</a>
+        <div class="menu-item">常见问题</div>
+        <div class="menu-item">个人资料</div>
+        <div class="menu-item">自动交易</div>
+        <div class="menu-item">指数跟投</div>
+        <div class="menu-footer">
+            <div class="menu-item">退出</div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换功能菜单
+        function toggleMenu() {
+            const menu = document.getElementById('functionMenu');
+            menu.classList.toggle('active');
+        }
+        
+        // 生成模拟数据（季度数据，减少数据点数量）
+        function generateData(startYear, endYear, initialValue, volatility, trend) {
+            const data = [];
+            const labels = [];
+            let value = initialValue;
+            
+            for (let year = startYear; year <= endYear; year++) {
+                for (let quarter = 1; quarter <= 4; quarter++) {
+                    if (year === endYear && quarter > 1) break;
+                    
+                    const date = `${year}-Q${quarter}`;
+                    labels.push(date);
+                    
+                    // 生成随机波动
+                    const change = (Math.random() - 0.5) * 2 * volatility + trend;
+                    value *= (1 + change / 100);
+                    data.push(value);
+                }
+            }
+            
+            return { labels, data };
+        }
+        
+        // 异步初始化图表
+        window.onload = function() {
+            // 使用requestAnimationFrame异步执行，避免阻塞页面加载
+            requestAnimationFrame(function() {
+                // 图表1数据
+                const chart1Data = generateData(2020, 2026, 100, 5, 2);
+                const chart1Hs300 = generateData(2020, 2026, 100, 3, 1);
+                
+                // 图表1
+                const ctx1 = document.getElementById('chart1').getContext('2d');
+                new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels: chart1Data.labels,
+                        datasets: [
+                            {
+                                label: '本策略: 10843.97%',
+                                data: chart1Data.data,
+                                borderColor: '#1a56db',
+                                backgroundColor: 'rgba(26, 86, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: '沪深300: 103.33%',
+                                data: chart1Hs300.data,
+                                borderColor: '#2ed573',
+                                backgroundColor: 'rgba(46, 213, 115, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 0 // 禁用动画，提高性能
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        }
+                    }
+                });
+                
+                // 图表2数据
+                const chart2Data = generateData(2020, 2026, 100, 4, 1.5);
+                const chart2Hs300 = generateData(2020, 2026, 100, 3, 0.8);
+                
+                // 图表2
+                const ctx2 = document.getElementById('chart2').getContext('2d');
+                new Chart(ctx2, {
+                    type: 'line',
+                    data: {
+                        labels: chart2Data.labels,
+                        datasets: [
+                            {
+                                label: '本策略: 1957.06%',
+                                data: chart2Data.data,
+                                borderColor: '#1a56db',
+                                backgroundColor: 'rgba(26, 86, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: '沪深300: 118.82%',
+                                data: chart2Hs300.data,
+                                borderColor: '#2ed573',
+                                backgroundColor: 'rgba(46, 213, 115, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 0 // 禁用动画，提高性能
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        }
+                    }
+                });
+                
+                // 图表3数据
+                const chart3Data = generateData(2020, 2026, 100, 3, 1.2);
+                const chart3Hs300 = generateData(2020, 2026, 100, 3, 0.8);
+                
+                // 图表3
+                const ctx3 = document.getElementById('chart3').getContext('2d');
+                new Chart(ctx3, {
+                    type: 'line',
+                    data: {
+                        labels: chart3Data.labels,
+                        datasets: [
+                            {
+                                label: '本策略: 1735.07%',
+                                data: chart3Data.data,
+                                borderColor: '#1a56db',
+                                backgroundColor: 'rgba(26, 86, 219, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: '沪深300: 103.33%',
+                                data: chart3Hs300.data,
+                                borderColor: '#2ed573',
+                                backgroundColor: 'rgba(46, 213, 115, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 0 // 禁用动画，提高性能
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            }
+                        }
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

@@ -26,18 +26,133 @@ def generate_wechat_message(result_df):
     # 创建一个副本用于格式化显示
     df_display = result_df.copy()
     
-    # 格式化收益率为百分比
-    df_display['today_return'] = df_display['today_return'].map('{:.2f}%'.format)
-    df_display['prev_day_return'] = df_display['prev_day_return'].map('{:.2f}%'.format)
-    df_display['comparison_value'] = df_display['comparison_value'].map('{:.2f}%'.format)
-    
-    # 按照操作建议和执行金额排序
-    df_display = df_display.sort_values(by=['operation_suggestion', 'execution_amount'])
-    
     # 生成HTML消息
     message = f"<h2>📊 基金分析报告 - {date.today().strftime('%Y年%m月%d日')}</h2>\n"
-    message += f"<h3>持仓基金收益率变化分析</h3>\n"
-    message += f"<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%;'>\n"
+    
+    # 检查是否包含绩效分析的指标
+    if 'annualized_return' in df_display.columns and 'max_drawdown' in df_display.columns and 'sharpe_ratio' in df_display.columns:
+        # 这是绩效分析结果
+        message += f"<h3>基金绩效对比分析</h3>\n"
+        
+        # 格式化收益率为百分比
+        df_display['yesterday_return'] = df_display['yesterday_return'].map('{:.2f}%'.format)
+        df_display['today_return'] = df_display['today_return'].map('{:.2f}%'.format)
+        df_display['return_change'] = df_display['return_change'].map('{:.2f}%'.format)
+        df_display['annualized_return'] = (df_display['annualized_return'] * 100).map('{:.2f}%'.format)
+        df_display['max_drawdown'] = (df_display['max_drawdown'] * 100).map('{:.2f}%'.format)
+        df_display['sharpe_ratio'] = df_display['sharpe_ratio'].map('{:.2f}'.format)
+        
+        # 生成绩效分析表格
+        message += f"<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%;'>\n"
+        message += f"<thead>\n"
+        message += f"<tr style='background-color: #f0f0f0;'>\n"
+        message += f"<th>基金代码</th>\n"
+        message += f"<th>基金名称</th>\n"
+        message += f"<th>昨日收益率</th>\n"
+        message += f"<th>今日收益率</th>\n"
+        message += f"<th>收益率变化</th>\n"
+        message += f"<th>年化收益率</th>\n"
+        message += f"<th>最大回撤</th>\n"
+        message += f"<th>Sharpe比率</th>\n"
+        message += f"</tr>\n"
+        message += f"</thead>\n"
+        message += f"<tbody>\n"
+        
+        for _, row in df_display.iterrows():
+            message += f"<tr>\n"
+            message += f"<td>{row['fund_code']}</td>\n"
+            message += f"<td>{row['fund_name']}</td>\n"
+            message += f"<td>{row['yesterday_return']}</td>\n"
+            message += f"<td>{row['today_return']}</td>\n"
+            message += f"<td>{row['return_change']}</td>\n"
+            message += f"<td>{row['annualized_return']}</td>\n"
+            message += f"<td>{row['max_drawdown']}</td>\n"
+            message += f"<td>{row['sharpe_ratio']}</td>\n"
+            message += f"</tr>\n"
+        
+        message += f"</tbody>\n"
+        message += f"</table>\n"
+    else:
+        # 这是常规的基金分析结果
+        message += f"<h3>持仓基金收益率变化分析</h3>\n"
+        
+        # 格式化收益率为百分比
+        df_display['today_return'] = df_display['today_return'].map('{:.2f}%'.format)
+        df_display['prev_day_return'] = df_display['prev_day_return'].map('{:.2f}%'.format)
+        df_display['comparison_value'] = df_display['comparison_value'].map('{:.2f}%'.format)
+        
+        # 按照操作建议和执行金额排序
+        df_display = df_display.sort_values(by=['operation_suggestion', 'execution_amount'])
+        
+        # 生成常规分析表格
+        message += f"<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%;'>\n"
+        message += f"<thead>\n"
+        message += f"<tr style='background-color: #f0f0f0;'>\n"
+        message += f"<th>基金代码</th>\n"
+        message += f"<th>基金名称</th>\n"
+        message += f"<th>今日收益率</th>\n"
+        message += f"<th>昨日收益率</th>\n"
+        message += f"<th>趋势状态</th>\n"
+        message += f"<th>操作建议</th>\n"
+        message += f"<th>执行金额</th>\n"
+        message += f"</tr>\n"
+        message += f"</thead>\n"
+        message += f"<tbody>\n"
+        
+        for _, row in df_display.iterrows():
+            message += f"<tr>\n"
+            message += f"<td>{row['fund_code']}</td>\n"
+            message += f"<td>{row['fund_name']}</td>\n"
+            message += f"<td>{row['today_return']}</td>\n"
+            message += f"<td>{row['prev_day_return']}</td>\n"
+            message += f"<td>{row['status_label']}</td>\n"
+            message += f"<td>{row['operation_suggestion']}</td>\n"
+            message += f"<td>{row['execution_amount']}</td>\n"
+            message += f"</tr>\n"
+        
+        message += f"</tbody>\n"
+        message += f"</table>\n"
+    
+    message += f"<p style='margin-top: 15px; color: #666; font-size: 14px;'>"
+    message += f"<strong>提示</strong>：以上分析基于实时估值数据，仅供参考。最终投资决策请结合市场情况谨慎考虑。"
+    message += f"</p>"
+    
+    return message
+
+# 定义生成组合报告的函数
+def generate_combined_report(regular_df, performance_df):
+    """
+    将持仓基金收益率变化分析和基金绩效对比分析结合到一个HTML邮件中
+    
+    参数：
+    regular_df: 常规基金分析结果的DataFrame
+    performance_df: 基金绩效分析结果的DataFrame
+    
+    返回：
+    str: 格式化的HTML邮件内容
+    """
+    from datetime import date
+    
+    # 创建副本用于格式化显示
+    regular_display = regular_df.copy()
+    performance_display = performance_df.copy()
+    
+    # 生成HTML消息
+    message = f"<h2>📊 基金综合分析报告 - {date.today().strftime('%Y年%m月%d日')}</h2>\n"
+    
+    # =================== 第一部分：持仓基金收益率变化分析 ===================
+    message += f"<h3>一、持仓基金收益率变化分析</h3>\n"
+    
+    # 格式化收益率为百分比
+    regular_display['today_return'] = regular_display['today_return'].map('{:.2f}%'.format)
+    regular_display['prev_day_return'] = regular_display['prev_day_return'].map('{:.2f}%'.format)
+    regular_display['comparison_value'] = regular_display['comparison_value'].map('{:.2f}%'.format)
+    
+    # 按照操作建议和执行金额排序
+    regular_display = regular_display.sort_values(by=['operation_suggestion', 'execution_amount'])
+    
+    # 生成常规分析表格
+    message += f"<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%; margin-bottom: 30px;'>\n"
     message += f"<thead>\n"
     message += f"<tr style='background-color: #f0f0f0;'>\n"
     message += f"<th>基金代码</th>\n"
@@ -51,7 +166,7 @@ def generate_wechat_message(result_df):
     message += f"</thead>\n"
     message += f"<tbody>\n"
     
-    for _, row in df_display.iterrows():
+    for _, row in regular_display.iterrows():
         message += f"<tr>\n"
         message += f"<td>{row['fund_code']}</td>\n"
         message += f"<td>{row['fund_name']}</td>\n"
@@ -64,7 +179,51 @@ def generate_wechat_message(result_df):
     
     message += f"</tbody>\n"
     message += f"</table>\n"
-    message += f"<p style='margin-top: 15px; color: #666; font-size: 14px;'>"
+    
+    # =================== 第二部分：基金绩效对比分析 ===================
+    message += f"<h3>二、基金绩效对比分析</h3>\n"
+    
+    # 格式化收益率为百分比
+    performance_display['yesterday_return'] = performance_display['yesterday_return'].map('{:.2f}%'.format)
+    performance_display['today_return'] = performance_display['today_return'].map('{:.2f}%'.format)
+    performance_display['return_change'] = performance_display['return_change'].map('{:.2f}%'.format)
+    performance_display['annualized_return'] = (performance_display['annualized_return'] * 100).map('{:.2f}%'.format)
+    performance_display['max_drawdown'] = (performance_display['max_drawdown'] * 100).map('{:.2f}%'.format)
+    performance_display['sharpe_ratio'] = performance_display['sharpe_ratio'].map('{:.2f}'.format)
+    
+    # 生成绩效分析表格
+    message += f"<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%;'>\n"
+    message += f"<thead>\n"
+    message += f"<tr style='background-color: #f0f0f0;'>\n"
+    message += f"<th>基金代码</th>\n"
+    message += f"<th>基金名称</th>\n"
+    message += f"<th>昨日收益率</th>\n"
+    message += f"<th>今日收益率</th>\n"
+    message += f"<th>收益率变化</th>\n"
+    message += f"<th>年化收益率</th>\n"
+    message += f"<th>最大回撤</th>\n"
+    message += f"<th>Sharpe比率</th>\n"
+    message += f"</tr>\n"
+    message += f"</thead>\n"
+    message += f"<tbody>\n"
+    
+    for _, row in performance_display.iterrows():
+        message += f"<tr>\n"
+        message += f"<td>{row['fund_code']}</td>\n"
+        message += f"<td>{row['fund_name']}</td>\n"
+        message += f"<td>{row['yesterday_return']}</td>\n"
+        message += f"<td>{row['today_return']}</td>\n"
+        message += f"<td>{row['return_change']}</td>\n"
+        message += f"<td>{row['annualized_return']}</td>\n"
+        message += f"<td>{row['max_drawdown']}</td>\n"
+        message += f"<td>{row['sharpe_ratio']}</td>\n"
+        message += f"</tr>\n"
+    
+    message += f"</tbody>\n"
+    message += f"</table>\n"
+    
+    # 共同的提示信息
+    message += f"<p style='margin-top: 20px; color: #666; font-size: 14px;'>"
     message += f"<strong>提示</strong>：以上分析基于实时估值数据，仅供参考。最终投资决策请结合市场情况谨慎考虑。"
     message += f"</p>"
     
@@ -311,8 +470,10 @@ def analyze_funds():
         # 只读取名为'持仓数据'的工作表
         position_data = pd.read_excel(file_path, sheet_name='持仓数据')
 
-        # 获取持仓数据中的基金代码
-        fund_codes = position_data['代码'].astype(str).tolist()
+        # 获取持仓数据中的基金代码，并确保为6位数字格式
+        fund_codes = position_data['代码'].apply(lambda x: str(int(x)).zfill(6) if pd.notna(x) else '').tolist()
+        # 过滤空字符串
+        fund_codes = [code for code in fund_codes if code]
 
         # 批量获取所有持仓基金的实时数据
         all_fund_data = FundRealTime.get_realtime_batch(fund_codes)
@@ -347,9 +508,30 @@ def analyze_funds():
                         # Get previous day's actual return rate
                         prev_day_return = float(fund_hist.iloc[0]['日增长率'])
                     else:
-                        # 如果无法获取历史数据，使用估算值
-                        print(f"  基金 {fund_code} ({fund_name}) 无法获取历史数据，使用估算值")
-                        prev_day_return = estimate_change_pct
+                        # 如果无法获取历史数据，尝试使用其他数据源
+                        print(f"  基金 {fund_code} ({fund_name}) 无法从fund_open_fund_info_em获取历史数据，尝试使用其他数据源")
+                        
+                        # 尝试使用fund_etf_spot_em获取ETF数据
+                        try:
+                            etf_data = ak.fund_etf_spot_em()
+                            etf_fund = etf_data[etf_data['代码'] == fund_code]
+                            if not etf_fund.empty:
+                                print(f"  基金 {fund_code} ({fund_name}) 是ETF，从fund_etf_spot_em获取数据")
+                                # ETF数据可能没有历史增长率，使用估算值
+                                prev_day_return = estimate_change_pct
+                            else:
+                                # 尝试使用fund_info_em获取基金基本信息
+                                try:
+                                    fund_info = ak.fund_info_em(fund_code)
+                                    print(f"  基金 {fund_code} ({fund_name}) 从fund_info_em获取到基本信息")
+                                    # 基本信息可能没有增长率，使用估算值
+                                    prev_day_return = estimate_change_pct
+                                except Exception as e:
+                                    print(f"  基金 {fund_code} ({fund_name}) 从fund_info_em获取数据失败: {str(e)}")
+                                    prev_day_return = estimate_change_pct
+                        except Exception as e:
+                            print(f"  基金 {fund_code} ({fund_name}) 尝试其他数据源失败: {str(e)}")
+                            prev_day_return = estimate_change_pct
                 except Exception as e:
                     # 如果获取历史数据失败，使用估算值
                     print(f"  基金 {fund_code} ({fund_name}) 获取历史数据失败: {str(e)}，使用估算值")
@@ -526,15 +708,20 @@ def analyze_funds():
             else:
                 print("\n通知功能未启用，请在配置中设置enabled为True")
 
+            return result_df_db
+
         except ImportError:
             print("\n缺少必要的数据库依赖包，请安装: pip install PyMySQL sqlalchemy requests")
+            return None
         except Exception as e:
             print(f"\n保存到数据库时出错: {str(e)}")
             print("请检查数据库连接配置是否正确")
             print("请确保MySQL服务已启动，并且用户名密码正确")
+            return None
             
     except Exception as e:
         print(f"\n分析基金收益率时出错: {str(e)}")
+        return None
 
 # 定义基金绩效对比函数
 def compare_fund_performance():
@@ -574,10 +761,28 @@ def compare_fund_performance():
         
         print(f"对比日期：昨天({yesterday}) vs 今天({today})")
         
-        # 查询今日和昨日的基金数据
+        # 从Excel文件中获取基金代码列表
+        try:
+            file_path = "d:/codes/py4zinia/京东金融.xlsx"
+            position_data = pd.read_excel(file_path, sheet_name='持仓数据')
+            excel_fund_codes = position_data['代码'].apply(lambda x: str(int(x)).zfill(6) if pd.notna(x) else '').tolist()
+            excel_fund_codes = [code for code in excel_fund_codes if code]
+            print(f"从京东金融.xlsx中获取到 {len(excel_fund_codes)} 只基金用于绩效对比分析")
+        except Exception as e:
+            print(f"读取Excel文件失败: {str(e)}")
+            excel_fund_codes = []
+        
+        # 查询今日和昨日的基金数据，只查询Excel文件中存在的基金
+        if excel_fund_codes:
+            fund_codes_str = "','"
+            fund_codes_clause = f"AND fund_code IN ('{fund_codes_str.join(excel_fund_codes)}')"
+        else:
+            fund_codes_clause = ""
+        
         query = f"""
         SELECT * FROM fund_analysis_results 
         WHERE analysis_date IN ('{yesterday}', '{today}')
+        {fund_codes_clause}
         ORDER BY fund_code, analysis_date
         """
         
@@ -594,7 +799,30 @@ def compare_fund_performance():
         
         for fund_code, group in fund_groups:
             if len(group) < 2:
-                print(f"基金 {fund_code} 缺少完整的历史数据")
+                print(f"基金 {fund_code} 缺少完整的历史数据，尝试从其他数据源获取")
+                
+                # 尝试从FundRealTime获取实时数据
+                try:
+                    from fund_realtime import FundRealTime
+                    fund_data = FundRealTime.get_realtime_nav(fund_code)
+                    if fund_data:
+                        print(f"  基金 {fund_code} ({fund_data['name']}) 从FundRealTime获取到实时数据")
+                        # 由于我们需要昨天和今天的数据，而这里只能获取实时数据，所以仍然无法进行对比
+                        # 但至少我们知道了基金的名称
+                        continue
+                    else:
+                        print(f"  基金 {fund_code} 无法从FundRealTime获取数据")
+                except Exception as e:
+                    print(f"  基金 {fund_code} 尝试从FundRealTime获取数据失败: {str(e)}")
+                
+                # 尝试从akshare获取基金基本信息
+                try:
+                    import akshare as ak
+                    fund_info = ak.fund_info_em(fund_code)
+                    print(f"  基金 {fund_code} 从fund_info_em获取到基本信息")
+                except Exception as e:
+                    print(f"  基金 {fund_code} 尝试从fund_info_em获取数据失败: {str(e)}")
+                
                 continue
                 
             # 按日期排序
@@ -763,9 +991,17 @@ def plot_daily_returns_comparison(comparison_df, today_str):
             
             # 3. 添加基金名称注释
             fund_names = comparison_df['fund_name'].tolist()
-            ax1.text(1.02, 0.5, '基金名称:', transform=ax1.transAxes, fontweight='bold', ha='left', va='center')
-            for i, name in enumerate(fund_names):
-                ax1.text(1.02, 0.45 - i*0.05, f'{comparison_df.iloc[i, 0]}: {name}', transform=ax1.transAxes, ha='left', va='top')
+            fund_codes = comparison_df['fund_code'].tolist()
+            
+            # 计算图例位置，使其更整齐
+            legend_start_y = 0.9
+            for i, (code, name) in enumerate(zip(fund_codes, fund_names)):
+                ax1.text(1.02, legend_start_y - i*0.06, f'{code}: {name}', 
+                         transform=ax1.transAxes, ha='left', va='top', fontsize=9)
+            
+            # 添加图例标题
+            ax1.text(1.02, legend_start_y + 0.03, '基金名称:', transform=ax1.transAxes, 
+                     fontweight='bold', ha='left', va='bottom')
             
             # 调整布局
             plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -804,10 +1040,17 @@ def plot_daily_returns_comparison(comparison_df, today_str):
                 
                 # 添加基金名称注释
                 fund_names = comparison_df['fund_name'].tolist()
-                ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-                for i, name in enumerate(fund_names):
-                    ax.text(1.02, 0.45 - i*0.05, f'{comparison_df.iloc[i]["fund_code"]}: {name}', 
-                            transform=ax.transAxes, ha='left', va='top')
+                fund_codes = comparison_df['fund_code'].tolist()
+                
+                # 计算图例位置，使其更整齐
+                legend_start_y = 0.9
+                for i, (code, name) in enumerate(zip(fund_codes, fund_names)):
+                    ax.text(1.02, legend_start_y - i*0.06, f'{code}: {name}', 
+                            transform=ax.transAxes, ha='left', va='top', fontsize=9)
+                
+                # 添加图例标题
+                ax.text(1.02, legend_start_y + 0.03, '基金名称:', transform=ax.transAxes, 
+                        fontweight='bold', ha='left', va='bottom')
                 
                 # 调整布局
                 plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -872,10 +1115,17 @@ def plot_annualized_returns(comparison_df, today_str):
         
         # 添加基金名称注释
         fund_names = valid_data['fund_name'].tolist()
-        ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-        for i, name in enumerate(fund_names):
-            ax.text(1.02, 0.45 - i*0.05, f'{valid_data.iloc[i]["fund_code"]}: {name}', 
-                    transform=ax.transAxes, ha='left', va='top')
+        fund_codes = valid_data['fund_code'].tolist()
+        
+        # 计算图例位置，使其更整齐
+        legend_start_y = 0.9
+        for i, (code, name) in enumerate(zip(fund_codes, fund_names)):
+            ax.text(1.02, legend_start_y - i*0.06, f'{code}: {name}', 
+                    transform=ax.transAxes, ha='left', va='top', fontsize=9)
+        
+        # 添加图例标题
+        ax.text(1.02, legend_start_y + 0.03, '基金名称:', transform=ax.transAxes, 
+                fontweight='bold', ha='left', va='bottom')
         
         # 调整布局
         plt.tight_layout(rect=[0, 0, 0.85, 1])
@@ -1108,6 +1358,300 @@ def plot_volatility(comparison_df, today_str):
     except Exception as e:
         print(f"生成波动率对比图表时出错: {str(e)}")
 
+import math
+
+# 定义获取基金历史数据并计算指标的函数
+def get_fund_metrics(fund_code, fund_name):
+    """
+    获取基金历史数据并计算各种指标
+    
+    参数：
+    fund_code: 基金代码
+    fund_name: 基金名称
+    
+    返回：
+    dict: 包含各种指标的字典
+    """
+    try:
+        import akshare as ak
+        import pandas as pd
+        import math
+        
+        # 获取基金历史净值数据
+        print(f"正在获取基金 {fund_code} ({fund_name}) 的历史数据...")
+        
+        # 使用正确的参数调用函数
+        fund_data = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+        
+        if fund_data.empty:
+            print(f"基金 {fund_code} ({fund_name}) 无历史数据")
+            return None
+        
+        # 处理数据
+        fund_data['净值日期'] = pd.to_datetime(fund_data['净值日期'])
+        fund_data = fund_data.sort_values('净值日期')
+        
+        # 检查是否有足够的数据点进行计算
+        if len(fund_data) < 2:
+            print(f"基金 {fund_code} ({fund_name}) 历史数据不足，无法计算指标")
+            return None
+        
+        # 计算收益率
+        fund_data['单位净值'] = pd.to_numeric(fund_data['单位净值'], errors='coerce')
+        fund_data = fund_data.dropna(subset=['单位净值'])
+        
+        if len(fund_data) < 2:
+            print(f"基金 {fund_code} ({fund_name}) 净值数据不足，无法计算指标")
+            return None
+        
+        fund_data['returns'] = fund_data['单位净值'].pct_change()
+        fund_data = fund_data.dropna(subset=['returns'])
+        
+        if len(fund_data) < 2:
+            print(f"基金 {fund_code} ({fund_name}) 收益率数据不足，无法计算指标")
+            return None
+        
+        # 计算年化收益（假设一年252个交易日）
+        total_return = (fund_data['单位净值'].iloc[-1] / fund_data['单位净值'].iloc[0]) - 1
+        days = (fund_data['净值日期'].iloc[-1] - fund_data['净值日期'].iloc[0]).days
+        if days > 0:
+            annualized_return = (1 + total_return) ** (365 / days) - 1
+        else:
+            annualized_return = 0
+        
+        # 计算最大回撤
+        fund_data['cumulative_return'] = (1 + fund_data['returns']).cumprod()
+        fund_data['cumulative_max'] = fund_data['cumulative_return'].cummax()
+        fund_data['drawdown'] = (fund_data['cumulative_return'] / fund_data['cumulative_max']) - 1
+        max_drawdown = fund_data['drawdown'].min()
+        
+        # 计算Sharpe比率（假设无风险利率为3%）
+        risk_free_rate = 0.03
+        daily_returns = fund_data['returns'].dropna()
+        if len(daily_returns) > 0:
+            mean_return = daily_returns.mean() * 252  # 年化平均收益率
+            std_return = daily_returns.std() * math.sqrt(252)  # 年化标准差
+            if std_return > 0:
+                sharpe_ratio = (mean_return - risk_free_rate) / std_return
+            else:
+                sharpe_ratio = 0
+        else:
+            sharpe_ratio = 0
+        
+        # 计算波动率
+        volatility = daily_returns.std() * math.sqrt(252) if len(daily_returns) > 0 else 0
+        
+        # 计算信息比率（简化处理，实际应该有基准数据）
+        info_ratio = 0
+        
+        metrics = {
+            'fund_code': fund_code,
+            'fund_name': fund_name,
+            'annualized_return': annualized_return,
+            'max_drawdown': max_drawdown,
+            'sharpe_ratio': sharpe_ratio,
+            'volatility': volatility,
+            'info_ratio': info_ratio,
+            'total_return': total_return,
+            'days': days,
+            'data_points': len(fund_data)
+        }
+        
+        print(f"基金 {fund_code} ({fund_name}) 指标计算完成")
+        return metrics
+        
+    except Exception as e:
+        print(f"获取基金 {fund_code} ({fund_name}) 指标失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def enhanced_compare_fund_performance():
+    """
+    增强版基金绩效对比函数，包含Sharpe比率、年化收益、最大回撤等指标
+    """
+    print("\n开始增强版基金绩效对比分析...")
+    
+    try:
+        import pandas as pd
+        import pymysql
+        from sqlalchemy import create_engine
+        from datetime import date, timedelta
+        import warnings
+        import time
+        warnings.filterwarnings('ignore', category=pymysql.Warning)
+        
+        # 数据库连接信息（与analyze_funds函数保持一致）
+        db_config = {
+            'host': 'localhost',
+            'user': 'root',
+            'password': 'root',
+            'database': 'fund_analysis',
+            'port': 3306,
+            'charset': 'utf8mb4'
+        }
+        
+        # 创建数据库连接
+        connection_string = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}?charset={db_config['charset']}"
+        engine = create_engine(connection_string)
+        
+        # 获取今日和昨日日期
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        
+        print(f"对比日期：昨天({yesterday}) vs 今天({today})")
+        
+        # 从Excel文件中获取基金代码列表
+        try:
+            file_path = "d:/codes/py4zinia/京东金融.xlsx"
+            position_data = pd.read_excel(file_path, sheet_name='持仓数据')
+            excel_fund_codes = position_data['代码'].apply(lambda x: str(int(x)).zfill(6) if pd.notna(x) else '').tolist()
+            excel_fund_codes = [code for code in excel_fund_codes if code]
+            print(f"从京东金融.xlsx中获取到 {len(excel_fund_codes)} 只基金用于绩效对比分析")
+        except Exception as e:
+            print(f"读取Excel文件失败: {str(e)}")
+            excel_fund_codes = []
+        
+        # 查询今日和昨日的基金数据，只查询Excel文件中存在的基金
+        if excel_fund_codes:
+            fund_codes_str = "','".join(excel_fund_codes)
+            fund_codes_clause = f"AND fund_code IN ('{fund_codes_str}')"
+        else:
+            fund_codes_clause = ""
+        
+        query = f"""
+        SELECT * FROM fund_analysis_results 
+        WHERE analysis_date IN ('{yesterday}', '{today}')
+        {fund_codes_clause}
+        ORDER BY fund_code, analysis_date
+        """
+        
+        df = pd.read_sql(query, engine)
+        
+        if df.empty:
+            print("未找到足够的数据进行对比")
+            return None
+        
+        # 按基金代码分组
+        fund_groups = df.groupby('fund_code')
+        
+        comparison_results = []
+        
+        for fund_code, group in fund_groups:
+            if len(group) < 2:
+                print(f"基金 {fund_code} 缺少完整的历史数据，尝试从其他数据源获取")
+                
+                # 尝试从FundRealTime获取实时数据
+                try:
+                    from fund_realtime import FundRealTime
+                    fund_data = FundRealTime.get_realtime_nav(fund_code)
+                    if fund_data:
+                        print(f"  基金 {fund_code} ({fund_data['name']}) 从FundRealTime获取到实时数据")
+                        # 由于我们需要昨天和今天的数据，而这里只能获取实时数据，所以仍然无法进行对比
+                        # 但至少我们知道了基金的名称
+                        continue
+                    else:
+                        print(f"  基金 {fund_code} 无法从FundRealTime获取数据")
+                except Exception as e:
+                    print(f"  基金 {fund_code} 尝试从FundRealTime获取数据失败: {str(e)}")
+                
+                # 尝试从akshare获取基金基本信息
+                try:
+                    import akshare as ak
+                    fund_info = ak.fund_info_em(fund_code)
+                    print(f"  基金 {fund_code} 从fund_info_em获取到基本信息")
+                except Exception as e:
+                    print(f"  基金 {fund_code} 尝试从fund_info_em获取数据失败: {str(e)}")
+                
+                continue
+                
+            # 按日期排序
+            sorted_group = group.sort_values('analysis_date')
+            
+            # 获取昨日和今日数据
+            yesterday_data = sorted_group.iloc[0]
+            today_data = sorted_group.iloc[1]
+            
+            # 计算变化值
+            return_change = today_data['today_return'] - yesterday_data['today_return']
+            
+            comparison_results.append({
+                'fund_code': fund_code,
+                'fund_name': today_data['fund_name'],
+                'yesterday_return': yesterday_data['today_return'],
+                'today_return': today_data['today_return'],
+                'return_change': return_change,
+                'yesterday_status': yesterday_data['status_label'],
+                'today_status': today_data['status_label'],
+                'yesterday_operation': yesterday_data['operation_suggestion'],
+                'today_operation': today_data['operation_suggestion']
+            })
+        
+        if not comparison_results:
+            print("没有足够的基金数据进行完整对比")
+            return None
+        
+        comparison_df = pd.DataFrame(comparison_results)
+        
+        # 获取基金的详细指标分析
+        print("\n正在获取基金详细指标分析...")
+        fund_metrics = []
+        
+        for index, row in comparison_df.iterrows():
+            fund_code = row['fund_code']
+            fund_name = row['fund_name']
+            metrics = get_fund_metrics(fund_code, fund_name)
+            if metrics:
+                fund_metrics.append(metrics)
+            # 添加延迟，避免API调用过于频繁
+            time.sleep(0.5)
+        
+        # 显示详细指标分析
+        if fund_metrics:
+            metrics_df = pd.DataFrame(fund_metrics)
+            print("\n基金详细指标分析：")
+            display_metrics_df = metrics_df.copy()
+            display_metrics_df['annualized_return'] = (display_metrics_df['annualized_return'] * 100).map('{:.2f}%'.format)
+            display_metrics_df['max_drawdown'] = (display_metrics_df['max_drawdown'] * 100).map('{:.2f}%'.format)
+            display_metrics_df['sharpe_ratio'] = display_metrics_df['sharpe_ratio'].map('{:.2f}'.format)
+            display_metrics_df['volatility'] = (display_metrics_df['volatility'] * 100).map('{:.2f}%'.format)
+            display_metrics_df['total_return'] = (display_metrics_df['total_return'] * 100).map('{:.2f}%'.format)
+            print(display_metrics_df[['fund_code', 'fund_name', 'annualized_return', 'max_drawdown', 'sharpe_ratio', 'volatility', 'total_return']])
+            
+            # 合并指标到对比结果中
+            comparison_df = comparison_df.merge(metrics_df, on=['fund_code', 'fund_name'], how='left')
+        else:
+            print("未能获取任何基金的详细指标")
+        
+        # 格式化显示
+        print("\n基金绩效对比结果：")
+        display_columns = ['fund_code', 'fund_name', 'yesterday_return', 'today_return', 'return_change', 'annualized_return', 'max_drawdown', 'sharpe_ratio']
+        display_df = comparison_df.copy()
+        display_df['yesterday_return'] = display_df['yesterday_return'].map('{:.2f}%'.format)
+        display_df['today_return'] = display_df['today_return'].map('{:.2f}%'.format)
+        display_df['return_change'] = display_df['return_change'].map('{:.2f}%'.format)
+        if 'annualized_return' in display_df.columns:
+            display_df['annualized_return'] = (display_df['annualized_return'] * 100).map('{:.2f}%'.format)
+        if 'max_drawdown' in display_df.columns:
+            display_df['max_drawdown'] = (display_df['max_drawdown'] * 100).map('{:.2f}%'.format)
+        if 'sharpe_ratio' in display_df.columns:
+            display_df['sharpe_ratio'] = display_df['sharpe_ratio'].map('{:.2f}'.format)
+        print(display_df[display_columns])
+        
+        # 生成可视化图表
+        plot_performance_comparison(comparison_df)
+        
+        return comparison_df
+        
+    except ImportError:
+        print("缺少必要的依赖包，请安装: pip install PyMySQL sqlalchemy pandas")
+        return None
+    except Exception as e:
+        print(f"进行基金绩效对比时出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
 # 主程序入口
 if __name__ == "__main__":
     import sys
@@ -1115,11 +1659,27 @@ if __name__ == "__main__":
     try:
         # 立即执行一次基金分析
         print("执行基金分析...")
-        analyze_funds()
+        regular_df = analyze_funds()
         
-        # 执行绩效对比
-        print("\n\n执行基金绩效对比分析...")
-        compare_fund_performance()
+        # 执行增强版绩效对比分析
+        print("\n执行增强版基金绩效对比分析...")
+        performance_df = enhanced_compare_fund_performance()
+        
+        # 如果两者都成功获取，生成组合报告并发送邮件
+        if regular_df is not None and performance_df is not None:
+            print("\n生成组合报告并发送邮件...")
+            
+            # 生成组合报告
+            combined_message = generate_combined_report(regular_df, performance_df)
+            
+            # 获取微信配置
+            wechat_config = {
+                'enabled': True,
+                'token': 'fb0dfd5592ed4eb19cd886d737b6cc6a'
+            }
+            
+            # 发送组合报告邮件
+            send_notification(wechat_config['token'], combined_message, title="基金综合分析报告")
         
         print("\n程序执行完成")
     except ImportError as e:
@@ -1130,4 +1690,6 @@ if __name__ == "__main__":
         sys.exit(0)
     except Exception as e:
         print(f"程序执行出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
