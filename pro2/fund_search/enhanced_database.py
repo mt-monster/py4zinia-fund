@@ -67,9 +67,12 @@ class EnhancedDatabaseManager:
             # 创建投资策略结果表
             self._create_strategy_results_table()
             
+<<<<<<< HEAD
             # 创建基金分析结果表
             self._create_fund_analysis_results_table()
             
+=======
+>>>>>>> bb6422c7ceae433b7b87ced076c543c5fa9aa2aa
             # 创建基金分析汇总表
             self._create_analysis_summary_table()
             
@@ -183,6 +186,7 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
     
+<<<<<<< HEAD
     def _create_fund_analysis_results_table(self):
         """创建基金分析结果表"""
         sql = """
@@ -215,6 +219,8 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
     
+=======
+>>>>>>> bb6422c7ceae433b7b87ced076c543c5fa9aa2aa
     def execute_sql(self, sql: str, params: Optional[Dict] = None) -> bool:
         """
         执行SQL语句
@@ -238,6 +244,7 @@ class EnhancedDatabaseManager:
             logger.error(f"执行SQL失败: {str(e)}")
             return False
     
+<<<<<<< HEAD
     def execute_query(self, sql: str, params: Optional[Dict] = None) -> pd.DataFrame:
         """
         执行查询SQL并返回DataFrame
@@ -259,6 +266,8 @@ class EnhancedDatabaseManager:
             logger.error(f"执行查询失败: {str(e)}")
             return pd.DataFrame()
     
+=======
+>>>>>>> bb6422c7ceae433b7b87ced076c543c5fa9aa2aa
     def insert_fund_basic_info(self, fund_info: Dict) -> bool:
         """
         插入基金基本信息
@@ -652,6 +661,7 @@ class EnhancedDatabaseManager:
             logger.error(f"获取分析汇总数据失败: {str(e)}")
             return pd.DataFrame()
     
+<<<<<<< HEAD
     def save_fund_analysis(self, analysis_data: Dict) -> bool:
         """
         保存基金分析数据（兼容性方法）
@@ -868,6 +878,8 @@ class EnhancedDatabaseManager:
             logger.error(f"插入基金分析结果数据失败: {str(e)}")
             return False
 
+=======
+>>>>>>> bb6422c7ceae433b7b87ced076c543c5fa9aa2aa
     def close_connection(self):
         """关闭数据库连接"""
         try:
