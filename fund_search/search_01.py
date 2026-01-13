@@ -311,8 +311,10 @@ def analyze_funds():
         # 只读取名为'持仓数据'的工作表
         position_data = pd.read_excel(file_path, sheet_name='持仓数据')
 
-        # 获取持仓数据中的基金代码
-        fund_codes = position_data['代码'].astype(str).tolist()
+        # 获取持仓数据中的基金代码，并确保为6位数字格式
+        fund_codes = position_data['代码'].apply(lambda x: str(int(x)).zfill(6) if pd.notna(x) else '').tolist()
+        # 过滤空字符串
+        fund_codes = [code for code in fund_codes if code]
 
         # 批量获取所有持仓基金的实时数据
         all_fund_data = FundRealTime.get_realtime_batch(fund_codes)
@@ -355,10 +357,13 @@ def analyze_funds():
                     print(f"  基金 {fund_code} ({fund_name}) 获取历史数据失败: {str(e)}，使用估算值")
                     prev_day_return = estimate_change_pct
                 
+                # 获取基金绩效指标
+                metrics = get_fund_metrics(fund_code, fund_name)
+                
                 # 应用投资策略
                 status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, buy_multiplier = get_investment_strategy(today_return, prev_day_return)
                 
-                # 将所有基金数据添加到列表，包括投资策略结果
+                # 将所有基金数据添加到列表，包括投资策略结果和绩效指标
                 all_funds.append({
                     'fund_code': fund_code,
                     'fund_name': fund_name,
@@ -373,6 +378,15 @@ def analyze_funds():
                     'operation_suggestion': operation_suggestion,
                     'execution_amount': execution_amount,
                     'buy_multiplier': buy_multiplier,
+                    'annualized_return': metrics['annualized_return'],
+                    'sharpe_ratio': metrics['sharpe_ratio'],
+                    'max_drawdown': metrics['max_drawdown'],
+                    'volatility': metrics['volatility'],
+                    'calmar_ratio': metrics['calmar_ratio'],
+                    'sortino_ratio': metrics['sortino_ratio'],
+                    'var_95': metrics['var_95'],
+                    'win_rate': metrics['win_rate'],
+                    'profit_loss_ratio': metrics['profit_loss_ratio'],
                     'analysis_date': date.today()  # 添加分析日期
                 })
             else:
@@ -430,7 +444,7 @@ def analyze_funds():
             # 将结果保存到数据库表中 - 使用upsert操作避免重复记录
             from sqlalchemy.types import String, Float, Boolean, DECIMAL, Date
             
-            # 定义所有列的数据类型，包括新添加的analysis_date和buy_multiplier
+            # 定义所有列的数据类型，包括新添加的analysis_date、buy_multiplier和绩效指标
             dtype = {
                 'fund_code': String(20),
                 'fund_name': String(100),
@@ -445,7 +459,16 @@ def analyze_funds():
                 'operation_suggestion': String(100),
                 'execution_amount': String(20),
                 'analysis_date': Date,
-                'buy_multiplier': Float
+                'buy_multiplier': Float,
+                'annualized_return': Float,
+                'sharpe_ratio': Float,
+                'max_drawdown': Float,
+                'volatility': Float,
+                'calmar_ratio': Float,
+                'sortino_ratio': Float,
+                'var_95': Float,
+                'win_rate': Float,
+                'profit_loss_ratio': Float
             }
             
             # 使用临时表方式实现upsert
@@ -470,10 +493,12 @@ def analyze_funds():
                 upsert_sql = """
                 INSERT INTO fund_analysis_results (
                     fund_code, fund_name, yesterday_nav, current_estimate, today_return, prev_day_return, 
-                    status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, analysis_date, buy_multiplier
+                    status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, analysis_date, buy_multiplier,
+                    annualized_return, sharpe_ratio, max_drawdown, volatility, calmar_ratio, sortino_ratio, var_95, win_rate, profit_loss_ratio
                 ) SELECT 
                     fund_code, fund_name, yesterday_nav, current_estimate, today_return, prev_day_return, 
-                    status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, analysis_date, buy_multiplier
+                    status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, analysis_date, buy_multiplier,
+                    annualized_return, sharpe_ratio, max_drawdown, volatility, calmar_ratio, sortino_ratio, var_95, win_rate, profit_loss_ratio
                 FROM %s
                 ON DUPLICATE KEY UPDATE
                     fund_name = VALUES(fund_name),
@@ -487,7 +512,16 @@ def analyze_funds():
                     comparison_value = VALUES(comparison_value),
                     operation_suggestion = VALUES(operation_suggestion),
                     execution_amount = VALUES(execution_amount),
-                    buy_multiplier = VALUES(buy_multiplier)
+                    buy_multiplier = VALUES(buy_multiplier),
+                    annualized_return = VALUES(annualized_return),
+                    sharpe_ratio = VALUES(sharpe_ratio),
+                    max_drawdown = VALUES(max_drawdown),
+                    volatility = VALUES(volatility),
+                    calmar_ratio = VALUES(calmar_ratio),
+                    sortino_ratio = VALUES(sortino_ratio),
+                    var_95 = VALUES(var_95),
+                    win_rate = VALUES(win_rate),
+                    profit_loss_ratio = VALUES(profit_loss_ratio)
                 """ % temp_table
                 
                 cursor.execute(upsert_sql)
@@ -539,10 +573,10 @@ def analyze_funds():
 # 定义基金绩效对比函数
 def compare_fund_performance():
     """
-    对比前一天和今天的基金绩效变化
+    对比基金的综合绩效指标
     
     返回：
-    DataFrame: 包含基金代码、名称、昨日收益率、今日收益率、变化值的对比数据
+    DataFrame: 包含基金代码、名称和各项绩效指标的对比数据
     """
     print("\n开始基金绩效对比分析...")
     
@@ -550,7 +584,7 @@ def compare_fund_performance():
         import pandas as pd
         import pymysql
         from sqlalchemy import create_engine
-        from datetime import date, timedelta
+        from datetime import date
         import warnings
         warnings.filterwarnings('ignore', category=pymysql.Warning)
         
@@ -568,17 +602,17 @@ def compare_fund_performance():
         connection_string = f"mysql+pymysql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}?charset={db_config['charset']}"
         engine = create_engine(connection_string)
         
-        # 获取今日和昨日日期
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        
-        print(f"对比日期：昨天({yesterday}) vs 今天({today})")
-        
-        # 查询今日和昨日的基金数据
-        query = f"""
-        SELECT * FROM fund_analysis_results 
-        WHERE analysis_date IN ('{yesterday}', '{today}')
-        ORDER BY fund_code, analysis_date
+        # 获取最新的基金数据（每个基金只取最新一条记录）
+        query = """
+        SELECT DISTINCT t1.fund_code, t1.fund_name, t1.today_return, t1.prev_day_return, t1.status_label, t1.operation_suggestion,
+               t1.annualized_return, t1.sharpe_ratio, t1.max_drawdown, t1.volatility, t1.calmar_ratio, t1.sortino_ratio, t1.var_95, t1.win_rate, t1.profit_loss_ratio
+        FROM fund_analysis_results t1
+        INNER JOIN (
+            SELECT fund_code, MAX(analysis_date) as max_date
+            FROM fund_analysis_results
+            GROUP BY fund_code
+        ) t2 ON t1.fund_code = t2.fund_code AND t1.analysis_date = t2.max_date
+        ORDER BY t1.fund_code
         """
         
         df = pd.read_sql(query, engine)
@@ -587,57 +621,36 @@ def compare_fund_performance():
             print("未找到足够的数据进行对比")
             return None
         
-        # 按基金代码分组
-        fund_groups = df.groupby('fund_code')
-        
-        comparison_results = []
-        
-        for fund_code, group in fund_groups:
-            if len(group) < 2:
-                print(f"基金 {fund_code} 缺少完整的历史数据")
-                continue
-                
-            # 按日期排序
-            sorted_group = group.sort_values('analysis_date')
-            
-            # 获取昨日和今日数据
-            yesterday_data = sorted_group.iloc[0]
-            today_data = sorted_group.iloc[1]
-            
-            # 计算变化值
-            return_change = today_data['today_return'] - yesterday_data['today_return']
-            
-            comparison_results.append({
-                'fund_code': fund_code,
-                'fund_name': today_data['fund_name'],
-                'yesterday_return': yesterday_data['today_return'],
-                'today_return': today_data['today_return'],
-                'return_change': return_change,
-                'yesterday_status': yesterday_data['status_label'],
-                'today_status': today_data['status_label'],
-                'yesterday_operation': yesterday_data['operation_suggestion'],
-                'today_operation': today_data['operation_suggestion']
-            })
-        
-        if not comparison_results:
-            print("没有足够的基金数据进行完整对比")
-            return None
-        
-        comparison_df = pd.DataFrame(comparison_results)
+        print(f"\n共找到 {len(df)} 只基金的最新绩效数据")
         
         # 格式化显示
-        print("\n基金绩效对比结果：")
-        display_columns = ['fund_code', 'fund_name', 'yesterday_return', 'today_return', 'return_change', 'yesterday_status', 'today_status']
-        display_df = comparison_df.copy()
-        display_df['yesterday_return'] = display_df['yesterday_return'].map('{:.2f}%'.format)
+        print("\n基金绩效指标对比结果：")
+        display_columns = [
+            'fund_code', 'fund_name', 'today_return', 'annualized_return', 
+            'sharpe_ratio', 'max_drawdown', 'volatility', 'calmar_ratio', 
+            'sortino_ratio', 'win_rate', 'status_label', 'operation_suggestion'
+        ]
+        
+        display_df = df.copy()
+        # 格式化数值为百分比
         display_df['today_return'] = display_df['today_return'].map('{:.2f}%'.format)
-        display_df['return_change'] = display_df['return_change'].map('{:.2f}%'.format)
+        display_df['annualized_return'] = display_df['annualized_return'].map('{:.2f}%'.format)
+        display_df['max_drawdown'] = display_df['max_drawdown'].map('{:.2f}%'.format)
+        display_df['volatility'] = display_df['volatility'].map('{:.2f}%'.format)
+        display_df['win_rate'] = display_df['win_rate'].map('{:.2f}%'.format)
+        # 其他指标保留小数点后三位
+        display_df['sharpe_ratio'] = display_df['sharpe_ratio'].round(3)
+        display_df['calmar_ratio'] = display_df['calmar_ratio'].round(3)
+        display_df['sortino_ratio'] = display_df['sortino_ratio'].round(3)
+        display_df['var_95'] = display_df['var_95'].round(4)
+        display_df['profit_loss_ratio'] = display_df['profit_loss_ratio'].round(2)
+        
         print(display_df[display_columns])
         
         # 生成可视化图表
-        plot_performance_comparison(comparison_df)
+        plot_performance_comparison(df)
         
-        return comparison_df
+        return df
         
     except ImportError:
         print("缺少必要的依赖包，请安装: pip install PyMySQL sqlalchemy pandas")
@@ -846,39 +859,66 @@ def plot_annualized_returns(comparison_df, today_str):
             print("没有有效的年化收益率数据")
             return
         
-        # 创建图表
-        fig, ax = plt.subplots(figsize=(12, 8))
-        
         # 准备数据
         n_funds = len(valid_data)
         indices = np.arange(n_funds)
+        returns = valid_data['annualized_return'] * 100
+        
+        # 设置颜色：正收益为绿色，负收益为红色
+        colors = ['#2E8B57' if x >= 0 else '#CD5C5C' for x in returns]
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(14, 8))
         
         # 绘制柱状图
-        bars = ax.bar(indices, valid_data['annualized_return'] * 100, alpha=0.8, color='#2E8B57')
+        bars = ax.bar(indices, returns, alpha=0.8, color=colors, edgecolor='black', linewidth=0.5)
         
         # 设置图表属性
-        ax.set_xlabel('基金代码')
-        ax.set_ylabel('年化收益率 (%)')
-        ax.set_title('基金年化收益率对比', fontweight='bold', fontsize=14)
+        ax.set_xlabel('基金代码', fontsize=12, fontweight='bold')
+        ax.set_ylabel('年化收益率 (%)', fontsize=12, fontweight='bold')
+        ax.set_title('基金年化收益率对比', fontweight='bold', fontsize=16, pad=20)
         ax.set_xticks(indices)
-        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right')
+        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right', fontsize=10)
         ax.grid(True, alpha=0.3, axis='y')
         
-        # 在柱子上添加数值标签
-        for bar, value in zip(bars, valid_data['annualized_return'] * 100):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.05 * abs(height),
-                    f'{value:.2f}%', ha='center', va='bottom', fontsize=9)
+        # 添加零基准线
+        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
         
-        # 添加基金名称注释
+        # 在柱子上添加数值标签
+        for bar, value in zip(bars, returns):
+            height = bar.get_height()
+            # 根据值的正负决定标签位置
+            if height >= 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + max(0.1 * abs(height), 0.2),
+                        f'{value:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            else:
+                ax.text(bar.get_x() + bar.get_width()/2., height - max(0.1 * abs(height), 0.2),
+                        f'{value:.2f}%', ha='center', va='top', fontsize=9, fontweight='bold')
+        
+        # 创建图例
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor='#2E8B57', label='正收益'),
+                          Patch(facecolor='#CD5C5C', label='负收益')]
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0, 1), fontsize=10)
+        
+        # 在右侧显示基金名称
         fund_names = valid_data['fund_name'].tolist()
-        ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-        for i, name in enumerate(fund_names):
-            ax.text(1.02, 0.45 - i*0.05, f'{valid_data.iloc[i]["fund_code"]}: {name}', 
-                    transform=ax.transAxes, ha='left', va='top')
+        if fund_names:
+            # 计算合适的文本位置
+            y_positions = np.linspace(ax.get_ylim()[1] * 0.8, ax.get_ylim()[1] * 0.3, len(fund_names))
+            for i, (name, code) in enumerate(zip(fund_names, valid_data['fund_code'])):
+                # Truncate long names
+                display_name = name[:20] + '...' if len(name) > 20 else name
+                ax.annotate(f'{code}: {display_name}', 
+                           xy=(1, y_positions[i]), 
+                           xytext=(5, 0), 
+                           xycoords=('axes fraction', 'data'),
+                           textcoords='offset points',
+                           va='center', ha='left', fontsize=9,
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.7))
         
         # 调整布局
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.tight_layout()
         
         # 保存图表
         chart_path = f"基金年化收益率对比_{today_str}.png"
@@ -912,24 +952,26 @@ def plot_max_drawdown(comparison_df, today_str):
             print("没有有效的最大回撤数据")
             return
         
-        # 创建图表
-        fig, ax = plt.subplots(figsize=(12, 8))
-        
-        # 准备数据（转换为百分比，并取正值用于绘图，负值会在标签中体现）
+        # 准备数据（转换为百分比）
         n_funds = len(valid_data)
         indices = np.arange(n_funds)
         drawdown_values = valid_data['max_drawdown'] * 100  # 转换为百分比
         
-        # 绘制柱状图（使用正值，但保留原始值用于标签）
-        colors = ['#FF6B6B' if x < 0 else '#4ECDC4' for x in drawdown_values]  # 红色表示负回撤，绿色表示正数（理论上不应该有正数）
-        bars = ax.bar(indices, drawdown_values, alpha=0.8, color=colors)
+        # 设置颜色：回撤越深（负值越大）用更红的颜色表示，较小回撤用较浅颜色
+        colors = ['#CD5C5C' if x < 0 else '#2E8B57' for x in drawdown_values]
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        # 绘制柱状图
+        bars = ax.bar(indices, drawdown_values, alpha=0.8, color=colors, edgecolor='black', linewidth=0.5)
         
         # 设置图表属性
-        ax.set_xlabel('基金代码')
-        ax.set_ylabel('最大回撤 (%)')
-        ax.set_title('基金最大回撤对比', fontweight='bold', fontsize=14)
+        ax.set_xlabel('基金代码', fontsize=12, fontweight='bold')
+        ax.set_ylabel('最大回撤 (%)', fontsize=12, fontweight='bold')
+        ax.set_title('基金最大回撤对比', fontweight='bold', fontsize=16, pad=20)
         ax.set_xticks(indices)
-        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right')
+        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right', fontsize=10)
         ax.grid(True, alpha=0.3, axis='y')
         
         # 添加零基准线
@@ -938,23 +980,38 @@ def plot_max_drawdown(comparison_df, today_str):
         # 在柱子上添加数值标签
         for bar, value in zip(bars, drawdown_values):
             height = bar.get_height()
-            # 如果是负值，标签放在柱子上方；如果是正值，标签放在柱子下方
-            if height < 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height - 0.05 * abs(height),
-                        f'{value:.2f}%', ha='center', va='top', fontsize=9)
+            # 根据值的正负决定标签位置
+            if height >= 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + max(0.1 * abs(height), 0.2),
+                        f'{value:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
             else:
-                ax.text(bar.get_x() + bar.get_width()/2., height + 0.05 * abs(height),
-                        f'{value:.2f}%', ha='center', va='bottom', fontsize=9)
+                ax.text(bar.get_x() + bar.get_width()/2., height - max(0.1 * abs(height), 0.2),
+                        f'{value:.2f}%', ha='center', va='top', fontsize=9, fontweight='bold')
         
-        # 添加基金名称注释
+        # 创建图例
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor='#2E8B57', label='较小回撤'),
+                          Patch(facecolor='#CD5C5C', label='较大回撤')]
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0, 1), fontsize=10)
+        
+        # 在右侧显示基金名称
         fund_names = valid_data['fund_name'].tolist()
-        ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-        for i, name in enumerate(fund_names):
-            ax.text(1.02, 0.45 - i*0.05, f'{valid_data.iloc[i]["fund_code"]}: {name}', 
-                    transform=ax.transAxes, ha='left', va='top')
+        if fund_names:
+            # 计算合适的文本位置
+            y_positions = np.linspace(ax.get_ylim()[1] * 0.8, ax.get_ylim()[1] * 0.3, len(fund_names))
+            for i, (name, code) in enumerate(zip(fund_names, valid_data['fund_code'])):
+                # Truncate long names
+                display_name = name[:20] + '...' if len(name) > 20 else name
+                ax.annotate(f'{code}: {display_name}', 
+                           xy=(1, y_positions[i]), 
+                           xytext=(5, 0), 
+                           xycoords=('axes fraction', 'data'),
+                           textcoords='offset points',
+                           va='center', ha='left', fontsize=9,
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.7))
         
         # 调整布局
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.tight_layout()
         
         # 保存图表
         chart_path = f"基金最大回撤对比_{today_str}.png"
@@ -988,24 +1045,26 @@ def plot_sharpe_ratio(comparison_df, today_str):
             print("没有有效的夏普比率数据")
             return
         
-        # 创建图表
-        fig, ax = plt.subplots(figsize=(12, 8))
-        
         # 准备数据
         n_funds = len(valid_data)
         indices = np.arange(n_funds)
+        ratios = valid_data['sharpe_ratio']
+        
+        # 设置颜色：正比率为绿色，负比率为红色
+        colors = ['#2E8B57' if x >= 0 else '#CD5C5C' for x in ratios]
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(14, 8))
         
         # 绘制柱状图
-        ratios = valid_data['sharpe_ratio']
-        colors = ['#98FB98' if x >= 0 else '#FFB6C1' for x in ratios]  # 绿色表示正比率，粉色表示负比率
-        bars = ax.bar(indices, ratios, alpha=0.8, color=colors)
+        bars = ax.bar(indices, ratios, alpha=0.8, color=colors, edgecolor='black', linewidth=0.5)
         
         # 设置图表属性
-        ax.set_xlabel('基金代码')
-        ax.set_ylabel('夏普比率')
-        ax.set_title('基金夏普比率对比', fontweight='bold', fontsize=14)
+        ax.set_xlabel('基金代码', fontsize=12, fontweight='bold')
+        ax.set_ylabel('夏普比率', fontsize=12, fontweight='bold')
+        ax.set_title('基金夏普比率对比', fontweight='bold', fontsize=16, pad=20)
         ax.set_xticks(indices)
-        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right')
+        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right', fontsize=10)
         ax.grid(True, alpha=0.3, axis='y')
         
         # 添加零基准线
@@ -1014,23 +1073,38 @@ def plot_sharpe_ratio(comparison_df, today_str):
         # 在柱子上添加数值标签
         for bar, value in zip(bars, ratios):
             height = bar.get_height()
-            # 如果是负值，标签放在柱子上方；如果是正值，标签放在柱子下方
-            if height < 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height - 0.05 * abs(height),
-                        f'{value:.2f}', ha='center', va='top', fontsize=9)
+            # 根据值的正负决定标签位置
+            if height >= 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + max(0.1 * abs(height), 0.05),
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
             else:
-                ax.text(bar.get_x() + bar.get_width()/2., height + 0.05 * abs(height),
-                        f'{value:.2f}', ha='center', va='bottom', fontsize=9)
+                ax.text(bar.get_x() + bar.get_width()/2., height - max(0.1 * abs(height), 0.05),
+                        f'{value:.2f}', ha='center', va='top', fontsize=9, fontweight='bold')
         
-        # 添加基金名称注释
+        # 创建图例
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor='#2E8B57', label='正比率'),
+                          Patch(facecolor='#CD5C5C', label='负比率')]
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0, 1), fontsize=10)
+        
+        # 在右侧显示基金名称
         fund_names = valid_data['fund_name'].tolist()
-        ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-        for i, name in enumerate(fund_names):
-            ax.text(1.02, 0.45 - i*0.05, f'{valid_data.iloc[i]["fund_code"]}: {name}', 
-                    transform=ax.transAxes, ha='left', va='top')
+        if fund_names:
+            # 计算合适的文本位置
+            y_positions = np.linspace(ax.get_ylim()[1] * 0.8, ax.get_ylim()[1] * 0.3, len(fund_names))
+            for i, (name, code) in enumerate(zip(fund_names, valid_data['fund_code'])):
+                # Truncate long names
+                display_name = name[:20] + '...' if len(name) > 20 else name
+                ax.annotate(f'{code}: {display_name}', 
+                           xy=(1, y_positions[i]), 
+                           xytext=(5, 0), 
+                           xycoords=('axes fraction', 'data'),
+                           textcoords='offset points',
+                           va='center', ha='left', fontsize=9,
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.7))
         
         # 调整布局
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.tight_layout()
         
         # 保存图表
         chart_path = f"基金夏普比率对比_{today_str}.png"
@@ -1064,40 +1138,59 @@ def plot_volatility(comparison_df, today_str):
             print("没有有效的波动率数据")
             return
         
-        # 创建图表
-        fig, ax = plt.subplots(figsize=(12, 8))
-        
         # 准备数据
         n_funds = len(valid_data)
         indices = np.arange(n_funds)
         vol_values = valid_data['volatility'] * 100  # 转换为百分比
         
+        # 设置颜色: 波动率较低为绿色，较高为红色（可根据实际情况调整阈值）
+        median_vol = np.median(vol_values) if len(vol_values) > 0 else 0
+        colors = ['#2E8B57' if x <= median_vol else '#CD5C5C' for x in vol_values]
+        
+        # 创建图表
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
         # 绘制柱状图
-        bars = ax.bar(indices, vol_values, alpha=0.8, color='#87CEEB')
+        bars = ax.bar(indices, vol_values, alpha=0.8, color=colors, edgecolor='black', linewidth=0.5)
         
         # 设置图表属性
-        ax.set_xlabel('基金代码')
-        ax.set_ylabel('波动率 (%)')
-        ax.set_title('基金波动率对比', fontweight='bold', fontsize=14)
+        ax.set_xlabel('基金代码', fontsize=12, fontweight='bold')
+        ax.set_ylabel('波动率 (%)', fontsize=12, fontweight='bold')
+        ax.set_title('基金波动率对比', fontweight='bold', fontsize=16, pad=20)
         ax.set_xticks(indices)
-        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right')
+        ax.set_xticklabels(valid_data['fund_code'], rotation=45, ha='right', fontsize=10)
         ax.grid(True, alpha=0.3, axis='y')
         
         # 在柱子上添加数值标签
         for bar, value in zip(bars, vol_values):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.05 * abs(height),
-                    f'{value:.2f}%', ha='center', va='bottom', fontsize=9)
+            ax.text(bar.get_x() + bar.get_width()/2., height + max(0.1 * abs(height), 0.2),
+                    f'{value:.2f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
         
-        # 添加基金名称注释
+        # 创建图例
+        from matplotlib.patches import Patch
+        legend_elements = [Patch(facecolor='#2E8B57', label='低波动率'),
+                          Patch(facecolor='#CD5C5C', label='高波动率')]
+        ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0, 1), fontsize=10)
+        
+        # 在右侧显示基金名称
         fund_names = valid_data['fund_name'].tolist()
-        ax.text(1.02, 0.5, '基金名称:', transform=ax.transAxes, fontweight='bold', ha='left', va='center')
-        for i, name in enumerate(fund_names):
-            ax.text(1.02, 0.45 - i*0.05, f'{valid_data.iloc[i]["fund_code"]}: {name}', 
-                    transform=ax.transAxes, ha='left', va='top')
+        if fund_names:
+            # 计算合适的文本位置
+            y_positions = np.linspace(ax.get_ylim()[1] * 0.8, ax.get_ylim()[1] * 0.3, len(fund_names))
+            for i, (name, code) in enumerate(zip(fund_names, valid_data['fund_code'])):
+                # Truncate long names
+                display_name = name[:20] + '...' if len(name) > 20 else name
+                ax.annotate(f'{code}: {display_name}', 
+                           xy=(1, y_positions[i]), 
+                           xytext=(5, 0), 
+                           xycoords=('axes fraction', 'data'),
+                           textcoords='offset points',
+                           va='center', ha='left', fontsize=9,
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.7))
         
         # 调整布局
-        plt.tight_layout(rect=[0, 0, 0.85, 1])
+        plt.tight_layout()
         
         # 保存图表
         chart_path = f"基金波动率对比_{today_str}.png"
@@ -1107,6 +1200,153 @@ def plot_volatility(comparison_df, today_str):
         
     except Exception as e:
         print(f"生成波动率对比图表时出错: {str(e)}")
+
+
+def get_fund_metrics(fund_code, fund_name):
+    """
+    获取基金的绩效指标
+    
+    参数：
+    fund_code: 基金代码
+    fund_name: 基金名称
+    
+    返回：
+    dict: 包含各种绩效指标的字典
+    """
+    try:
+        import akshare as ak
+        import pandas as pd
+        import numpy as np
+        from datetime import datetime
+        
+        print(f"正在获取基金 {fund_code} ({fund_name}) 的历史数据...")
+        
+        # 获取基金历史净值数据
+        fund_data = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+        
+        if fund_data.empty:
+            print(f"基金 {fund_code} ({fund_name}) 无历史数据")
+            return {
+                'annualized_return': 0,
+                'sharpe_ratio': 0,
+                'max_drawdown': 0,
+                'volatility': 0,
+                'calmar_ratio': 0,
+                'alpha': 0,
+                'beta': 0,
+                'sortino_ratio': 0,
+                'var_95': 0,
+                'win_rate': 0,
+                'profit_loss_ratio': 0,
+                'tracking_error': 0,
+                'information_ratio': 0
+            }
+        
+        # 数据预处理
+        fund_data['净值日期'] = pd.to_datetime(fund_data['净值日期'])
+        fund_data = fund_data.sort_values('净值日期').reset_index(drop=True)
+        
+        # 计算每日收益率
+        fund_data['daily_return'] = fund_data['单位净值'].pct_change()
+        daily_returns = fund_data['daily_return'].dropna()
+        
+        if len(daily_returns) < 2:
+            print(f"基金 {fund_code} ({fund_name}) 历史数据不足，无法计算指标")
+            return {
+                'annualized_return': 0,
+                'sharpe_ratio': 0,
+                'max_drawdown': 0,
+                'volatility': 0,
+                'calmar_ratio': 0,
+                'alpha': 0,
+                'beta': 0,
+                'sortino_ratio': 0,
+                'var_95': 0,
+                'win_rate': 0,
+                'profit_loss_ratio': 0,
+                'tracking_error': 0,
+                'information_ratio': 0
+            }
+        
+        # 计算年化收益率
+        total_return = fund_data['单位净值'].iloc[-1] / fund_data['单位净值'].iloc[0] - 1
+        days = (fund_data['净值日期'].iloc[-1] - fund_data['净值日期'].iloc[0]).days
+        if days > 0:
+            annualized_return = (1 + total_return) ** (365.25 / days) - 1
+        else:
+            annualized_return = 0
+        
+        # 计算年化波动率
+        volatility = daily_returns.std() * np.sqrt(252) if len(daily_returns) > 1 else 0
+        
+        # 计算夏普比率 (假设无风险利率为3%)
+        risk_free_rate = 0.03
+        sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0
+        
+        # 计算最大回撤
+        cumulative_returns = (1 + daily_returns).cumprod()
+        running_max = cumulative_returns.expanding().max()
+        drawdown = (cumulative_returns - running_max) / running_max
+        max_drawdown = drawdown.min() if not drawdown.empty else 0
+        
+        # 计算卡玛比率 (年化收益率 / 最大回撤绝对值)
+        calmar_ratio = annualized_return / abs(max_drawdown) if max_drawdown != 0 else 0
+        
+        # 计算索提诺比率 (下行风险调整)
+        negative_returns = daily_returns[daily_returns < 0]
+        downside_deviation = np.sqrt((negative_returns ** 2).mean()) * np.sqrt(252) if len(negative_returns) > 0 else 0
+        sortino_ratio = (annualized_return - risk_free_rate) / downside_deviation if downside_deviation != 0 else 0
+        
+        # 计算胜率 (正收益天数占比)
+        win_count = (daily_returns > 0).sum()
+        total_count = len(daily_returns)
+        win_rate = win_count / total_count if total_count > 0 else 0
+        
+        # 计算盈亏比 (平均盈利 / 平均亏损)
+        positive_returns = daily_returns[daily_returns > 0]
+        negative_returns = daily_returns[daily_returns < 0]
+        avg_positive = positive_returns.mean() if len(positive_returns) > 0 else 0
+        avg_negative = abs(negative_returns.mean()) if len(negative_returns) > 0 else 0
+        profit_loss_ratio = avg_positive / avg_negative if avg_negative != 0 else 0
+        
+        # 计算VaR (95%置信度)
+        var_95 = daily_returns.quantile(0.05) if len(daily_returns) > 0 else 0
+        
+        # 返回所有指标
+        return {
+            'annualized_return': annualized_return,
+            'sharpe_ratio': sharpe_ratio,
+            'max_drawdown': max_drawdown,
+            'volatility': volatility,
+            'calmar_ratio': calmar_ratio,
+            'alpha': 0,  # 需要基准数据才能计算
+            'beta': 0,   # 需要基准数据才能计算
+            'sortino_ratio': sortino_ratio,
+            'var_95': var_95,
+            'win_rate': win_rate,
+            'profit_loss_ratio': profit_loss_ratio,
+            'tracking_error': 0,  # 需要基准数据才能计算
+            'information_ratio': 0  # 需要基准数据才能计算
+        }
+        
+    except Exception as e:
+        print(f"基金 {fund_code} ({fund_name}) 收益率数据不足，无法计算指标: {str(e)}")
+        return {
+            'annualized_return': 0,
+            'sharpe_ratio': 0,
+            'max_drawdown': 0,
+            'volatility': 0,
+            'calmar_ratio': 0,
+            'alpha': 0,
+            'beta': 0,
+            'sortino_ratio': 0,
+            'var_95': 0,
+            'win_rate': 0,
+            'profit_loss_ratio': 0,
+            'tracking_error': 0,
+            'information_ratio': 0
+        }
+
 
 # 主程序入口
 if __name__ == "__main__":
