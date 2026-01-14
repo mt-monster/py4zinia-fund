@@ -19,12 +19,12 @@ from typing import Dict, List, Optional
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
-from enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
-from enhanced_fund_data import EnhancedFundData
-from enhanced_strategy import EnhancedInvestmentStrategy
-from enhanced_analytics import EnhancedFundAnalytics
-from enhanced_database import EnhancedDatabaseManager
-from enhanced_notification import EnhancedNotificationManager
+from shared.enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
+from data_retrieval.enhanced_fund_data import EnhancedFundData
+from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+from backtesting.enhanced_analytics import EnhancedFundAnalytics
+from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_retrieval.enhanced_notification import EnhancedNotificationManager
 
 # 设置日志
 logging.basicConfig(
@@ -155,15 +155,25 @@ class EnhancedFundAnalysisSystem:
             historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
             
             # 计算今日和昨日收益率
+            # 优先使用实时数据中的daily_return（来自AKShare的日增长率字段，已是百分比格式）
             today_return = realtime_data.get('daily_return', 0.0)
             prev_day_return = 0.0
             
-            if len(historical_data) >= 2:
-                # 获取前一日收益率
+            # 从历史数据获取前一日收益率
+            if not historical_data.empty and 'daily_growth_rate' in historical_data.columns:
+                # 使用AKShare原始的日增长率字段（已是百分比格式）
+                recent_growth = historical_data['daily_growth_rate'].dropna().tail(2)
+                if len(recent_growth) >= 2:
+                    prev_day_return = float(recent_growth.iloc[-2]) if pd.notna(recent_growth.iloc[-2]) else 0.0
+                elif len(recent_growth) == 1:
+                    prev_day_return = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+            elif not historical_data.empty and 'daily_return' in historical_data.columns:
+                # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
                 recent_returns = historical_data['daily_return'].dropna().tail(2)
                 if len(recent_returns) >= 2:
-                    today_return = recent_returns.iloc[-1] * 100  # 转换为百分比
                     prev_day_return = recent_returns.iloc[-2] * 100
+                elif len(recent_returns) == 1:
+                    prev_day_return = recent_returns.iloc[-1] * 100
             
             # 投资策略分析
             strategy_result = self.strategy_engine.analyze_strategy(
@@ -840,7 +850,7 @@ class EnhancedFundAnalysisSystem:
         try:
             import matplotlib.pyplot as plt
             import numpy as np
-            from enhanced_config import BASE_CONFIG
+            from shared.enhanced_config import BASE_CONFIG
             
             # 过滤掉年化收益率为空的数据
             valid_data = comparison_df.dropna(subset=['annualized_return'])
@@ -1002,7 +1012,7 @@ class EnhancedFundAnalysisSystem:
         try:
             import matplotlib.pyplot as plt
             import numpy as np
-            from enhanced_config import BASE_CONFIG
+            from shared.enhanced_config import BASE_CONFIG
             
             # 过滤掉最大回撤为空的数据
             valid_data = comparison_df.dropna(subset=['max_drawdown'])
@@ -1107,7 +1117,7 @@ class EnhancedFundAnalysisSystem:
         try:
             import matplotlib.pyplot as plt
             import numpy as np
-            from enhanced_config import BASE_CONFIG
+            from shared.enhanced_config import BASE_CONFIG
             
             # 过滤掉夏普比率为空的数据
             valid_data = comparison_df.dropna(subset=['sharpe_ratio'])
@@ -1213,7 +1223,7 @@ class EnhancedFundAnalysisSystem:
         try:
             import matplotlib.pyplot as plt
             import numpy as np
-            from enhanced_config import BASE_CONFIG
+            from shared.enhanced_config import BASE_CONFIG
             
             # 过滤掉波动率为空的数据
             valid_data = comparison_df.dropna(subset=['volatility'])
@@ -1311,7 +1321,7 @@ class EnhancedFundAnalysisSystem:
         try:
             import matplotlib.pyplot as plt
             import numpy as np
-            from enhanced_config import BASE_CONFIG
+            from shared.enhanced_config import BASE_CONFIG
             
             # 过滤掉日收益率为空的数据
             valid_data = comparison_df.dropna(subset=['today_return'])
@@ -1526,18 +1536,28 @@ class EnhancedFundAnalysisSystem:
                 metrics = self.fund_data_manager.get_performance_metrics(fund_code)
                 
                 # 获取投资策略建议 - 正确获取字段
+                # 优先使用实时数据中的daily_return（来自AKShare的日增长率字段，已是百分比格式）
                 today_return = float(fund_info.get('daily_return', 0))
                 
-                # 获取历史数据用于计算前一日收益率（与analyze_single_fund保持一致）
+                # 获取历史数据用于计算前一日收益率
                 historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
                 prev_day_return = 0.0
                 
-                if len(historical_data) >= 2:
-                    # 获取前一日收益率
+                # 从历史数据获取前一日收益率
+                if not historical_data.empty and 'daily_growth_rate' in historical_data.columns:
+                    # 使用AKShare原始的日增长率字段（已是百分比格式）
+                    recent_growth = historical_data['daily_growth_rate'].dropna().tail(2)
+                    if len(recent_growth) >= 2:
+                        prev_day_return = float(recent_growth.iloc[-2]) if pd.notna(recent_growth.iloc[-2]) else 0.0
+                    elif len(recent_growth) == 1:
+                        prev_day_return = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+                elif not historical_data.empty and 'daily_return' in historical_data.columns:
+                    # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
                     recent_returns = historical_data['daily_return'].dropna().tail(2)
                     if len(recent_returns) >= 2:
-                        today_return = recent_returns.iloc[-1] * 100  # 转换为百分比
                         prev_day_return = recent_returns.iloc[-2] * 100
+                    elif len(recent_returns) == 1:
+                        prev_day_return = recent_returns.iloc[-1] * 100
                 
                 # 计算交易建议的所有字段（与analyze_single_fund保持一致）
                 status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, buy_multiplier = self.get_investment_strategy(today_return, prev_day_return)

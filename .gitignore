@@ -35,3 +35,8 @@ dist/
 # Temporary files
 *.tmp
 *.temp
+
+.kiro/
+.trae/
+.cursor/
+

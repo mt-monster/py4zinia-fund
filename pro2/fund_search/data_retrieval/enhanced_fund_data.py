@@ -115,15 +115,18 @@ class EnhancedFundData:
             current_nav = float(latest_data.get('单位净值', 0))
             nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
             
-            # 优先使用日增长率字段（已转换为百分比）
-            daily_return = float(latest_data.get('日增长率', 0.0))
+            # 优先使用日增长率字段（已是百分比格式）
+            daily_return_raw = latest_data.get('日增长率', None)
+            if daily_return_raw is not None and pd.notna(daily_return_raw):
+                daily_return = float(daily_return_raw)
+            else:
+                # 如果日增长率不可用，使用净值计算
+                if previous_nav != 0:
+                    daily_return = (current_nav - previous_nav) / previous_nav * 100
+                else:
+                    daily_return = 0.0
             
-            # 如果日增长率为0或不可用，使用净值计算
-            if daily_return == 0 and previous_nav != 0:
-                daily_return = (current_nav - previous_nav) / previous_nav * 100
-            
-            # 确保日收益率格式正确
-            # 保留两位小数，格式统一
+            # 确保日收益率格式正确，保留两位小数
             daily_return = round(daily_return, 2)
             
             return {
@@ -388,7 +391,7 @@ class EnhancedFundData:
 
 if __name__ == "__main__":
     # 测试代码
-    test_codes = ['000001', '000002']
+    test_codes = ['025833', '012061']
     
     # 测试单个基金数据获取
     for code in test_codes:
