@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金详情 - {{ fund_code }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+        body { background-color: #f5f6fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .metric-card { padding: 20px; text-align: center; }
+        .metric-value { font-size: 1.8rem; font-weight: bold; }
+        .metric-label { color: #7f8c8d; font-size: 0.85rem; margin-top: 5px; }
+        .positive { color: var(--success-color); }
+        .negative { color: var(--danger-color); }
+        .chart-container { height: 300px; padding: 20px; }
+        .status-badge { padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; display: inline-block; }
+        .suggestion-box { background: #f8f9fa; border-left: 4px solid var(--primary-color); padding: 15px; border-radius: 0 8px 8px 0; }
+        .back-btn { border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="bi bi-graph-up-arrow me-2"></i>基金分析系统</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>首页</a>
+                <a class="nav-link" href="/strategy"><i class="bi bi-lightbulb me-1"></i>策略分析</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <a href="/" class="btn btn-outline-secondary back-btn mb-3"><i class="bi bi-arrow-left me-1"></i>返回列表</a>
+        
+        <!-- 基金基本信息 -->
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h3 id="fund-name">加载中...</h3>
+                        <p class="text-muted mb-0"><code id="fund-code">{{ fund_code }}</code> | 分析日期: <span id="analysis-date">--</span></p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="status-badge bg-primary text-white" id="status-label">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 核心指标 -->
+        <div class="row">
+            <div class="col-md-3"><div class="card metric-card"><div class="metric-value" id="today-return">--</div><div class="metric-label">今日收益</div></div></div>
+            <div class="col-md-3"><div class="card metric-card"><div class="metric-value" id="annualized-return">--</div><div class="metric-label">年化收益</div></div></div>
+            <div class="col-md-3"><div class="card metric-card"><div class="metric-value" id="sharpe-ratio">--</div><div class="metric-label">夏普比率</div></div></div>
+            <div class="col-md-3"><div class="card metric-card"><div class="metric-value" id="composite-score">--</div><div class="metric-label">综合评分</div></div></div>
+        </div>
+
+        <div class="row">
+            <!-- 风险指标 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>风险指标</h5></div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr><td>最大回撤</td><td class="text-end negative" id="max-drawdown">--</td></tr>
+                            <tr><td>波动率</td><td class="text-end" id="volatility">--</td></tr>
+                            <tr><td>VaR (95%)</td><td class="text-end" id="var-95">--</td></tr>
+                            <tr><td>卡尔玛比率</td><td class="text-end" id="calmar-ratio">--</td></tr>
+                            <tr><td>索提诺比率</td><td class="text-end" id="sortino-ratio">--</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- 收益指标 -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>收益指标</h5></div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr><td>昨日收益</td><td class="text-end" id="prev-day-return">--</td></tr>
+                            <tr><td>胜率</td><td class="text-end" id="win-rate">--</td></tr>
+                            <tr><td>盈亏比</td><td class="text-end" id="profit-loss-ratio">--</td></tr>
+                            <tr><td>买入倍数</td><td class="text-end" id="buy-multiplier">--</td></tr>
+                            <tr><td>赎回金额</td><td class="text-end" id="redeem-amount">--</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作建议 -->
+        <div class="card">
+            <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-lightbulb me-2"></i>操作建议</h5></div>
+            <div class="card-body">
+                <div class="suggestion-box" id="operation-suggestion">加载中...</div>
+                <div class="mt-3"><strong>执行金额：</strong><span id="execution-amount">--</span></div>
+            </div>
+        </div>
+
+        <!-- 历史走势图 -->
+        <div class="card">
+            <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>历史走势</h5></div>
+            <div class="chart-container"><canvas id="historyChart"></canvas></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const fundCode = '{{ fund_code }}';
+        let historyChart = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFundDetail();
+            loadFundHistory();
+        });
+
+        async function loadFundDetail() {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}`);
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const fund = result.data;
+                    document.getElementById('fund-name').textContent = fund.fund_name || fundCode;
+                    document.getElementById('analysis-date').textContent = fund.analysis_date || '--';
+                    document.getElementById('status-label').textContent = fund.status_label || '--';
+                    
+                    updateMetric('today-return', fund.today_return, '%', true);
+                    updateMetric('annualized-return', fund.annualized_return, '%', true);
+                    updateMetric('sharpe-ratio', fund.sharpe_ratio);
+                    updateMetric('composite-score', fund.composite_score);
+                    updateMetric('max-drawdown', fund.max_drawdown, '%');
+                    updateMetric('volatility', fund.volatility, '%');
+                    updateMetric('var-95', fund.var_95);
+                    updateMetric('calmar-ratio', fund.calmar_ratio);
+                    updateMetric('sortino-ratio', fund.sortino_ratio);
+                    updateMetric('prev-day-return', fund.prev_day_return, '%', true);
+                    updateMetric('win-rate', fund.win_rate, '%');
+                    updateMetric('profit-loss-ratio', fund.profit_loss_ratio);
+                    document.getElementById('buy-multiplier').textContent = fund.buy_multiplier ? fund.buy_multiplier + '×' : '--';
+                    document.getElementById('redeem-amount').textContent = fund.redeem_amount ? '¥' + fund.redeem_amount : '¥0';
+                    document.getElementById('operation-suggestion').textContent = fund.operation_suggestion || '暂无建议';
+                    document.getElementById('execution-amount').textContent = fund.execution_amount || '--';
+                }
+            } catch (error) { console.error('加载基金详情失败:', error); }
+        }
+
+        function updateMetric(id, value, suffix = '', colorize = false) {
+            const el = document.getElementById(id);
+            if (value !== null && value !== undefined) {
+                el.textContent = (typeof value === 'number' ? value.toFixed(2) : value) + suffix;
+                if (colorize) el.className = 'metric-value ' + (value >= 0 ? 'positive' : 'negative');
+            } else { el.textContent = '--'; }
+        }
+
+        async function loadFundHistory() {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?days=30`);
+                const result = await response.json();
+                if (result.success && result.data && result.data.length > 0) {
+                    const data = result.data.reverse();
+                    const ctx = document.getElementById('historyChart').getContext('2d');
+                    historyChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.map(d => d.analysis_date),
+                            datasets: [{
+                                label: '今日收益 (%)',
+                                data: data.map(d => d.today_return),
+                                borderColor: '#3498db',
+                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                                fill: true, tension: 0.4
+                            }, {
+                                label: '综合评分',
+                                data: data.map(d => d.composite_score),
+                                borderColor: '#9b59b6',
+                                backgroundColor: 'transparent',
+                                yAxisID: 'y1', tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            scales: {
+                                y: { position: 'left', title: { display: true, text: '收益率 (%)' } },
+                                y1: { position: 'right', title: { display: true, text: '综合评分' }, grid: { drawOnChartArea: false } }
+                            }
+                        }
+                    });
+                }
+            } catch (error) { console.error('加载历史数据失败:', error); }
+        }
+    </script>
+</body>
+</html>

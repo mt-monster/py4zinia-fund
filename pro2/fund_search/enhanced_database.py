@@ -188,28 +188,35 @@ class EnhancedDatabaseManager:
         """创建基金分析结果表"""
         sql = """
         CREATE TABLE IF NOT EXISTS fund_analysis_results (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fund_code VARCHAR(10) NOT NULL,
-            fund_name VARCHAR(100) NOT NULL,
-            analysis_date DATE NOT NULL,
-            today_return DECIMAL(8,4),
-            prev_day_return DECIMAL(8,4),
-            status_label VARCHAR(100),
-            operation_suggestion TEXT,
-            annualized_return DECIMAL(8,4),
-            sharpe_ratio DECIMAL(8,4),
-            max_drawdown DECIMAL(8,4),
-            volatility DECIMAL(8,4),
-            calmar_ratio DECIMAL(8,4),
-            sortino_ratio DECIMAL(8,4),
-            var_95 DECIMAL(8,4),
-            win_rate DECIMAL(5,4),
-            profit_loss_ratio DECIMAL(8,4),
-            composite_score DECIMAL(5,4),
-            daily_return DECIMAL(8,4),
-            total_return DECIMAL(8,4),
+            fund_code VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+            fund_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+            yesterday_nav FLOAT DEFAULT NULL,
+            current_estimate FLOAT DEFAULT NULL,
+            today_return FLOAT DEFAULT NULL,
+            prev_day_return FLOAT DEFAULT NULL,
+            status_label VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+            is_buy TINYINT(1) DEFAULT NULL,
+            redeem_amount DECIMAL(10,2) DEFAULT NULL,
+            comparison_value FLOAT DEFAULT NULL,
+            operation_suggestion VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+            execution_amount VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+            analysis_date DATE DEFAULT NULL,
+            buy_multiplier FLOAT DEFAULT NULL,
+            annualized_return FLOAT DEFAULT NULL,
+            sharpe_ratio FLOAT DEFAULT NULL,
+            max_drawdown FLOAT DEFAULT NULL,
+            volatility FLOAT DEFAULT NULL,
+            calmar_ratio FLOAT DEFAULT NULL,
+            sortino_ratio FLOAT DEFAULT NULL,
+            var_95 FLOAT DEFAULT NULL,
+            win_rate FLOAT DEFAULT NULL,
+            profit_loss_ratio FLOAT DEFAULT NULL,
+            daily_return FLOAT DEFAULT NULL,
+            total_return FLOAT DEFAULT NULL,
+            composite_score FLOAT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_fund_date (fund_code, analysis_date),
             INDEX idx_fund_code (fund_code),
             INDEX idx_analysis_date (analysis_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -435,10 +442,24 @@ class EnhancedDatabaseManager:
             """
             
             import json
-            report_files_json = json.dumps(summary_data.get('report_files', {}))
             
-            summary_data['report_files'] = report_files_json
-            self.execute_sql(sql, summary_data)
+            # 确保所有必填字段都有默认值
+            safe_summary_data = {
+                'analysis_date': summary_data.get('analysis_date', datetime.now().date()),
+                'total_funds': summary_data.get('total_funds', 0),
+                'buy_signals': summary_data.get('buy_signals', 0),
+                'sell_signals': summary_data.get('sell_signals', 0),
+                'hold_signals': summary_data.get('hold_signals', 0),
+                'avg_buy_multiplier': summary_data.get('avg_buy_multiplier', 0.0),
+                'total_redeem_amount': summary_data.get('total_redeem_amount', 0),
+                'best_performing_fund': summary_data.get('best_performing_fund', ''),
+                'worst_performing_fund': summary_data.get('worst_performing_fund', ''),
+                'highest_sharpe_fund': summary_data.get('highest_sharpe_fund', ''),
+                'lowest_volatility_fund': summary_data.get('lowest_volatility_fund', ''),
+                'report_files': json.dumps(summary_data.get('report_files', {}))
+            }
+            
+            self.execute_sql(sql, safe_summary_data)
             
             logger.info(f"分析汇总数据已保存，日期: {summary_data.get('analysis_date', datetime.now().date())}")
             return True
@@ -693,7 +714,15 @@ class EnhancedDatabaseManager:
                     'profit_loss_ratio': analysis_data.get('profit_loss_ratio', 0.0),
                     'composite_score': analysis_data.get('composite_score', 0.0),
                     'daily_return': analysis_data.get('daily_return', 0.0),
-                    'total_return': analysis_data.get('total_return', 0.0)
+                    'total_return': analysis_data.get('total_return', 0.0),
+                    # 修复字段名不匹配的问题
+                    'yesterday_nav': analysis_data.get('previous_nav', 0.0),
+                    'current_estimate': analysis_data.get('estimate_nav', 0.0),
+                    'is_buy': analysis_data.get('is_buy', 0),
+                    'redeem_amount': analysis_data.get('redeem_amount', 0.0),
+                    'comparison_value': analysis_data.get('comparison_value', 0.0),
+                    'execution_amount': analysis_data.get('execution_amount', ''),
+                    'buy_multiplier': analysis_data.get('buy_multiplier', 0.0)
                 }
                 
                 # 插入到fund_analysis_results表
@@ -756,16 +785,112 @@ class EnhancedDatabaseManager:
                 'total_redeem_amount': summary_data.get('total_redeem_amount', 0),
                 'best_performing_fund': summary_data.get('best_performing_fund', ''),
                 'worst_performing_fund': summary_data.get('worst_performing_fund', ''),
-                'highest_sharpe_fund': summary_data.get('highest_sharpe_fund', ''),
-                'lowest_volatility_fund': summary_data.get('lowest_volatility_fund', ''),
-                'report_files': summary_data.get('report_files', {})
+                'avg_today_return': summary_data.get('avg_today_return', 0.0)
             }
             
+            # 插入到analysis_summary表
             return self.insert_analysis_summary(summary_record)
             
         except Exception as e:
             logger.error(f"保存策略汇总数据失败: {str(e)}")
             return False
+    
+    def get_latest_performance_analysis(self, limit: int = 100) -> pd.DataFrame:
+        """
+        获取最新的基金绩效分析结果
+        
+        参数：
+        limit: 返回结果的最大数量
+        
+        返回：
+        pd.DataFrame: 包含基金绩效分析结果的DataFrame
+        """
+        try:
+            # 查询最新的分析结果
+            sql = """
+            SELECT * 
+            FROM fund_analysis_results 
+            WHERE fund_code IS NOT NULL AND fund_code != '' 
+            ORDER BY analysis_date DESC, fund_code ASC 
+            LIMIT :limit
+            """
+            
+            with self.engine.connect() as connection:
+                df = pd.read_sql(text(sql), connection, params={'limit': limit})
+            
+            logger.info(f"获取最新绩效分析结果成功，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取绩效分析结果失败: {str(e)}")
+            return pd.DataFrame()
+    
+    def get_performance_analysis_by_date(self, analysis_date: datetime.date, limit: int = 100) -> pd.DataFrame:
+        """
+        根据日期获取基金绩效分析结果
+        
+        参数：
+        analysis_date: 分析日期
+        limit: 返回结果的最大数量
+        
+        返回：
+        pd.DataFrame: 包含基金绩效分析结果的DataFrame
+        """
+        try:
+            # 查询指定日期的分析结果
+            sql = """
+            SELECT * 
+            FROM fund_analysis_results 
+            WHERE analysis_date = :analysis_date 
+            AND fund_code IS NOT NULL AND fund_code != '' 
+            ORDER BY fund_code ASC 
+            LIMIT :limit
+            """
+            
+            with self.engine.connect() as connection:
+                df = pd.read_sql(text(sql), connection, params={'analysis_date': analysis_date, 'limit': limit})
+            
+            logger.info(f"获取 {analysis_date} 绩效分析结果成功，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取指定日期绩效分析结果失败: {str(e)}")
+            return pd.DataFrame()
+    
+    def get_performance_analysis_by_fund(self, fund_code: str, days_limit: int = 30) -> pd.DataFrame:
+        """
+        根据基金代码获取历史绩效分析结果
+        
+        参数：
+        fund_code: 基金代码
+        days_limit: 查询天数限制
+        
+        返回：
+        pd.DataFrame: 包含基金历史绩效分析结果的DataFrame
+        """
+        try:
+            # 计算起始日期
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=days_limit)
+            
+            # 查询指定基金的历史分析结果
+            sql = """
+            SELECT * 
+            FROM fund_analysis_results 
+            WHERE fund_code = :fund_code 
+            AND analysis_date BETWEEN :start_date AND :end_date 
+            ORDER BY analysis_date DESC
+            """
+            
+            with self.engine.connect() as connection:
+                df = pd.read_sql(text(sql), connection, params={'fund_code': fund_code, 'start_date': start_date, 'end_date': end_date})
+            
+            logger.info(f"获取基金 {fund_code} 历史绩效分析结果成功，共 {len(df)} 条记录")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取基金历史绩效分析结果失败: {str(e)}")
+            return pd.DataFrame()
     
     def save_report_info(self, report_file: str, report_type: str = 'general') -> bool:
         """
@@ -805,13 +930,15 @@ class EnhancedDatabaseManager:
                 prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
                 operation_suggestion, execution_amount, analysis_date, buy_multiplier, 
                 annualized_return, sharpe_ratio, max_drawdown, volatility, calmar_ratio, 
-                sortino_ratio, var_95, win_rate, profit_loss_ratio, daily_return
+                sortino_ratio, var_95, win_rate, profit_loss_ratio, daily_return, 
+                total_return, composite_score
             ) VALUES (
                 :fund_code, :fund_name, :yesterday_nav, :current_estimate, :today_return,
                 :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
                 :operation_suggestion, :execution_amount, :analysis_date, :buy_multiplier,
                 :annualized_return, :sharpe_ratio, :max_drawdown, :volatility, :calmar_ratio,
-                :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, :daily_return
+                :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, :daily_return, 
+                :total_return, :composite_score
             ) ON DUPLICATE KEY UPDATE
                 fund_name = VALUES(fund_name),
                 yesterday_nav = VALUES(yesterday_nav),
@@ -824,7 +951,6 @@ class EnhancedDatabaseManager:
                 comparison_value = VALUES(comparison_value),
                 operation_suggestion = VALUES(operation_suggestion),
                 execution_amount = VALUES(execution_amount),
-                analysis_date = VALUES(analysis_date),
                 buy_multiplier = VALUES(buy_multiplier),
                 annualized_return = VALUES(annualized_return),
                 sharpe_ratio = VALUES(sharpe_ratio),
@@ -835,7 +961,9 @@ class EnhancedDatabaseManager:
                 var_95 = VALUES(var_95),
                 win_rate = VALUES(win_rate),
                 profit_loss_ratio = VALUES(profit_loss_ratio),
-                daily_return = VALUES(daily_return)
+                daily_return = VALUES(daily_return),
+                total_return = VALUES(total_return),
+                composite_score = VALUES(composite_score)
             """
             
             # 准备插入的数据，映射到实际表的列
@@ -863,7 +991,9 @@ class EnhancedDatabaseManager:
                 'var_95': analysis_data.get('var_95', 0.0),
                 'win_rate': analysis_data.get('win_rate', 0.0),
                 'profit_loss_ratio': analysis_data.get('profit_loss_ratio', 0.0),
-                'daily_return': analysis_data.get('daily_return', 0.0)
+                'daily_return': analysis_data.get('daily_return', 0.0),
+                'total_return': analysis_data.get('total_return', 0.0),
+                'composite_score': analysis_data.get('composite_score', 0.0)
             }
             
             self.execute_sql(sql, prepared_data)

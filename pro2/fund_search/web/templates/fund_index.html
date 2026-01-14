@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #27ae60;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+        }
+        body {
+            background-color: #f5f6fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+        .stat-card {
+            padding: 20px;
+            text-align: center;
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        .stat-card .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .fund-table th {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .fund-table td {
+            vertical-align: middle;
+        }
+        .positive { color: var(--success-color); }
+        .negative { color: var(--danger-color); }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .search-box {
+            border-radius: 20px;
+            padding-left: 40px;
+            border: 1px solid #ddd;
+        }
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa;
+        }
+        .filter-btn {
+            border-radius: 20px;
+            padding: 8px 20px;
+        }
+        .pagination .page-link {
+            border-radius: 8px;
+            margin: 0 2px;
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .fund-name-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .fund-name-link:hover {
+            text-decoration: underline;
+        }
+        /* 日期选择器样式 */
+        input[type="date"] {
+            border-radius: 8px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-graph-up-arrow me-2"></i>基金分析系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/"><i class="bi bi-house me-1"></i>首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/strategy"><i class="bi bi-lightbulb me-1"></i>策略分析</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 统计卡片 -->
+        <div class="row mb-4" id="summary-cards">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="total-funds">--</div>
+                    <div class="stat-label">分析基金数量</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value positive" id="buy-signals">--</div>
+                    <div class="stat-label">买入信号</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value negative" id="sell-signals">--</div>
+                    <div class="stat-label">卖出信号</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="stat-value" id="avg-score">--</div>
+                    <div class="stat-label">平均综合评分</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 筛选和搜索 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <div class="position-relative">
+                            <i class="bi bi-search search-icon"></i>
+                            <input type="text" class="form-control search-box" id="search-input" 
+                                   placeholder="搜索基金代码或名称...">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="sort-select">
+                            <option value="composite_score">按综合评分排序</option>
+                            <option value="today_return">按今日收益排序</option>
+                            <option value="annualized_return">按年化收益排序</option>
+                            <option value="sharpe_ratio">按夏普比率排序</option>
+                            <option value="max_drawdown">按最大回撤排序</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" id="date-select" placeholder="选择分析日期">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary filter-btn w-100" onclick="loadFunds()">
+                            <i class="bi bi-funnel me-1"></i>筛选
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 基金列表 -->
+        <div class="table-container">
+            <div class="loading-spinner" id="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2 text-muted">正在加载数据...</p>
+            </div>
+            
+            <div class="table-responsive" id="table-container">
+                <table class="table fund-table">
+                    <thead>
+                        <tr>
+                            <th>基金代码</th>
+                            <th>基金名称</th>
+                            <th>今日收益</th>
+                            <th>年化收益</th>
+                            <th>夏普比率</th>
+                            <th>最大回撤</th>
+                            <th>综合评分</th>
+                            <th>状态</th>
+                            <th>操作建议</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fund-table-body">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <nav aria-label="Page navigation" class="mt-3">
+                <ul class="pagination justify-content-center" id="pagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- 基金详情模态框 -->
+    <div class="modal fade" id="fundDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modal-fund-title">基金详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="modal-fund-body">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let currentPage = 1;
+        const perPage = 20;
+        let totalPages = 1;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSummary();
+            initDatePicker();
+            loadFunds();
+            
+            // 搜索框回车事件
+            document.getElementById('search-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    currentPage = 1;
+                    loadFunds();
+                }
+            });
+            
+            // 排序选择变化时自动筛选
+            document.getElementById('sort-select').addEventListener('change', function() {
+                currentPage = 1;
+                loadFunds();
+            });
+            
+            // 日期选择变化时自动筛选
+            document.getElementById('date-select').addEventListener('change', function() {
+                currentPage = 1;
+                loadFunds();
+            });
+        });
+
+        // 初始化日期选择器
+        async function initDatePicker() {
+            try {
+                const response = await fetch('/api/analysis/dates');
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const dateInput = document.getElementById('date-select');
+                    // 设置默认值为最新日期
+                    const latestDate = result.data[0];
+                    dateInput.value = latestDate;
+                    
+                    // 设置可选日期范围
+                    const dates = result.data;
+                    if (dates.length > 0) {
+                        dateInput.min = dates[dates.length - 1];
+                        dateInput.max = dates[0];
+                    }
+                }
+            } catch (error) {
+                console.error('初始化日期选择器失败:', error);
+            }
+        }
+
+        // 加载汇总数据
+        async function loadSummary() {
+            try {
+                const response = await fetch('/api/summary');
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    document.getElementById('total-funds').textContent = result.data.total_funds || '--';
+                    document.getElementById('buy-signals').textContent = result.data.buy_signals || '0';
+                    document.getElementById('sell-signals').textContent = result.data.sell_signals || '0';
+                    document.getElementById('avg-score').textContent = 
+                        result.data.avg_composite_score ? result.data.avg_composite_score.toFixed(4) : '--';
+                }
+            } catch (error) {
+                console.error('加载汇总数据失败:', error);
+            }
+        }
+
+        // 加载基金列表
+        async function loadFunds() {
+            const loading = document.getElementById('loading');
+            const tableContainer = document.getElementById('table-container');
+            
+            loading.style.display = 'block';
+            tableContainer.style.opacity = '0.5';
+            
+            try {
+                const search = document.getElementById('search-input').value.trim();
+                const sortBy = document.getElementById('sort-select').value;
+                const date = document.getElementById('date-select').value;
+                
+                let url;
+                // 如果选择了日期，使用日期接口
+                if (date) {
+                    url = `/api/funds/by-date/${date}?sort_by=${sortBy}&sort_order=desc`;
+                    if (search) url += `&search=${encodeURIComponent(search)}`;
+                } else {
+                    url = `/api/funds?page=${currentPage}&per_page=${perPage}&sort_by=${sortBy}&sort_order=desc`;
+                    if (search) url += `&search=${encodeURIComponent(search)}`;
+                }
+                
+                console.log('请求URL:', url);  // 调试日志
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                console.log('返回结果:', result);  // 调试日志
+                
+                if (result.success) {
+                    renderFundTable(result.data);
+                    if (date) {
+                        // 日期接口返回全部数据，计算分页
+                        totalPages = Math.ceil((result.total || result.data.length) / perPage);
+                    } else {
+                        totalPages = Math.ceil(result.total / perPage);
+                    }
+                    renderPagination();
+                } else {
+                    console.error('API返回错误:', result.error);
+                    renderFundTable([]);
+                }
+            } catch (error) {
+                console.error('加载基金列表失败:', error);
+                renderFundTable([]);
+            } finally {
+                loading.style.display = 'none';
+                tableContainer.style.opacity = '1';
+            }
+        }
+
+        // 渲染基金表格
+        function renderFundTable(funds) {
+            const tbody = document.getElementById('fund-table-body');
+            tbody.innerHTML = '';
+            
+            if (!funds || funds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>';
+                return;
+            }
+            
+            funds.forEach(fund => {
+                const todayReturnClass = fund.today_return >= 0 ? 'positive' : 'negative';
+                const annualizedReturnClass = fund.annualized_return >= 0 ? 'positive' : 'negative';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><code>${fund.fund_code}</code></td>
+                        <td>
+                            <a href="/fund/${fund.fund_code}" class="fund-name-link">
+                                ${fund.fund_name || '--'}
+                            </a>
+                        </td>
+                        <td class="${todayReturnClass}">${fund.today_return !== null ? fund.today_return.toFixed(2) + '%' : '--'}</td>
+                        <td class="${annualizedReturnClass}">${fund.annualized_return !== null ? fund.annualized_return.toFixed(2) + '%' : '--'}</td>
+                        <td>${fund.sharpe_ratio !== null ? fund.sharpe_ratio.toFixed(4) : '--'}</td>
+                        <td class="negative">${fund.max_drawdown !== null ? fund.max_drawdown.toFixed(2) + '%' : '--'}</td>
+                        <td><strong>${fund.composite_score !== null ? fund.composite_score.toFixed(4) : '--'}</strong></td>
+                        <td><span class="status-badge">${fund.status_label || '--'}</span></td>
+                        <td><small>${fund.operation_suggestion || '--'}</small></td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 渲染分页
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // 上一页
+            pagination.innerHTML += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">上一页</a>
+                </li>
+            `;
+            
+            // 页码
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    pagination.innerHTML += `
+                        <li class="page-item ${i === currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+                        </li>
+                    `;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    pagination.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+            
+            // 下一页
+            pagination.innerHTML += `
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">下一页</a>
+                </li>
+            `;
+        }
+
+        // 跳转页面
+        function goToPage(page) {
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadFunds();
+        }
+
+        // 查看基金详情
+        async function viewFundDetail(fundCode) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const fund = result.data;
+                    document.getElementById('modal-fund-title').textContent = 
+                        `${fund.fund_code} - ${fund.fund_name}`;
+                    
+                    document.getElementById('modal-fund-body').innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>收益指标</h6>
+                                <table class="table table-sm">
+                                    <tr><td>今日收益</td><td class="${fund.today_return >= 0 ? 'positive' : 'negative'}">${fund.today_return}%</td></tr>
+                                    <tr><td>年化收益</td><td class="${fund.annualized_return >= 0 ? 'positive' : 'negative'}">${fund.annualized_return}%</td></tr>
+                                    <tr><td>胜率</td><td>${fund.win_rate}%</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>风险指标</h6>
+                                <table class="table table-sm">
+                                    <tr><td>夏普比率</td><td>${fund.sharpe_ratio}</td></tr>
+                                    <tr><td>最大回撤</td><td class="negative">${fund.max_drawdown}%</td></tr>
+                                    <tr><td>波动率</td><td>${fund.volatility}%</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-12">
+                                <h6>操作建议</h6>
+                                <p><strong>状态：</strong>${fund.status_label}</p>
+                                <p><strong>建议：</strong>${fund.operation_suggestion}</p>
+                                <p><strong>综合评分：</strong><span class="badge bg-primary">${fund.composite_score}</span></p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    new bootstrap.Modal(document.getElementById('fundDetailModal')).show();
+                }
+            } catch (error) {
+                console.error('加载基金详情失败:', error);
+            }
+        }
+    </script>
+</body>
+</html>
