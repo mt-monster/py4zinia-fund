@@ -137,39 +137,57 @@ class EnhancedNotificationManager:
     def _generate_html_report(self, fund_data: pd.DataFrame, strategy_summary: Dict, 
                              report_files: Dict, analysis_date: str) -> str:
         """
-        生成HTML格式报告（匹配参考图片样式）
+        生成HTML格式报告（匹配参考图片样式 - 专业绩效分析表格）
         """
         try:
-            # 构建HTML表格
-            html_table = self._format_fund_data_to_table(fund_data)
+            # 构建专业的HTML表格（使用绩效分析表格格式）
+            html_table = self._format_performance_data_to_table(fund_data)
             
             # 格式化日期（将2026-01-13转换为2026年01月13日格式）
             try:
                 date_obj = datetime.strptime(analysis_date, '%Y-%m-%d')
-                formatted_date = date_obj.strftime('%Y年%m月%d日')
+                formatted_date = date_obj.strftime('%Y-%m-%d')
             except:
                 formatted_date = analysis_date
             
-            # 添加策略汇总信息（如果有）
+            # 生成策略汇总信息
             summary_html = ""
             if strategy_summary:
                 summary_html = self._format_strategy_summary_to_html(strategy_summary)
+            else:
+                # 如果没有传入策略汇总，从数据中生成
+                summary_html = self._format_strategy_summary_to_html(self._generate_performance_summary(fund_data))
             
-            # 构建完整的HTML报告
+            # 添加报告标题和时间信息
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 构建完整的HTML报告（与图片完全一致的样式）
             full_content = f"""
-            <div style="font-family: Arial, sans-serif; margin: 20px;">
-                <div style="display: flex; align-items: center; margin-bottom: 20px;">
-                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
-                        <span style="color: white; font-size: 24px; font-weight: bold;">📊</span>
-                    </div>
-                    <h2 style="margin: 0; color: #333;">基金分析报告 - {formatted_date}</h2>
+            <div style="font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto;">
+                <h2 style="color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                    [测试] 📊 基金绩效分析报告 - {formatted_date}
+                </h2>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                    <p style="margin: 5px 0;"><strong>生成时间:</strong> {current_time}</p>
+                    <p style="margin: 5px 0;"><strong>分析基金数量:</strong> {len(fund_data)} 只</p>
+                    <p style="margin: 5px 0;"><strong>报告类型:</strong> 专业绩效分析</p>
                 </div>
                 
-                <h3 style="color: #555; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">持仓基金收益率变化分析</h3>
-                
-                {html_table}
-                
                 {summary_html}
+                
+                <h3 style="color: #2c3e50; margin-top: 30px;">📈 基金绩效分析详情</h3>
+                <div style="margin: 20px 0;">{html_table}</div>
+                
+                <div style="border-top: 1px solid #ecf0f1; padding-top: 15px; margin-top: 30px; font-size: 12px; color: #7f8c8d;">
+                    <p>📋 <strong>备注:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>绩效数据基于历史表现计算，不代表未来收益</li>
+                        <li>夏普比率、卡尔玛比率等指标用于风险调整收益评估</li>
+                        <li>最大回撤率反映基金历史最大跌幅</li>
+                        <li>操作建议仅供参考，请结合自身投资策略决策</li>
+                    </ul>
+                </div>
             </div>
             """
             
@@ -598,7 +616,332 @@ class EnhancedNotificationManager:
         except Exception as e:
             logger.error(f"发送基金表格通知失败: {str(e)}")
             return False
+    
+    def send_performance_analysis_email(self, performance_data: pd.DataFrame, title: str = None) -> bool:
+        """
+        发送基金绩效分析结果邮件
+        
+        参数：
+        performance_data: 基金绩效分析数据DataFrame
+        title: 邮件标题（可选）
+        
+        返回：
+        bool: 发送是否成功
+        """
+        try:
+            if performance_data.empty:
+                logger.warning("绩效分析数据为空，无法发送邮件")
+                return True
+            
+            # 设置邮件标题（与图片完全一致）
+            if not title:
+                current_date = datetime.now().strftime('%Y-%m-%d')
+                title = f"[测试] 基金绩效分析报告 - {current_date}"
+            
+            # 构建专业的HTML表格
+            html_table = self._format_performance_data_to_table(performance_data)
+            
+            # 生成策略汇总信息
+            strategy_summary = self._generate_performance_summary(performance_data)
+            summary_html = self._format_strategy_summary_to_html(strategy_summary)
+            
+            # 添加报告标题和时间信息
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 构建完整的HTML邮件内容
+            full_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto;">
+                <h2 style="color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                    {title}
+                </h2>
+                
+                <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                    <p style="margin: 5px 0;"><strong>生成时间:</strong> {current_time}</p>
+                    <p style="margin: 5px 0;"><strong>分析基金数量:</strong> {len(performance_data)} 只</p>
+                    <p style="margin: 5px 0;"><strong>报告类型:</strong> 专业绩效分析</p>
+                </div>
+                
+                {summary_html}
+                
+                <h3 style="color: #2c3e50; margin-top: 30px;">📈 基金绩效分析详情</h3>
+                <div style="margin: 20px 0;">{html_table}</div>
+                
+                <div style="border-top: 1px solid #ecf0f1; padding-top: 15px; margin-top: 30px; font-size: 12px; color: #7f8c8d;">
+                    <p>📋 <strong>备注:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>绩效数据基于历史表现计算，不代表未来收益</li>
+                        <li>夏普比率、卡尔玛比率等指标用于风险调整收益评估</li>
+                        <li>最大回撤率反映基金历史最大跌幅</li>
+                        <li>操作建议仅供参考，请结合自身投资策略决策</li>
+                    </ul>
+                </div>
+            </div>
+            """
+            
+            # 发送邮件通知（使用专业的绩效分析模板）
+            email_success = self.send_email_notification(title, full_content)
+            
+            return email_success
+            
+        except Exception as e:
+            logger.error(f"发送绩效分析邮件失败: {str(e)}")
+            return False
+    
+    def _generate_performance_summary(self, performance_data: pd.DataFrame) -> Dict:
+        """
+        从绩效分析数据中生成策略汇总信息
+        
+        参数：
+        performance_data: 基金绩效分析数据DataFrame
+        
+        返回：
+        Dict: 策略汇总信息
+        """
+        summary = {
+            'total_funds': len(performance_data),
+            'buy_signals': 0,
+            'sell_signals': 0,
+            'hold_signals': 0,
+            'avg_today_return': 0.0
+        }
+        
+        if performance_data.empty:
+            return summary
+        
+        # 计算买入/卖出/持有信号数量
+        if 'operation_suggestion' in performance_data.columns:
+            suggestions = performance_data['operation_suggestion'].dropna()
+            summary['buy_signals'] = len(suggestions[suggestions.str.contains('买入|加仓')])
+            summary['sell_signals'] = len(suggestions[suggestions.str.contains('卖出|赎回')])
+            summary['hold_signals'] = len(suggestions[suggestions.str.contains('持有|观望')])
+        
+        # 计算平均今日收益率
+        if 'today_return' in performance_data.columns:
+            today_returns = performance_data['today_return'].dropna()
+            if not today_returns.empty:
+                summary['avg_today_return'] = today_returns.mean()
+        
+        # 计算平均年化收益率
+        if 'annualized_return' in performance_data.columns:
+            annualized_returns = performance_data['annualized_return'].dropna()
+            if not annualized_returns.empty:
+                summary['avg_annualized_return'] = annualized_returns.mean()
+        
+        # 计算平均夏普比率
+        if 'sharpe_ratio' in performance_data.columns:
+            sharpe_ratios = performance_data['sharpe_ratio'].dropna()
+            if not sharpe_ratios.empty:
+                summary['avg_sharpe_ratio'] = sharpe_ratios.mean()
+        
+        return summary
 
+    def _format_performance_data_to_table(self, fund_data: pd.DataFrame) -> str:
+        """
+        将基金绩效分析数据格式化为专业的HTML表格
+        
+        参数：
+        fund_data: 基金绩效分析数据DataFrame
+        
+        返回：
+        str: HTML格式的表格
+        """
+        if fund_data.empty:
+            return "<p>没有基金绩效数据可显示</p>"
+        
+        # 定义与图片完全一致的列顺序
+        priority_columns = [
+            'fund_code', 'fund_name', 'yesterday_nav', 'current_estimate', 
+            'today_return', 'prev_day_return', 'annualized_return',
+            'sharpe_ratio', 'max_drawdown', 'volatility',
+            'calmar_ratio', 'sortino_ratio', 'var_95',
+            'win_rate', 'profit_loss_ratio', 'composite_score',
+            'status_label', 'operation_suggestion', 'redeem_amount',
+            'execute_amount', 'execution_amount'
+        ]
+        
+        # 确定实际可用的列，按照优先级排序
+        available_columns = []
+        for col in priority_columns:
+            if col in fund_data.columns:
+                available_columns.append(col)
+        
+        # 如果优先级列中没有可用的，使用数据中的所有列
+        if not available_columns:
+            available_columns = fund_data.columns.tolist()
+        
+        # 创建HTML表格（与图片完全一致的样式）
+        html_table = """
+        <div style="width: 100%; overflow-x: auto;">
+        <table border="1" style="border-collapse: collapse; width: 100%; text-align: center; font-size: 12px; font-family: Arial, sans-serif;">
+            <thead>
+                <tr style="background-color: #f5f5f5; color: #333; font-weight: bold; border-bottom: 2px solid #333;">
+        """
+        
+        # 添加表头
+        for col in available_columns:
+            display_name = self._get_column_display_name(col)
+            html_table += f"<th style='padding: 8px; border: 1px solid #bdc3c7; background-color: #e8f4f8;'>{display_name}</th>"
+        
+        html_table += "</tr></thead><tbody>"
+        
+        # 添加数据行
+        for _, row in fund_data.iterrows():
+            html_table += "<tr>"
+            for col in available_columns:
+                value = row[col] if col in row else "N/A"
+                
+                # 根据列类型格式化值
+                if col in ['today_return', 'prev_day_return', 'yesterday_return', 
+                           'annualized_return', 'daily_return', 'total_return',
+                           'volatility', 'win_rate']:
+                    # 百分比格式的收益率和波动率
+                    if pd.notna(value):
+                        formatted_value = f"{value*100:.2f}%"
+                        # 根据数值正负设置颜色
+                        color = '#FF6B6B' if value < 0 else '#27ae60' if value > 0 else '#7f8c8d'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col in ['max_drawdown']:
+                    # 百分比格式的回撤率（通常为负值）
+                    if pd.notna(value):
+                        formatted_value = f"{value*100:.2f}%"
+                        # 回撤率通常显示为红色
+                        color = '#FF6B6B'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col in ['sharpe_ratio', 'calmar_ratio', 'sortino_ratio', 'profit_loss_ratio', 'composite_score']:
+                    # 数值格式的绩效指标
+                    if pd.notna(value):
+                        formatted_value = f"{value:.4f}"
+                        # 根据数值好坏设置颜色
+                        if col in ['sharpe_ratio', 'calmar_ratio', 'sortino_ratio', 'profit_loss_ratio', 'composite_score']:
+                            color = '#27ae60' if value > 0 else '#FF6B6B' if value < 0 else '#7f8c8d'
+                        else:
+                            color = '#2c3e50'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col == 'var_95':
+                    # 风险价值
+                    if pd.notna(value):
+                        formatted_value = f"{value:.4f}"
+                        # 风险价值通常显示为红色
+                        color = '#FF6B6B'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col in ['yesterday_nav', 'current_estimate']:
+                    # 净值和估值
+                    if pd.notna(value):
+                        try:
+                            # 确保值是数值类型
+                            num_value = float(value)
+                            formatted_value = f"¥{num_value:.4f}"
+                            color = '#2c3e50'
+                        except (ValueError, TypeError):
+                            # 如果是字符串，直接使用
+                            formatted_value = str(value)
+                            color = '#2c3e50'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col == 'redeem_amount':
+                    # 赎回金额（支持数值和字符串格式）
+                    if pd.notna(value):
+                        try:
+                            # 尝试将值转换为数值
+                            num_value = float(value)
+                            formatted_value = f"¥{num_value:.2f}"
+                            color = '#FF6B6B' if num_value > 0 else '#2c3e50'
+                        except (ValueError, TypeError):
+                            # 如果是字符串，直接使用
+                            formatted_value = str(value)
+                            color = '#FF6B6B' if '赎回' in formatted_value else '#2c3e50'
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                elif col == 'operation_suggestion':
+                    # 操作建议格式化
+                    suggestion = str(value) if pd.notna(value) else "N/A"
+                    # 根据建议内容设置颜色
+                    if "买入" in suggestion or "持有" in suggestion:
+                        color = "#27ae60"
+                    elif "赎回" in suggestion or "卖出" in suggestion:
+                        color = "#FF6B6B"
+                    else:
+                        color = "#2c3e50"
+                    html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color}; font-weight: bold;'>{suggestion}</td>"
+                
+                elif col in ['execute_amount', 'execution_amount']:
+                    # 执行金额格式化
+                    amount = str(value) if pd.notna(value) else "N/A"
+                    # 根据金额内容设置颜色
+                    color = "#FF6B6B" if "赎回" in amount else "#27ae60" if "买入" in amount else "#2c3e50"
+                    html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{amount}</td>"
+                
+                elif col == 'status_label':
+                    # 状态标签格式化（与图片完全一致的样式）
+                    status = str(value) if pd.notna(value) else "N/A"
+                    # 根据状态设置不同颜色的圆形标记（与图片完全一致）
+                    if "反转转跌" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #FF6B6B; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#FF6B6B"
+                        status_text = "反转转跌"
+                    elif "连涨加速" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #FFD700; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#FFD700"
+                        status_text = "连涨加速"
+                    elif "连涨放缓" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #FFA500; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#FFA500"
+                        status_text = "连涨放缓"
+                    elif "连涨回落" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #FF6B6B; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#FF6B6B"
+                        status_text = "连涨回落"
+                    elif "大涨" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #00FF00; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#00FF00"
+                        status_text = "大涨"
+                    elif "震荡整理" in status:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #808080; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#808080"
+                        status_text = "震荡整理"
+                    else:
+                        icon = '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #808080; margin-right: 5px; vertical-align: middle;"></span>'
+                        color = "#808080"
+                        status_text = status
+                    
+                    html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7;'>{icon}<strong style='color: {color};'>{status_text}</strong></td>"
+                
+                elif col == 'is_buy':
+                    # 是否买入字段
+                    if pd.notna(value):
+                        is_buy = bool(value)
+                        formatted_value = "是" if is_buy else "否"
+                        color = "#27ae60" if is_buy else "#FF6B6B"
+                        html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7; color: {color};'>{formatted_value}</td>"
+                    else:
+                        html_table += "<td style='padding: 6px; border: 1px solid #bdc3c7;'>N/A</td>"
+                
+                else:
+                    # 普通文本格式
+                    display_value = str(value) if pd.notna(value) else "N/A"
+                    html_table += f"<td style='padding: 6px; border: 1px solid #bdc3c7;'>{display_value}</td>"
+            
+            html_table += "</tr>"
+        
+        html_table += "</tbody></table></div>"
+        return html_table
+    
     def _format_fund_data_to_table(self, fund_data: pd.DataFrame) -> str:
         """
         将基金数据格式化为HTML表格（匹配参考图片样式）
@@ -721,11 +1064,44 @@ class EnhancedNotificationManager:
         if not strategy_summary:
             return ""
         
-        html_content = "<div style='margin: 15px 0; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'><h4>📊 策略汇总</h4><ul>"
+        html_content = "<div style='margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;'><h4 style='color: #2c3e50; margin-top: 0;'>📊 绩效分析汇总</h4><ul style='margin: 10px 0; padding-left: 20px; list-style-type: disc;'>"
+        
+        # 添加分析基金总数
+        if 'total_funds' in strategy_summary:
+            html_content += f"<li><strong>分析基金总数:</strong> {strategy_summary['total_funds']} 只</li>"
+        
+        # 添加信号统计
+        if 'buy_signals' in strategy_summary or 'sell_signals' in strategy_summary or 'hold_signals' in strategy_summary:
+            html_content += "<li><strong>操作建议分布:</strong> "
+            if 'buy_signals' in strategy_summary and strategy_summary['buy_signals'] > 0:
+                html_content += f"<span style='color: #27ae60;'>买入: {strategy_summary['buy_signals']} 只</span>, "
+            if 'hold_signals' in strategy_summary and strategy_summary['hold_signals'] > 0:
+                html_content += f"<span style='color: #f39c12;'>持有: {strategy_summary['hold_signals']} 只</span>, "
+            if 'sell_signals' in strategy_summary and strategy_summary['sell_signals'] > 0:
+                html_content += f"<span style='color: #e74c3c;'>卖出: {strategy_summary['sell_signals']} 只</span>"
+            html_content = html_content.rstrip(', ') + "</li>"
+        
+        # 添加平均收益率信息
+        if 'avg_today_return' in strategy_summary:
+            avg_today = strategy_summary['avg_today_return']
+            color = '#27ae60' if avg_today > 0 else '#e74c3c' if avg_today < 0 else '#7f8c8d'
+            html_content += f"<li><strong>平均今日收益率:</strong> <span style='color: {color};'>{avg_today*100:.2f}%</span></li>"
+        
+        # 添加年化收益率信息
+        if 'avg_annualized_return' in strategy_summary:
+            avg_annualized = strategy_summary['avg_annualized_return']
+            color = '#27ae60' if avg_annualized > 0 else '#e74c3c' if avg_annualized < 0 else '#7f8c8d'
+            html_content += f"<li><strong>平均年化收益率:</strong> <span style='color: {color};'>{avg_annualized*100:.2f}%</span></li>"
+        
+        # 添加平均夏普比率
+        if 'avg_sharpe_ratio' in strategy_summary:
+            avg_sharpe = strategy_summary['avg_sharpe_ratio']
+            color = '#27ae60' if avg_sharpe > 1 else '#f39c12' if avg_sharpe > 0 else '#e74c3c'
+            html_content += f"<li><strong>平均夏普比率:</strong> <span style='color: {color};'>{avg_sharpe:.4f}</span></li>"
         
         # 添加操作分布
         if 'action_distribution' in strategy_summary:
-            html_content += "<li><strong>操作分布:</strong> "
+            html_content += "<li><strong>详细操作分布:</strong> "
             for action, count in strategy_summary['action_distribution'].items():
                 html_content += f"{action}: {count} 只, "
             html_content = html_content.rstrip(', ') + "</li>"
@@ -736,15 +1112,7 @@ class EnhancedNotificationManager:
         
         # 添加总赎回金额
         if 'total_redeem_amount' in strategy_summary:
-            html_content += f"<li><strong>总赎回金额:</strong> ¥{strategy_summary['total_redeem_amount']}</li>"
-        
-        # 添加信号统计
-        if 'buy_signals' in strategy_summary:
-            html_content += f"<li><strong>买入信号:</strong> {strategy_summary['buy_signals']} 只</li>"
-        if 'sell_signals' in strategy_summary:
-            html_content += f"<li><strong>卖出信号:</strong> {strategy_summary['sell_signals']} 只</li>"
-        if 'hold_signals' in strategy_summary:
-            html_content += f"<li><strong>持有信号:</strong> {strategy_summary['hold_signals']} 只</li>"
+            html_content += f"<li><strong>总赎回金额:</strong> ¥{strategy_summary['total_redeem_amount']:.2f}</li>"
         
         html_content += "</ul></div>"
         return html_content
@@ -752,19 +1120,46 @@ class EnhancedNotificationManager:
     def _get_column_display_name(self, column_name: str) -> str:
         """获取列的显示名称"""
         column_names = {
+            # 基本信息字段
             'fund_code': '基金代码',
             'fund_name': '基金名称',
+            'analysis_date': '分析日期',
+            
+            # 净值相关字段
+            'yesterday_nav': '昨日净值',
+            'current_estimate': '今日估值',
+            'daily_return': '日收益率',
+            'total_return': '总收益率',
+            
+            # 收益率相关字段
             'today_return': '今日收益率',
+            'prev_day_return': '前一日收益率',
             'yesterday_return': '昨日收益率',
-            'trend_status': '趋势状态',
-            'operation_suggestion': '操作建议',
-            'execute_amount': '执行金额',
             'annualized_return': '年化收益率',
+            
+            # 绩效分析字段
             'sharpe_ratio': '夏普比率',
-            'max_drawdown': '最大回撤',
-            'volatility': '波动率',
-            'win_rate': '胜率',
-            'composite_score': '综合评分'
+            'max_drawdown': '最大回撤率',
+            'volatility': '年化波动率',
+            'calmar_ratio': '卡尔玛比率',
+            'sortino_ratio': '索提诺比率',
+            'var_95': '风险价值(VaR)',
+            'win_rate': '盈利胜率',
+            'profit_loss_ratio': '盈亏比率',
+            'composite_score': '综合绩效评分',
+            
+            # 交易建议字段
+            'status_label': '状态标签',
+            'is_buy': '是否买入',
+            'redeem_amount': '赎回金额',
+            'comparison_value': '比较值',
+            'operation_suggestion': '操作建议',
+            'execution_amount': '执行金额',
+            'execute_amount': '执行金额',
+            'buy_multiplier': '买入倍数',
+            
+            # 趋势分析字段
+            'trend_status': '趋势状态'
         }
         return column_names.get(column_name, column_name)
 

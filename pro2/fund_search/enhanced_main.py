@@ -1525,11 +1525,26 @@ class EnhancedFundAnalysisSystem:
                 # 获取基金绩效指标
                 metrics = self.fund_data_manager.get_performance_metrics(fund_code)
                 
-                # 获取投资策略建议
-                today_return = float(fund_info.get('today_return', 0))
-                prev_day_return = float(fund_info.get('prev_day_return', 0))
+                # 获取投资策略建议 - 正确获取字段
+                today_return = float(fund_info.get('daily_return', 0))
+                
+                # 获取历史数据用于计算前一日收益率（与analyze_single_fund保持一致）
+                historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
+                prev_day_return = 0.0
+                
+                if len(historical_data) >= 2:
+                    # 获取前一日收益率
+                    recent_returns = historical_data['daily_return'].dropna().tail(2)
+                    if len(recent_returns) >= 2:
+                        today_return = recent_returns.iloc[-1] * 100  # 转换为百分比
+                        prev_day_return = recent_returns.iloc[-2] * 100
+                
+                # 计算交易建议的所有字段（与analyze_single_fund保持一致）
+                status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, buy_multiplier = self.get_investment_strategy(today_return, prev_day_return)
+                
                 strategy = self.strategy_engine.analyze_strategy(today_return, prev_day_return)
                 
+                # 确保字段名与analyze_single_fund保持一致
                 result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name,
@@ -1537,12 +1552,21 @@ class EnhancedFundAnalysisSystem:
                     'today_return': today_return,
                     'prev_day_return': prev_day_return,
                     'daily_return': today_return,  # 用于收益率分析图表
-                    'total_return': float(fund_info.get('total_return', 0)),
-                    'nav': float(fund_info.get('nav', 0)),
-                    'prev_nav': float(fund_info.get('prev_nav', 0)),
+                    'total_return': float(metrics.get('total_return', 0)),
+                    'current_nav': float(fund_info.get('current_nav', 0)),
+                    'previous_nav': float(fund_info.get('previous_nav', 0)),
+                    'estimate_nav': float(fund_info.get('estimate_nav', 0)),
                     'strategy_advice': strategy['action'],
                     'strategy_reason': strategy['operation_suggestion'],
                     'risk_level': 'medium',  # 默认风险等级
+                    # 添加缺失的字段
+                    'status_label': status_label,
+                    'is_buy': is_buy,
+                    'redeem_amount': redeem_amount,
+                    'comparison_value': comparison_value,
+                    'operation_suggestion': operation_suggestion,
+                    'execution_amount': execution_amount,
+                    'buy_multiplier': buy_multiplier,
                     **metrics
                 }
                 
