@@ -3,503 +3,2507 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>基金分析系统</title>
+    <title>投资账本 - 基金分析系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #3498db;
-            --success-color: #27ae60;
-            --danger-color: #e74c3c;
-            --warning-color: #f39c12;
+            --primary-red: #e74c3c;
+            --light-red: #fadbd8;
+            --success-green: #27ae60;
+            --danger-red: #e74c3c;
+            --text-dark: #2c3e50;
+            --text-muted: #7f8c8d;
+            --border-color: #ecf0f1;
+            --bg-light: #f8f9fa;
         }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background-color: #f5f6fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-size: 13px;
+            background-color: #f5f5f5;
+            color: var(--text-dark);
         }
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-        }
-        .stat-card {
-            padding: 20px;
-            text-align: center;
-        }
-        .stat-card .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        .stat-card .stat-label {
-            color: #7f8c8d;
-            font-size: 0.9rem;
-        }
-        .table-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-        }
-        .fund-table th {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .fund-table td {
-            vertical-align: middle;
-        }
-        .positive { color: var(--success-color); }
-        .negative { color: var(--danger-color); }
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-        .search-box {
-            border-radius: 20px;
-            padding-left: 40px;
-            border: 1px solid #ddd;
-        }
-        .search-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
-        .filter-btn {
-            border-radius: 20px;
+        /* 顶部导航 */
+        .top-nav {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        .pagination .page-link {
-            border-radius: 8px;
-            margin: 0 2px;
+        .top-nav .brand {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        .loading-spinner {
-            display: none;
-            text-align: center;
-            padding: 40px;
-        }
-        .fund-name-link {
-            color: var(--primary-color);
+        .top-nav .nav-links { display: flex; gap: 20px; }
+        .top-nav .nav-links a {
+            color: rgba(255,255,255,0.9);
             text-decoration: none;
-            font-weight: 500;
-        }
-        .fund-name-link:hover {
-            text-decoration: underline;
-        }
-        /* 日期选择器样式 */
-        input[type="date"] {
-            border-radius: 8px;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            cursor: pointer;
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-            padding: 4px;
+            font-size: 14px;
+            padding: 5px 10px;
             border-radius: 4px;
         }
-        input[type="date"]::-webkit-calendar-picker-indicator:hover {
-            background-color: #f0f0f0;
-        }
-    </style>
+        .top-nav .nav-links a:hover { background: rgba(255,255,255,0.1); }
+</style>
 </head>
 <body>
-    <!-- 导航栏 -->
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <i class="bi bi-graph-up-arrow me-2"></i>基金分析系统
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/"><i class="bi bi-house me-1"></i>首页</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/strategy"><i class="bi bi-lightbulb me-1"></i>策略分析</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container">
-        <!-- 统计卡片 -->
-        <div class="row mb-4" id="summary-cards">
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value" id="total-funds">--</div>
-                    <div class="stat-label">分析基金数量</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value positive" id="buy-signals">--</div>
-                    <div class="stat-label">买入信号</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value negative" id="sell-signals">--</div>
-                    <div class="stat-label">卖出信号</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value" id="avg-score">--</div>
-                    <div class="stat-label">平均综合评分</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 筛选和搜索 -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-4">
-                        <div class="position-relative">
-                            <i class="bi bi-search search-icon"></i>
-                            <input type="text" class="form-control search-box" id="search-input" 
-                                   placeholder="搜索基金代码或名称...">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="sort-select">
-                            <option value="composite_score">按综合评分排序</option>
-                            <option value="today_return">按今日收益排序</option>
-                            <option value="annualized_return">按年化收益排序</option>
-                            <option value="sharpe_ratio">按夏普比率排序</option>
-                            <option value="max_drawdown">按最大回撤排序</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <input type="date" class="form-control" id="date-select" placeholder="选择分析日期">
-                    </div>
-                    <div class="col-md-2">
-                        <button class="btn btn-primary filter-btn w-100" onclick="loadFunds()">
-                            <i class="bi bi-funnel me-1"></i>筛选
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 基金列表 -->
-        <div class="table-container">
-            <div class="loading-spinner" id="loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">加载中...</span>
-                </div>
-                <p class="mt-2 text-muted">正在加载数据...</p>
-            </div>
+<style>
+        /* 主容器布局 - 更新为单列布局 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 50px);
+        }
+        /* 表格区域 - 现在占据全宽 */
+        .left-panel {
+            flex: 1;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        /* 工具栏 */
+        .toolbar {
+            padding: 10px 15px;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .toolbar .search-box {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0 10px;
+        }
+        .toolbar .search-box input {
+            border: none;
+            outline: none;
+            padding: 6px 8px;
+            width: 180px;
+            font-size: 13px;
+        }
+        .toolbar select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+        }
+        .toolbar input[type="date"] {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .toolbar .btn-filter {
+            background: var(--primary-red);
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .toolbar .btn-filter:hover { background: #c0392b; }
+        /* 表格样式 */
+        .table-wrapper {
+            flex: 1;
+            overflow: auto;
+        }
+        .fund-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .fund-table th {
+            background: #fafafa;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 500;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            white-space: nowrap;
+        }
+        .fund-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+        .fund-table tr:hover { background: #fafafa; }
+        .fund-table tr.selected { background: #fff3f3; }
+        .fund-table .fund-code {
+            color: var(--primary-red);
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .fund-table .fund-code:hover { text-decoration: underline; }
+        
+        /* 展开面板样式 */
+        .expansion-panel-row {
+            background: transparent !important;
+        }
+        .expansion-panel-row:hover {
+            background: transparent !important;
+        }
+        .expansion-panel-container {
+            transition: height 0.3s ease-out;
+            overflow: hidden;
+        }
+        
+        .positive { color: var(--success-green); }
+        .negative { color: var(--danger-red); }
+        .text-muted { color: var(--text-muted); }
+        /* 排序相关样式 */
+        .fund-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+        .fund-table th.sortable:hover {
+            background: #f0f0f0;
+        }
+        .fund-table th.sortable.sorted {
+            background: #e8f4fc;
+            color: var(--text-dark);
+        }
+        .sort-indicator {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 10px;
+            color: #aaa;
+            vertical-align: middle;
+        }
+        .sort-indicator.asc::after {
+            content: '▲';
+            color: var(--primary-red);
+        }
+        .sort-indicator.desc::after {
+            content: '▼';
+            color: var(--primary-red);
+        }
+</style>
+<style>
+        /* 右侧详情面板样式 - 保留供后续展开功能使用 */
+        /* 这些样式将在展开功能中重新使用 */
+        .detail-panel {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            margin: 10px;
+        }
+        
+        .detail-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .fund-title-section .fund-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-dark);
+            margin-bottom: 5px;
+        }
+        
+        .fund-title-section .fund-code-display {
+            color: var(--text-muted);
+            font-size: 13px;
+            font-family: monospace;
+        }
+        
+        .detail-content {
+            padding: 0;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 300px;
+        }
+        
+        .detail-left, .detail-right {
+            padding: 20px;
+        }
+        
+        .detail-right {
+            border-left: 1px solid var(--border-color);
+            background: #fafafa;
+        }
+        
+        /* 收益率显示 */
+        .return-display {
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        .return-display .main-return {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .return-display .return-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        
+        .nav-info {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 12px;
+        }
+        
+        .nav-value {
+            color: var(--text-muted);
+        }
+        
+        .nav-change {
+            font-weight: 500;
+        }
+        
+        /* 性能指标区域 */
+        .metrics-section, .risk-section, .advice-section {
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title i {
+            color: var(--primary-red);
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .metric-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        /* 投资建议区域 */
+        .advice-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 0 -20px 20px -20px;
+        }
+        
+        .advice-content {
+            margin-top: 15px;
+        }
+        
+        .advice-main {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .advice-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .advice-icon.strong-buy {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .advice-icon.buy {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .advice-icon.hold {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .advice-icon.sell {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .advice-text {
+            flex: 1;
+        }
+        
+        .advice-status {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 3px;
+        }
+        
+        .advice-suggestion {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        
+        .advice-details {
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+        }
+        
+        .advice-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .advice-row:last-child {
+            border-bottom: none;
+        }
+        
+        .advice-row .label {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        
+        .advice-row .value {
+            font-weight: 500;
+            font-size: 12px;
+        }
+        
+        .score-strong-buy { color: #155724; }
+        .score-buy { color: #0c5460; }
+        .score-hold { color: #856404; }
+        .score-sell { color: #721c24; }
+        
+        /* 风险指标区域 */
+        .risk-level {
+            margin-bottom: 15px;
+        }
+        
+        .risk-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .risk-badge.risk-low {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .risk-badge.risk-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .risk-badge.risk-high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .risk-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .risk-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .risk-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .risk-value {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        /* 走势图区域 */
+        .chart-section {
+            margin-top: 20px;
+        }
+        
+        .chart-section .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .chart-section .chart-title i {
+            color: var(--primary-red);
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #eee;
+            padding: 15px;
+            min-height: 250px;
+            position: relative;
+        }
+        
+        /* 可调整大小的图表样式 */
+        .resizable-chart-wrapper {
+            position: relative;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            overflow: hidden;
+            transition: box-shadow 0.2s ease;
+        }
+        
+        .resizable-chart-wrapper:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .resize-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--primary-red);
+            border: 1px solid white;
+            border-radius: 50%;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .resize-handle:hover {
+            background: #c0392b;
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+        
+        .resizable-chart-wrapper:hover .resize-handle {
+            opacity: 1;
+        }
+        
+        /* 拖拽时的样式 */
+        body.dragging {
+            user-select: none;
+            cursor: grabbing !important;
+        }
+        
+        body.dragging * {
+            cursor: inherit !important;
+        }
+        
+        .chart-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+        }
+        
+        .chart-placeholder i {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #ddd;
+        }
+        
+        .chart-error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--danger-red);
+        }
+        
+        .chart-error i {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .chart-controls {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* 时间段选择 */
+        .period-tabs {
+            display: flex;
+            gap: 5px;
+            background: #f8f9fa;
+            padding: 4px;
+            border-radius: 6px;
+        }
+        
+        .period-tabs .tab {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+        }
+        
+        .period-tabs .tab:hover {
+            background: #e9ecef;
+            color: var(--text-dark);
+        }
+        
+        .period-tabs .tab.active {
+            background: var(--primary-red);
+            color: white;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
             
-            <div class="table-responsive" id="table-container">
-                <table class="table fund-table">
+            .detail-right {
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+            }
+            
+            .detail-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+            
+            .metrics-grid, .risk-metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .detail-panel {
+                margin: 5px;
+            }
+            
+            .detail-left, .detail-right {
+                padding: 15px;
+            }
+            
+            .advice-section {
+                margin: 0 -15px 15px -15px;
+                padding: 15px;
+            }
+            
+            .return-display .main-return {
+                font-size: 24px;
+            }
+        }
+        /* 收益率显示 */
+        .return-display {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        .return-display .main-return {
+            font-size: 36px;
+            font-weight: bold;
+        }
+        .return-display .return-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+        .return-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        .return-item {
+            text-align: center;
+        }
+        .return-item .value {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .return-item .label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        /* 走势图区域 */
+        .chart-section {
+            margin-bottom: 15px;
+        }
+        .chart-section .chart-title {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: var(--text-dark);
+        }
+        .chart-container {
+            height: 120px;
+            background: #fafafa;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+        }
+        /* 投资建议区域 */
+        .advice-section {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .advice-section .section-title {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .advice-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .advice-row:last-child { border-bottom: none; }
+        .advice-row .label { color: var(--text-muted); }
+        .advice-row .value { font-weight: 500; }
+        /* 时间段选择 */
+        .period-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .period-tabs .tab {
+            padding: 5px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            background: white;
+        }
+        .period-tabs .tab:hover { background: #f5f5f5; }
+        .period-tabs .tab.active {
+            background: var(--primary-red);
+            color: white;
+            border-color: var(--primary-red);
+        }
+        /* 交易记录 */
+        .trade-section { margin-top: 15px; }
+        .trade-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 12px;
+        }
+        /* 加载状态 */
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        
+        /* 性能优化：加载指示器 */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .loading-overlay .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-red);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative; /* 为加载指示器提供定位上下文 */
+        }
+    </style>
+    <!-- 顶部导航 -->
+    <div class="top-nav">
+        <div class="brand">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>投资账本</span>
+        </div>
+        <div class="nav-links">
+            <a href="/"><i class="bi bi-house"></i> 首页</a>
+            <a href="#" onclick="refreshData()"><i class="bi bi-arrow-clockwise"></i> 数据导入</a>
+            <a href="/strategy"><i class="bi bi-lightbulb"></i> 策略分析</a>
+        </div>
+        <div class="search-global">
+            <span style="color: rgba(255,255,255,0.7); font-size: 12px;">
+                沪深主板指数 <span id="index-value">--</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 表格区域 - 现在占据全宽 -->
+        <div class="left-panel">
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <div class="search-box">
+                    <i class="bi bi-search" style="color: #aaa;"></i>
+                    <input type="text" id="search-input" placeholder="搜索基金代码/名称">
+                </div>
+                <select id="sort-select">
+                    <option value="composite_score">综合评分</option>
+                    <option value="today_return">今日收益</option>
+                    <option value="annualized_return">年化收益</option>
+                    <option value="sharpe_ratio">夏普比率</option>
+                    <option value="max_drawdown">最大回撤</option>
+                </select>
+                <input type="date" id="date-select">
+                <button class="btn-filter" onclick="loadFunds()">
+                    <i class="bi bi-funnel"></i> 筛选
+                </button>
+                <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
+                    共 <span id="total-count">0</span> 只基金
+                </span>
+            </div>
+
+            <!-- 表格 -->
+            <div class="table-wrapper">
+                <table class="fund-table">
                     <thead>
                         <tr>
-                            <th>基金代码</th>
-                            <th>基金名称</th>
-                            <th>今日收益</th>
-                            <th>年化收益</th>
-                            <th>夏普比率</th>
-                            <th>最大回撤</th>
-                            <th>综合评分</th>
-                            <th>状态</th>
-                            <th>操作建议</th>
+                            <th style="width: 30px;" data-column="checkbox"></th>
+                            <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_profit">持有盈亏 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_profit_rate">持有盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="total_profit_rate">累计盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio">夏普比率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="max_drawdown">最大回撤 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span></th>
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
+                        <tr><td colspan="14" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
-
-            <!-- 分页 -->
-            <nav aria-label="Page navigation" class="mt-3">
-                <ul class="pagination justify-content-center" id="pagination">
-                </ul>
-            </nav>
         </div>
     </div>
-
-    <!-- 基金详情模态框 -->
-    <div class="modal fade" id="fundDetailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modal-fund-title">基金详情</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="modal-fund-body">
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         let currentPage = 1;
-        const perPage = 20;
-        let totalPages = 1;
+        const perPage = 50;
+        let allFunds = [];
+        let selectedFund = null;
+        let navChart = null;
 
-        // 页面加载时初始化
+        // ==================== DataSorter 类 ====================
+        // 负责执行数据排序逻辑
+        class DataSorter {
+            // 判断是否为空值
+            isNullValue(value) {
+                return value === null || value === undefined || value === '' || value === '--' || 
+                       (typeof value === 'number' && isNaN(value));
+            }
+
+            // 处理空值，返回用于比较的值
+            handleNullValue(value) {
+                if (this.isNullValue(value)) {
+                    return null;
+                }
+                return value;
+            }
+
+            // 比较数字
+            compareNumbers(a, b, order) {
+                const aVal = this.handleNullValue(a);
+                const bVal = this.handleNullValue(b);
+                
+                // 空值处理：升序时空值排最后，降序时空值排最前
+                if (aVal === null && bVal === null) return 0;
+                if (aVal === null) return order === 'asc' ? 1 : -1;
+                if (bVal === null) return order === 'asc' ? -1 : 1;
+                
+                const numA = parseFloat(aVal);
+                const numB = parseFloat(bVal);
+                
+                if (isNaN(numA) && isNaN(numB)) return 0;
+                if (isNaN(numA)) return order === 'asc' ? 1 : -1;
+                if (isNaN(numB)) return order === 'asc' ? -1 : 1;
+                
+                return order === 'asc' ? numA - numB : numB - numA;
+            }
+
+            // 比较字符串（支持中文）
+            compareStrings(a, b, order) {
+                const aVal = this.handleNullValue(a);
+                const bVal = this.handleNullValue(b);
+                
+                // 空值处理
+                if (aVal === null && bVal === null) return 0;
+                if (aVal === null) return order === 'asc' ? 1 : -1;
+                if (bVal === null) return order === 'asc' ? -1 : 1;
+                
+                const strA = String(aVal);
+                const strB = String(bVal);
+                
+                const result = strA.localeCompare(strB, 'zh-CN');
+                return order === 'asc' ? result : -result;
+            }
+
+            // 按列排序数据
+            sortByColumn(data, columnName, order, columnType) {
+                if (!data || data.length === 0) return data;
+                if (order === 'none') return data;
+                
+                const sortedData = [...data];
+                
+                sortedData.sort((a, b) => {
+                    const aValue = a[columnName];
+                    const bValue = b[columnName];
+                    
+                    if (columnType === 'number') {
+                        return this.compareNumbers(aValue, bValue, order);
+                    } else {
+                        return this.compareStrings(aValue, bValue, order);
+                    }
+                });
+                
+                return sortedData;
+            }
+        }
+
+        // 创建 DataSorter 实例
+        const dataSorter = new DataSorter();
+
+        // ==================== 列配置 ====================
+        const COLUMN_CONFIG = {
+            'checkbox': { type: 'none', sortable: false, label: '' },
+            'fund_code': { type: 'text', sortable: true, label: '代码' },
+            'fund_name': { type: 'text', sortable: true, label: '名称' },
+            'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
+            'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
+            'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
+            'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏率' },
+            'holding_profit': { type: 'number', sortable: true, label: '持有盈亏' },
+            'holding_profit_rate': { type: 'number', sortable: true, label: '持有盈亏率' },
+            'total_profit': { type: 'number', sortable: true, label: '累计盈亏' },
+            'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏率' },
+            'sharpe_ratio': { type: 'number', sortable: true, label: '夏普比率' },
+            'max_drawdown': { type: 'number', sortable: true, label: '最大回撤' },
+            'composite_score': { type: 'number', sortable: true, label: '综合评分' }
+        };
+
+        // ==================== SortController 类 ====================
+        // 负责管理排序状态和处理用户交互
+        class SortController {
+            constructor(columnConfig) {
+                this.columnConfig = columnConfig;
+                this.currentColumn = 'composite_score';  // 默认排序列
+                this.currentOrder = 'desc';  // 默认降序
+            }
+
+            // 检查列是否可排序
+            isColumnSortable(columnName) {
+                const config = this.columnConfig[columnName];
+                return config && config.sortable === true;
+            }
+
+            // 获取列数据类型
+            getColumnType(columnName) {
+                const config = this.columnConfig[columnName];
+                return config ? config.type : 'text';
+            }
+
+            // 计算下一个排序状态
+            calculateNextSortOrder(columnName) {
+                if (columnName !== this.currentColumn) {
+                    return 'asc';  // 切换到新列，从升序开始
+                }
+                // 同一列：asc -> desc -> none -> asc
+                switch (this.currentOrder) {
+                    case 'asc': return 'desc';
+                    case 'desc': return 'none';
+                    case 'none': return 'asc';
+                    default: return 'asc';
+                }
+            }
+
+            // 更新排序状态
+            updateSortState(columnName, order) {
+                this.currentColumn = columnName;
+                this.currentOrder = order;
+            }
+
+            // 处理列标题点击
+            handleColumnClick(columnName) {
+                if (!this.isColumnSortable(columnName)) {
+                    return null;
+                }
+                const nextOrder = this.calculateNextSortOrder(columnName);
+                this.updateSortState(columnName, nextOrder);
+                return { column: columnName, order: nextOrder };
+            }
+
+            // 获取当前排序状态
+            getSortState() {
+                return {
+                    column: this.currentColumn,
+                    order: this.currentOrder
+                };
+            }
+        }
+
+        // 创建 SortController 实例
+        const sortController = new SortController(COLUMN_CONFIG);
+
+        // ==================== UIRenderer 类 ====================
+        // 负责更新UI显示
+        class UIRenderer {
+            // 显示/隐藏加载指示器
+            toggleLoading(show, message = '排序中...') {
+                const tableWrapper = document.querySelector('.table-wrapper');
+                let overlay = tableWrapper.querySelector('.loading-overlay');
+                
+                if (show) {
+                    if (!overlay) {
+                        overlay = document.createElement('div');
+                        overlay.className = 'loading-overlay';
+                        overlay.innerHTML = `
+                            <div>
+                                <div class="spinner"></div>
+                                <span>${message}</span>
+                            </div>
+                        `;
+                        tableWrapper.appendChild(overlay);
+                    }
+                    overlay.style.display = 'flex';
+                } else {
+                    if (overlay) {
+                        overlay.style.display = 'none';
+                    }
+                }
+            }
+
+            // 更新排序指示器
+            updateSortIndicators(columnName, order) {
+                // 清除所有指示器
+                document.querySelectorAll('.fund-table th.sortable').forEach(th => {
+                    th.classList.remove('sorted');
+                    const indicator = th.querySelector('.sort-indicator');
+                    if (indicator) {
+                        indicator.classList.remove('asc', 'desc');
+                    }
+                });
+                
+                // 设置当前列的指示器
+                if (order !== 'none') {
+                    const th = document.querySelector(`.fund-table th[data-column="${columnName}"]`);
+                    if (th) {
+                        th.classList.add('sorted');
+                        const indicator = th.querySelector('.sort-indicator');
+                        if (indicator) {
+                            indicator.classList.add(order);
+                        }
+                    }
+                }
+            }
+
+            // 高亮当前排序列
+            highlightSortedColumn(columnName) {
+                document.querySelectorAll('.fund-table th.sortable').forEach(th => {
+                    th.classList.remove('sorted');
+                });
+                if (columnName) {
+                    const th = document.querySelector(`.fund-table th[data-column="${columnName}"]`);
+                    if (th) {
+                        th.classList.add('sorted');
+                    }
+                }
+            }
+
+            // 性能优化：使用文档片段渲染表格
+            renderTableRows(funds) {
+                const tbody = document.getElementById('fund-table-body');
+                
+                if (!funds || funds.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
+                    return;
+                }
+
+                // 使用文档片段提高性能
+                const fragment = document.createDocumentFragment();
+                
+                funds.forEach((fund, index) => {
+                    const tr = document.createElement('tr');
+                    
+                    // 修改点击事件处理 - 集成展开功能
+                    tr.onclick = (event) => {
+                        // 检查是否点击了复选框
+                        if (event.target.type === 'checkbox') {
+                            return; // 不处理复选框点击
+                        }
+                        
+                        // 处理展开功能
+                        expansionController.handleRowClick(fund, tr);
+                        
+                        // 保持原有的选中逻辑
+                        selectFund(fund);
+                    };
+                    
+                    // 添加样式以指示行可点击
+                    tr.style.cursor = 'pointer';
+                    tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
+                    
+                    const todayReturn = fund.today_return || 0;
+                    const annualReturn = fund.annualized_return || 0;
+                    const maxDrawdown = fund.max_drawdown || 0;
+                    const sharpe = fund.sharpe_ratio || 0;
+                    const score = fund.composite_score || 0;
+                    
+                    tr.innerHTML = `
+                        <td><input type="checkbox"></td>
+                        <td class="fund-code">${fund.fund_code}</td>
+                        <td>${this.truncate(fund.fund_name || '--', 12)}</td>
+                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
+                        <td>--</td>
+                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">--</td>
+                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
+                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">--</td>
+                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
+                        <td>--</td>
+                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
+                        <td>${sharpe.toFixed(2)}</td>
+                        <td class="negative">${this.formatPercent(maxDrawdown)}</td>
+                        <td><strong>${score.toFixed(4)}</strong></td>
+                    `;
+                    
+                    fragment.appendChild(tr);
+                });
+                
+                // 一次性添加所有行，提高性能
+                tbody.innerHTML = '';
+                tbody.appendChild(fragment);
+            }
+
+            // 辅助方法：格式化百分比
+            formatPercent(value) {
+                if (value === null || value === undefined || isNaN(value)) return '--';
+                const sign = value >= 0 ? '+' : '';
+                return sign + value.toFixed(2) + '%';
+            }
+
+            // 辅助方法：截断文本
+            truncate(str, len) {
+                if (!str) return '--';
+                return str.length > len ? str.substring(0, len) + '...' : str;
+            }
+        }
+
+        // 创建 UIRenderer 实例
+        const uiRenderer = new UIRenderer();
+
+        // ==================== ResizableChart 类 ====================
+        // 负责可拖拽调整大小的图表组件
+        class ResizableChart {
+            constructor(container, options = {}) {
+                this.container = container;
+                this.options = {
+                    minWidth: options.minWidth || 300,
+                    minHeight: options.minHeight || 200,
+                    maxWidth: options.maxWidth || 800,
+                    maxHeight: options.maxHeight || 600,
+                    resizable: options.resizable !== false,
+                    zoomable: options.zoomable !== false,
+                    pannable: options.pannable !== false,
+                    ...options
+                };
+                
+                this.chart = null;
+                this.resizeHandles = [];
+                this.isDragging = false;
+                this.dragStartPos = { x: 0, y: 0 };
+                this.initialSize = { width: 0, height: 0 };
+                this.currentSize = { 
+                    width: this.options.width || 400, 
+                    height: this.options.height || 250 
+                };
+                
+                this.init();
+            }
+            
+            // 初始化图表组件
+            init() {
+                this.createChartContainer();
+                if (this.options.resizable) {
+                    this.createResizeHandles();
+                }
+                this.bindEvents();
+            }
+            
+            // 创建图表容器
+            createChartContainer() {
+                this.chartWrapper = document.createElement('div');
+                this.chartWrapper.className = 'resizable-chart-wrapper';
+                this.chartWrapper.style.cssText = `
+                    position: relative;
+                    width: ${this.currentSize.width}px;
+                    height: ${this.currentSize.height}px;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    background: white;
+                    overflow: hidden;
+                `;
+                
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = this.currentSize.width - 2; // 减去边框
+                this.canvas.height = this.currentSize.height - 2;
+                this.canvas.style.cssText = `
+                    display: block;
+                    width: 100%;
+                    height: 100%;
+                `;
+                
+                this.chartWrapper.appendChild(this.canvas);
+                this.container.appendChild(this.chartWrapper);
+            }
+            
+            // 创建调整大小手柄
+            createResizeHandles() {
+                const handles = [
+                    { position: 'se', cursor: 'se-resize', x: '100%', y: '100%' },
+                    { position: 'sw', cursor: 'sw-resize', x: '0%', y: '100%' },
+                    { position: 'ne', cursor: 'ne-resize', x: '100%', y: '0%' },
+                    { position: 'nw', cursor: 'nw-resize', x: '0%', y: '0%' },
+                    { position: 'n', cursor: 'n-resize', x: '50%', y: '0%' },
+                    { position: 's', cursor: 's-resize', x: '50%', y: '100%' },
+                    { position: 'e', cursor: 'e-resize', x: '100%', y: '50%' },
+                    { position: 'w', cursor: 'w-resize', x: '0%', y: '50%' }
+                ];
+                
+                handles.forEach(handleConfig => {
+                    const handle = document.createElement('div');
+                    handle.className = `resize-handle resize-${handleConfig.position}`;
+                    handle.style.cssText = `
+                        position: absolute;
+                        width: 8px;
+                        height: 8px;
+                        background: var(--primary-red);
+                        border: 1px solid white;
+                        border-radius: 50%;
+                        cursor: ${handleConfig.cursor};
+                        transform: translate(-50%, -50%);
+                        left: ${handleConfig.x};
+                        top: ${handleConfig.y};
+                        z-index: 10;
+                        opacity: 0;
+                        transition: opacity 0.2s ease;
+                    `;
+                    
+                    handle.dataset.position = handleConfig.position;
+                    this.chartWrapper.appendChild(handle);
+                    this.resizeHandles.push(handle);
+                });
+                
+                // 鼠标悬停时显示手柄
+                this.chartWrapper.addEventListener('mouseenter', () => {
+                    this.resizeHandles.forEach(handle => {
+                        handle.style.opacity = '1';
+                    });
+                });
+                
+                this.chartWrapper.addEventListener('mouseleave', () => {
+                    if (!this.isDragging) {
+                        this.resizeHandles.forEach(handle => {
+                            handle.style.opacity = '0';
+                        });
+                    }
+                });
+            }
+            
+            // 绑定事件
+            bindEvents() {
+                // 绑定调整大小事件
+                this.resizeHandles.forEach(handle => {
+                    handle.addEventListener('mousedown', (e) => {
+                        this.handleDragStart(e, handle.dataset.position);
+                    });
+                });
+                
+                // 绑定全局鼠标事件
+                document.addEventListener('mousemove', (e) => {
+                    if (this.isDragging) {
+                        this.handleDragMove(e);
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.handleDragEnd();
+                });
+                
+                // 防止图表内容被选中
+                this.chartWrapper.addEventListener('selectstart', (e) => {
+                    e.preventDefault();
+                });
+            }
+            
+            // 处理拖拽开始
+            handleDragStart(event, position) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                this.isDragging = true;
+                this.dragPosition = position;
+                this.dragStartPos = { x: event.clientX, y: event.clientY };
+                this.initialSize = { ...this.currentSize };
+                
+                // 添加拖拽时的样式
+                document.body.style.cursor = event.target.style.cursor;
+                document.body.style.userSelect = 'none';
+                
+                // 保持手柄可见
+                this.resizeHandles.forEach(handle => {
+                    handle.style.opacity = '1';
+                });
+            }
+            
+            // 处理拖拽中
+            handleDragMove(event) {
+                if (!this.isDragging) return;
+                
+                const deltaX = event.clientX - this.dragStartPos.x;
+                const deltaY = event.clientY - this.dragStartPos.y;
+                
+                let newWidth = this.initialSize.width;
+                let newHeight = this.initialSize.height;
+                
+                // 根据拖拽位置计算新尺寸
+                switch (this.dragPosition) {
+                    case 'se':
+                        newWidth = this.initialSize.width + deltaX;
+                        newHeight = this.initialSize.height + deltaY;
+                        break;
+                    case 'sw':
+                        newWidth = this.initialSize.width - deltaX;
+                        newHeight = this.initialSize.height + deltaY;
+                        break;
+                    case 'ne':
+                        newWidth = this.initialSize.width + deltaX;
+                        newHeight = this.initialSize.height - deltaY;
+                        break;
+                    case 'nw':
+                        newWidth = this.initialSize.width - deltaX;
+                        newHeight = this.initialSize.height - deltaY;
+                        break;
+                    case 'n':
+                        newHeight = this.initialSize.height - deltaY;
+                        break;
+                    case 's':
+                        newHeight = this.initialSize.height + deltaY;
+                        break;
+                    case 'e':
+                        newWidth = this.initialSize.width + deltaX;
+                        break;
+                    case 'w':
+                        newWidth = this.initialSize.width - deltaX;
+                        break;
+                }
+                
+                // 应用尺寸约束
+                newWidth = Math.max(this.options.minWidth, Math.min(this.options.maxWidth, newWidth));
+                newHeight = Math.max(this.options.minHeight, Math.min(this.options.maxHeight, newHeight));
+                
+                // 更新图表尺寸
+                this.resizeChart(newWidth, newHeight);
+            }
+            
+            // 处理拖拽结束
+            handleDragEnd() {
+                if (!this.isDragging) return;
+                
+                this.isDragging = false;
+                this.dragPosition = null;
+                
+                // 恢复样式
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                
+                // 隐藏手柄
+                setTimeout(() => {
+                    if (!this.chartWrapper.matches(':hover')) {
+                        this.resizeHandles.forEach(handle => {
+                            handle.style.opacity = '0';
+                        });
+                    }
+                }, 100);
+                
+                // 触发尺寸变化事件
+                this.onResize();
+            }
+            
+            // 调整图表大小
+            resizeChart(width, height) {
+                this.currentSize.width = width;
+                this.currentSize.height = height;
+                
+                // 更新容器尺寸
+                this.chartWrapper.style.width = width + 'px';
+                this.chartWrapper.style.height = height + 'px';
+                
+                // 更新canvas尺寸
+                this.canvas.width = width - 2;
+                this.canvas.height = height - 2;
+                
+                // 重新渲染图表
+                if (this.chart) {
+                    this.chart.resize();
+                }
+            }
+            
+            // 初始化Chart.js图表
+            initChart(data, options = {}) {
+                if (!window.Chart) {
+                    console.error('Chart.js library not found');
+                    return;
+                }
+                
+                const ctx = this.canvas.getContext('2d');
+                
+                // 销毁现有图表
+                if (this.chart) {
+                    this.chart.destroy();
+                }
+                
+                const defaultOptions = {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: true,
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: { size: 10 },
+                                    maxTicksLimit: 8
+                                }
+                            },
+                            y: {
+                                display: true,
+                                grid: {
+                                    color: '#f0f0f0'
+                                },
+                                ticks: {
+                                    font: { size: 10 }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        },
+                        elements: {
+                            point: {
+                                radius: 0,
+                                hoverRadius: 4
+                            },
+                            line: {
+                                borderWidth: 2,
+                                tension: 0.4
+                            }
+                        }
+                    }
+                };
+                
+                // 合并选项
+                const chartConfig = this.mergeDeep(defaultOptions, options);
+                
+                // 添加缩放和平移功能
+                if (this.options.zoomable || this.options.pannable) {
+                    chartConfig.options.plugins.zoom = {
+                        zoom: {
+                            wheel: {
+                                enabled: this.options.zoomable
+                            },
+                            pinch: {
+                                enabled: this.options.zoomable
+                            },
+                            mode: 'x'
+                        },
+                        pan: {
+                            enabled: this.options.pannable,
+                            mode: 'x'
+                        }
+                    };
+                }
+                
+                // 创建图表
+                this.chart = new Chart(ctx, chartConfig);
+                
+                return this.chart;
+            }
+            
+            // 更新图表数据
+            updateData(data) {
+                if (this.chart) {
+                    this.chart.data = data;
+                    this.chart.update('none'); // 无动画更新
+                }
+            }
+            
+            // 获取当前尺寸
+            getSize() {
+                return { ...this.currentSize };
+            }
+            
+            // 设置尺寸
+            setSize(width, height) {
+                this.resizeChart(width, height);
+                this.onResize();
+            }
+            
+            // 尺寸变化回调
+            onResize() {
+                // 可以被子类重写或通过选项传入回调
+                if (this.options.onResize) {
+                    this.options.onResize(this.currentSize);
+                }
+            }
+            
+            // 深度合并对象
+            mergeDeep(target, source) {
+                const result = { ...target };
+                
+                for (const key in source) {
+                    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                        result[key] = this.mergeDeep(result[key] || {}, source[key]);
+                    } else {
+                        result[key] = source[key];
+                    }
+                }
+                
+                return result;
+            }
+            
+            // 销毁图表
+            destroy() {
+                if (this.chart) {
+                    this.chart.destroy();
+                    this.chart = null;
+                }
+                
+                if (this.chartWrapper) {
+                    this.chartWrapper.remove();
+                    this.chartWrapper = null;
+                }
+                
+                this.resizeHandles = [];
+                this.canvas = null;
+            }
+        }
+
+        // ==================== DetailPanel 类 ====================
+        // 负责渲染详情面板内容
+        class DetailPanel {
+            constructor(fundData) {
+                this.fundData = fundData;
+                this.element = null;
+                this.chartComponent = null;
+                this.isVisible = false;
+            }
+            
+            // 创建面板DOM结构
+            createElement() {
+                if (this.element) {
+                    return this.element;
+                }
+                
+                const panelDiv = document.createElement('div');
+                panelDiv.className = 'detail-panel';
+                panelDiv.innerHTML = this.getHTML();
+                this.element = panelDiv;
+                
+                return this.element;
+            }
+            
+            // 获取面板HTML内容
+            getHTML() {
+                const basicInfo = this.renderBasicInfo();
+                const performanceMetrics = this.renderPerformanceMetrics();
+                const investmentAdvice = this.renderInvestmentAdvice();
+                const riskIndicators = this.renderRiskIndicators();
+                
+                return `
+                    <div class="detail-panel">
+                        ${basicInfo}
+                        <div class="detail-content">
+                            <div class="detail-grid">
+                                <div class="detail-left">
+                                    ${performanceMetrics}
+                                    ${riskIndicators}
+                                </div>
+                                <div class="detail-right">
+                                    ${investmentAdvice}
+                                    <div class="chart-section">
+                                        <div class="chart-title">
+                                            <i class="bi bi-graph-up"></i> NAV走势图
+                                        </div>
+                                        <div class="chart-container" id="chart-${this.fundData.fund_code}">
+                                            <div class="chart-placeholder">
+                                                <i class="bi bi-bar-chart-line"></i>
+                                                <p>图表加载中...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 渲染基本信息
+            renderBasicInfo() {
+                const todayReturn = this.fundData.today_return || 0;
+                const currentNav = this.fundData.current_nav || 0;
+                
+                return `
+                    <div class="detail-header">
+                        <div class="fund-title-section">
+                            <div class="fund-title">${this.fundData.fund_name || '--'}</div>
+                            <div class="fund-code-display">${this.fundData.fund_code}</div>
+                        </div>
+                        <div class="return-display">
+                            <div class="main-return ${todayReturn >= 0 ? 'positive' : 'negative'}">
+                                ${formatPercent(todayReturn)}
+                            </div>
+                            <div class="return-label">今日涨跌幅</div>
+                            <div class="nav-info">
+                                <span class="nav-value">净值: ${currentNav.toFixed(4)}</span>
+                                <span class="nav-change ${todayReturn >= 0 ? 'positive' : 'negative'}">
+                                    ${todayReturn >= 0 ? '+' : ''}${todayReturn.toFixed(2)}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 渲染性能指标
+            renderPerformanceMetrics() {
+                const annualReturn = this.fundData.annualized_return || 0;
+                const sharpeRatio = this.fundData.sharpe_ratio || 0;
+                const volatility = this.fundData.volatility || 0;
+                const winRate = this.fundData.win_rate || 0;
+                
+                return `
+                    <div class="metrics-section">
+                        <div class="section-title">
+                            <i class="bi bi-speedometer2"></i> 性能指标
+                        </div>
+                        <div class="metrics-grid">
+                            <div class="metric-item">
+                                <div class="metric-label">年化收益率</div>
+                                <div class="metric-value ${annualReturn >= 0 ? 'positive' : 'negative'}">
+                                    ${formatPercent(annualReturn)}
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">夏普比率</div>
+                                <div class="metric-value">
+                                    ${sharpeRatio.toFixed(4)}
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">波动率</div>
+                                <div class="metric-value">
+                                    ${formatPercent(volatility)}
+                                </div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">胜率</div>
+                                <div class="metric-value">
+                                    ${formatPercent(winRate)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 渲染投资建议
+            renderInvestmentAdvice() {
+                const statusLabel = this.fundData.status_label || '--';
+                const operationSuggestion = this.fundData.operation_suggestion || '--';
+                const executionAmount = this.fundData.execution_amount || '--';
+                const compositeScore = this.fundData.composite_score || 0;
+                
+                // 根据综合评分确定建议等级
+                let adviceLevel = 'neutral';
+                let adviceIcon = 'bi-dash-circle';
+                if (compositeScore >= 0.8) {
+                    adviceLevel = 'strong-buy';
+                    adviceIcon = 'bi-arrow-up-circle-fill';
+                } else if (compositeScore >= 0.6) {
+                    adviceLevel = 'buy';
+                    adviceIcon = 'bi-arrow-up-circle';
+                } else if (compositeScore >= 0.4) {
+                    adviceLevel = 'hold';
+                    adviceIcon = 'bi-dash-circle';
+                } else {
+                    adviceLevel = 'sell';
+                    adviceIcon = 'bi-arrow-down-circle';
+                }
+                
+                return `
+                    <div class="advice-section">
+                        <div class="section-title">
+                            <i class="bi bi-lightbulb"></i> 投资建议
+                        </div>
+                        <div class="advice-content">
+                            <div class="advice-main">
+                                <div class="advice-icon ${adviceLevel}">
+                                    <i class="bi ${adviceIcon}"></i>
+                                </div>
+                                <div class="advice-text">
+                                    <div class="advice-status">${statusLabel}</div>
+                                    <div class="advice-suggestion">${operationSuggestion}</div>
+                                </div>
+                            </div>
+                            <div class="advice-details">
+                                <div class="advice-row">
+                                    <span class="label">建议金额:</span>
+                                    <span class="value">${executionAmount}</span>
+                                </div>
+                                <div class="advice-row">
+                                    <span class="label">综合评分:</span>
+                                    <span class="value score-${adviceLevel}">
+                                        ${compositeScore.toFixed(4)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 渲染风险指标
+            renderRiskIndicators() {
+                const maxDrawdown = this.fundData.max_drawdown || 0;
+                const volatility = this.fundData.volatility || 0;
+                const beta = this.fundData.beta || 0;
+                const var95 = this.fundData.var_95 || 0;
+                
+                // 风险等级评估
+                let riskLevel = 'low';
+                let riskColor = 'success';
+                if (Math.abs(maxDrawdown) > 20 || volatility > 25) {
+                    riskLevel = 'high';
+                    riskColor = 'danger';
+                } else if (Math.abs(maxDrawdown) > 10 || volatility > 15) {
+                    riskLevel = 'medium';
+                    riskColor = 'warning';
+                }
+                
+                return `
+                    <div class="risk-section">
+                        <div class="section-title">
+                            <i class="bi bi-shield-exclamation"></i> 风险指标
+                        </div>
+                        <div class="risk-level">
+                            <span class="risk-badge risk-${riskLevel}">
+                                ${riskLevel === 'low' ? '低风险' : riskLevel === 'medium' ? '中风险' : '高风险'}
+                            </span>
+                        </div>
+                        <div class="risk-metrics">
+                            <div class="risk-item">
+                                <div class="risk-label">最大回撤</div>
+                                <div class="risk-value negative">
+                                    ${formatPercent(maxDrawdown)}
+                                </div>
+                            </div>
+                            <div class="risk-item">
+                                <div class="risk-label">波动率</div>
+                                <div class="risk-value">
+                                    ${formatPercent(volatility)}
+                                </div>
+                            </div>
+                            <div class="risk-item">
+                                <div class="risk-label">Beta系数</div>
+                                <div class="risk-value">
+                                    ${beta.toFixed(4)}
+                                </div>
+                            </div>
+                            <div class="risk-item">
+                                <div class="risk-label">VaR(95%)</div>
+                                <div class="risk-value negative">
+                                    ${formatPercent(var95)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 初始化交互功能
+            initializeInteractions(container) {
+                // 初始化图表
+                this.initializeChart(container);
+                
+                // 添加时间段切换功能
+                this.initializePeriodTabs(container);
+                
+                // 标记为可见
+                this.isVisible = true;
+            }
+            
+            // 初始化图表
+            initializeChart(container) {
+                const chartContainer = container.querySelector(`#chart-${this.fundData.fund_code}`);
+                if (chartContainer) {
+                    // 创建图表组件（将在任务4中完整实现）
+                    this.createBasicChart(chartContainer);
+                }
+            }
+            
+            // 创建基础图表
+            createBasicChart(container) {
+                // 清空容器
+                container.innerHTML = '';
+                
+                // 创建可调整大小的图表
+                this.chartComponent = new ResizableChart(container, {
+                    width: 400,
+                    height: 220,
+                    minWidth: 300,
+                    minHeight: 180,
+                    maxWidth: 600,
+                    maxHeight: 400,
+                    resizable: true,
+                    zoomable: true,
+                    pannable: true,
+                    onResize: (size) => {
+                        console.log('图表尺寸变化:', size);
+                    }
+                });
+                
+                // 添加时间段控制
+                const controlsDiv = document.createElement('div');
+                controlsDiv.className = 'chart-controls';
+                controlsDiv.innerHTML = `
+                    <div class="period-tabs">
+                        <span class="tab active" data-period="7">7天</span>
+                        <span class="tab" data-period="30">30天</span>
+                        <span class="tab" data-period="90">90天</span>
+                        <span class="tab" data-period="365">1年</span>
+                    </div>
+                `;
+                container.appendChild(controlsDiv);
+                
+                // 加载图表数据
+                this.loadChartData(this.fundData.fund_code, 30);
+            }
+            
+            // 初始化时间段切换
+            initializePeriodTabs(container) {
+                const tabs = container.querySelectorAll('.period-tabs .tab');
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        // 移除其他tab的active状态
+                        tabs.forEach(t => t.classList.remove('active'));
+                        // 添加当前tab的active状态
+                        e.target.classList.add('active');
+                        
+                        // 重新加载图表数据
+                        const period = parseInt(e.target.getAttribute('data-period'));
+                        this.loadChartData(this.fundData.fund_code, period);
+                    });
+                });
+            }
+            
+            // 加载图表数据
+            async loadChartData(fundCode, days = 30) {
+                try {
+                    const response = await fetch(`/api/fund/${fundCode}/history?days=${days}`);
+                    const result = await response.json();
+                    
+                    if (result.success && result.data && result.data.length > 0) {
+                        const labels = result.data.map(d => d.date.substring(5)); // MM-DD格式
+                        const values = result.data.map(d => d.nav);
+                        
+                        const chartData = {
+                            labels: labels,
+                            datasets: [{
+                                label: 'NAV',
+                                data: values,
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4
+                            }]
+                        };
+                        
+                        // 使用ResizableChart创建图表
+                        if (this.chartComponent) {
+                            this.chartComponent.initChart(chartData, {
+                                options: {
+                                    plugins: {
+                                        title: {
+                                            display: true,
+                                            text: `${this.fundData.fund_name} - ${days}天走势`,
+                                            font: {
+                                                size: 14,
+                                                weight: 'bold'
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        // 显示无数据状态
+                        this.showChartError('暂无历史数据');
+                    }
+                } catch (error) {
+                    console.error('加载图表数据失败:', error);
+                    this.showChartError('数据加载失败');
+                }
+            }
+            
+            // 显示图表错误状态
+            showChartError(message) {
+                if (this.chartComponent && this.chartComponent.chartWrapper) {
+                    this.chartComponent.chartWrapper.innerHTML = `
+                        <div class="chart-error">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <p>${message}</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // 更新数据
+            updateData(fundData) {
+                this.fundData = fundData;
+                if (this.element) {
+                    this.element.innerHTML = this.getHTML();
+                    // 重新初始化交互功能
+                    this.initializeInteractions(this.element.parentElement);
+                }
+            }
+            
+            // 销毁面板
+            destroy() {
+                if (this.chartComponent) {
+                    this.chartComponent.destroy();
+                    this.chartComponent = null;
+                }
+                
+                if (this.element) {
+                    this.element.remove();
+                    this.element = null;
+                }
+                
+                this.isVisible = false;
+            }
+        }
+
+        // ==================== ExpansionController 类 ====================
+        // 负责管理详情面板的展开/收起状态
+        class ExpansionController {
+            constructor() {
+                this.expandedRow = null;        // 当前展开的行
+                this.animationDuration = 300;   // 动画持续时间
+                this.panels = new Map();        // 面板缓存
+                this.isAnimating = false;       // 动画状态标记
+            }
+            
+            // 处理行点击事件
+            handleRowClick(fundData, rowElement) {
+                // 防止动画期间的重复点击
+                if (this.isAnimating) {
+                    return;
+                }
+                
+                // 检查是否点击的是当前展开的行
+                if (this.expandedRow === rowElement) {
+                    this.collapsePanel(rowElement);
+                } else {
+                    // 如果有其他行展开，先收起
+                    if (this.expandedRow) {
+                        this.collapsePanel(this.expandedRow);
+                    }
+                    // 展开新行
+                    this.expandPanel(fundData, rowElement);
+                }
+            }
+            
+            // 展开详情面板
+            expandPanel(fundData, rowElement) {
+                if (this.isAnimating) return;
+                
+                this.isAnimating = true;
+                this.expandedRow = rowElement;
+                
+                // 获取或创建面板
+                const panel = this.getOrCreatePanel(fundData.fund_code, fundData);
+                
+                // 创建面板容器行
+                const panelRow = document.createElement('tr');
+                panelRow.className = 'expansion-panel-row';
+                panelRow.innerHTML = `
+                    <td colspan="14" style="padding: 0; border: none;">
+                        <div class="expansion-panel-container" style="height: 0; overflow: hidden;">
+                            ${panel.getHTML()}
+                        </div>
+                    </td>
+                `;
+                
+                // 插入到当前行后面
+                rowElement.parentNode.insertBefore(panelRow, rowElement.nextSibling);
+                
+                // 获取面板容器
+                const container = panelRow.querySelector('.expansion-panel-container');
+                
+                // 计算目标高度
+                container.style.height = 'auto';
+                const targetHeight = container.scrollHeight;
+                container.style.height = '0px';
+                
+                // 执行展开动画
+                requestAnimationFrame(() => {
+                    container.style.transition = `height ${this.animationDuration}ms ease-out`;
+                    container.style.height = targetHeight + 'px';
+                    
+                    setTimeout(() => {
+                        container.style.height = 'auto';
+                        this.isAnimating = false;
+                        
+                        // 初始化面板内的交互功能
+                        panel.initializeInteractions(container);
+                    }, this.animationDuration);
+                });
+                
+                // 更新面板状态
+                this.updatePanelState(fundData.fund_code, {
+                    isExpanded: true,
+                    panelHeight: targetHeight,
+                    lastUpdated: new Date()
+                });
+            }
+            
+            // 收起详情面板
+            collapsePanel(rowElement) {
+                if (this.isAnimating) return;
+                
+                this.isAnimating = true;
+                
+                // 查找面板行
+                const panelRow = rowElement.nextSibling;
+                if (!panelRow || !panelRow.classList.contains('expansion-panel-row')) {
+                    this.isAnimating = false;
+                    return;
+                }
+                
+                const container = panelRow.querySelector('.expansion-panel-container');
+                if (!container) {
+                    this.isAnimating = false;
+                    return;
+                }
+                
+                // 执行收起动画
+                const currentHeight = container.scrollHeight;
+                container.style.height = currentHeight + 'px';
+                container.style.transition = `height ${this.animationDuration}ms ease-in`;
+                
+                requestAnimationFrame(() => {
+                    container.style.height = '0px';
+                    
+                    setTimeout(() => {
+                        panelRow.remove();
+                        this.expandedRow = null;
+                        this.isAnimating = false;
+                    }, this.animationDuration);
+                });
+                
+                // 更新面板状态
+                const fundCode = this.getFundCodeFromRow(rowElement);
+                if (fundCode) {
+                    this.updatePanelState(fundCode, {
+                        isExpanded: false,
+                        lastUpdated: new Date()
+                    });
+                }
+            }
+            
+            // 切换面板状态
+            togglePanel(fundData, rowElement) {
+                if (this.expandedRow === rowElement) {
+                    this.collapsePanel(rowElement);
+                } else {
+                    this.handleRowClick(fundData, rowElement);
+                }
+            }
+            
+            // 获取或创建面板
+            getOrCreatePanel(fundCode, fundData) {
+                if (!this.panels.has(fundCode)) {
+                    const panel = new DetailPanel(fundData);
+                    this.panels.set(fundCode, panel);
+                }
+                return this.panels.get(fundCode);
+            }
+            
+            // 更新面板状态
+            updatePanelState(fundCode, state) {
+                const currentState = this.getPanelState(fundCode) || {};
+                const newState = { ...currentState, ...state };
+                
+                // 这里可以添加状态持久化逻辑
+                // 例如保存到 localStorage 或发送到服务器
+                console.log('更新面板状态:', fundCode, newState);
+            }
+            
+            // 获取面板状态
+            getPanelState(fundCode) {
+                // 这里可以从 localStorage 或服务器获取状态
+                return {
+                    fundCode: fundCode,
+                    isExpanded: false,
+                    panelHeight: 300,
+                    chartWidth: 400,
+                    chartHeight: 200,
+                    lastUpdated: new Date()
+                };
+            }
+            
+            // 从行元素获取基金代码
+            getFundCodeFromRow(rowElement) {
+                const codeCell = rowElement.querySelector('.fund-code');
+                return codeCell ? codeCell.textContent.trim() : null;
+            }
+            
+            // 清理所有面板
+            clearAllPanels() {
+                this.panels.forEach(panel => panel.destroy());
+                this.panels.clear();
+                this.expandedRow = null;
+                this.isAnimating = false;
+            }
+            
+            // 获取当前展开状态
+            getExpansionState() {
+                return {
+                    hasExpandedPanel: this.expandedRow !== null,
+                    expandedFundCode: this.expandedRow ? this.getFundCodeFromRow(this.expandedRow) : null,
+                    isAnimating: this.isAnimating,
+                    panelCount: this.panels.size
+                };
+            }
+        }
+
+        // 创建 ExpansionController 实例
+        const expansionController = new ExpansionController();
+
+        // 页面加载
         document.addEventListener('DOMContentLoaded', function() {
-            loadSummary();
             initDatePicker();
+            initSorting();  // 初始化排序功能
             loadFunds();
             
-            // 搜索框回车事件
             document.getElementById('search-input').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    currentPage = 1;
-                    loadFunds();
-                }
+                if (e.key === 'Enter') loadFunds();
             });
+            document.getElementById('sort-select').addEventListener('change', loadFunds);
+            document.getElementById('date-select').addEventListener('change', loadFunds);
             
-            // 排序选择变化时自动筛选
-            document.getElementById('sort-select').addEventListener('change', function() {
-                currentPage = 1;
-                loadFunds();
+            // 注释：时间段切换事件监听器保留供展开功能使用
+            /*
+            document.querySelectorAll('.period-tabs .tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.period-tabs .tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                });
             });
-            
-            // 日期选择变化时自动筛选
-            document.getElementById('date-select').addEventListener('change', function() {
-                currentPage = 1;
-                loadFunds();
-            });
+            */
         });
 
-        // 初始化日期选择器
+        // 初始化排序功能
+        function initSorting() {
+            // 为所有可排序的表头绑定点击事件
+            document.querySelectorAll('.fund-table th.sortable').forEach(th => {
+                th.addEventListener('click', function() {
+                    const columnName = this.getAttribute('data-column');
+                    handleSort(columnName);
+                });
+            });
+            
+            // 设置默认排序状态的UI显示
+            const state = sortController.getSortState();
+            uiRenderer.updateSortIndicators(state.column, state.order);
+        }
+
+        // 处理排序点击（性能优化版本）
+        function handleSort(columnName) {
+            const result = sortController.handleColumnClick(columnName);
+            if (!result) return;
+            
+            // 更新UI指示器
+            uiRenderer.updateSortIndicators(result.column, result.order);
+            
+            // 性能优化：大数据量时显示加载指示器并异步排序
+            const isLargeDataset = allFunds.length > 500;
+            
+            if (isLargeDataset) {
+                uiRenderer.toggleLoading(true, '排序中...');
+            }
+            
+            // 异步执行排序操作
+            setTimeout(() => {
+                try {
+                    if (result.order === 'none') {
+                        // 恢复原始顺序，重新加载数据
+                        uiRenderer.renderTableRows(allFunds);
+                    } else {
+                        const columnType = sortController.getColumnType(result.column);
+                        const sortedFunds = dataSorter.sortByColumn(allFunds, result.column, result.order, columnType);
+                        uiRenderer.renderTableRows(sortedFunds);
+                    }
+                } catch (error) {
+                    console.error('排序操作失败:', error);
+                } finally {
+                    if (isLargeDataset) {
+                        uiRenderer.toggleLoading(false);
+                    }
+                }
+            }, isLargeDataset ? 10 : 0); // 大数据量时延迟10ms，小数据量立即执行
+        }
+
         async function initDatePicker() {
             try {
                 const response = await fetch('/api/analysis/dates');
                 const result = await response.json();
-                
                 if (result.success && result.data && result.data.length > 0) {
                     const dateInput = document.getElementById('date-select');
-                    // 设置默认值为最新日期
-                    const latestDate = result.data[0];
-                    dateInput.value = latestDate;
-                    
-                    // 设置可选日期范围
-                    const dates = result.data;
-                    if (dates.length > 0) {
-                        dateInput.min = dates[dates.length - 1];
-                        dateInput.max = dates[0];
-                    }
+                    dateInput.value = result.data[0];
+                    dateInput.min = result.data[result.data.length - 1];
+                    dateInput.max = result.data[0];
                 }
             } catch (error) {
-                console.error('初始化日期选择器失败:', error);
+                console.error('初始化日期失败:', error);
             }
         }
 
-        // 加载汇总数据
-        async function loadSummary() {
-            try {
-                const response = await fetch('/api/summary');
-                const result = await response.json();
-                
-                if (result.success && result.data) {
-                    document.getElementById('total-funds').textContent = result.data.total_funds || '--';
-                    document.getElementById('buy-signals').textContent = result.data.buy_signals || '0';
-                    document.getElementById('sell-signals').textContent = result.data.sell_signals || '0';
-                    document.getElementById('avg-score').textContent = 
-                        result.data.avg_composite_score ? result.data.avg_composite_score.toFixed(4) : '--';
-                }
-            } catch (error) {
-                console.error('加载汇总数据失败:', error);
-            }
-        }
-
-        // 加载基金列表
         async function loadFunds() {
-            const loading = document.getElementById('loading');
-            const tableContainer = document.getElementById('table-container');
-            
-            loading.style.display = 'block';
-            tableContainer.style.opacity = '0.5';
+            const tbody = document.getElementById('fund-table-body');
+            tbody.innerHTML = '<tr><td colspan="14" class="loading">加载中...</td></tr>';
             
             try {
                 const search = document.getElementById('search-input').value.trim();
                 const sortBy = document.getElementById('sort-select').value;
                 const date = document.getElementById('date-select').value;
                 
-                let url;
-                // 如果选择了日期，使用日期接口
-                if (date) {
-                    url = `/api/funds/by-date/${date}?sort_by=${sortBy}&sort_order=desc`;
-                    if (search) url += `&search=${encodeURIComponent(search)}`;
-                } else {
-                    url = `/api/funds?page=${currentPage}&per_page=${perPage}&sort_by=${sortBy}&sort_order=desc`;
-                    if (search) url += `&search=${encodeURIComponent(search)}`;
-                }
-                
-                console.log('请求URL:', url);  // 调试日志
+                let url = date 
+                    ? `/api/funds/by-date/${date}?sort_by=${sortBy}&sort_order=desc`
+                    : `/api/funds?page=1&per_page=100&sort_by=${sortBy}&sort_order=desc`;
+                if (search) url += `&search=${encodeURIComponent(search)}`;
                 
                 const response = await fetch(url);
                 const result = await response.json();
                 
-                console.log('返回结果:', result);  // 调试日志
-                
                 if (result.success) {
-                    renderFundTable(result.data);
-                    if (date) {
-                        // 日期接口返回全部数据，计算分页
-                        totalPages = Math.ceil((result.total || result.data.length) / perPage);
-                    } else {
-                        totalPages = Math.ceil(result.total / perPage);
+                    allFunds = result.data;
+                    document.getElementById('total-count').textContent = allFunds.length;
+                    
+                    // 应用当前排序状态（性能优化版本）
+                    const sortState = sortController.getSortState();
+                    const isLargeDataset = allFunds.length > 500;
+                    
+                    if (isLargeDataset) {
+                        uiRenderer.toggleLoading(true, '加载中...');
                     }
-                    renderPagination();
+                    
+                    // 异步应用排序
+                    setTimeout(() => {
+                        try {
+                            if (sortState.order !== 'none') {
+                                const columnType = sortController.getColumnType(sortState.column);
+                                const sortedFunds = dataSorter.sortByColumn(allFunds, sortState.column, sortState.order, columnType);
+                                uiRenderer.renderTableRows(sortedFunds);
+                            } else {
+                                uiRenderer.renderTableRows(allFunds);
+                            }
+                            
+                            // 注释：自动选择第一个基金的逻辑保留供展开功能使用
+                            // if (allFunds.length > 0) selectFund(allFunds[0]);
+                        } catch (error) {
+                            console.error('应用排序失败:', error);
+                            uiRenderer.renderTableRows(allFunds);
+                        } finally {
+                            if (isLargeDataset) {
+                                uiRenderer.toggleLoading(false);
+                            }
+                        }
+                    }, isLargeDataset ? 10 : 0);
                 } else {
-                    console.error('API返回错误:', result.error);
-                    renderFundTable([]);
+                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
                 }
             } catch (error) {
-                console.error('加载基金列表失败:', error);
-                renderFundTable([]);
-            } finally {
-                loading.style.display = 'none';
-                tableContainer.style.opacity = '1';
+                console.error('加载失败:', error);
+                tbody.innerHTML = '<tr><td colspan="14" class="empty-state">加载失败</td></tr>';
             }
         }
-
-        // 渲染基金表格
+        
+        // 保留原有的 renderFundTable 函数以保持兼容性
         function renderFundTable(funds) {
-            const tbody = document.getElementById('fund-table-body');
-            tbody.innerHTML = '';
-            
-            if (!funds || funds.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">暂无数据</td></tr>';
-                return;
-            }
-            
-            funds.forEach(fund => {
-                const todayReturnClass = fund.today_return >= 0 ? 'positive' : 'negative';
-                const annualizedReturnClass = fund.annualized_return >= 0 ? 'positive' : 'negative';
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td><code>${fund.fund_code}</code></td>
-                        <td>
-                            <a href="/fund/${fund.fund_code}" class="fund-name-link">
-                                ${fund.fund_name || '--'}
-                            </a>
-                        </td>
-                        <td class="${todayReturnClass}">${fund.today_return !== null ? fund.today_return.toFixed(2) + '%' : '--'}</td>
-                        <td class="${annualizedReturnClass}">${fund.annualized_return !== null ? fund.annualized_return.toFixed(2) + '%' : '--'}</td>
-                        <td>${fund.sharpe_ratio !== null ? fund.sharpe_ratio.toFixed(4) : '--'}</td>
-                        <td class="negative">${fund.max_drawdown !== null ? fund.max_drawdown.toFixed(2) + '%' : '--'}</td>
-                        <td><strong>${fund.composite_score !== null ? fund.composite_score.toFixed(4) : '--'}</strong></td>
-                        <td><span class="status-badge">${fund.status_label || '--'}</span></td>
-                        <td><small>${fund.operation_suggestion || '--'}</small></td>
-                    </tr>
-                `;
-            });
+            uiRenderer.renderTableRows(funds);
         }
-
-        // 渲染分页
-        function renderPagination() {
-            const pagination = document.getElementById('pagination');
-            pagination.innerHTML = '';
-            
-            if (totalPages <= 1) return;
-            
-            // 上一页
-            pagination.innerHTML += `
-                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                    <a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">上一页</a>
-                </li>
-            `;
-            
-            // 页码
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                    pagination.innerHTML += `
-                        <li class="page-item ${i === currentPage ? 'active' : ''}">
-                            <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
-                        </li>
-                    `;
-                } else if (i === currentPage - 3 || i === currentPage + 3) {
-                    pagination.innerHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        
+        function selectFund(fund) {
+            selectedFund = fund;
+            // 更新表格选中状态 - 修改为兼容展开面板的逻辑
+            document.querySelectorAll('.fund-table tbody tr').forEach((tr) => {
+                // 跳过展开面板行
+                if (tr.classList.contains('expansion-panel-row')) {
+                    return;
                 }
-            }
+                
+                // 检查是否是当前选中的基金行
+                const fundCodeCell = tr.querySelector('.fund-code');
+                if (fundCodeCell && fundCodeCell.textContent.trim() === fund.fund_code) {
+                    tr.classList.add('selected');
+                } else {
+                    tr.classList.remove('selected');
+                }
+            });
             
-            // 下一页
-            pagination.innerHTML += `
-                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                    <a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">下一页</a>
-                </li>
-            `;
+            // 注释：详情面板更新逻辑保留供展开功能使用
+            // updateDetailPanel(fund);
+            // loadNavChart(fund.fund_code);
         }
 
-        // 跳转页面
-        function goToPage(page) {
-            if (page < 1 || page > totalPages) return;
-            currentPage = page;
-            loadFunds();
+        // 保留详情面板更新逻辑供展开功能使用
+        function updateDetailPanel(fund) {
+            const todayReturn = fund.today_return || 0;
+            const annualReturn = fund.annualized_return || 0;  // API已转换为百分比
+            const maxDrawdown = fund.max_drawdown || 0;  // API已转换为百分比
+            const volatility = fund.volatility || 0;  // API已转换为百分比
+            const winRate = fund.win_rate || 0;  // API已转换为百分比
+            
+            // 这些DOM元素在展开功能中会重新创建
+            /*
+            document.getElementById('detail-fund-name').textContent = fund.fund_name || '--';
+            document.getElementById('detail-fund-code').textContent = fund.fund_code;
+            
+            const returnEl = document.getElementById('detail-today-return');
+            returnEl.textContent = formatPercent(todayReturn);
+            returnEl.className = 'main-return ' + (todayReturn >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('detail-nav').textContent = fund.current_nav ? fund.current_nav.toFixed(4) : '--';
+            document.getElementById('detail-nav-change').textContent = todayReturn >= 0 ? '+' + todayReturn.toFixed(2) : todayReturn.toFixed(2);
+            document.getElementById('detail-nav-change').className = 'value ' + (todayReturn >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('detail-total-return').textContent = formatPercent(annualReturn);
+            document.getElementById('detail-total-return').className = 'value ' + (annualReturn >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('detail-status').textContent = fund.status_label || '--';
+            document.getElementById('detail-suggestion').textContent = fund.operation_suggestion || '--';
+            document.getElementById('detail-amount').textContent = fund.execution_amount || '--';
+            
+            document.getElementById('detail-sharpe').textContent = (fund.sharpe_ratio || 0).toFixed(4);
+            document.getElementById('detail-drawdown').textContent = formatPercent(maxDrawdown);
+            document.getElementById('detail-volatility').textContent = formatPercent(volatility);
+            document.getElementById('detail-winrate').textContent = formatPercent(winRate);
+            */
+            
+            // 返回格式化的数据对象供展开功能使用
+            return {
+                fundName: fund.fund_name || '--',
+                fundCode: fund.fund_code,
+                todayReturn: todayReturn,
+                todayReturnFormatted: formatPercent(todayReturn),
+                todayReturnClass: todayReturn >= 0 ? 'positive' : 'negative',
+                currentNav: fund.current_nav ? fund.current_nav.toFixed(4) : '--',
+                navChange: todayReturn >= 0 ? '+' + todayReturn.toFixed(2) : todayReturn.toFixed(2),
+                navChangeClass: todayReturn >= 0 ? 'positive' : 'negative',
+                totalReturn: formatPercent(annualReturn),
+                totalReturnClass: annualReturn >= 0 ? 'positive' : 'negative',
+                statusLabel: fund.status_label || '--',
+                operationSuggestion: fund.operation_suggestion || '--',
+                executionAmount: fund.execution_amount || '--',
+                sharpeRatio: (fund.sharpe_ratio || 0).toFixed(4),
+                maxDrawdown: formatPercent(maxDrawdown),
+                volatility: formatPercent(volatility),
+                winRate: formatPercent(winRate)
+            };
         }
-
-        // 查看基金详情
-        async function viewFundDetail(fundCode) {
+        // 保留图表加载逻辑供展开功能使用
+        async function loadNavChart(fundCode, canvasElement) {
             try {
-                const response = await fetch(`/api/fund/${fundCode}`);
+                const response = await fetch(`/api/fund/${fundCode}/history?days=30`);
                 const result = await response.json();
                 
-                if (result.success && result.data) {
-                    const fund = result.data;
-                    document.getElementById('modal-fund-title').textContent = 
-                        `${fund.fund_code} - ${fund.fund_name}`;
-                    
-                    document.getElementById('modal-fund-body').innerHTML = `
-                        <div class="row">
-                            <div class="col-md-6">
-                                <h6>收益指标</h6>
-                                <table class="table table-sm">
-                                    <tr><td>今日收益</td><td class="${fund.today_return >= 0 ? 'positive' : 'negative'}">${fund.today_return}%</td></tr>
-                                    <tr><td>年化收益</td><td class="${fund.annualized_return >= 0 ? 'positive' : 'negative'}">${fund.annualized_return}%</td></tr>
-                                    <tr><td>胜率</td><td>${fund.win_rate}%</td></tr>
-                                </table>
-                            </div>
-                            <div class="col-md-6">
-                                <h6>风险指标</h6>
-                                <table class="table table-sm">
-                                    <tr><td>夏普比率</td><td>${fund.sharpe_ratio}</td></tr>
-                                    <tr><td>最大回撤</td><td class="negative">${fund.max_drawdown}%</td></tr>
-                                    <tr><td>波动率</td><td>${fund.volatility}%</td></tr>
-                                </table>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class="row">
-                            <div class="col-12">
-                                <h6>操作建议</h6>
-                                <p><strong>状态：</strong>${fund.status_label}</p>
-                                <p><strong>建议：</strong>${fund.operation_suggestion}</p>
-                                <p><strong>综合评分：</strong><span class="badge bg-primary">${fund.composite_score}</span></p>
-                            </div>
-                        </div>
-                    `;
-                    
-                    new bootstrap.Modal(document.getElementById('fundDetailModal')).show();
+                // 如果没有提供canvas元素，则不创建图表（用于展开功能）
+                if (!canvasElement) {
+                    return result; // 返回数据供展开功能使用
                 }
+                
+                const ctx = canvasElement.getContext('2d');
+                
+                if (navChart) navChart.destroy();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const labels = result.data.map(d => d.date.substring(5));
+                    const values = result.data.map(d => d.nav);
+                    
+                    navChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: true, grid: { display: false }, ticks: { font: { size: 10 }, maxTicksLimit: 6 } },
+                                y: { display: true, grid: { color: '#f0f0f0' }, ticks: { font: { size: 10 } } }
+                            }
+                        }
+                    });
+                } else {
+                    navChart = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [{ data: [] }] },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                }
+                
+                return result;
             } catch (error) {
-                console.error('加载基金详情失败:', error);
+                console.error('加载走势图失败:', error);
+                return { success: false, error: error.message };
             }
+        }
+
+        function formatPercent(value) {
+            if (value === null || value === undefined || isNaN(value)) return '--';
+            const sign = value >= 0 ? '+' : '';
+            return sign + value.toFixed(2) + '%';
+        }
+
+        function truncate(str, len) {
+            if (!str) return '--';
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+
+        function refreshData() {
+            alert('数据导入功能开发中...');
         }
     </script>
 </body>

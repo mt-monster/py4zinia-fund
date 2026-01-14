@@ -137,57 +137,39 @@ class EnhancedNotificationManager:
     def _generate_html_report(self, fund_data: pd.DataFrame, strategy_summary: Dict, 
                              report_files: Dict, analysis_date: str) -> str:
         """
-        生成HTML格式报告（匹配参考图片样式 - 专业绩效分析表格）
+        生成HTML格式报告（匹配参考图片样式）
         """
         try:
-            # 构建专业的HTML表格（使用绩效分析表格格式）
-            html_table = self._format_performance_data_to_table(fund_data)
+            # 构建HTML表格
+            html_table = self._format_fund_data_to_table(fund_data)
             
             # 格式化日期（将2026-01-13转换为2026年01月13日格式）
             try:
                 date_obj = datetime.strptime(analysis_date, '%Y-%m-%d')
-                formatted_date = date_obj.strftime('%Y-%m-%d')
+                formatted_date = date_obj.strftime('%Y年%m月%d日')
             except:
                 formatted_date = analysis_date
             
-            # 生成策略汇总信息
+            # 添加策略汇总信息（如果有）
             summary_html = ""
             if strategy_summary:
                 summary_html = self._format_strategy_summary_to_html(strategy_summary)
-            else:
-                # 如果没有传入策略汇总，从数据中生成
-                summary_html = self._format_strategy_summary_to_html(self._generate_performance_summary(fund_data))
             
-            # 添加报告标题和时间信息
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            # 构建完整的HTML报告（与图片完全一致的样式）
+            # 构建完整的HTML报告
             full_content = f"""
-            <div style="font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto;">
-                <h2 style="color: #2c3e50; text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-                    [测试] 📊 基金绩效分析报告 - {formatted_date}
-                </h2>
-                
-                <div style="background-color: #f8f9fa; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                    <p style="margin: 5px 0;"><strong>生成时间:</strong> {current_time}</p>
-                    <p style="margin: 5px 0;"><strong>分析基金数量:</strong> {len(fund_data)} 只</p>
-                    <p style="margin: 5px 0;"><strong>报告类型:</strong> 专业绩效分析</p>
+            <div style="font-family: Arial, sans-serif; margin: 20px;">
+                <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                        <span style="color: white; font-size: 24px; font-weight: bold;">📊</span>
+                    </div>
+                    <h2 style="margin: 0; color: #333;">基金分析报告 - {formatted_date}</h2>
                 </div>
+                
+                <h3 style="color: #555; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">持仓基金收益率变化分析</h3>
+                
+                {html_table}
                 
                 {summary_html}
-                
-                <h3 style="color: #2c3e50; margin-top: 30px;">📈 基金绩效分析详情</h3>
-                <div style="margin: 20px 0;">{html_table}</div>
-                
-                <div style="border-top: 1px solid #ecf0f1; padding-top: 15px; margin-top: 30px; font-size: 12px; color: #7f8c8d;">
-                    <p>📋 <strong>备注:</strong></p>
-                    <ul style="margin: 10px 0; padding-left: 20px;">
-                        <li>绩效数据基于历史表现计算，不代表未来收益</li>
-                        <li>夏普比率、卡尔玛比率等指标用于风险调整收益评估</li>
-                        <li>最大回撤率反映基金历史最大跌幅</li>
-                        <li>操作建议仅供参考，请结合自身投资策略决策</li>
-                    </ul>
-                </div>
             </div>
             """
             
@@ -756,7 +738,7 @@ class EnhancedNotificationManager:
             'calmar_ratio', 'sortino_ratio', 'var_95',
             'win_rate', 'profit_loss_ratio', 'composite_score',
             'status_label', 'operation_suggestion', 'redeem_amount',
-            'execute_amount', 'execution_amount'
+            'execution_amount', 'execute_amount'
         ]
         
         # 确定实际可用的列，按照优先级排序

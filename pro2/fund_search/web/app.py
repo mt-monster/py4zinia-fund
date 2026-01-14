@@ -17,10 +17,10 @@ import logging
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
-from enhanced_database import EnhancedDatabaseManager
-from enhanced_strategy import EnhancedInvestmentStrategy
-from enhanced_fund_data import EnhancedFundData
+from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
+from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+from data_retrieval.enhanced_fund_data import EnhancedFundData
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -156,9 +156,22 @@ def get_fund_history(fund_code):
     """获取基金历史绩效数据"""
     try:
         days = request.args.get('days', 30, type=int)
+        
+        # 尝试从AKShare获取实时净值数据
+        try:
+            hist_data = fund_data_manager.get_historical_data(fund_code, days=days)
+            if not hist_data.empty:
+                # 转换日期格式
+                hist_data['date'] = hist_data['date'].dt.strftime('%Y-%m-%d')
+                result_data = hist_data[['date', 'nav']].tail(days).to_dict('records')
+                return jsonify({'success': True, 'data': result_data})
+        except Exception as e:
+            logger.warning(f"从AKShare获取历史数据失败: {str(e)}, 尝试从数据库获取")
+        
+        # 备用方案：从数据库获取
         sql = f"""
-        SELECT analysis_date, today_return, annualized_return, sharpe_ratio,
-               max_drawdown, volatility, composite_score, status_label
+        SELECT analysis_date as date, today_return, annualized_return, sharpe_ratio,
+               max_drawdown, volatility, composite_score, status_label, current_nav as nav
         FROM fund_analysis_results WHERE fund_code = '{fund_code}'
         ORDER BY analysis_date DESC LIMIT {days}
         """
@@ -167,7 +180,7 @@ def get_fund_history(fund_code):
         if df.empty:
             return jsonify({'success': True, 'data': []})
         
-        df['analysis_date'] = df['analysis_date'].astype(str)
+        df['date'] = df['date'].astype(str)
         
         for key in ['today_return', 'annualized_return', 'max_drawdown', 'volatility']:
             if key in df.columns:
