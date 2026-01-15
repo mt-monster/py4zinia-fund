@@ -41,11 +41,32 @@ class EnhancedDatabaseManager:
         数据库引擎对象
         """
         try:
+            # 先连接到MySQL服务器（不指定数据库）
+            connection_string_no_db = (
+                f"mysql+pymysql://{self.db_config['user']}:{self.db_config['password']}"
+                f"@{self.db_config['host']}:{self.db_config['port']}"
+                f"?charset={self.db_config['charset']}"
+            )
+            
+            # 创建临时引擎连接到服务器
+            temp_engine = create_engine(connection_string_no_db, echo=False)
+            
+            # 检查并创建数据库
+            with temp_engine.connect() as conn:
+                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {self.db_config['database']} DEFAULT CHARACTER SET {self.db_config['charset']}"))
+                conn.commit()
+                logger.info(f"数据库 {self.db_config['database']} 检查/创建成功")
+            
+            # 关闭临时引擎
+            temp_engine.dispose()
+            
+            # 创建最终引擎（指定数据库）
             connection_string = (
                 f"mysql+pymysql://{self.db_config['user']}:{self.db_config['password']}"
                 f"@{self.db_config['host']}:{self.db_config['port']}/{self.db_config['database']}"
                 f"?charset={self.db_config['charset']}"
             )
+            
             engine = create_engine(connection_string, echo=False)
             logger.info("数据库引擎创建成功")
             return engine
@@ -69,6 +90,9 @@ class EnhancedDatabaseManager:
             
             # 创建基金分析汇总表
             self._create_analysis_summary_table()
+            
+            # 创建用户持仓表
+            self._create_user_holdings_table()
             
             logger.info("数据库表结构初始化完成")
             
@@ -196,6 +220,28 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
     
+    def _create_user_holdings_table(self):
+        """
+        创建用户持仓表
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS user_holdings (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
+            fund_code VARCHAR(20) NOT NULL,
+            fund_name VARCHAR(100) NOT NULL,
+            holding_shares FLOAT DEFAULT 0,
+            cost_price FLOAT DEFAULT 0,
+            holding_amount FLOAT DEFAULT 0,
+            buy_date DATE DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_user_fund (user_id, fund_code),
+            INDEX idx_user_id (user_id),
+            INDEX idx_fund_code (fund_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """
+        self.execute_sql(sql)
 
 
     def execute_query_raw(self, sql: str, params: Optional[Tuple] = None) -> Optional[List]:
