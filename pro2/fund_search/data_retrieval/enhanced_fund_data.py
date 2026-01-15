@@ -37,11 +37,13 @@ class EnhancedFundData:
             fund_info = ak.fund_open_fund_info_em(symbol=fund_code, indicator="基本信息")
             
             if fund_info.empty:
+                # API返回空数据，但不一定是无效基金，可能是API限制或延迟
+                logger.debug(f"基金 {fund_code} 基本信息API返回空，使用默认值")
                 return {
                     'fund_code': fund_code,
                     'fund_name': f'基金{fund_code}',
                     'fund_type': '未知',
-                    'establish_date': '',
+                    'establish_date': None,  # 返回None而不是空字符串
                     'fund_company': '未知',
                     'fund_manager': '未知',
                     'management_fee': 0.0,
@@ -57,19 +59,23 @@ class EnhancedFundData:
                 'fund_code': fund_code,
                 'fund_name': info_dict.get('基金简称', f'基金{fund_code}'),
                 'fund_type': info_dict.get('基金类型', '未知'),
-                'establish_date': info_dict.get('成立日期', ''),
+                'establish_date': info_dict.get('成立日期', None),  # 返回None而不是空字符串
                 'fund_company': info_dict.get('基金管理人', '未知'),
                 'fund_manager': info_dict.get('基金经理', '未知'),
                 'management_fee': float(info_dict.get('管理费率', 0.0)),
                 'custody_fee': float(info_dict.get('托管费率', 0.0))
             }
         except Exception as e:
-            logger.error(f"获取基金 {fund_code} 基本信息失败: {str(e)}")
+            error_msg = str(e)
+            if "SyntaxError" in error_msg and "<!doctype html>" in error_msg:
+                logger.debug(f"基金 {fund_code} API返回错误页面，使用默认值")
+            else:
+                logger.debug(f"获取基金 {fund_code} 基本信息失败: {error_msg}，使用默认值")
             return {
                 'fund_code': fund_code,
                 'fund_name': f'基金{fund_code}',
                 'fund_type': '未知',
-                'establish_date': '',
+                'establish_date': None,  # 返回None而不是空字符串
                 'fund_company': '未知',
                 'fund_manager': '未知',
                 'management_fee': 0.0,
@@ -92,11 +98,13 @@ class EnhancedFundData:
             fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
             
             if fund_nav.empty:
+                logger.debug(f"基金 {fund_code} 净值数据API返回空，使用默认值")
                 return {
                     'fund_code': fund_code,
                     'current_nav': 0.0,
                     'previous_nav': 0.0,
                     'daily_return': 0.0,
+                    'yesterday_return': 0.0,  # 新增昨日盈亏率
                     'nav_date': datetime.now().strftime('%Y-%m-%d'),
                     'estimate_nav': 0.0,
                     'estimate_return': 0.0
@@ -109,8 +117,11 @@ class EnhancedFundData:
             if len(fund_nav) > 1:
                 previous_data = fund_nav.iloc[-2]
                 previous_nav = float(previous_data.get('单位净值', 0))
+                # 获取昨日盈亏率（前一日的日增长率）
+                yesterday_return = float(previous_data.get('日增长率', 0))
             else:
                 previous_nav = float(latest_data.get('单位净值', 0))
+                yesterday_return = 0.0
             
             current_nav = float(latest_data.get('单位净值', 0))
             nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
@@ -128,23 +139,30 @@ class EnhancedFundData:
             
             # 确保日收益率格式正确，保留两位小数
             daily_return = round(daily_return, 2)
+            yesterday_return = round(yesterday_return, 2)
             
             return {
                 'fund_code': fund_code,
                 'current_nav': current_nav,
                 'previous_nav': previous_nav,
                 'daily_return': daily_return,
+                'yesterday_return': yesterday_return,  # 新增昨日盈亏率
                 'nav_date': nav_date,
                 'estimate_nav': float(latest_data.get('估算值', current_nav)),
                 'estimate_return': float(latest_data.get('日增长率', daily_return))
             }
         except Exception as e:
-            logger.error(f"获取基金 {fund_code} 实时数据失败: {str(e)}")
+            error_msg = str(e)
+            if "SyntaxError" in error_msg and "<!doctype html>" in error_msg:
+                logger.debug(f"基金 {fund_code} API返回错误页面，使用默认值")
+            else:
+                logger.debug(f"获取基金 {fund_code} 实时数据失败: {error_msg}，使用默认值")
             return {
                 'fund_code': fund_code,
                 'current_nav': 0.0,
                 'previous_nav': 0.0,
                 'daily_return': 0.0,
+                'yesterday_return': 0.0,  # 新增昨日盈亏率
                 'nav_date': datetime.now().strftime('%Y-%m-%d'),
                 'estimate_nav': 0.0,
                 'estimate_return': 0.0
@@ -167,6 +185,7 @@ class EnhancedFundData:
             fund_hist = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
             
             if fund_hist.empty:
+                logger.debug(f"基金 {fund_code} 历史数据API返回空，使用空DataFrame")
                 return pd.DataFrame()
             
             # 转换日期格式
@@ -195,14 +214,18 @@ class EnhancedFundData:
             
             return fund_hist
         except Exception as e:
-            logger.error(f"获取基金 {fund_code} 历史数据失败: {str(e)}")
+            error_msg = str(e)
+            if "SyntaxError" in error_msg and "<!doctype html>" in error_msg:
+                logger.debug(f"基金 {fund_code} API返回错误页面，使用空DataFrame")
+            else:
+                logger.debug(f"获取基金 {fund_code} 历史数据失败: {error_msg}，使用空DataFrame")
             return pd.DataFrame()
     
     @staticmethod
     def get_performance_metrics(fund_code: str, days: int = 365) -> Dict:
         """
         获取基金绩效指标
-        
+    
         参数：
         fund_code: 基金代码（6位数字）
         days: 历史数据天数（默认365天）
@@ -241,7 +264,7 @@ class EnhancedFundData:
         返回：
         dict: 绩效指标
         """
-        from enhanced_config import PERFORMANCE_CONFIG, INVESTMENT_STRATEGY_CONFIG
+        from shared.enhanced_config import PERFORMANCE_CONFIG, INVESTMENT_STRATEGY_CONFIG
         
         # 获取配置参数
         risk_free_rate = INVESTMENT_STRATEGY_CONFIG['risk_free_rate']

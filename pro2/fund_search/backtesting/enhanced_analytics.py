@@ -29,7 +29,7 @@ class EnhancedFundAnalytics:
     """增强版基金分析类"""
     
     def __init__(self):
-        from enhanced_config import CHART_CONFIG
+        from shared.enhanced_config import CHART_CONFIG
         self.chart_config = CHART_CONFIG
         self.color_palette = CHART_CONFIG['color_palette']
         

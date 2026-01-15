@@ -21,7 +21,7 @@ class EnhancedInvestmentStrategy:
     """增强版投资策略类"""
     
     def __init__(self):
-        from enhanced_config import INVESTMENT_STRATEGY_CONFIG
+        from shared.enhanced_config import INVESTMENT_STRATEGY_CONFIG
         self.config = INVESTMENT_STRATEGY_CONFIG
         
         # 策略规则定义

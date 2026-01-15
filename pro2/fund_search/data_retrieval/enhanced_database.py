@@ -193,6 +193,7 @@ class EnhancedDatabaseManager:
             yesterday_nav FLOAT DEFAULT NULL,
             current_estimate FLOAT DEFAULT NULL,
             today_return FLOAT DEFAULT NULL,
+            yesterday_return FLOAT DEFAULT NULL,
             prev_day_return FLOAT DEFAULT NULL,
             status_label VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
             is_buy TINYINT(1) DEFAULT NULL,
@@ -225,6 +226,28 @@ class EnhancedDatabaseManager:
     
 
 
+    def execute_query_raw(self, sql: str, params: Optional[Tuple] = None) -> Optional[List]:
+        """
+        执行原始查询并返回结果
+        
+        参数：
+        sql: SQL查询语句
+        params: 查询参数元组
+        
+        返回：
+        查询结果列表或None
+        """
+        try:
+            with self.engine.connect() as conn:
+                if params:
+                    result = conn.execute(text(sql), params)
+                else:
+                    result = conn.execute(text(sql))
+                return result.fetchall()
+        except Exception as e:
+            logger.error(f"执行原始查询失败: {str(e)}")
+            return None
+    
     def execute_sql(self, sql: str, params: Optional[Dict] = None) -> bool:
         """
         执行SQL语句
@@ -522,9 +545,38 @@ class EnhancedDatabaseManager:
                 }
                 self.insert_fund_performance(performance_data)
             
-            # 插入策略结果数据
-            for strategy_result in strategy_results_list:
-                self.insert_strategy_result(strategy_result)
+            # 插入综合分析结果数据到fund_analysis_results表
+            for fund_data in fund_data_list:
+                fund_analysis_data = {
+                    'fund_code': fund_data.get('fund_code', ''),
+                    'fund_name': fund_data.get('fund_name', ''),
+                    'analysis_date': fund_data.get('analysis_date', datetime.now().date()),
+                    'today_return': fund_data.get('today_return', 0.0),
+                    'yesterday_return': fund_data.get('yesterday_return', 0.0),
+                    'prev_day_return': fund_data.get('prev_day_return', 0.0),
+                    'daily_return': fund_data.get('daily_return', 0.0),
+                    'status_label': fund_data.get('status_label', ''),
+                    'operation_suggestion': fund_data.get('operation_suggestion', ''),
+                    'execution_amount': fund_data.get('execution_amount', ''),
+                    'annualized_return': fund_data.get('annualized_return', 0.0),
+                    'sharpe_ratio': fund_data.get('sharpe_ratio', 0.0),
+                    'max_drawdown': fund_data.get('max_drawdown', 0.0),
+                    'volatility': fund_data.get('volatility', 0.0),
+                    'calmar_ratio': fund_data.get('calmar_ratio', 0.0),
+                    'sortino_ratio': fund_data.get('sortino_ratio', 0.0),
+                    'var_95': fund_data.get('var_95', 0.0),
+                    'win_rate': fund_data.get('win_rate', 0.0),
+                    'profit_loss_ratio': fund_data.get('profit_loss_ratio', 0.0),
+                    'composite_score': fund_data.get('composite_score', 0.0),
+                    'total_return': fund_data.get('total_return', 0.0),
+                    'yesterday_nav': fund_data.get('previous_nav', 0.0),
+                    'current_estimate': fund_data.get('estimate_nav', 0.0),
+                    'is_buy': 1 if fund_data.get('is_buy', False) else 0,
+                    'redeem_amount': fund_data.get('redeem_amount', 0.0),
+                    'comparison_value': fund_data.get('comparison_value', 0.0),
+                    'buy_multiplier': fund_data.get('buy_multiplier', 0.0)
+                }
+                self.insert_fund_analysis_results(fund_analysis_data)
             
             # 插入分析汇总数据
             self.insert_analysis_summary(summary_data)
@@ -927,14 +979,14 @@ class EnhancedDatabaseManager:
             sql = """
             INSERT INTO fund_analysis_results (
                 fund_code, fund_name, yesterday_nav, current_estimate, today_return, 
-                prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
+                yesterday_return, prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
                 operation_suggestion, execution_amount, analysis_date, buy_multiplier, 
                 annualized_return, sharpe_ratio, max_drawdown, volatility, calmar_ratio, 
                 sortino_ratio, var_95, win_rate, profit_loss_ratio, daily_return, 
                 total_return, composite_score
             ) VALUES (
                 :fund_code, :fund_name, :yesterday_nav, :current_estimate, :today_return,
-                :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
+                :yesterday_return, :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
                 :operation_suggestion, :execution_amount, :analysis_date, :buy_multiplier,
                 :annualized_return, :sharpe_ratio, :max_drawdown, :volatility, :calmar_ratio,
                 :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, :daily_return, 
@@ -944,6 +996,7 @@ class EnhancedDatabaseManager:
                 yesterday_nav = VALUES(yesterday_nav),
                 current_estimate = VALUES(current_estimate),
                 today_return = VALUES(today_return),
+                yesterday_return = VALUES(yesterday_return),
                 prev_day_return = VALUES(prev_day_return),
                 status_label = VALUES(status_label),
                 is_buy = VALUES(is_buy),
@@ -973,6 +1026,7 @@ class EnhancedDatabaseManager:
                 'yesterday_nav': analysis_data.get('yesterday_nav', 0.0),
                 'current_estimate': analysis_data.get('current_estimate', 0.0),
                 'today_return': analysis_data.get('today_return', 0.0),
+                'yesterday_return': analysis_data.get('yesterday_return', 0.0),
                 'prev_day_return': analysis_data.get('prev_day_return', 0.0),
                 'status_label': analysis_data.get('status_label', ''),
                 'is_buy': analysis_data.get('is_buy', 0),
@@ -1019,7 +1073,7 @@ class EnhancedDatabaseManager:
 
 if __name__ == "__main__":
     # 测试代码
-    from enhanced_config import DATABASE_CONFIG
+    from shared.enhanced_config import DATABASE_CONFIG
     
     # 创建数据库管理器
     db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)

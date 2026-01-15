@@ -12,11 +12,11 @@
 from .backtest_engine import FundBacktest
 from .enhanced_strategy import EnhancedInvestmentStrategy
 from .enhanced_analytics import EnhancedFundAnalytics
-from .fund_similarity import FundSimilarity
+from .fund_similarity import FundSimilarityAnalyzer
 
 __all__ = [
     'FundBacktest',
     'EnhancedInvestmentStrategy',
     'EnhancedFundAnalytics', 
-    'FundSimilarity'
+    'FundSimilarityAnalyzer'
 ]

@@ -26,7 +26,7 @@ import numpy as np   # 用于数值计算
 import matplotlib.pyplot as plt  # 用于数据可视化
 import akshare as ak  # 用于获取金融数据
 import datetime       # 用于日期处理
-from fund_realtime import FundRealTime  # 导入实时基金数据模块
+from data_retrieval.fund_realtime import FundRealTime  # 导入实时基金数据模块
 
 class FundBacktest:
     """
