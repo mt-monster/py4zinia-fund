@@ -424,7 +424,7 @@ class EnhancedFundAnalysisSystem:
             logger.info("开始保存分析结果到数据库")
             
             # 批量插入数据
-            success = self.db_manager.batch_insert_data(results, results, {
+            success = self.db_manager.batch_insert_data(results, {
                 'analysis_date': datetime.now().date(),
                 **strategy_summary,
                 'report_files': report_files

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -16,6 +16,8 @@
             --text-muted: #7f8c8d;
             --border-color: #ecf0f1;
             --bg-light: #f8f9fa;
+            --card-bg: #ffffff;
+            --bg-color: #f5f6fa;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -53,12 +55,13 @@
 </head>
 <body>
 <style>
-        /* 主容器布局 - 更新为单列布局 */
+        /* 主容器布局 - 支持侧边�?*/
         .main-container {
             display: flex;
             height: calc(100vh - 50px);
+            position: relative;
         }
-        /* 表格区域 - 现在占据全宽 */
+        /* 表格区域 - 可调整宽�?*/
         .left-panel {
             flex: 1;
             width: 100%;
@@ -66,8 +69,186 @@
             display: flex;
             flex-direction: column;
             background: white;
+            transition: margin-right 0.3s ease;
         }
-        /* 工具栏 */
+        /* 侧边栏样�?*/
+        .sidebar {
+            position: fixed;
+            top: 50px;
+            right: 0;
+            width: 400px;
+            min-width: 300px;
+            max-width: 800px;
+            height: calc(100vh - 50px);
+            background: white;
+            border-left: 1px solid var(--border-color);
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .sidebar.open {
+            transform: translateX(0);
+        }
+        .sidebar.resizing {
+            transition: none;
+        }
+        .main-container.sidebar-open .left-panel {
+            margin-right: 400px;
+            transition: margin-right 0.3s ease;
+        }
+        .main-container.sidebar-open.resizing .left-panel {
+            transition: none;
+        }
+        
+        /* 侧边栏拖拽手�?*/
+        .sidebar-resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 8px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 1001;
+        }
+        .sidebar-resize-handle:hover {
+            background: rgba(231, 76, 60, 0.2);
+        }
+        .sidebar-resize-handle::before {
+            content: '';
+            position: absolute;
+            left: 3px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2px;
+            height: 40px;
+            background: var(--primary-red);
+            border-radius: 1px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .sidebar-resize-handle:hover::before,
+        .sidebar.resizing .sidebar-resize-handle::before {
+            opacity: 1;
+        }
+        
+        /* 侧边栏内容样�?- 复用fund_detail.html的样�?*/
+        .sidebar .page-header {
+            background: var(--card-bg);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .sidebar .back-btn {
+            background: none; border: none;
+            font-size: 1.2rem; color: #333;
+            cursor: pointer; padding: 8px;
+        }
+        .sidebar .header-title { flex: 1; text-align: center; }
+        .sidebar .header-title h1 { font-size: 1.1rem; font-weight: 600; margin: 0; color: #333; }
+        .sidebar .header-title .fund-code { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        .sidebar .add-watchlist-btn {
+            background: #ff6b6b; color: white; border: none;
+            padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; cursor: pointer;
+        }
+        .sidebar .add-watchlist-btn:hover { background: #ee5a5a; }
+
+        /* 核心指标区域 */
+        .sidebar .core-metrics { background: var(--card-bg); padding: 20px 16px; border-bottom: 8px solid var(--bg-color); }
+        .sidebar .main-return { text-align: center; margin-bottom: 20px; }
+        .sidebar .main-return .label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; }
+        .sidebar .main-return .value { font-size: 2.5rem; font-weight: bold; }
+        .sidebar .metrics-row { display: flex; justify-content: space-around; text-align: center; }
+        .sidebar .metric-item { flex: 1; }
+        .sidebar .metric-item .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+        .sidebar .metric-item .value { font-size: 1.1rem; font-weight: 600; }
+
+        /* 持仓信息区域 */
+        .sidebar .holding-info { background: var(--card-bg); padding: 16px; border-bottom: 8px solid var(--bg-color); }
+        .sidebar .holding-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .sidebar .holding-item { text-align: center; }
+        .sidebar .holding-item .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
+        .sidebar .holding-item .value { font-size: 0.95rem; font-weight: 600; }
+        .sidebar .no-holding { text-align: center; padding: 20px; color: var(--text-muted); }
+
+        /* 业绩走势图区�?*/
+        .sidebar .chart-section { background: var(--card-bg); border-bottom: 8px solid var(--bg-color); }
+        .sidebar .chart-tabs { display: flex; border-bottom: 1px solid var(--border-color); padding: 0 16px; }
+        .sidebar .chart-tab {
+            padding: 12px 16px; font-size: 0.9rem; color: var(--text-muted);
+            cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+        }
+        .sidebar .chart-tab.active { color: var(--primary-red); border-bottom-color: var(--primary-red); }
+        .sidebar .chart-container { padding: 16px; position: relative; }
+        .sidebar .period-selector {
+            display: flex; justify-content: center; padding: 12px 16px;
+            gap: 8px; border-top: 1px solid var(--border-color);
+        }
+        .sidebar .period-btn {
+            padding: 6px 16px; border: 1px solid var(--border-color); border-radius: 20px;
+            background: var(--card-bg); font-size: 0.85rem; color: #666; cursor: pointer; transition: all 0.2s;
+        }
+        .sidebar .period-btn.active { background: var(--primary-red); color: white; border-color: var(--primary-red); }
+        .sidebar .period-btn:hover:not(.active) { border-color: var(--primary-red); color: var(--primary-red); }
+
+        /* 标签页导�?*/
+        .sidebar .tab-nav { background: var(--card-bg); display: flex; border-bottom: 1px solid var(--border-color); }
+        .sidebar .tab-nav-item {
+            flex: 1; text-align: center; padding: 14px 0; font-size: 0.9rem;
+            color: var(--text-muted); cursor: pointer; position: relative; transition: color 0.2s;
+        }
+        .sidebar .tab-nav-item.active { color: #333; font-weight: 600; }
+        .sidebar .tab-nav-item.active::after {
+            content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 24px; height: 3px; background: var(--primary-red); border-radius: 2px;
+        }
+
+        /* 标签页内�?*/
+        .sidebar .tab-content { background: var(--card-bg); }
+        .sidebar .tab-pane { display: none; padding: 0; }
+        .sidebar .tab-pane.active { display: block; }
+
+        /* 阶段涨幅 */
+        .sidebar .stage-returns { padding: 16px; }
+        .sidebar .stage-table { width: 100%; }
+        .sidebar .stage-table th, .sidebar .stage-table td { padding: 12px 8px; text-align: center; font-size: 0.85rem; }
+        .sidebar .stage-table th { color: var(--text-muted); font-weight: normal; border-bottom: 1px solid var(--border-color); }
+        .sidebar .stage-table td { font-weight: 500; }
+
+        /* 历史净值列�?*/
+        .sidebar .nav-history { max-height: 400px; overflow-y: auto; }
+        .sidebar .nav-history-header {
+            display: flex; padding: 12px 16px; background: #fafafa;
+            font-size: 0.8rem; color: var(--text-muted); position: sticky; top: 0;
+        }
+        .sidebar .nav-history-header span { flex: 1; text-align: center; }
+        .sidebar .nav-history-header span:first-child { text-align: left; }
+        .sidebar .nav-history-header span:last-child { text-align: right; }
+        .sidebar .nav-history-item { display: flex; padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
+        .sidebar .nav-history-item span { flex: 1; text-align: center; }
+        .sidebar .nav-history-item span:first-child { text-align: left; color: #333; }
+        .sidebar .nav-history-item span:last-child { text-align: right; }
+        .sidebar .nav-history-item .nav-value { font-weight: 500; }
+
+        /* 加载状�?*/
+        .sidebar .loading { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: var(--text-muted); }
+        .sidebar .loading-spinner {
+            width: 24px; height: 24px; border: 2px solid var(--border-color);
+            border-top-color: var(--primary-red); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin-bottom: 8px;
+        }
+
+        /* 错误提示 */
+        .sidebar .error-message { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+        .sidebar .error-message i { font-size: 2rem; margin-bottom: 12px; display: block; }
+        /* 工具�?*/
         .toolbar {
             padding: 10px 15px;
             background: var(--bg-light);
@@ -162,8 +343,11 @@
             overflow: hidden;
         }
         
-        .positive { color: var(--success-green); }
-        .negative { color: var(--danger-red); }
+        .positive { color: #e74c3c; }  /* 红色表示上涨 */
+        .negative { color: #27ae60; }  /* 绿色表示下跌 */
+        .text-up { color: #e74c3c; }  /* 红色表示上涨 */
+        .text-down { color: #27ae60; }  /* 绿色表示下跌 */
+        .text-neutral { color: #333; }  /* 中性颜�?*/
         .text-muted { color: var(--text-muted); }
         /* 排序相关样式 */
         .fund-table th.sortable {
@@ -186,17 +370,25 @@
             vertical-align: middle;
         }
         .sort-indicator.asc::after {
-            content: '▲';
+            content: '�?;
             color: var(--primary-red);
         }
         .sort-indicator.desc::after {
-            content: '▼';
+            content: '�?;
             color: var(--primary-red);
+        }
+        /* 不可排序的列样式 */
+        .fund-table th:not(.sortable) {
+            color: #bbb;
+            cursor: default;
+        }
+        .fund-table th:not(.sortable):hover {
+            background: #fafafa;
         }
 </style>
 <style>
         /* 右侧详情面板样式 - 保留供后续展开功能使用 */
-        /* 这些样式将在展开功能中重新使用 */
+        /* 这些样式将在展开功能中重新使�?*/
         .detail-panel {
             background: white;
             border: 1px solid var(--border-color);
@@ -248,7 +440,7 @@
             background: #fafafa;
         }
         
-        /* 收益率显示 */
+        /* 收益率显�?*/
         .return-display {
             text-align: center;
             padding: 10px 0;
@@ -476,7 +668,7 @@
             font-weight: 600;
         }
         
-        /* 走势图区域 */
+        /* 走势图区�?*/
         .chart-section {
             margin-top: 20px;
         }
@@ -493,6 +685,36 @@
         
         .chart-section .chart-title i {
             color: var(--primary-red);
+        }
+        
+        /* 时间维度选择�?*/
+        .chart-period-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .chart-period-selector .period-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-dark);
+        }
+        
+        .chart-period-selector .period-btn:hover {
+            border-color: var(--primary-red);
+            color: var(--primary-red);
+        }
+        
+        .chart-period-selector .period-btn.active {
+            background: var(--primary-red);
+            border-color: var(--primary-red);
+            color: white;
         }
         
         .chart-container {
@@ -613,7 +835,7 @@
             color: white;
         }
         
-        /* 响应式设计 */
+        /* 响应式设�?*/
         @media (max-width: 1200px) {
             .detail-grid {
                 grid-template-columns: 1fr;
@@ -653,7 +875,7 @@
                 font-size: 24px;
             }
         }
-        /* 收益率显示 */
+        /* 收益率显�?*/
         .return-display {
             text-align: center;
             padding: 20px 0;
@@ -685,7 +907,7 @@
             font-size: 11px;
             color: var(--text-muted);
         }
-        /* 走势图区域 */
+        /* 走势图区�?*/
         .chart-section {
             margin-bottom: 15px;
         }
@@ -757,7 +979,7 @@
             padding: 8px 0;
             font-size: 12px;
         }
-        /* 加载状态 */
+        /* 加载状�?*/
         .loading { text-align: center; padding: 40px; color: var(--text-muted); }
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         
@@ -793,63 +1015,7 @@
         .table-wrapper {
             flex: 1;
             overflow: auto;
-            position: relative; /* 为加载指示器提供定位上下文 */
-        }
-        
-        /* 侧边栏样式 */
-        .sidebar {
-            position: fixed;
-            top: 50px;
-            right: 0;
-            width: 400px;
-            min-width: 300px;
-            max-width: 800px;
-            height: calc(100vh - 50px);
-            background: white;
-            border-left: 1px solid var(--border-color);
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        .sidebar.open {
-            transform: translateX(0);
-        }
-        .sidebar.resizing {
-            transition: none;
-        }
-        
-        /* 侧边栏拖拽手柄 */
-        .sidebar-resize-handle {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 8px;
-            height: 100%;
-            cursor: ew-resize;
-            background: transparent;
-            z-index: 1001;
-        }
-        .sidebar-resize-handle:hover {
-            background: rgba(231, 76, 60, 0.2);
-        }
-        .sidebar-resize-handle::before {
-            content: '';
-            position: absolute;
-            left: 3px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 2px;
-            height: 40px;
-            background: var(--primary-red);
-            border-radius: 1px;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        .sidebar-resize-handle:hover::before,
-        .sidebar.resizing .sidebar-resize-handle::before {
-            opacity: 1;
+            position: relative; /* 为加载指示器提供定位上下�?*/
         }
     </style>
     <!-- 顶部导航 -->
@@ -870,11 +1036,11 @@
         </div>
     </div>
 
-    <!-- 主容器 -->
-    <div class="main-container">
+    <!-- 主容�?-->
+    <div class="main-container" id="main-container">
         <!-- 表格区域 - 现在占据全宽 -->
         <div class="left-panel">
-            <!-- 工具栏 -->
+            <!-- 工具�?-->
             <div class="toolbar">
                 <div class="search-box">
                     <i class="bi bi-search" style="color: #aaa;"></i>
@@ -886,14 +1052,14 @@
                     <option value="yesterday_return">昨日收益</option>
                     <option value="annualized_return">年化收益</option>
                     <option value="sharpe_ratio">夏普比率</option>
-                    <option value="max_drawdown">最大回撤</option>
+                    <option value="max_drawdown">最大回�?/option>
                 </select>
                 <input type="date" id="date-select">
                 <button class="btn-filter" onclick="loadFunds()">
-                    <i class="bi bi-funnel"></i> 筛选
+                    <i class="bi bi-funnel"></i> 筛�?
                 </button>
                 <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
-                    共 <span id="total-count">0</span> 只基金
+                    �?<span id="total-count">0</span> 只基�?
                 </span>
             </div>
 
@@ -906,24 +1072,32 @@
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="yesterday_return">昨日盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="yesterday_return">昨日盈亏�?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_profit_rate">当日盈亏�?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_profit">持有盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="holding_profit_rate">持有盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_profit_rate">持有盈亏�?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="total_profit_rate">累计盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="total_profit_rate">累计盈亏�?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="sharpe_ratio">夏普比率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="max_drawdown">最大回撤 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="max_drawdown">最大回�?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span></th>
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
-                        <tr><td colspan="14" class="loading">加载中...</td></tr>
+                        <tr><td colspan="15" class="loading">加载�?..</td></tr>
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- 侧边�?-->
+    <div class="sidebar" id="fund-sidebar">
+        <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
+        <div id="sidebar-content">
+            <!-- 侧边栏内容将通过JavaScript动态加�?-->
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -935,16 +1109,16 @@
         let selectedFund = null;
         let navChart = null;
 
-        // ==================== DataSorter 类 ====================
+        // ==================== DataSorter �?====================
         // 负责执行数据排序逻辑
         class DataSorter {
-            // 判断是否为空值
+            // 判断是否为空�?
             isNullValue(value) {
                 return value === null || value === undefined || value === '' || value === '--' || 
                        (typeof value === 'number' && isNaN(value));
             }
 
-            // 处理空值，返回用于比较的值
+            // 处理空值，返回用于比较的�?
             handleNullValue(value) {
                 if (this.isNullValue(value)) {
                     return null;
@@ -957,7 +1131,7 @@
                 const aVal = this.handleNullValue(a);
                 const bVal = this.handleNullValue(b);
                 
-                // 空值处理：升序时空值排最后，降序时空值排最前
+                // 空值处理：升序时空值排最后，降序时空值排最�?
                 if (aVal === null && bVal === null) return 0;
                 if (aVal === null) return order === 'asc' ? 1 : -1;
                 if (bVal === null) return order === 'asc' ? -1 : 1;
@@ -972,12 +1146,12 @@
                 return order === 'asc' ? numA - numB : numB - numA;
             }
 
-            // 比较字符串（支持中文）
+            // 比较字符串（支持中文�?
             compareStrings(a, b, order) {
                 const aVal = this.handleNullValue(a);
                 const bVal = this.handleNullValue(b);
                 
-                // 空值处理
+                // 空值处�?
                 if (aVal === null && bVal === null) return 0;
                 if (aVal === null) return order === 'asc' ? 1 : -1;
                 if (bVal === null) return order === 'asc' ? -1 : 1;
@@ -1014,50 +1188,50 @@
         // 创建 DataSorter 实例
         const dataSorter = new DataSorter();
 
-        // ==================== 列配置 ====================
+        // ==================== 列配�?====================
         const COLUMN_CONFIG = {
             'checkbox': { type: 'none', sortable: false, label: '' },
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
-            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
+            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏�? },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
-            'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏率' },
+            'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏�? },
             'holding_profit': { type: 'number', sortable: true, label: '持有盈亏' },
-            'holding_profit_rate': { type: 'number', sortable: true, label: '持有盈亏率' },
+            'holding_profit_rate': { type: 'number', sortable: true, label: '持有盈亏�? },
             'total_profit': { type: 'number', sortable: true, label: '累计盈亏' },
-            'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏率' },
+            'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏�? },
             'sharpe_ratio': { type: 'number', sortable: true, label: '夏普比率' },
-            'max_drawdown': { type: 'number', sortable: true, label: '最大回撤' },
+            'max_drawdown': { type: 'number', sortable: true, label: '最大回�? },
             'composite_score': { type: 'number', sortable: true, label: '综合评分' }
         };
 
-        // ==================== SortController 类 ====================
+        // ==================== SortController �?====================
         // 负责管理排序状态和处理用户交互
         class SortController {
             constructor(columnConfig) {
                 this.columnConfig = columnConfig;
-                this.currentColumn = 'composite_score';  // 默认排序列
+                this.currentColumn = 'composite_score';  // 默认排序�?
                 this.currentOrder = 'desc';  // 默认降序
             }
 
-            // 检查列是否可排序
+            // 检查列是否可排�?
             isColumnSortable(columnName) {
                 const config = this.columnConfig[columnName];
                 return config && config.sortable === true;
             }
 
-            // 获取列数据类型
+            // 获取列数据类�?
             getColumnType(columnName) {
                 const config = this.columnConfig[columnName];
                 return config ? config.type : 'text';
             }
 
-            // 计算下一个排序状态
+            // 计算下一个排序状�?
             calculateNextSortOrder(columnName) {
                 if (columnName !== this.currentColumn) {
-                    return 'asc';  // 切换到新列，从升序开始
+                    return 'asc';  // 切换到新列，从升序开�?
                 }
                 // 同一列：asc -> desc -> none -> asc
                 switch (this.currentOrder) {
@@ -1068,13 +1242,13 @@
                 }
             }
 
-            // 更新排序状态
+            // 更新排序状�?
             updateSortState(columnName, order) {
                 this.currentColumn = columnName;
                 this.currentOrder = order;
             }
 
-            // 处理列标题点击
+            // 处理列标题点�?
             handleColumnClick(columnName) {
                 if (!this.isColumnSortable(columnName)) {
                     return null;
@@ -1084,7 +1258,7 @@
                 return { column: columnName, order: nextOrder };
             }
 
-            // 获取当前排序状态
+            // 获取当前排序状�?
             getSortState() {
                 return {
                     column: this.currentColumn,
@@ -1096,11 +1270,11 @@
         // 创建 SortController 实例
         const sortController = new SortController(COLUMN_CONFIG);
 
-        // ==================== UIRenderer 类 ====================
+        // ==================== UIRenderer �?====================
         // 负责更新UI显示
         class UIRenderer {
-            // 显示/隐藏加载指示器
-            toggleLoading(show, message = '排序中...') {
+            // 显示/隐藏加载指示�?
+            toggleLoading(show, message = '排序�?..') {
                 const tableWrapper = document.querySelector('.table-wrapper');
                 let overlay = tableWrapper.querySelector('.loading-overlay');
                 
@@ -1124,7 +1298,7 @@
                 }
             }
 
-            // 更新排序指示器
+            // 更新排序指示�?
             updateSortIndicators(columnName, order) {
                 // 清除所有指示器
                 document.querySelectorAll('.fund-table th.sortable').forEach(th => {
@@ -1135,7 +1309,7 @@
                     }
                 });
                 
-                // 设置当前列的指示器
+                // 设置当前列的指示�?
                 if (order !== 'none') {
                     const th = document.querySelector(`.fund-table th[data-column="${columnName}"]`);
                     if (th) {
@@ -1148,7 +1322,7 @@
                 }
             }
 
-            // 高亮当前排序列
+            // 高亮当前排序�?
             highlightSortedColumn(columnName) {
                 document.querySelectorAll('.fund-table th.sortable').forEach(th => {
                     th.classList.remove('sorted');
@@ -1161,12 +1335,12 @@
                 }
             }
 
-            // 性能优化：使用文档片段渲染表格
+            // 性能优化：使用文档片段渲染表�?
             renderTableRows(funds) {
                 const tbody = document.getElementById('fund-table-body');
                 
                 if (!funds || funds.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="15" class="empty-state">暂无数据</td></tr>';
                     return;
                 }
 
@@ -1176,21 +1350,18 @@
                 funds.forEach((fund, index) => {
                     const tr = document.createElement('tr');
                     
-                    // 修改点击事件处理 - 展开侧边栏而不是跳转页面
+                    // 修改点击事件处理 - 展开侧边栏而不是跳转页�?
                     tr.onclick = (event) => {
                         // 检查是否点击了复选框
                         if (event.target.type === 'checkbox') {
                             return; // 不处理复选框点击
                         }
                         
-                        // 展开侧边栏显示基金详情
+                        // 展开侧边栏显示基金详�?
                         showFundSidebar(fund);
-                        
-                        // 保持原有的选中逻辑
-                        selectFund(fund);
                     };
                     
-                    // 添加样式以指示行可点击
+                    // 添加样式以指示行可点�?
                     tr.style.cursor = 'pointer';
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
                     
@@ -1201,19 +1372,28 @@
                     const sharpe = fund.sharpe_ratio || 0;
                     const score = fund.composite_score || 0;
                     
+                    // 持仓盈亏数据
+                    const holdingAmount = fund.holding_amount;
+                    const todayProfit = fund.today_profit;
+                    const todayProfitRate = fund.today_profit_rate;
+                    const holdingProfit = fund.holding_profit;
+                    const holdingProfitRate = fund.holding_profit_rate;
+                    const totalProfit = fund.total_profit;
+                    const totalProfitRate = fund.total_profit_rate;
+                    
                     tr.innerHTML = `
                         <td><input type="checkbox"></td>
                         <td class="fund-code">${fund.fund_code}</td>
                         <td>${this.truncate(fund.fund_name || '--', 12)}</td>
                         <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
                         <td class="${yesterdayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(yesterdayReturn)}</td>
-                        <td>--</td>
-                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">--</td>
-                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">--</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
-                        <td>--</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
+                        <td>${holdingAmount !== null && holdingAmount !== undefined ? '¥' + holdingAmount.toFixed(2) : '--'}</td>
+                        <td class="${todayProfit !== null && todayProfit >= 0 ? 'positive' : 'negative'}">${todayProfit !== null && todayProfit !== undefined ? (todayProfit >= 0 ? '+' : '') + todayProfit.toFixed(2) : '--'}</td>
+                        <td class="${todayProfitRate !== null && todayProfitRate >= 0 ? 'positive' : 'negative'}">${todayProfitRate !== null && todayProfitRate !== undefined ? this.formatPercent(todayProfitRate) : '--'}</td>
+                        <td class="${holdingProfit !== null && holdingProfit >= 0 ? 'positive' : 'negative'}">${holdingProfit !== null && holdingProfit !== undefined ? (holdingProfit >= 0 ? '+' : '') + holdingProfit.toFixed(2) : '--'}</td>
+                        <td class="${holdingProfitRate !== null && holdingProfitRate >= 0 ? 'positive' : 'negative'}">${holdingProfitRate !== null && holdingProfitRate !== undefined ? this.formatPercent(holdingProfitRate) : '--'}</td>
+                        <td class="${totalProfit !== null && totalProfit >= 0 ? 'positive' : 'negative'}">${totalProfit !== null && totalProfit !== undefined ? (totalProfit >= 0 ? '+' : '') + totalProfit.toFixed(2) : '--'}</td>
+                        <td class="${totalProfitRate !== null && totalProfitRate >= 0 ? 'positive' : 'negative'}">${totalProfitRate !== null && totalProfitRate !== undefined ? this.formatPercent(totalProfitRate) : '--'}</td>
                         <td>${sharpe.toFixed(2)}</td>
                         <td class="negative">${this.formatPercent(maxDrawdown)}</td>
                         <td><strong>${score.toFixed(4)}</strong></td>
@@ -1227,14 +1407,14 @@
                 tbody.appendChild(fragment);
             }
 
-            // 辅助方法：格式化百分比
+            // 辅助方法：格式化百分�?
             formatPercent(value) {
                 if (value === null || value === undefined || isNaN(value)) return '--';
                 const sign = value >= 0 ? '+' : '';
                 return sign + value.toFixed(2) + '%';
             }
 
-            // 辅助方法：截断文本
+            // 辅助方法：截断文�?
             truncate(str, len) {
                 if (!str) return '--';
                 return str.length > len ? str.substring(0, len) + '...' : str;
@@ -1244,7 +1424,7 @@
         // 创建 UIRenderer 实例
         const uiRenderer = new UIRenderer();
 
-        // ==================== ResizableChart 类 ====================
+        // ==================== ResizableChart �?====================
         // 负责可拖拽调整大小的图表组件
         class ResizableChart {
             constructor(container, options = {}) {
@@ -1273,7 +1453,7 @@
                 this.init();
             }
             
-            // 初始化图表组件
+            // 初始化图表组�?
             init() {
                 this.createChartContainer();
                 if (this.options.resizable) {
@@ -1346,7 +1526,7 @@
                     this.resizeHandles.push(handle);
                 });
                 
-                // 鼠标悬停时显示手柄
+                // 鼠标悬停时显示手�?
                 this.chartWrapper.addEventListener('mouseenter', () => {
                     this.resizeHandles.forEach(handle => {
                         handle.style.opacity = '1';
@@ -1388,7 +1568,7 @@
                 });
             }
             
-            // 处理拖拽开始
+            // 处理拖拽开�?
             handleDragStart(event, position) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1408,7 +1588,7 @@
                 });
             }
             
-            // 处理拖拽中
+            // 处理拖拽�?
             handleDragMove(event) {
                 if (!this.isDragging) return;
                 
@@ -1418,7 +1598,7 @@
                 let newWidth = this.initialSize.width;
                 let newHeight = this.initialSize.height;
                 
-                // 根据拖拽位置计算新尺寸
+                // 根据拖拽位置计算新尺�?
                 switch (this.dragPosition) {
                     case 'se':
                         newWidth = this.initialSize.width + deltaX;
@@ -1510,7 +1690,7 @@
                 
                 const ctx = this.canvas.getContext('2d');
                 
-                // 销毁现有图表
+                // 销毁现有图�?
                 if (this.chart) {
                     this.chart.destroy();
                 }
@@ -1572,7 +1752,7 @@
                 // 合并选项
                 const chartConfig = this.mergeDeep(defaultOptions, options);
                 
-                // 添加缩放和平移功能
+                // 添加缩放和平移功�?
                 if (this.options.zoomable || this.options.pannable) {
                     chartConfig.options.plugins.zoom = {
                         zoom: {
@@ -1601,7 +1781,7 @@
             updateData(data) {
                 if (this.chart) {
                     this.chart.data = data;
-                    this.chart.update('none'); // 无动画更新
+                    this.chart.update('none'); // 无动画更�?
                 }
             }
             
@@ -1639,7 +1819,7 @@
                 return result;
             }
             
-            // 销毁图表
+            // 销毁图�?
             destroy() {
                 if (this.chart) {
                     this.chart.destroy();
@@ -1656,7 +1836,7 @@
             }
         }
 
-        // ==================== DetailPanel 类 ====================
+        // ==================== DetailPanel �?====================
         // 负责渲染详情面板内容
         class DetailPanel {
             constructor(fundData) {
@@ -1700,12 +1880,20 @@
                                     ${investmentAdvice}
                                     <div class="chart-section">
                                         <div class="chart-title">
-                                            <i class="bi bi-graph-up"></i> NAV走势图
+                                            <i class="bi bi-graph-up"></i> NAV走势�?
+                                        </div>
+                                        <div class="chart-period-selector">
+                                            <button class="period-btn active" data-period="1m">近一�?/button>
+                                            <button class="period-btn" data-period="3m">近三�?/button>
+                                            <button class="period-btn" data-period="6m">近半�?/button>
+                                            <button class="period-btn" data-period="1y">近一�?/button>
+                                            <button class="period-btn" data-period="ytd">今年�?/button>
+                                            <button class="period-btn" data-period="all">成立以来</button>
                                         </div>
                                         <div class="chart-container" id="chart-${this.fundData.fund_code}">
                                             <div class="chart-placeholder">
                                                 <i class="bi bi-bar-chart-line"></i>
-                                                <p>图表加载中...</p>
+                                                <p>图表加载�?..</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1731,9 +1919,9 @@
                             <div class="main-return ${todayReturn >= 0 ? 'positive' : 'negative'}">
                                 ${formatPercent(todayReturn)}
                             </div>
-                            <div class="return-label">今日涨跌幅</div>
+                            <div class="return-label">今日涨跌�?/div>
                             <div class="nav-info">
-                                <span class="nav-value">净值: ${currentNav.toFixed(4)}</span>
+                                <span class="nav-value">净�? ${currentNav.toFixed(4)}</span>
                                 <span class="nav-change ${todayReturn >= 0 ? 'positive' : 'negative'}">
                                     ${todayReturn >= 0 ? '+' : ''}${todayReturn.toFixed(2)}%
                                 </span>
@@ -1757,7 +1945,7 @@
                         </div>
                         <div class="metrics-grid">
                             <div class="metric-item">
-                                <div class="metric-label">年化收益率</div>
+                                <div class="metric-label">年化收益�?/div>
                                 <div class="metric-value ${annualReturn >= 0 ? 'positive' : 'negative'}">
                                     ${formatPercent(annualReturn)}
                                 </div>
@@ -1769,7 +1957,7 @@
                                 </div>
                             </div>
                             <div class="metric-item">
-                                <div class="metric-label">波动率</div>
+                                <div class="metric-label">波动�?/div>
                                 <div class="metric-value">
                                     ${formatPercent(volatility)}
                                 </div>
@@ -1866,18 +2054,18 @@
                         </div>
                         <div class="risk-level">
                             <span class="risk-badge risk-${riskLevel}">
-                                ${riskLevel === 'low' ? '低风险' : riskLevel === 'medium' ? '中风险' : '高风险'}
+                                ${riskLevel === 'low' ? '低风�? : riskLevel === 'medium' ? '中风�? : '高风�?}
                             </span>
                         </div>
                         <div class="risk-metrics">
                             <div class="risk-item">
-                                <div class="risk-label">最大回撤</div>
+                                <div class="risk-label">最大回�?/div>
                                 <div class="risk-value negative">
                                     ${formatPercent(maxDrawdown)}
                                 </div>
                             </div>
                             <div class="risk-item">
-                                <div class="risk-label">波动率</div>
+                                <div class="risk-label">波动�?/div>
                                 <div class="risk-value">
                                     ${formatPercent(volatility)}
                                 </div>
@@ -1899,23 +2087,23 @@
                 `;
             }
             
-            // 初始化交互功能
+            // 初始化交互功�?
             initializeInteractions(container) {
-                // 初始化图表
+                // 初始化图�?
                 this.initializeChart(container);
                 
-                // 添加时间段切换功能
+                // 添加时间段切换功�?
                 this.initializePeriodTabs(container);
                 
-                // 标记为可见
+                // 标记为可�?
                 this.isVisible = true;
             }
             
-            // 初始化图表
+            // 初始化图�?
             initializeChart(container) {
                 const chartContainer = container.querySelector(`#chart-${this.fundData.fund_code}`);
                 if (chartContainer) {
-                    // 创建图表组件（将在任务4中完整实现）
+                    // 创建图表组件（将在任�?中完整实现）
                     this.createBasicChart(chartContainer);
                 }
             }
@@ -1941,48 +2129,54 @@
                     }
                 });
                 
-                // 添加时间段控制
-                const controlsDiv = document.createElement('div');
-                controlsDiv.className = 'chart-controls';
-                controlsDiv.innerHTML = `
-                    <div class="period-tabs">
-                        <span class="tab active" data-period="7">7天</span>
-                        <span class="tab" data-period="30">30天</span>
-                        <span class="tab" data-period="90">90天</span>
-                        <span class="tab" data-period="365">1年</span>
-                    </div>
-                `;
-                container.appendChild(controlsDiv);
-                
                 // 加载图表数据
-                this.loadChartData(this.fundData.fund_code, 30);
+                this.loadChartData(this.fundData.fund_code, '1m');
             }
             
             // 初始化时间段切换
             initializePeriodTabs(container) {
-                const tabs = container.querySelectorAll('.period-tabs .tab');
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', (e) => {
-                        // 移除其他tab的active状态
-                        tabs.forEach(t => t.classList.remove('active'));
-                        // 添加当前tab的active状态
+                // period-btn选择�?
+                const periodBtns = container.querySelectorAll('.chart-period-selector .period-btn');
+                periodBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        periodBtns.forEach(b => b.classList.remove('active'));
                         e.target.classList.add('active');
-                        
-                        // 重新加载图表数据
-                        const period = parseInt(e.target.getAttribute('data-period'));
+                        const period = e.target.getAttribute('data-period');
                         this.loadChartData(this.fundData.fund_code, period);
                     });
                 });
             }
             
             // 加载图表数据
-            async loadChartData(fundCode, days = 30) {
+            async loadChartData(fundCode, period = '1m') {
                 try {
-                    const response = await fetch(`/api/fund/${fundCode}/history?days=${days}`);
+                    // 支持数字(天数)或字符串(时间�?
+                    let url;
+                    let periodLabel;
+                    if (typeof period === 'number') {
+                        url = `/api/fund/${fundCode}/history?days=${period}`;
+                        periodLabel = `${period}天`;
+                    } else {
+                        url = `/api/fund/${fundCode}/history?period=${period}`;
+                        const periodLabels = {'1m': '近一�?, '3m': '近三�?, '6m': '近半�?, '1y': '近一�?, 'ytd': '今年�?, 'all': '成立以来'};
+                        periodLabel = periodLabels[period] || period;
+                    }
+                    
+                    const response = await fetch(url);
                     const result = await response.json();
                     
                     if (result.success && result.data && result.data.length > 0) {
-                        const labels = result.data.map(d => d.date.substring(5)); // MM-DD格式
+                        // 根据数据量决定日期格�?
+                        const dataLen = result.data.length;
+                        const labels = result.data.map(d => {
+                            if (dataLen > 180) {
+                                return d.date.substring(2, 7); // YY-MM格式
+                            } else if (dataLen > 60) {
+                                return d.date.substring(5); // MM-DD格式
+                            } else {
+                                return d.date.substring(5); // MM-DD格式
+                            }
+                        });
                         const values = result.data.map(d => d.nav);
                         
                         const chartData = {
@@ -2007,7 +2201,7 @@
                                     plugins: {
                                         title: {
                                             display: true,
-                                            text: `${this.fundData.fund_name} - ${days}天走势`,
+                                            text: `${this.fundData.fund_name} - ${periodLabel}走势`,
                                             font: {
                                                 size: 14,
                                                 weight: 'bold'
@@ -2018,7 +2212,7 @@
                             });
                         }
                     } else {
-                        // 显示无数据状态
+                        // 显示无数据状�?
                         this.showChartError('暂无历史数据');
                     }
                 } catch (error) {
@@ -2027,7 +2221,7 @@
                 }
             }
             
-            // 显示图表错误状态
+            // 显示图表错误状�?
             showChartError(message) {
                 if (this.chartComponent && this.chartComponent.chartWrapper) {
                     this.chartComponent.chartWrapper.innerHTML = `
@@ -2044,12 +2238,12 @@
                 this.fundData = fundData;
                 if (this.element) {
                     this.element.innerHTML = this.getHTML();
-                    // 重新初始化交互功能
+                    // 重新初始化交互功�?
                     this.initializeInteractions(this.element.parentElement);
                 }
             }
             
-            // 销毁面板
+            // 销毁面�?
             destroy() {
                 if (this.chartComponent) {
                     this.chartComponent.destroy();
@@ -2065,19 +2259,19 @@
             }
         }
 
-        // ==================== ExpansionController 类 ====================
-        // 负责管理详情面板的展开/收起状态
+        // ==================== ExpansionController �?====================
+        // 负责管理详情面板的展开/收起状�?
         class ExpansionController {
             constructor() {
                 this.expandedRow = null;        // 当前展开的行
                 this.animationDuration = 300;   // 动画持续时间
                 this.panels = new Map();        // 面板缓存
-                this.isAnimating = false;       // 动画状态标记
+                this.isAnimating = false;       // 动画状态标�?
             }
             
-            // 处理行点击事件
+            // 处理行点击事�?
             handleRowClick(fundData, rowElement) {
-                // 防止动画期间的重复点击
+                // 防止动画期间的重复点�?
                 if (this.isAnimating) {
                     return;
                 }
@@ -2102,14 +2296,14 @@
                 this.isAnimating = true;
                 this.expandedRow = rowElement;
                 
-                // 获取或创建面板
+                // 获取或创建面�?
                 const panel = this.getOrCreatePanel(fundData.fund_code, fundData);
                 
-                // 创建面板容器行
+                // 创建面板容器�?
                 const panelRow = document.createElement('tr');
                 panelRow.className = 'expansion-panel-row';
                 panelRow.innerHTML = `
-                    <td colspan="14" style="padding: 0; border: none;">
+                    <td colspan="15" style="padding: 0; border: none;">
                         <div class="expansion-panel-container" style="height: 0; overflow: hidden;">
                             ${panel.getHTML()}
                         </div>
@@ -2136,12 +2330,12 @@
                         container.style.height = 'auto';
                         this.isAnimating = false;
                         
-                        // 初始化面板内的交互功能
+                        // 初始化面板内的交互功�?
                         panel.initializeInteractions(container);
                     }, this.animationDuration);
                 });
                 
-                // 更新面板状态
+                // 更新面板状�?
                 this.updatePanelState(fundData.fund_code, {
                     isExpanded: true,
                     panelHeight: targetHeight,
@@ -2155,7 +2349,7 @@
                 
                 this.isAnimating = true;
                 
-                // 查找面板行
+                // 查找面板�?
                 const panelRow = rowElement.nextSibling;
                 if (!panelRow || !panelRow.classList.contains('expansion-panel-row')) {
                     this.isAnimating = false;
@@ -2183,7 +2377,7 @@
                     }, this.animationDuration);
                 });
                 
-                // 更新面板状态
+                // 更新面板状�?
                 const fundCode = this.getFundCodeFromRow(rowElement);
                 if (fundCode) {
                     this.updatePanelState(fundCode, {
@@ -2193,7 +2387,7 @@
                 }
             }
             
-            // 切换面板状态
+            // 切换面板状�?
             togglePanel(fundData, rowElement) {
                 if (this.expandedRow === rowElement) {
                     this.collapsePanel(rowElement);
@@ -2202,7 +2396,7 @@
                 }
             }
             
-            // 获取或创建面板
+            // 获取或创建面�?
             getOrCreatePanel(fundCode, fundData) {
                 if (!this.panels.has(fundCode)) {
                     const panel = new DetailPanel(fundData);
@@ -2211,19 +2405,19 @@
                 return this.panels.get(fundCode);
             }
             
-            // 更新面板状态
+            // 更新面板状�?
             updatePanelState(fundCode, state) {
                 const currentState = this.getPanelState(fundCode) || {};
                 const newState = { ...currentState, ...state };
                 
                 // 这里可以添加状态持久化逻辑
-                // 例如保存到 localStorage 或发送到服务器
-                console.log('更新面板状态:', fundCode, newState);
+                // 例如保存�?localStorage 或发送到服务�?
+                console.log('更新面板状�?', fundCode, newState);
             }
             
-            // 获取面板状态
+            // 获取面板状�?
             getPanelState(fundCode) {
-                // 这里可以从 localStorage 或服务器获取状态
+                // 这里可以�?localStorage 或服务器获取状�?
                 return {
                     fundCode: fundCode,
                     isExpanded: false,
@@ -2240,7 +2434,7 @@
                 return codeCell ? codeCell.textContent.trim() : null;
             }
             
-            // 清理所有面板
+            // 清理所有面�?
             clearAllPanels() {
                 this.panels.forEach(panel => panel.destroy());
                 this.panels.clear();
@@ -2248,7 +2442,7 @@
                 this.isAnimating = false;
             }
             
-            // 获取当前展开状态
+            // 获取当前展开状�?
             getExpansionState() {
                 return {
                     hasExpandedPanel: this.expandedRow !== null,
@@ -2265,7 +2459,7 @@
         // 页面加载
         document.addEventListener('DOMContentLoaded', function() {
             initDatePicker();
-            initSorting();  // 初始化排序功能
+            initSorting();  // 初始化排序功�?
             loadFunds();
             
             document.getElementById('search-input').addEventListener('keypress', function(e) {
@@ -2285,9 +2479,9 @@
             */
         });
 
-        // 初始化排序功能
+        // 初始化排序功�?
         function initSorting() {
-            // 为所有可排序的表头绑定点击事件
+            // 为所有可排序的表头绑定点击事�?
             document.querySelectorAll('.fund-table th.sortable').forEach(th => {
                 th.addEventListener('click', function() {
                     const columnName = this.getAttribute('data-column');
@@ -2300,26 +2494,26 @@
             uiRenderer.updateSortIndicators(state.column, state.order);
         }
 
-        // 处理排序点击（性能优化版本）
+        // 处理排序点击（性能优化版本�?
         function handleSort(columnName) {
             const result = sortController.handleColumnClick(columnName);
             if (!result) return;
             
-            // 更新UI指示器
+            // 更新UI指示�?
             uiRenderer.updateSortIndicators(result.column, result.order);
             
             // 性能优化：大数据量时显示加载指示器并异步排序
             const isLargeDataset = allFunds.length > 500;
             
             if (isLargeDataset) {
-                uiRenderer.toggleLoading(true, '排序中...');
+                uiRenderer.toggleLoading(true, '排序�?..');
             }
             
             // 异步执行排序操作
             setTimeout(() => {
                 try {
                     if (result.order === 'none') {
-                        // 恢复原始顺序，重新加载数据
+                        // 恢复原始顺序，重新加载数�?
                         uiRenderer.renderTableRows(allFunds);
                     } else {
                         const columnType = sortController.getColumnType(result.column);
@@ -2333,7 +2527,7 @@
                         uiRenderer.toggleLoading(false);
                     }
                 }
-            }, isLargeDataset ? 10 : 0); // 大数据量时延迟10ms，小数据量立即执行
+            }, isLargeDataset ? 10 : 0); // 大数据量时延�?0ms，小数据量立即执�?
         }
 
         async function initDatePicker() {
@@ -2347,13 +2541,13 @@
                     dateInput.max = result.data[0];
                 }
             } catch (error) {
-                console.error('初始化日期失败:', error);
+                console.error('初始化日期失�?', error);
             }
         }
 
         async function loadFunds() {
             const tbody = document.getElementById('fund-table-body');
-            tbody.innerHTML = '<tr><td colspan="14" class="loading">加载中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="15" class="loading">加载�?..</td></tr>';
             
             try {
                 const search = document.getElementById('search-input').value.trim();
@@ -2372,12 +2566,12 @@
                     allFunds = result.data;
                     document.getElementById('total-count').textContent = allFunds.length;
                     
-                    // 应用当前排序状态（性能优化版本）
+                    // 应用当前排序状态（性能优化版本�?
                     const sortState = sortController.getSortState();
                     const isLargeDataset = allFunds.length > 500;
                     
                     if (isLargeDataset) {
-                        uiRenderer.toggleLoading(true, '加载中...');
+                        uiRenderer.toggleLoading(true, '加载�?..');
                     }
                     
                     // 异步应用排序
@@ -2403,24 +2597,25 @@
                         }
                     }, isLargeDataset ? 10 : 0);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="15" class="empty-state">暂无数据</td></tr>';
                 }
             } catch (error) {
                 console.error('加载失败:', error);
-                tbody.innerHTML = '<tr><td colspan="14" class="empty-state">加载失败</td></tr>';
+                console.error('Error details:', error.message, error.stack);
+                tbody.innerHTML = '<tr><td colspan="15" class="empty-state">加载失败: ' + error.message + '</td></tr>';
             }
         }
         
-        // 保留原有的 renderFundTable 函数以保持兼容性
+        // 保留原有�?renderFundTable 函数以保持兼容�?
         function renderFundTable(funds) {
             uiRenderer.renderTableRows(funds);
         }
         
         function selectFund(fund) {
             selectedFund = fund;
-            // 更新表格选中状态 - 修改为兼容展开面板的逻辑
+            // 更新表格选中状�?- 修改为兼容展开面板的逻辑
             document.querySelectorAll('.fund-table tbody tr').forEach((tr) => {
-                // 跳过展开面板行
+                // 跳过展开面板�?
                 if (tr.classList.contains('expansion-panel-row')) {
                     return;
                 }
@@ -2442,10 +2637,10 @@
         // 保留详情面板更新逻辑供展开功能使用
         function updateDetailPanel(fund) {
             const todayReturn = fund.today_return || 0;
-            const annualReturn = fund.annualized_return || 0;  // API已转换为百分比
-            const maxDrawdown = fund.max_drawdown || 0;  // API已转换为百分比
-            const volatility = fund.volatility || 0;  // API已转换为百分比
-            const winRate = fund.win_rate || 0;  // API已转换为百分比
+            const annualReturn = fund.annualized_return || 0;  // API已转换为百分�?
+            const maxDrawdown = fund.max_drawdown || 0;  // API已转换为百分�?
+            const volatility = fund.volatility || 0;  // API已转换为百分�?
+            const winRate = fund.win_rate || 0;  // API已转换为百分�?
             
             // 这些DOM元素在展开功能中会重新创建
             /*
@@ -2500,7 +2695,7 @@
                 const response = await fetch(`/api/fund/${fundCode}/history?days=30`);
                 const result = await response.json();
                 
-                // 如果没有提供canvas元素，则不创建图表（用于展开功能）
+                // 如果没有提供canvas元素，则不创建图表（用于展开功能�?
                 if (!canvasElement) {
                     return result; // 返回数据供展开功能使用
                 }
@@ -2547,7 +2742,7 @@
                 
                 return result;
             } catch (error) {
-                console.error('加载走势图失败:', error);
+                console.error('加载走势图失�?', error);
                 return { success: false, error: error.message };
             }
         }
@@ -2567,41 +2762,46 @@
             alert('数据导入功能开发中...');
         }
 
-        // ==================== 侧边栏功能 ====================
+        // ==================== 侧边栏功�?====================
         let currentSidebarFund = null;
-        let sidebarWidth = 400;
+        let sidebarChart = null;
+        let sidebarWidth = 400; // 默认宽度
         let isResizingSidebar = false;
         let resizeStartX = 0;
         let resizeStartWidth = 0;
-        let sidebarChart = null;
 
-        // 显示基金详情侧边栏
+        // 显示基金详情侧边�?
         async function showFundSidebar(fund) {
             currentSidebarFund = fund;
             const sidebar = document.getElementById('fund-sidebar');
+            const mainContainer = document.getElementById('main-container');
             const sidebarContent = document.getElementById('sidebar-content');
             
-            // 加载侧边栏内容
+            // 加载侧边栏内�?
             sidebarContent.innerHTML = await generateSidebarContent(fund);
             
-            // 显示侧边栏
+            // 显示侧边�?
             sidebar.classList.add('open');
+            mainContainer.classList.add('sidebar-open');
             
             // 应用当前宽度
             sidebar.style.width = sidebarWidth + 'px';
+            mainContainer.querySelector('.left-panel').style.marginRight = sidebarWidth + 'px';
             
             // 初始化侧边栏内的功能
             initializeSidebarFeatures(fund);
             
-            // 初始化拖拽调整大小功能
+            // 初始化拖拽调整大小功�?
             initializeSidebarResize();
         }
 
-        // 隐藏侧边栏
+        // 隐藏侧边�?
         function hideSidebar() {
             const sidebar = document.getElementById('fund-sidebar');
+            const mainContainer = document.getElementById('main-container');
             
             sidebar.classList.remove('open');
+            mainContainer.classList.remove('sidebar-open');
             
             // 清理图表
             if (sidebarChart) {
@@ -2612,75 +2812,11 @@
             currentSidebarFund = null;
         }
 
-        // 生成侧边栏内容
-        async function generateSidebarContent(fund) {
-            const todayReturn = fund.today_return || 0;
-            const yearReturn = fund.annualized_return || 0;
-            
-            return `
-                <!-- 页面头部 -->
-                <div style="background: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ecf0f1; position: sticky; top: 0; z-index: 100;">
-                    <button style="background: none; border: none; font-size: 1.2rem; color: #333; cursor: pointer; padding: 8px;" onclick="hideSidebar()">
-                        <i class="bi bi-chevron-left"></i>
-                    </button>
-                    <div style="flex: 1; text-align: center;">
-                        <h1 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: #333;">${fund.fund_name || fund.fund_code}</h1>
-                        <div style="font-size: 0.8rem; color: #7f8c8d; margin-top: 2px;">${fund.fund_code}</div>
-                    </div>
-                    <button style="background: #ff6b6b; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
-                        <i class="bi bi-plus"></i> 加自选
-                    </button>
-                </div>
-
-                <!-- 核心指标区域 -->
-                <div style="background: white; padding: 20px 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <div style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 4px;">当日涨幅</div>
-                        <div style="font-size: 2.5rem; font-weight: bold; color: ${todayReturn >= 0 ? '#e74c3c' : '#27ae60'};">
-                            ${todayReturn >= 0 ? '+' : ''}${todayReturn.toFixed(2)}%
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-around; text-align: center;">
-                        <div style="flex: 1;">
-                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 4px;">近一年</div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: ${yearReturn >= 0 ? '#e74c3c' : '#27ae60'};">
-                                ${yearReturn >= 0 ? '+' : ''}${yearReturn.toFixed(2)}%
-                            </div>
-                        </div>
-                        <div style="flex: 1;">
-                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 4px;">最新净值</div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: #333;">
-                                ${fund.current_nav ? fund.current_nav.toFixed(4) : '--'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 简单的持仓信息 -->
-                <div style="background: white; padding: 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; padding: 20px; color: #7f8c8d;">
-                        <i class="bi bi-inbox"></i> 暂无持仓数据
-                    </div>
-                </div>
-
-                <!-- 图表区域占位 -->
-                <div style="background: white; padding: 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; padding: 40px; color: #7f8c8d;">
-                        <i class="bi bi-graph-up"></i> 图表功能开发中...
-                    </div>
-                </div>
-            `;
-        }
-
-        // 初始化侧边栏功能（简化版）
-        function initializeSidebarFeatures(fund) {
-            // 这里可以添加更多功能
-        }
-
         // 初始化侧边栏拖拽调整大小功能
         function initializeSidebarResize() {
             const resizeHandle = document.getElementById('sidebar-resize-handle');
             const sidebar = document.getElementById('fund-sidebar');
+            const mainContainer = document.getElementById('main-container');
             
             if (!resizeHandle) return;
             
@@ -2692,6 +2828,7 @@
                 
                 // 添加拖拽状态类
                 sidebar.classList.add('resizing');
+                mainContainer.classList.add('resizing');
                 document.body.style.cursor = 'ew-resize';
                 document.body.style.userSelect = 'none';
             });
@@ -2706,9 +2843,10 @@
                 // 限制宽度范围
                 newWidth = Math.max(300, Math.min(800, newWidth));
                 
-                // 应用新宽度
+                // 应用新宽�?
                 sidebarWidth = newWidth;
                 sidebar.style.width = newWidth + 'px';
+                mainContainer.querySelector('.left-panel').style.marginRight = newWidth + 'px';
             });
             
             document.addEventListener('mouseup', () => {
@@ -2716,18 +2854,602 @@
                 
                 isResizingSidebar = false;
                 sidebar.classList.remove('resizing');
+                mainContainer.classList.remove('resizing');
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
+                
+                // 如果图表存在，触发重绘以适应新宽�?
+                if (sidebarChart) {
+                    setTimeout(() => {
+                        sidebarChart.resize();
+                    }, 100);
+                }
             });
         }
-    </script>
 
-    <!-- 侧边栏 -->
-    <div class="sidebar" id="fund-sidebar">
-        <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
-        <div id="sidebar-content">
-            <!-- 侧边栏内容将通过JavaScript动态加载 -->
-        </div>
-    </div>
+        // 生成侧边栏内�?
+        async function generateSidebarContent(fund) {
+            // 加载持仓数据
+            let holdingData = null;
+            try {
+                const holdingResponse = await fetch(`/api/holdings?user_id=default_user`);
+                const holdingResult = await holdingResponse.json();
+                if (holdingResult.success && holdingResult.data) {
+                    holdingData = holdingResult.data.find(h => h.fund_code === fund.fund_code);
+                }
+            } catch (error) {
+                console.error('加载持仓数据失败:', error);
+            }
+
+            const todayReturn = fund.today_return || 0;
+            const yearReturn = fund.annualized_return || 0;
+            
+            return `
+                <!-- 页面头部 -->
+                <div class="page-header">
+                    <button class="back-btn" onclick="hideSidebar()"><i class="bi bi-chevron-left"></i></button>
+                    <div class="header-title">
+                        <h1>${fund.fund_name || fund.fund_code}</h1>
+                        <div class="fund-code">${fund.fund_code}</div>
+                    </div>
+                    <button class="add-watchlist-btn"><i class="bi bi-plus"></i> 加自�?/button>
+                </div>
+
+                <!-- 核心指标区域 -->
+                <div class="core-metrics">
+                    <div class="main-return">
+                        <div class="label">当日涨幅</div>
+                        <div class="value ${todayReturn >= 0 ? 'text-up' : 'text-down'}">${formatReturn(todayReturn, '%').text}</div>
+                    </div>
+                    <div class="metrics-row">
+                        <div class="metric-item">
+                            <div class="label">近一�?/div>
+                            <div class="value ${yearReturn >= 0 ? 'text-up' : 'text-down'}">${formatReturn(yearReturn, '%').text}</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="label">最新净�?/div>
+                            <div class="value text-neutral">${fund.current_nav ? fund.current_nav.toFixed(4) : '--'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 持仓信息区域 -->
+                ${generateHoldingSection(holdingData)}
+
+                <!-- 业绩走势图区�?-->
+                <div class="chart-section">
+                    <div class="chart-tabs">
+                        <div class="chart-tab active" data-type="trend">业绩走势</div>
+                        <div class="chart-tab" data-type="nav">单位净�?/div>
+                        <div class="chart-tab" data-type="profit">累计盈亏</div>
+                    </div>
+                    <div class="chart-container" style="height: 280px; position: relative;">
+                        <canvas id="sidebar-chart"></canvas>
+                    </div>
+                    <div class="period-selector">
+                        <button class="period-btn" data-period="1d">当日(�?</button>
+                        <button class="period-btn active" data-period="1m">近一�?/button>
+                        <button class="period-btn" data-period="6m">近半�?/button>
+                        <button class="period-btn" data-period="1y">近一�?/button>
+                        <button class="period-btn" data-period="ytd">今年�?/button>
+                    </div>
+                </div>
+
+                <!-- 标签页导�?-->
+                <div class="tab-nav">
+                    <div class="tab-nav-item active" data-tab="nav-history">历史净�?/div>
+                    <div class="tab-nav-item" data-tab="stage-returns">阶段涨幅</div>
+                    <div class="tab-nav-item" data-tab="fund-holdings">基金持仓</div>
+                    <div class="tab-nav-item" data-tab="transactions">交易记录</div>
+                </div>
+
+                <!-- 标签页内�?-->
+                <div class="tab-content">
+                    <div class="tab-pane active" id="nav-history-sidebar">
+                        <div class="nav-history">
+                            <div class="nav-history-header">
+                                <span>日期</span><span>单位净�?/span><span>日涨�?/span>
+                            </div>
+                            <div id="nav-history-list-sidebar">
+                                <div class="loading"><div class="loading-spinner"></div>加载�?..</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="stage-returns-sidebar">
+                        <div class="stage-returns">
+                            <table class="stage-table">
+                                <thead><tr><th>时间�?/th><th>本基�?/th><th>沪深300</th></tr></thead>
+                                <tbody id="stage-returns-body-sidebar">
+                                    ${generateStageReturnsTable(fund)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="fund-holdings-sidebar">
+                        <div class="loading"><i class="bi bi-pie-chart" style="font-size: 2rem;"></i><div>基金持仓数据暂未开�?/div></div>
+                    </div>
+                    <div class="tab-pane" id="transactions-sidebar">
+                        <div class="loading"><i class="bi bi-receipt" style="font-size: 2rem;"></i><div>暂无交易记录</div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 生成持仓信息区域
+        function generateHoldingSection(holdingData) {
+            if (!holdingData) {
+                return `
+                    <div class="holding-info">
+                        <div class="no-holding"><i class="bi bi-inbox"></i> 暂无持仓数据</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="holding-info">
+                    <div class="holding-grid">
+                        <div class="holding-item">
+                            <div class="label">当日盈亏</div>
+                            <div class="value ${(holdingData.today_profit || 0) >= 0 ? 'text-up' : 'text-down'}">
+                                ${holdingData.today_profit ? formatReturn(holdingData.today_profit, '').text : '--'}
+                            </div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">当日盈亏�?/div>
+                            <div class="value ${(holdingData.today_profit_rate || 0) >= 0 ? 'text-up' : 'text-down'}">
+                                ${holdingData.today_profit_rate ? formatReturn(holdingData.today_profit_rate, '%').text : '--'}
+                            </div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">持有盈亏</div>
+                            <div class="value ${(holdingData.holding_profit || 0) >= 0 ? 'text-up' : 'text-down'}">
+                                ${holdingData.holding_profit ? formatReturn(holdingData.holding_profit, '').text : '--'}
+                            </div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">持有盈亏�?/div>
+                            <div class="value ${(holdingData.holding_profit_rate || 0) >= 0 ? 'text-up' : 'text-down'}">
+                                ${holdingData.holding_profit_rate ? formatReturn(holdingData.holding_profit_rate, '%').text : '--'}
+                            </div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">持有金额</div>
+                            <div class="value text-neutral">${holdingData.holding_amount ? holdingData.holding_amount.toFixed(2) : '--'}</div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">累计盈亏</div>
+                            <div class="value ${(holdingData.total_profit || 0) >= 0 ? 'text-up' : 'text-down'}">
+                                ${holdingData.total_profit ? formatReturn(holdingData.total_profit, '').text : '--'}
+                            </div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">持有份额</div>
+                            <div class="value text-neutral">${holdingData.holding_shares ? holdingData.holding_shares.toFixed(2) : '--'}</div>
+                        </div>
+                        <div class="holding-item">
+                            <div class="label">持仓成本</div>
+                            <div class="value text-neutral">${holdingData.cost_price && holdingData.holding_shares ? (holdingData.cost_price * holdingData.holding_shares).toFixed(2) : '--'}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 生成阶段涨幅表格
+        function generateStageReturnsTable(fund) {
+            const stages = [
+                { label: '�?�?, fund: fund.week_return },
+                { label: '�?�?, fund: fund.month_return },
+                { label: '�?�?, fund: fund.quarter_return },
+                { label: '�?�?, fund: fund.half_year_return },
+                { label: '�?�?, fund: fund.annualized_return },
+                { label: '今年�?, fund: fund.ytd_return }
+            ];
+
+            return stages.map(stage => {
+                const fundReturn = formatReturn(stage.fund, '%');
+                const benchmarkReturn = formatReturn(null, '%'); // 暂无基准数据
+                return `
+                    <tr>
+                        <td>${stage.label}</td>
+                        <td class="${fundReturn.colorClass}">${fundReturn.text}</td>
+                        <td class="${benchmarkReturn.colorClass}">${benchmarkReturn.text}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 初始化侧边栏功能
+        function initializeSidebarFeatures(fund) {
+            // 初始化图�?
+            initializeSidebarChart(fund.fund_code);
+            
+            // 初始化标签页切换
+            initializeSidebarTabs();
+            
+            // 初始化时间周期选择
+            initializeSidebarPeriodSelector(fund.fund_code);
+            
+            // 加载历史净值数�?
+            loadSidebarNavHistory(fund.fund_code, '1m');
+        }
+
+        // 初始化侧边栏图表
+        async function initializeSidebarChart(fundCode) {
+            const canvas = document.getElementById('sidebar-chart');
+            if (!canvas) return;
+
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=1m`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (sidebarChart) {
+                        sidebarChart.destroy();
+                    }
+                    
+                    const sortedData = [...result.data].sort((a, b) => (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date));
+                    const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
+                    const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
+                    
+                    sidebarChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '净�?,
+                                data: navData,
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4,
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { intersect: false, mode: 'index' },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    padding: 12,
+                                    displayColors: false,
+                                    callbacks: {
+                                        title: ctx => ctx[0].label,
+                                        label: ctx => `净�? ${ctx.parsed.y.toFixed(4)}`
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    grid: { display: false },
+                                    ticks: { maxTicksLimit: 5, color: '#999', font: { size: 11 } }
+                                },
+                                y: {
+                                    display: true,
+                                    position: 'right',
+                                    grid: { color: 'rgba(0,0,0,0.05)' },
+                                    ticks: { color: '#999', font: { size: 11 } }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('加载侧边栏图表失�?', error);
+            }
+        }
+
+        // 初始化侧边栏标签�?
+        function initializeSidebarTabs() {
+            document.querySelectorAll('.tab-nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const tabId = item.dataset.tab;
+                    switchSidebarTab(tabId);
+                });
+            });
+        }
+
+        // 切换侧边栏标签页
+        function switchSidebarTab(tabId) {
+            // 更新标签页导�?
+            document.querySelectorAll('.tab-nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.tab === tabId);
+            });
+            
+            // 更新标签页内�?
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.toggle('active', pane.id === tabId + '-sidebar');
+            });
+            
+            // 如果切换到历史净值标签页，加载数�?
+            if (tabId === 'nav-history' && currentSidebarFund) {
+                loadSidebarNavHistory(currentSidebarFund.fund_code, '1m');
+            }
+        }
+
+        // 初始化时间周期选择�?
+        function initializeSidebarPeriodSelector(fundCode) {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const period = btn.dataset.period;
+                    
+                    // 更新按钮状�?
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // 更新图表
+                    updateSidebarChart(fundCode, period);
+                });
+            });
+        }
+
+        // 更新侧边栏图�?
+        async function updateSidebarChart(fundCode, period) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0 && sidebarChart) {
+                    const sortedData = [...result.data].sort((a, b) => (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date));
+                    const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
+                    const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
+                    
+                    sidebarChart.data.labels = labels;
+                    sidebarChart.data.datasets[0].data = navData;
+                    sidebarChart.update('none');
+                }
+            } catch (error) {
+                console.error('更新侧边栏图表失�?', error);
+            }
+        }
+
+        // 加载侧边栏历史净�?
+        async function loadSidebarNavHistory(fundCode, period = '1m') {
+            const listEl = document.getElementById('nav-history-list-sidebar');
+            if (!listEl) return;
+            
+            listEl.innerHTML = '<div class="loading"><div class="loading-spinner"></div>加载�?..</div>';
+            
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const sortedData = [...result.data].sort((a, b) => (b.date || b.analysis_date).localeCompare(a.date || a.analysis_date));
+                    
+                    let html = '';
+                    sortedData.forEach(item => {
+                        const date = (item.date || item.analysis_date || '').substring(0, 10);
+                        const nav = item.nav ? item.nav.toFixed(4) : '--';
+                        const dailyReturn = item.daily_return !== undefined ? item.daily_return : item.today_return;
+                        const returnFormatted = formatReturn(dailyReturn, '%');
+                        
+                        html += `
+                            <div class="nav-history-item">
+                                <span>${date}</span>
+                                <span class="nav-value">${nav}</span>
+                                <span class="${returnFormatted.colorClass}">${returnFormatted.text}</span>
+                            </div>
+                        `;
+                    });
+                    
+                    listEl.innerHTML = html;
+                } else {
+                    listEl.innerHTML = '<div class="error-message"><i class="bi bi-inbox"></i>暂无数据</div>';
+                }
+            } catch (error) {
+                console.error('加载侧边栏历史净值失�?', error);
+                listEl.innerHTML = '<div class="error-message"><i class="bi bi-exclamation-circle"></i>加载失败</div>';
+            }
+        }
+
+        // 格式化收益率并返回颜色类名（红涨绿跌�?
+        function formatReturn(value, suffix = '%') {
+            if (value === null || value === undefined || isNaN(value)) {
+                return { text: '--', colorClass: 'text-neutral' };
+            }
+            const num = parseFloat(value);
+            const colorClass = num >= 0 ? 'text-up' : 'text-down';
+            const sign = num >= 0 ? '+' : '';
+            return { 
+                text: `${sign}${num.toFixed(2)}${suffix}`, 
+                colorClass 
+            };
+        }
+
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=1m`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (sidebarChart) {
+                        sidebarChart.destroy();
+                    }
+                    
+                    const sortedData = [...result.data].sort((a, b) => (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date));
+                    const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
+                    const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
+                    
+                    sidebarChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '净�?,
+                                data: navData,
+                                borderColor: '#e74c3c',
+                                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 0,
+                                pointHoverRadius: 4,
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { intersect: false, mode: 'index' },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    padding: 12,
+                                    displayColors: false,
+                                    callbacks: {
+                                        title: ctx => ctx[0].label,
+                                        label: ctx => `净�? ${ctx.parsed.y.toFixed(4)}`
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    grid: { display: false },
+                                    ticks: { maxTicksLimit: 5, color: '#999', font: { size: 11 } }
+                                },
+                                y: {
+                                    display: true,
+                                    position: 'right',
+                                    grid: { color: 'rgba(0,0,0,0.05)' },
+                                    ticks: { color: '#999', font: { size: 11 } }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('加载侧边栏图表失�?', error);
+            }
+        }
+
+        // 初始化侧边栏标签�?
+        function initializeSidebarTabs() {
+            document.querySelectorAll('.tab-nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const tabId = item.dataset.tab;
+                    switchSidebarTab(tabId);
+                });
+            });
+        }
+
+        // 切换侧边栏标签页
+        function switchSidebarTab(tabId) {
+            // 更新标签页导�?
+            document.querySelectorAll('.tab-nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.tab === tabId);
+            });
+            
+            // 更新标签页内�?
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.toggle('active', pane.id === tabId + '-sidebar');
+            });
+            
+            // 如果切换到历史净值标签页，加载数�?
+            if (tabId === 'nav-history' && currentSidebarFund) {
+                loadSidebarNavHistory(currentSidebarFund.fund_code, '1m');
+            }
+        }
+
+        // 初始化时间周期选择�?
+        function initializeSidebarPeriodSelector(fundCode) {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const period = btn.dataset.period;
+                    
+                    // 更新按钮状�?
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // 更新图表
+                    updateSidebarChart(fundCode, period);
+                });
+            });
+        }
+
+        // 更新侧边栏图�?
+        async function updateSidebarChart(fundCode, period) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0 && sidebarChart) {
+                    const sortedData = [...result.data].sort((a, b) => (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date));
+                    const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
+                    const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
+                    
+                    sidebarChart.data.labels = labels;
+                    sidebarChart.data.datasets[0].data = navData;
+                    sidebarChart.update('none');
+                }
+            } catch (error) {
+                console.error('更新侧边栏图表失�?', error);
+            }
+        }
+
+        // 加载侧边栏历史净�?
+        async function loadSidebarNavHistory(fundCode, period = '1m') {
+            const listEl = document.getElementById('nav-history-list-sidebar');
+            if (!listEl) return;
+            
+            listEl.innerHTML = '<div class="loading"><div class="loading-spinner"></div>加载�?..</div>';
+            
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const sortedData = [...result.data].sort((a, b) => (b.date || b.analysis_date).localeCompare(a.date || a.analysis_date));
+                    
+                    let html = '';
+                    sortedData.forEach(item => {
+                        const date = (item.date || item.analysis_date || '').substring(0, 10);
+                        const nav = item.nav ? item.nav.toFixed(4) : '--';
+                        const dailyReturn = item.daily_return !== undefined ? item.daily_return : item.today_return;
+                        const returnFormatted = formatReturn(dailyReturn, '%');
+                        
+                        html += `
+                            <div class="nav-history-item">
+                                <span>${date}</span>
+                                <span class="nav-value">${nav}</span>
+                                <span class="${returnFormatted.colorClass}">${returnFormatted.text}</span>
+                            </div>
+                        `;
+                    });
+                    
+                    listEl.innerHTML = html;
+                } else {
+                    listEl.innerHTML = '<div class="error-message"><i class="bi bi-inbox"></i>暂无数据</div>';
+                }
+            } catch (error) {
+                console.error('加载侧边栏历史净值失�?', error);
+                listEl.innerHTML = '<div class="error-message"><i class="bi bi-exclamation-circle"></i>加载失败</div>';
+            }
+        }
+
+        // 格式化收益率并返回颜色类名（红涨绿跌�?
+        function formatReturn(value, suffix = '%') {
+            if (value === null || value === undefined || isNaN(value)) {
+                return { text: '--', colorClass: 'text-neutral' };
+            }
+            const num = parseFloat(value);
+            const colorClass = num >= 0 ? 'text-up' : 'text-down';
+            const sign = num >= 0 ? '+' : '';
+            return { 
+                text: `${sign}${num.toFixed(2)}${suffix}`, 
+                colorClass 
+            };
+        }
+    </script>
 </body>
 </html>

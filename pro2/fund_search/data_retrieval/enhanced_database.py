@@ -64,9 +64,6 @@ class EnhancedDatabaseManager:
             # 创建基金绩效数据表
             self._create_fund_performance_table()
             
-            # 创建投资策略结果表
-            self._create_strategy_results_table()
-            
             # 创建基金分析结果表
             self._create_fund_analysis_results_table()
             
@@ -132,32 +129,7 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
     
-    def _create_strategy_results_table(self):
-        """创建投资策略结果表"""
-        sql = """
-        CREATE TABLE IF NOT EXISTS strategy_results (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fund_code VARCHAR(10) NOT NULL,
-            analysis_date DATE NOT NULL,
-            today_return DECIMAL(8,4),
-            prev_day_return DECIMAL(8,4),
-            strategy_name VARCHAR(50),
-            action VARCHAR(20),
-            buy_multiplier DECIMAL(4,2),
-            redeem_amount INT,
-            status_label VARCHAR(100),
-            operation_suggestion TEXT,
-            execution_amount VARCHAR(50),
-            comparison_value DECIMAL(8,4),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_fund_code (fund_code),
-            INDEX idx_analysis_date (analysis_date),
-            INDEX idx_action (action),
-            UNIQUE KEY uk_fund_date (fund_code, analysis_date)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        """
-        self.execute_sql(sql)
+
     
     def _create_analysis_summary_table(self):
         """创建分析汇总表"""
@@ -384,48 +356,7 @@ class EnhancedDatabaseManager:
             logger.error(f"插入基金绩效数据失败: {str(e)}")
             return False
     
-    def insert_strategy_result(self, strategy_data: Dict) -> bool:
-        """
-        插入策略结果数据
-        
-        参数：
-        strategy_data: 策略结果数据字典
-        
-        返回：
-        bool: 插入是否成功
-        """
-        try:
-            sql = """
-            INSERT INTO strategy_results (
-                fund_code, analysis_date, today_return, prev_day_return, strategy_name,
-                action, buy_multiplier, redeem_amount, status_label, operation_suggestion,
-                execution_amount, comparison_value
-            ) VALUES (
-                :fund_code, :analysis_date, :today_return, :prev_day_return, :strategy_name,
-                :action, :buy_multiplier, :redeem_amount, :status_label, :operation_suggestion,
-                :execution_amount, :comparison_value
-            ) ON DUPLICATE KEY UPDATE
-                today_return = VALUES(today_return),
-                prev_day_return = VALUES(prev_day_return),
-                strategy_name = VALUES(strategy_name),
-                action = VALUES(action),
-                buy_multiplier = VALUES(buy_multiplier),
-                redeem_amount = VALUES(redeem_amount),
-                status_label = VALUES(status_label),
-                operation_suggestion = VALUES(operation_suggestion),
-                execution_amount = VALUES(execution_amount),
-                comparison_value = VALUES(comparison_value),
-                updated_at = CURRENT_TIMESTAMP
-            """
-            
-            self.execute_sql(sql, strategy_data)
-            
-            logger.info(f"基金 {strategy_data.get('fund_code', '')} 策略结果已保存")
-            return True
-            
-        except Exception as e:
-            logger.error(f"插入策略结果数据失败: {str(e)}")
-            return False
+
     
     def insert_analysis_summary(self, summary_data: Dict) -> bool:
         """
@@ -491,14 +422,13 @@ class EnhancedDatabaseManager:
             logger.error(f"插入分析汇总数据失败: {str(e)}")
             return False
     
-    def batch_insert_data(self, fund_data_list: List[Dict], strategy_results_list: List[Dict], 
+    def batch_insert_data(self, fund_data_list: List[Dict], 
                          summary_data: Dict) -> bool:
         """
         批量插入所有数据
         
         参数：
         fund_data_list: 基金数据列表
-        strategy_results_list: 策略结果列表
         summary_data: 汇总数据
         
         返回：
@@ -610,11 +540,10 @@ class EnhancedDatabaseManager:
                 fp.max_drawdown,
                 fp.volatility,
                 fp.composite_score,
-                sr.action,
-                sr.status_label
+                far.status_label
             FROM fund_performance fp
-            LEFT JOIN strategy_results sr ON fp.fund_code = sr.fund_code AND fp.analysis_date = sr.analysis_date
-            WHERE fp.fund_code = :fund_code AND fp.analysis_date >= :start_date
+            LEFT JOIN fund_analysis_results far ON fp.fund_code = far.fund_code AND fp.analysis_date = far.analysis_date
+            WHERE fp.fund_code = %(fund_code)s AND fp.analysis_date >= %(start_date)s
             ORDER BY fp.analysis_date DESC
             """
             
@@ -680,13 +609,13 @@ class EnhancedDatabaseManager:
             
             sql = """
             SELECT 
-                action,
+                status_label,
                 COUNT(*) as fund_count,
                 AVG(buy_multiplier) as avg_buy_multiplier,
                 SUM(redeem_amount) as total_redeem_amount
-            FROM strategy_results
-            WHERE analysis_date = :analysis_date
-            GROUP BY action
+            FROM fund_analysis_results
+            WHERE analysis_date = %(analysis_date)s
+            GROUP BY status_label
             ORDER BY fund_count DESC
             """
             
@@ -720,7 +649,7 @@ class EnhancedDatabaseManager:
                 avg_buy_multiplier,
                 total_redeem_amount
             FROM analysis_summary
-            WHERE analysis_date >= :start_date
+            WHERE analysis_date >= %(start_date)s
             ORDER BY analysis_date DESC
             """
             
@@ -804,9 +733,6 @@ class EnhancedDatabaseManager:
                     'data_days': analysis_data.get('data_days', 0)
                 }
                 return self.insert_fund_performance(performance_data)
-            elif 'action' in analysis_data or 'strategy_name' in analysis_data:
-                # 包含策略信息，使用策略结果表
-                return self.insert_strategy_result(analysis_data)
             else:
                 # 默认使用绩效数据表
                 return self.insert_fund_performance(analysis_data)
@@ -1111,21 +1037,6 @@ if __name__ == "__main__":
         'data_days': 365
     }
     
-    test_strategy = {
-        'fund_code': '000001',
-        'analysis_date': datetime.now().date(),
-        'today_return': 0.5,
-        'prev_day_return': 0.3,
-        'strategy_name': 'bull_continuation',
-        'action': 'buy',
-        'buy_multiplier': 1.5,
-        'redeem_amount': 15,
-        'status_label': "🟡 **连涨加速**",
-        'operation_suggestion': "基金持续上涨，建议适量买入，小额赎回",
-        'execution_amount': "买入1.5×定额",
-        'comparison_value': 0.2
-    }
-    
     test_summary = {
         'analysis_date': datetime.now().date(),
         'total_funds': 5,
@@ -1148,10 +1059,6 @@ if __name__ == "__main__":
     
     print("\n测试插入基金绩效数据:")
     result = db_manager.insert_fund_performance(test_performance)
-    print(f"结果: {result}")
-    
-    print("\n测试插入策略结果:")
-    result = db_manager.insert_strategy_result(test_strategy)
     print(f"结果: {result}")
     
     print("\n测试插入分析汇总:")
