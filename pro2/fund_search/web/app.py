@@ -87,7 +87,7 @@ def get_funds():
         max_date = date_df.iloc[0]['max_date']
         
         sql = f"""
-        SELECT DISTINCT fund_code, fund_name, today_return, prev_day_return,
+        SELECT DISTINCT fund_code, fund_name, today_return, yesterday_return, prev_day_return,
                annualized_return, sharpe_ratio, max_drawdown, volatility,
                composite_score, status_label, operation_suggestion, analysis_date
         FROM fund_analysis_results WHERE analysis_date = '{max_date}'
@@ -96,7 +96,7 @@ def get_funds():
         if search:
             sql += f" AND (fund_code LIKE '%%{search}%%' OR fund_name LIKE '%%{search}%%')"
         
-        valid_sort_fields = ['composite_score', 'today_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
+        valid_sort_fields = ['composite_score', 'today_return', 'yesterday_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
         if sort_by not in valid_sort_fields:
             sort_by = 'composite_score'
         
@@ -113,9 +113,14 @@ def get_funds():
         funds = df_page.to_dict('records')
         
         for fund in funds:
-            for key in ['today_return', 'prev_day_return', 'annualized_return', 'max_drawdown', 'volatility']:
+            # today_return 和 prev_day_return 已经是百分比格式，不需要乘100
+            for key in ['annualized_return', 'max_drawdown', 'volatility']:
                 if fund.get(key) is not None:
                     fund[key] = round(float(fund[key]) * 100, 2)
+            # 单独处理已经是百分比格式的字段
+            for key in ['today_return', 'yesterday_return', 'prev_day_return']:
+                if fund.get(key) is not None:
+                    fund[key] = round(float(fund[key]), 2)
             for key in ['sharpe_ratio', 'composite_score']:
                 if fund.get(key) is not None:
                     fund[key] = round(float(fund[key]), 4)
@@ -138,9 +143,14 @@ def get_fund_detail(fund_code):
         
         fund = df.iloc[0].to_dict()
         
-        for key in ['today_return', 'prev_day_return', 'annualized_return', 'max_drawdown', 'volatility', 'win_rate']:
+        # today_return 和 prev_day_return 已经是百分比格式，不需要乘100
+        for key in ['annualized_return', 'max_drawdown', 'volatility', 'win_rate']:
             if fund.get(key) is not None:
                 fund[key] = round(float(fund[key]) * 100, 2)
+        # 单独处理已经是百分比格式的字段
+        for key in ['today_return', 'yesterday_return', 'prev_day_return']:
+            if fund.get(key) is not None:
+                fund[key] = round(float(fund[key]), 2)
         for key in ['sharpe_ratio', 'calmar_ratio', 'sortino_ratio', 'var_95', 'profit_loss_ratio', 'composite_score']:
             if fund.get(key) is not None:
                 fund[key] = round(float(fund[key]), 4)
@@ -182,9 +192,14 @@ def get_fund_history(fund_code):
         
         df['date'] = df['date'].astype(str)
         
-        for key in ['today_return', 'annualized_return', 'max_drawdown', 'volatility']:
+        # today_return 和 prev_day_return 已经是百分比格式，不需要乘100
+        for key in ['annualized_return', 'max_drawdown', 'volatility']:
             if key in df.columns:
                 df[key] = df[key].apply(lambda x: round(float(x) * 100, 2) if pd.notna(x) else None)
+        # 单独处理已经是百分比格式的字段
+        for key in ['today_return']:
+            if key in df.columns:
+                df[key] = df[key].apply(lambda x: round(float(x), 2) if pd.notna(x) else None)
         for key in ['sharpe_ratio', 'composite_score']:
             if key in df.columns:
                 df[key] = df[key].apply(lambda x: round(float(x), 4) if pd.notna(x) else None)
@@ -312,8 +327,9 @@ def get_summary():
             return jsonify({'success': True, 'data': {}})
         
         summary = df.iloc[0].to_dict()
+        # avg_today_return已经是百分比格式，不需要乘100
         if summary.get('avg_today_return') is not None:
-            summary['avg_today_return'] = round(float(summary['avg_today_return']) * 100, 2)
+            summary['avg_today_return'] = round(float(summary['avg_today_return']), 2)
         if summary.get('avg_composite_score') is not None:
             summary['avg_composite_score'] = round(float(summary['avg_composite_score']), 4)
         
@@ -347,7 +363,7 @@ def get_funds_by_date(date):
         if search:
             sql += f" AND (fund_code LIKE '%%{search}%%' OR fund_name LIKE '%%{search}%%')"
         
-        valid_sort_fields = ['composite_score', 'today_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
+        valid_sort_fields = ['composite_score', 'today_return', 'yesterday_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
         if sort_by not in valid_sort_fields:
             sort_by = 'composite_score'
         

@@ -1067,13 +1067,13 @@ class EnhancedNotificationManager:
         if 'avg_today_return' in strategy_summary:
             avg_today = strategy_summary['avg_today_return']
             color = '#27ae60' if avg_today > 0 else '#e74c3c' if avg_today < 0 else '#7f8c8d'
-            html_content += f"<li><strong>平均今日收益率:</strong> <span style='color: {color};'>{avg_today*100:.2f}%</span></li>"
+            html_content += f"<li><strong>平均今日收益率:</strong> <span style='color: {color};'>{avg_today:.2f}%</span></li>"
         
         # 添加年化收益率信息
         if 'avg_annualized_return' in strategy_summary:
             avg_annualized = strategy_summary['avg_annualized_return']
             color = '#27ae60' if avg_annualized > 0 else '#e74c3c' if avg_annualized < 0 else '#7f8c8d'
-            html_content += f"<li><strong>平均年化收益率:</strong> <span style='color: {color};'>{avg_annualized*100:.2f}%</span></li>"
+            html_content += f"<li><strong>平均年化收益率:</strong> <span style='color: {color};'>{avg_annualized:.2f}%</span></li>"
         
         # 添加平均夏普比率
         if 'avg_sharpe_ratio' in strategy_summary:
@@ -1148,7 +1148,7 @@ class EnhancedNotificationManager:
 
 if __name__ == "__main__":
     # 测试代码
-    from enhanced_config import NOTIFICATION_CONFIG
+    from shared.enhanced_config import NOTIFICATION_CONFIG
     
     # 创建通知管理器
     notification_manager = EnhancedNotificationManager(NOTIFICATION_CONFIG)

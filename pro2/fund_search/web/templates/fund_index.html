@@ -827,6 +827,7 @@
                 <select id="sort-select">
                     <option value="composite_score">综合评分</option>
                     <option value="today_return">今日收益</option>
+                    <option value="yesterday_return">昨日收益</option>
                     <option value="annualized_return">年化收益</option>
                     <option value="sharpe_ratio">夏普比率</option>
                     <option value="max_drawdown">最大回撤</option>
@@ -849,6 +850,7 @@
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="yesterday_return">昨日盈亏率 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span class="sort-indicator"></span></th>
@@ -962,6 +964,7 @@
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
+            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
             'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏率' },
@@ -1136,6 +1139,7 @@
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
                     
                     const todayReturn = fund.today_return || 0;
+                    const yesterdayReturn = fund.yesterday_return || 0;
                     const annualReturn = fund.annualized_return || 0;
                     const maxDrawdown = fund.max_drawdown || 0;
                     const sharpe = fund.sharpe_ratio || 0;
@@ -1146,6 +1150,7 @@
                         <td class="fund-code">${fund.fund_code}</td>
                         <td>${this.truncate(fund.fund_name || '--', 12)}</td>
                         <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
+                        <td class="${yesterdayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(yesterdayReturn)}</td>
                         <td>--</td>
                         <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">--</td>
                         <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
