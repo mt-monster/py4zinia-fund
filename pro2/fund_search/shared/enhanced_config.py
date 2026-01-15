@@ -9,8 +9,11 @@ import os
 
 # 基础配置
 BASE_CONFIG = {
-    # 基金持仓数据文件路径
-    'fund_position_file': os.environ.get('FUND_POSITION_FILE_PATH', 'd:/codes/py4zinia/pro2/fund_search/京东金融.xlsx'),
+    # 基金持仓数据文件路径 - 使用相对路径
+    'fund_position_file': os.environ.get(
+        'FUND_POSITION_FILE_PATH', 
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '京东金融.xlsx')
+    ),
     
     # 工作表名称
     'sheet_name': '持仓数据',
