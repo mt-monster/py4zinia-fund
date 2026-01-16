@@ -8,6 +8,7 @@
 
 import os
 import sys
+import json
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import pandas as pd
@@ -73,6 +74,21 @@ def fund_detail(fund_code):
 def strategy_page():
     """策略分析页"""
     return render_template('strategy.html')
+
+@app.route('/strategy-editor')
+def strategy_editor_page():
+    """策略编辑器页"""
+    return render_template('strategy_editor.html')
+
+@app.route('/etf')
+def etf_page():
+    """ETF市场页"""
+    return render_template('etf_market.html')
+
+@app.route('/etf/<etf_code>')
+def etf_detail_page(etf_code):
+    """ETF详情页"""
+    return render_template('etf_detail.html', etf_code=etf_code)
 
 
 # ==================== API 路由 ====================
@@ -1069,6 +1085,876 @@ def delete_holding(fund_code):
             
     except Exception as e:
         logger.error(f"删除持仓失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== ETF市场 API ====================
+
+@app.route('/api/etf/list', methods=['GET'])
+def get_etf_list():
+    """获取全市场ETF列表"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '').strip()
+        sort_by = request.args.get('sort_by', 'turnover')
+        sort_order = request.args.get('sort_order', 'desc')
+        
+        # 获取ETF列表
+        etf_df = fund_data_manager.get_etf_list()
+        
+        if etf_df.empty:
+            return jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
+        
+        # 搜索过滤
+        if search:
+            mask = (etf_df['etf_code'].str.contains(search, na=False) | 
+                   etf_df['etf_name'].str.contains(search, na=False))
+            etf_df = etf_df[mask]
+        
+        # 排序
+        valid_sort_fields = ['etf_code', 'etf_name', 'current_price', 'change_percent', 
+                            'volume', 'turnover', 'turnover_rate', 'amplitude']
+        if sort_by in valid_sort_fields and sort_by in etf_df.columns:
+            ascending = sort_order != 'desc'
+            etf_df = etf_df.sort_values(sort_by, ascending=ascending, na_position='last')
+        
+        total = len(etf_df)
+        
+        # 分页
+        start = (page - 1) * per_page
+        etf_page = etf_df.iloc[start:start + per_page]
+        
+        # 转换为字典列表
+        etf_list = []
+        for _, row in etf_page.iterrows():
+            etf_item = row.to_dict()
+            # 清理NaN值
+            for key in etf_item:
+                if pd.isna(etf_item[key]):
+                    etf_item[key] = None
+                elif isinstance(etf_item[key], float):
+                    etf_item[key] = round(etf_item[key], 4)
+            etf_list.append(etf_item)
+        
+        return jsonify({
+            'success': True, 
+            'data': etf_list, 
+            'total': total, 
+            'page': page, 
+            'per_page': per_page
+        })
+        
+    except Exception as e:
+        logger.error(f"获取ETF列表失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/etf/<etf_code>', methods=['GET'])
+def get_etf_detail(etf_code):
+    """获取单个ETF详情"""
+    try:
+        # 获取ETF列表找到该ETF
+        etf_df = fund_data_manager.get_etf_list()
+        
+        if etf_df.empty:
+            return jsonify({'success': False, 'error': 'ETF数据获取失败'}), 500
+        
+        etf_row = etf_df[etf_df['etf_code'] == etf_code]
+        
+        if etf_row.empty:
+            return jsonify({'success': False, 'error': 'ETF不存在'}), 404
+        
+        etf_data = etf_row.iloc[0].to_dict()
+        
+        # 获取绩效指标
+        performance = fund_data_manager.get_etf_performance(etf_code)
+        etf_data.update(performance)
+        
+        # 清理NaN值
+        for key in etf_data:
+            if pd.isna(etf_data[key]):
+                etf_data[key] = None
+            elif isinstance(etf_data[key], float):
+                etf_data[key] = round(etf_data[key], 4)
+        
+        return jsonify({'success': True, 'data': etf_data})
+        
+    except Exception as e:
+        logger.error(f"获取ETF详情失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/etf/<etf_code>/history', methods=['GET'])
+def get_etf_history(etf_code):
+    """获取ETF历史行情和净值数据"""
+    try:
+        from datetime import datetime as dt
+        
+        period = request.args.get('period', '')
+        days = request.args.get('days', 30, type=int)
+        start_date = request.args.get('start_date', '')
+        end_date = request.args.get('end_date', '')
+        
+        # 如果有自定义日期范围
+        if start_date and end_date:
+            start = dt.strptime(start_date, '%Y-%m-%d')
+            end = dt.strptime(end_date, '%Y-%m-%d')
+            days = (end - start).days + 1
+        else:
+            # 根据period计算days
+            today = dt.now()
+            if period == '1m':
+                days = 30
+            elif period == '3m':
+                days = 90
+            elif period == '6m':
+                days = 180
+            elif period == '1y':
+                days = 365
+            elif period == '3y':
+                days = 1095
+            elif period == 'ytd':
+                year_start = dt(today.year, 1, 1)
+                days = (today - year_start).days + 1
+            elif period == 'all':
+                days = 9999
+        
+        # 获取ETF净值历史数据（包含单位净值、累计净值）
+        nav_data = fund_data_manager.get_etf_nav_history(etf_code, days, start_date, end_date)
+        
+        if nav_data.empty:
+            # 如果净值数据为空，尝试获取行情数据作为备选
+            hist_data = fund_data_manager.get_etf_history(etf_code, days)
+            if hist_data.empty:
+                return jsonify({'success': True, 'data': []})
+            
+            # 如果有自定义日期范围，进行过滤
+            if start_date and end_date:
+                hist_data['date'] = pd.to_datetime(hist_data['date'])
+                hist_data = hist_data[(hist_data['date'] >= start_date) & (hist_data['date'] <= end_date)]
+            
+            # 转换日期格式
+            if 'date' in hist_data.columns:
+                hist_data['date'] = pd.to_datetime(hist_data['date']).dt.strftime('%Y-%m-%d')
+            
+            # 清理NaN值
+            result_data = []
+            for _, row in hist_data.iterrows():
+                item = row.to_dict()
+                for key in item:
+                    if pd.isna(item[key]):
+                        item[key] = None
+                    elif isinstance(item[key], float):
+                        item[key] = round(item[key], 4)
+                result_data.append(item)
+            
+            return jsonify({'success': True, 'data': result_data})
+        
+        # 如果有自定义日期范围，进行过滤
+        if start_date and end_date:
+            nav_data['date'] = pd.to_datetime(nav_data['date'])
+            nav_data = nav_data[(nav_data['date'] >= start_date) & (nav_data['date'] <= end_date)]
+        
+        # 转换日期格式
+        if 'date' in nav_data.columns:
+            nav_data['date'] = pd.to_datetime(nav_data['date']).dt.strftime('%Y-%m-%d')
+        
+        # 清理NaN值并构建结果
+        result_data = []
+        for _, row in nav_data.iterrows():
+            item = row.to_dict()
+            for key in item:
+                if pd.isna(item[key]):
+                    item[key] = None
+                elif isinstance(item[key], float):
+                    item[key] = round(item[key], 4)
+            result_data.append(item)
+        
+        return jsonify({'success': True, 'data': result_data})
+        
+    except Exception as e:
+        logger.error(f"获取ETF历史数据失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/etf/<etf_code>/holdings', methods=['GET'])
+def get_etf_holdings(etf_code):
+    """获取ETF持仓数据"""
+    try:
+        import akshare as ak
+        
+        holdings = []
+        update_date = None
+        
+        try:
+            # 尝试获取ETF持仓
+            holdings_df = ak.fund_etf_fund_info_em(fund=etf_code)
+            
+            if holdings_df is not None and not holdings_df.empty:
+                # 处理持仓数据
+                for _, row in holdings_df.head(20).iterrows():
+                    holding = {}
+                    for col in holdings_df.columns:
+                        val = row[col]
+                        if pd.isna(val):
+                            holding[col] = None
+                        elif isinstance(val, float):
+                            holding[col] = round(val, 4)
+                        else:
+                            holding[col] = str(val)
+                    holdings.append(holding)
+        except Exception as e:
+            logger.warning(f"获取ETF持仓失败: {str(e)}")
+            # 尝试备用方法
+            try:
+                holdings_df = ak.fund_portfolio_hold_em(symbol=etf_code, date="2024")
+                if holdings_df is not None and not holdings_df.empty:
+                    if '季度' in holdings_df.columns:
+                        update_date = str(holdings_df['季度'].iloc[0])
+                    
+                    for _, row in holdings_df.head(10).iterrows():
+                        holdings.append({
+                            'stock_code': str(row.get('股票代码', '')),
+                            'stock_name': str(row.get('股票名称', '')),
+                            'ratio': round(float(row.get('占净值比例', 0)), 2) if pd.notna(row.get('占净值比例')) else None,
+                            'shares': row.get('持股数', None),
+                            'value': row.get('持仓市值', None)
+                        })
+            except:
+                pass
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'holdings': holdings,
+                'update_date': update_date
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取ETF持仓失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/etf/<etf_code>/info', methods=['GET'])
+def get_etf_info(etf_code):
+    """获取ETF基金公司和基金经理信息"""
+    try:
+        import akshare as ak
+        
+        info = {
+            'fund_company': None,
+            'fund_manager': None,
+            'establish_date': None,
+            'fund_type': 'ETF',
+            'benchmark': None,
+            'management_fee': None,
+            'custody_fee': None,
+            'fund_size': None
+        }
+        
+        try:
+            # 获取基金基本信息
+            fund_info = ak.fund_individual_basic_info_xq(symbol=etf_code)
+            if fund_info is not None and not fund_info.empty:
+                info_dict = {}
+                for _, row in fund_info.iterrows():
+                    key = row.iloc[0] if len(row) > 0 else None
+                    val = row.iloc[1] if len(row) > 1 else None
+                    if key:
+                        info_dict[str(key)] = val
+                
+                info['fund_company'] = info_dict.get('基金公司', info_dict.get('管理人', None))
+                info['fund_manager'] = info_dict.get('基金经理', None)
+                info['establish_date'] = info_dict.get('成立日期', info_dict.get('成立时间', None))
+                info['benchmark'] = info_dict.get('业绩比较基准', None)
+                info['management_fee'] = info_dict.get('管理费率', None)
+                info['custody_fee'] = info_dict.get('托管费率', None)
+                info['fund_size'] = info_dict.get('基金规模', info_dict.get('资产规模', None))
+        except Exception as e:
+            logger.warning(f"从雪球获取基金信息失败: {str(e)}")
+            
+            # 备用方法：从天天基金获取
+            try:
+                fund_info = ak.fund_open_fund_info_em(symbol=etf_code, indicator="基本信息")
+                if fund_info is not None and not fund_info.empty:
+                    info_dict = {}
+                    for _, row in fund_info.iterrows():
+                        info_dict[row['项目']] = row['数值']
+                    
+                    info['fund_company'] = info_dict.get('基金管理人', None)
+                    info['fund_manager'] = info_dict.get('基金经理', None)
+                    info['establish_date'] = info_dict.get('成立日期', None)
+                    info['management_fee'] = info_dict.get('管理费率', None)
+                    info['custody_fee'] = info_dict.get('托管费率', None)
+            except:
+                pass
+        
+        return jsonify({'success': True, 'data': info})
+        
+    except Exception as e:
+        logger.error(f"获取ETF信息失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== 用户策略管理 API ====================
+
+from backtesting.strategy_models import (
+    StrategyConfig, FilterCondition, StrategyValidator, 
+    calculate_equal_weights, validate_weights_sum
+)
+
+
+@app.route('/api/user-strategies', methods=['GET'])
+def get_user_strategies():
+    """获取用户策略列表"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        sql = """
+        SELECT id, user_id, name, description, config, created_at, updated_at
+        FROM user_strategies
+        WHERE user_id = :user_id
+        ORDER BY updated_at DESC
+        """
+        
+        df = db_manager.execute_query(sql, {'user_id': user_id})
+        
+        if df.empty:
+            return jsonify({'success': True, 'data': [], 'total': 0})
+        
+        strategies = []
+        for _, row in df.iterrows():
+            strategy = {
+                'id': int(row['id']),
+                'user_id': row['user_id'],
+                'name': row['name'],
+                'description': row['description'] if pd.notna(row['description']) else '',
+                'config': json.loads(row['config']) if isinstance(row['config'], str) else row['config'],
+                'created_at': str(row['created_at']),
+                'updated_at': str(row['updated_at'])
+            }
+            strategies.append(strategy)
+        
+        return jsonify({'success': True, 'data': strategies, 'total': len(strategies)})
+        
+    except Exception as e:
+        logger.error(f"获取用户策略列表失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies', methods=['POST'])
+def create_user_strategy():
+    """创建新策略"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'default_user')
+        name = data.get('name', '').strip()
+        description = data.get('description', '')
+        config_data = data.get('config', {})
+        
+        # 验证策略名称
+        if not name:
+            return jsonify({'success': False, 'error': '策略名称不能为空'}), 400
+        
+        # 构建策略配置对象并验证
+        try:
+            strategy_config = StrategyConfig.from_dict(config_data)
+            strategy_config.name = name
+            strategy_config.description = description
+            
+            is_valid, errors = StrategyValidator.validate_strategy_config(strategy_config)
+            if not is_valid:
+                error_messages = [err.to_dict() for err in errors]
+                return jsonify({
+                    'success': False, 
+                    'error': '策略配置验证失败',
+                    'validation_errors': error_messages
+                }), 400
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'策略配置解析失败: {str(e)}'}), 400
+        
+        # 序列化配置为JSON
+        config_json = json.dumps(strategy_config.to_dict(), ensure_ascii=False)
+        
+        sql = """
+        INSERT INTO user_strategies (user_id, name, description, config)
+        VALUES (:user_id, :name, :description, :config)
+        """
+        
+        success = db_manager.execute_sql(sql, {
+            'user_id': user_id,
+            'name': name,
+            'description': description,
+            'config': config_json
+        })
+        
+        if success:
+            # 获取新创建的策略ID
+            id_sql = "SELECT LAST_INSERT_ID() as id"
+            id_df = db_manager.execute_query(id_sql)
+            new_id = int(id_df.iloc[0]['id']) if not id_df.empty else None
+            
+            return jsonify({
+                'success': True, 
+                'message': '策略创建成功',
+                'data': {'id': new_id, 'name': name}
+            })
+        else:
+            return jsonify({'success': False, 'error': '策略创建失败'}), 500
+            
+    except Exception as e:
+        logger.error(f"创建策略失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/<int:strategy_id>', methods=['GET'])
+def get_user_strategy(strategy_id):
+    """获取策略详情"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        sql = """
+        SELECT id, user_id, name, description, config, created_at, updated_at
+        FROM user_strategies
+        WHERE id = :strategy_id AND user_id = :user_id
+        """
+        
+        df = db_manager.execute_query(sql, {'strategy_id': strategy_id, 'user_id': user_id})
+        
+        if df.empty:
+            return jsonify({'success': False, 'error': '策略不存在'}), 404
+        
+        row = df.iloc[0]
+        strategy = {
+            'id': int(row['id']),
+            'user_id': row['user_id'],
+            'name': row['name'],
+            'description': row['description'] if pd.notna(row['description']) else '',
+            'config': json.loads(row['config']) if isinstance(row['config'], str) else row['config'],
+            'created_at': str(row['created_at']),
+            'updated_at': str(row['updated_at'])
+        }
+        
+        return jsonify({'success': True, 'data': strategy})
+        
+    except Exception as e:
+        logger.error(f"获取策略详情失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/<int:strategy_id>', methods=['PUT'])
+def update_user_strategy(strategy_id):
+    """更新策略"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'default_user')
+        
+        # 检查策略是否存在
+        check_sql = "SELECT id FROM user_strategies WHERE id = :strategy_id AND user_id = :user_id"
+        check_df = db_manager.execute_query(check_sql, {'strategy_id': strategy_id, 'user_id': user_id})
+        
+        if check_df.empty:
+            return jsonify({'success': False, 'error': '策略不存在'}), 404
+        
+        # 构建更新字段
+        update_fields = []
+        params = {'strategy_id': strategy_id, 'user_id': user_id}
+        
+        if 'name' in data:
+            name = data['name'].strip()
+            if not name:
+                return jsonify({'success': False, 'error': '策略名称不能为空'}), 400
+            update_fields.append('name = :name')
+            params['name'] = name
+        
+        if 'description' in data:
+            update_fields.append('description = :description')
+            params['description'] = data['description']
+        
+        if 'config' in data:
+            config_data = data['config']
+            try:
+                strategy_config = StrategyConfig.from_dict(config_data)
+                
+                # 如果更新了名称，同步到config
+                if 'name' in data:
+                    strategy_config.name = data['name'].strip()
+                if 'description' in data:
+                    strategy_config.description = data['description']
+                
+                is_valid, errors = StrategyValidator.validate_strategy_config(strategy_config)
+                if not is_valid:
+                    error_messages = [err.to_dict() for err in errors]
+                    return jsonify({
+                        'success': False,
+                        'error': '策略配置验证失败',
+                        'validation_errors': error_messages
+                    }), 400
+                
+                config_json = json.dumps(strategy_config.to_dict(), ensure_ascii=False)
+                update_fields.append('config = :config')
+                params['config'] = config_json
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'策略配置解析失败: {str(e)}'}), 400
+        
+        if not update_fields:
+            return jsonify({'success': False, 'error': '没有要更新的字段'}), 400
+        
+        sql = f"""
+        UPDATE user_strategies 
+        SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = :strategy_id AND user_id = :user_id
+        """
+        
+        success = db_manager.execute_sql(sql, params)
+        
+        if success:
+            return jsonify({'success': True, 'message': '策略更新成功'})
+        else:
+            return jsonify({'success': False, 'error': '策略更新失败'}), 500
+            
+    except Exception as e:
+        logger.error(f"更新策略失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/<int:strategy_id>', methods=['DELETE'])
+def delete_user_strategy(strategy_id):
+    """删除策略"""
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        # 检查策略是否存在
+        check_sql = "SELECT id FROM user_strategies WHERE id = :strategy_id AND user_id = :user_id"
+        check_df = db_manager.execute_query(check_sql, {'strategy_id': strategy_id, 'user_id': user_id})
+        
+        if check_df.empty:
+            return jsonify({'success': False, 'error': '策略不存在'}), 404
+        
+        sql = "DELETE FROM user_strategies WHERE id = :strategy_id AND user_id = :user_id"
+        success = db_manager.execute_sql(sql, {'strategy_id': strategy_id, 'user_id': user_id})
+        
+        if success:
+            return jsonify({'success': True, 'message': '策略删除成功'})
+        else:
+            return jsonify({'success': False, 'error': '策略删除失败'}), 500
+            
+    except Exception as e:
+        logger.error(f"删除策略失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/<int:strategy_id>/copy', methods=['POST'])
+def copy_user_strategy(strategy_id):
+    """复制策略"""
+    try:
+        data = request.get_json() or {}
+        user_id = data.get('user_id', 'default_user')
+        new_name = data.get('name', '').strip()
+        
+        # 获取原策略
+        sql = """
+        SELECT name, description, config
+        FROM user_strategies
+        WHERE id = :strategy_id AND user_id = :user_id
+        """
+        
+        df = db_manager.execute_query(sql, {'strategy_id': strategy_id, 'user_id': user_id})
+        
+        if df.empty:
+            return jsonify({'success': False, 'error': '原策略不存在'}), 404
+        
+        row = df.iloc[0]
+        original_name = row['name']
+        description = row['description'] if pd.notna(row['description']) else ''
+        config = row['config']
+        
+        # 生成新名称
+        if not new_name:
+            new_name = f"{original_name} (副本)"
+        
+        # 更新config中的名称
+        config_dict = json.loads(config) if isinstance(config, str) else config
+        config_dict['name'] = new_name
+        config_json = json.dumps(config_dict, ensure_ascii=False)
+        
+        # 插入新策略
+        insert_sql = """
+        INSERT INTO user_strategies (user_id, name, description, config)
+        VALUES (:user_id, :name, :description, :config)
+        """
+        
+        success = db_manager.execute_sql(insert_sql, {
+            'user_id': user_id,
+            'name': new_name,
+            'description': description,
+            'config': config_json
+        })
+        
+        if success:
+            # 获取新创建的策略ID
+            id_sql = "SELECT LAST_INSERT_ID() as id"
+            id_df = db_manager.execute_query(id_sql)
+            new_id = int(id_df.iloc[0]['id']) if not id_df.empty else None
+            
+            return jsonify({
+                'success': True,
+                'message': '策略复制成功',
+                'data': {'id': new_id, 'name': new_name}
+            })
+        else:
+            return jsonify({'success': False, 'error': '策略复制失败'}), 500
+            
+    except Exception as e:
+        logger.error(f"复制策略失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/validate', methods=['POST'])
+def validate_strategy_config():
+    """验证策略配置（不保存）"""
+    try:
+        data = request.get_json()
+        config_data = data.get('config', {})
+        
+        try:
+            strategy_config = StrategyConfig.from_dict(config_data)
+            is_valid, errors = StrategyValidator.validate_strategy_config(strategy_config)
+            
+            if is_valid:
+                return jsonify({
+                    'success': True,
+                    'valid': True,
+                    'message': '策略配置验证通过'
+                })
+            else:
+                error_messages = [err.to_dict() for err in errors]
+                return jsonify({
+                    'success': True,
+                    'valid': False,
+                    'validation_errors': error_messages
+                })
+        except Exception as e:
+            return jsonify({
+                'success': True,
+                'valid': False,
+                'error': f'策略配置解析失败: {str(e)}'
+            })
+            
+    except Exception as e:
+        logger.error(f"验证策略配置失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user-strategies/filter-fields', methods=['GET'])
+def get_filter_fields():
+    """获取支持的筛选字段列表"""
+    try:
+        from backtesting.strategy_models import SUPPORTED_FILTER_FIELDS, SUPPORTED_SORT_FIELDS
+        
+        filter_fields = []
+        for field_name, field_info in SUPPORTED_FILTER_FIELDS.items():
+            filter_fields.append({
+                'name': field_name,
+                'type': field_info['type'],
+                'description': field_info['description']
+            })
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'filter_fields': filter_fields,
+                'sort_fields': SUPPORTED_SORT_FIELDS,
+                'operators': ['>', '<', '>=', '<=', '==', '!='],
+                'filter_logic': ['AND', 'OR'],
+                'sort_orders': ['ASC', 'DESC'],
+                'weight_modes': ['equal', 'custom']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取筛选字段失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==================== 策略回测 API ====================
+
+from backtesting.backtest_api import (
+    BacktestAPIHandler, TradeRecordFilter, CSVExporter,
+    get_task_manager
+)
+
+# 全局回测API处理器
+backtest_handler = None
+
+def get_backtest_handler():
+    """获取回测API处理器"""
+    global backtest_handler
+    if backtest_handler is None:
+        backtest_handler = BacktestAPIHandler(
+            db_manager=db_manager,
+            fund_data_manager=fund_data_manager
+        )
+    return backtest_handler
+
+
+@app.route('/api/strategy-backtest/run', methods=['POST'])
+def run_strategy_backtest():
+    """执行策略回测"""
+    try:
+        data = request.get_json()
+        strategy_id = data.get('strategy_id')
+        user_id = data.get('user_id', 'default_user')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        initial_capital = data.get('initial_capital', 100000.0)
+        rebalance_freq = data.get('rebalance_freq', 'monthly')
+        
+        if not strategy_id:
+            return jsonify({'success': False, 'error': '策略ID不能为空'}), 400
+        
+        handler = get_backtest_handler()
+        success, result = handler.run_backtest(
+            strategy_id=strategy_id,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            initial_capital=initial_capital,
+            rebalance_freq=rebalance_freq
+        )
+        
+        if success:
+            return jsonify({'success': True, 'data': result})
+        else:
+            return jsonify({'success': False, 'error': result.get('error', '回测失败')}), 500
+            
+    except Exception as e:
+        logger.error(f"执行策略回测失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy-backtest/status/<task_id>', methods=['GET'])
+def get_backtest_status(task_id):
+    """获取回测状态"""
+    try:
+        handler = get_backtest_handler()
+        success, result = handler.get_backtest_status(task_id)
+        
+        if success:
+            return jsonify({'success': True, 'data': result})
+        else:
+            return jsonify({'success': False, 'error': result.get('error', '获取状态失败')}), 404
+            
+    except Exception as e:
+        logger.error(f"获取回测状态失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy-backtest/result/<task_id>', methods=['GET'])
+def get_backtest_result(task_id):
+    """获取回测结果"""
+    try:
+        # 获取筛选参数
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        fund_code = request.args.get('fund_code')
+        action = request.args.get('action')
+        
+        handler = get_backtest_handler()
+        success, result = handler.get_backtest_result(
+            task_id=task_id,
+            start_date=start_date,
+            end_date=end_date,
+            fund_code=fund_code,
+            action=action
+        )
+        
+        if success:
+            return jsonify({'success': True, 'data': result})
+        else:
+            status_code = 404 if '不存在' in result.get('error', '') else 400
+            return jsonify({'success': False, 'error': result.get('error', '获取结果失败')}), status_code
+            
+    except Exception as e:
+        logger.error(f"获取回测结果失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy-backtest/export/<task_id>', methods=['GET'])
+def export_backtest_trades(task_id):
+    """导出交易记录为CSV"""
+    try:
+        from flask import Response
+        
+        # 获取筛选参数
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        fund_code = request.args.get('fund_code')
+        action = request.args.get('action')
+        
+        handler = get_backtest_handler()
+        success, result = handler.export_trades_csv(
+            task_id=task_id,
+            start_date=start_date,
+            end_date=end_date,
+            fund_code=fund_code,
+            action=action
+        )
+        
+        if success:
+            # 返回CSV文件
+            filename = f"trades_{task_id}.csv"
+            return Response(
+                result,
+                mimetype='text/csv',
+                headers={
+                    'Content-Disposition': f'attachment; filename={filename}',
+                    'Content-Type': 'text/csv; charset=utf-8-sig'
+                }
+            )
+        else:
+            return jsonify({'success': False, 'error': result}), 404
+            
+    except Exception as e:
+        logger.error(f"导出交易记录失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy-backtest/trades/filter', methods=['POST'])
+def filter_backtest_trades():
+    """筛选交易记录（独立接口）"""
+    try:
+        data = request.get_json()
+        trades = data.get('trades', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        fund_code = data.get('fund_code')
+        action = data.get('action')
+        
+        filtered_trades = TradeRecordFilter.filter_trades(
+            trades=trades,
+            start_date=start_date,
+            end_date=end_date,
+            fund_code=fund_code,
+            action=action
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'trades': filtered_trades,
+                'total': len(filtered_trades)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"筛选交易记录失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

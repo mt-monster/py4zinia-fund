@@ -13,6 +13,7 @@
 - StrategyEvaluator: 策略评估
 - UnifiedStrategyEngine: 统一策略引擎
 - StrategyAdapter: 策略适配器（向后兼容）
+- BacktestAPIHandler: 回测API处理器
 """
 
 from .strategy_config import StrategyConfig, get_strategy_config
@@ -22,6 +23,18 @@ from .position_manager import PositionManager, VolatilityLevel, PositionAdjustme
 from .strategy_evaluator import StrategyEvaluator, EvaluationResult
 from .unified_strategy_engine import UnifiedStrategyEngine, UnifiedStrategyResult
 from .strategy_adapter import StrategyAdapter, create_strategy_adapter
+from .custom_strategy_backtest import (
+    CustomStrategyBacktest, BacktestResult, TradeRecord,
+    FilterEngine, SortingEngine, WeightCalculator, RiskController,
+    run_custom_backtest
+)
+from .performance_metrics import (
+    PerformanceMetrics, PerformanceCalculator, calculate_performance_metrics
+)
+from .backtest_api import (
+    BacktestAPIHandler, BacktestTaskManager, BacktestTask, BacktestStatus,
+    TradeRecordFilter, CSVExporter, get_task_manager
+)
 
 __all__ = [
     # 配置
@@ -54,4 +67,28 @@ __all__ = [
     # 策略适配器
     'StrategyAdapter',
     'create_strategy_adapter',
+    
+    # 自定义策略回测
+    'CustomStrategyBacktest',
+    'BacktestResult',
+    'TradeRecord',
+    'FilterEngine',
+    'SortingEngine',
+    'WeightCalculator',
+    'RiskController',
+    'run_custom_backtest',
+    
+    # 绩效指标计算
+    'PerformanceMetrics',
+    'PerformanceCalculator',
+    'calculate_performance_metrics',
+    
+    # 回测API
+    'BacktestAPIHandler',
+    'BacktestTaskManager',
+    'BacktestTask',
+    'BacktestStatus',
+    'TradeRecordFilter',
+    'CSVExporter',
+    'get_task_manager',
 ]

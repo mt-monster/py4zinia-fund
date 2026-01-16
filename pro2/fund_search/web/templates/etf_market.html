@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETF市场 - 投资账本</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-red: #e74c3c;
+            --light-red: #fadbd8;
+            --success-green: #27ae60;
+            --danger-red: #e74c3c;
+            --text-dark: #2c3e50;
+            --text-muted: #7f8c8d;
+            --border-color: #ecf0f1;
+            --bg-light: #f8f9fa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            font-size: 13px;
+            background-color: #f5f5f5;
+            color: var(--text-dark);
+        }
+        /* 顶部导航 */
+        .top-nav {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .top-nav .brand {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .top-nav .nav-links { display: flex; gap: 20px; }
+        .top-nav .nav-links a {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        .top-nav .nav-links a:hover { background: rgba(255,255,255,0.1); }
+        .top-nav .nav-links a.active { background: rgba(255,255,255,0.2); }
+        /* 主容器布局 */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 50px);
+        }
+        .left-panel {
+            flex: 1;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        /* 工具栏 */
+        .toolbar {
+            padding: 10px 15px;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .toolbar .search-box {
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 0 10px;
+        }
+        .toolbar .search-box input {
+            border: none;
+            outline: none;
+            padding: 6px 8px;
+            width: 200px;
+            font-size: 13px;
+        }
+        .toolbar select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+        }
+        .toolbar .btn-filter {
+            background: var(--primary-red);
+            color: white;
+            border: none;
+            padding: 6px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .toolbar .btn-filter:hover { background: #c0392b; }
+        .toolbar .btn-refresh {
+            background: transparent;
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+        }
+        .toolbar .btn-refresh:hover { background: #f5f5f5; }
+</style>
+</head>
+<body>
+<style>
+        /* 表格样式 */
+        .table-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+        .etf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .etf-table th {
+            background: #fafafa;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 500;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .etf-table th:hover { background: #f0f0f0; }
+        .etf-table th.sorted { background: #e8f4fc; color: var(--text-dark); }
+        .etf-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            white-space: nowrap;
+        }
+        .etf-table tr:hover { background: #fafafa; }
+        .etf-table .etf-code {
+            color: var(--primary-red);
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .etf-table .etf-code:hover { text-decoration: underline; }
+        .positive { color: var(--danger-red); }
+        .negative { color: var(--success-green); }
+        .text-muted { color: var(--text-muted); }
+        .sort-indicator {
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 10px;
+            color: #aaa;
+        }
+        .sort-indicator.asc::after { content: '▲'; color: var(--primary-red); }
+        .sort-indicator.desc::after { content: '▼'; color: var(--primary-red); }
+        /* 加载状态 */
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-red);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+</style>
+<style>
+        /* 侧边栏样式 */
+        .sidebar {
+            position: fixed;
+            top: 50px;
+            right: 0;
+            width: 450px;
+            height: calc(100vh - 50px);
+            background: white;
+            border-left: 1px solid var(--border-color);
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .sidebar-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+        }
+        .sidebar-header .etf-title { font-size: 16px; font-weight: bold; }
+        .sidebar-header .etf-code-display { color: var(--text-muted); font-size: 12px; }
+        .sidebar-header .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+        }
+        .sidebar-header .close-btn:hover { color: #333; }
+        .sidebar-content { padding: 20px; }
+        /* 价格显示 */
+        .price-display {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+        .price-display .main-price {
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .price-display .change-info {
+            margin-top: 8px;
+            font-size: 14px;
+        }
+        /* 指标网格 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .metric-label { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; }
+        .metric-value { font-size: 14px; font-weight: 600; }
+        /* 图表区域 */
+        .chart-section { margin-top: 20px; }
+        .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 15px; }
+        .chart-container {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 200px;
+        }
+        .period-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .period-tabs .tab {
+            padding: 5px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            background: white;
+        }
+        .period-tabs .tab:hover { background: #f5f5f5; }
+        .period-tabs .tab.active {
+            background: var(--primary-red);
+            color: white;
+            border-color: var(--primary-red);
+        }
+    </style>
+
+    <!-- 顶部导航 -->
+    <div class="top-nav">
+        <div class="brand">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>投资账本</span>
+        </div>
+        <div class="nav-links">
+            <a href="/"><i class="bi bi-house"></i> 首页</a>
+            <a href="/etf" class="active"><i class="bi bi-bar-chart"></i> ETF市场</a>
+            <a href="/strategy"><i class="bi bi-lightbulb"></i> 策略分析</a>
+        </div>
+        <div class="search-global">
+            <span style="color: rgba(255,255,255,0.7); font-size: 12px;">
+                全市场ETF实时行情
+            </span>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <div class="left-panel">
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <div class="search-box">
+                    <i class="bi bi-search" style="color: #aaa;"></i>
+                    <input type="text" id="search-input" placeholder="搜索ETF代码/名称">
+                </div>
+                <select id="sort-select">
+                    <option value="turnover">成交额</option>
+                    <option value="change_percent">涨跌幅</option>
+                    <option value="volume">成交量</option>
+                    <option value="turnover_rate">换手率</option>
+                    <option value="amplitude">振幅</option>
+                    <option value="current_price">最新价</option>
+                </select>
+                <button class="btn-filter" onclick="loadETFs()">
+                    <i class="bi bi-funnel"></i> 筛选
+                </button>
+                <button class="btn-refresh" onclick="refreshData()" title="刷新数据">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
+                    共 <span id="total-count">0</span> 只ETF
+                </span>
+            </div>
+
+            <!-- 表格 -->
+            <div class="table-wrapper">
+                <table class="etf-table">
+                    <thead>
+                        <tr>
+                            <th data-column="etf_code" onclick="sortByColumn('etf_code')">代码 <span class="sort-indicator"></span></th>
+                            <th data-column="etf_name" onclick="sortByColumn('etf_name')">名称 <span class="sort-indicator"></span></th>
+                            <th data-column="current_price" onclick="sortByColumn('current_price')">最新价 <span class="sort-indicator"></span></th>
+                            <th data-column="change_percent" onclick="sortByColumn('change_percent')">涨跌幅 <span class="sort-indicator"></span></th>
+                            <th data-column="change_amount" onclick="sortByColumn('change_amount')">涨跌额 <span class="sort-indicator"></span></th>
+                            <th data-column="volume" onclick="sortByColumn('volume')">成交量 <span class="sort-indicator"></span></th>
+                            <th data-column="turnover" onclick="sortByColumn('turnover')">成交额 <span class="sort-indicator"></span></th>
+                            <th data-column="open_price" onclick="sortByColumn('open_price')">开盘价 <span class="sort-indicator"></span></th>
+                            <th data-column="high_price" onclick="sortByColumn('high_price')">最高价 <span class="sort-indicator"></span></th>
+                            <th data-column="low_price" onclick="sortByColumn('low_price')">最低价 <span class="sort-indicator"></span></th>
+                            <th data-column="prev_close" onclick="sortByColumn('prev_close')">昨收 <span class="sort-indicator"></span></th>
+                            <th data-column="turnover_rate" onclick="sortByColumn('turnover_rate')">换手率 <span class="sort-indicator"></span></th>
+                            <th data-column="amplitude" onclick="sortByColumn('amplitude')">振幅 <span class="sort-indicator"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="etf-table-body">
+                        <tr><td colspan="13" class="loading">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 侧边栏详情 -->
+    <div class="sidebar" id="etf-sidebar">
+        <div class="sidebar-header">
+            <div>
+                <div class="etf-title" id="sidebar-etf-name">--</div>
+                <div class="etf-code-display" id="sidebar-etf-code">--</div>
+            </div>
+            <button class="close-btn" onclick="closeSidebar()">&times;</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="price-display">
+                <div class="main-price" id="sidebar-price">--</div>
+                <div class="change-info">
+                    <span id="sidebar-change-amount">--</span>
+                    <span id="sidebar-change-percent">--</span>
+                </div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-item">
+                    <div class="metric-label">开盘价</div>
+                    <div class="metric-value" id="sidebar-open">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">昨收</div>
+                    <div class="metric-value" id="sidebar-prev-close">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">最高价</div>
+                    <div class="metric-value" id="sidebar-high">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">最低价</div>
+                    <div class="metric-value" id="sidebar-low">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">成交量</div>
+                    <div class="metric-value" id="sidebar-volume">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">成交额</div>
+                    <div class="metric-value" id="sidebar-turnover">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">换手率</div>
+                    <div class="metric-value" id="sidebar-turnover-rate">--</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">振幅</div>
+                    <div class="metric-value" id="sidebar-amplitude">--</div>
+                </div>
+            </div>
+            <div class="chart-section">
+                <div class="chart-title"><i class="bi bi-graph-up"></i> 历史走势</div>
+                <div class="period-tabs">
+                    <span class="tab active" data-period="1m">近1月</span>
+                    <span class="tab" data-period="3m">近3月</span>
+                    <span class="tab" data-period="6m">近半年</span>
+                    <span class="tab" data-period="1y">近1年</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="etf-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>
+
+    <script>
+        let currentPage = 1;
+        const perPage = 100;
+        let allETFs = [];
+        let selectedETF = null;
+        let etfChart = null;
+        let currentSortColumn = 'turnover';
+        let currentSortOrder = 'desc';
+
+        // 页面加载时获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            loadETFs();
+            
+            // 搜索框回车事件
+            document.getElementById('search-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    loadETFs();
+                }
+            });
+            
+            // 时间段选择
+            document.querySelectorAll('.period-tabs .tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.period-tabs .tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    if (selectedETF) {
+                        loadETFChart(selectedETF.etf_code, this.dataset.period);
+                    }
+                });
+            });
+        });
+
+        // 加载ETF列表
+        async function loadETFs() {
+            const search = document.getElementById('search-input').value;
+            const sortBy = document.getElementById('sort-select').value;
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`/api/etf/list?page=${currentPage}&per_page=${perPage}&search=${encodeURIComponent(search)}&sort_by=${sortBy}&sort_order=${currentSortOrder}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    allETFs = result.data;
+                    document.getElementById('total-count').textContent = result.total;
+                    renderETFTable(allETFs);
+                } else {
+                    console.error('获取ETF列表失败:', result.error);
+                    document.getElementById('etf-table-body').innerHTML = 
+                        '<tr><td colspan="13" class="empty-state">加载失败，请重试</td></tr>';
+                }
+            } catch (error) {
+                console.error('请求失败:', error);
+                document.getElementById('etf-table-body').innerHTML = 
+                    '<tr><td colspan="13" class="empty-state">网络错误，请重试</td></tr>';
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 渲染ETF表格
+        function renderETFTable(etfs) {
+            const tbody = document.getElementById('etf-table-body');
+            
+            if (!etfs || etfs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="13" class="empty-state">暂无数据</td></tr>';
+                return;
+            }
+            
+            const fragment = document.createDocumentFragment();
+            
+            etfs.forEach(etf => {
+                const tr = document.createElement('tr');
+                tr.style.cursor = 'pointer';
+                tr.onclick = () => window.location.href = `/etf/${etf.etf_code}`;
+                
+                const changePercent = etf.change_percent || 0;
+                const changeClass = changePercent >= 0 ? 'positive' : 'negative';
+                
+                tr.innerHTML = `
+                    <td class="etf-code">${etf.etf_code || '--'}</td>
+                    <td>${truncate(etf.etf_name || '--', 15)}</td>
+                    <td>${formatPrice(etf.current_price)}</td>
+                    <td class="${changeClass}">${formatPercent(changePercent)}</td>
+                    <td class="${changeClass}">${formatPrice(etf.change_amount)}</td>
+                    <td>${formatVolume(etf.volume)}</td>
+                    <td>${formatTurnover(etf.turnover)}</td>
+                    <td>${formatPrice(etf.open_price)}</td>
+                    <td>${formatPrice(etf.high_price)}</td>
+                    <td>${formatPrice(etf.low_price)}</td>
+                    <td>${formatPrice(etf.prev_close)}</td>
+                    <td>${formatPercent(etf.turnover_rate)}</td>
+                    <td>${formatPercent(etf.amplitude)}</td>
+                `;
+                
+                fragment.appendChild(tr);
+            });
+            
+            tbody.innerHTML = '';
+            tbody.appendChild(fragment);
+        }
+
+        // 显示ETF侧边栏
+        function showETFSidebar(etf) {
+            selectedETF = etf;
+            
+            document.getElementById('sidebar-etf-name').textContent = etf.etf_name || '--';
+            document.getElementById('sidebar-etf-code').textContent = etf.etf_code || '--';
+            
+            const changePercent = etf.change_percent || 0;
+            const priceClass = changePercent >= 0 ? 'positive' : 'negative';
+            
+            const priceEl = document.getElementById('sidebar-price');
+            priceEl.textContent = formatPrice(etf.current_price);
+            priceEl.className = `main-price ${priceClass}`;
+            
+            const changeAmountEl = document.getElementById('sidebar-change-amount');
+            changeAmountEl.textContent = formatPrice(etf.change_amount);
+            changeAmountEl.className = priceClass;
+            
+            const changePercentEl = document.getElementById('sidebar-change-percent');
+            changePercentEl.textContent = `(${formatPercent(changePercent)})`;
+            changePercentEl.className = priceClass;
+            
+            document.getElementById('sidebar-open').textContent = formatPrice(etf.open_price);
+            document.getElementById('sidebar-prev-close').textContent = formatPrice(etf.prev_close);
+            document.getElementById('sidebar-high').textContent = formatPrice(etf.high_price);
+            document.getElementById('sidebar-low').textContent = formatPrice(etf.low_price);
+            document.getElementById('sidebar-volume').textContent = formatVolume(etf.volume);
+            document.getElementById('sidebar-turnover').textContent = formatTurnover(etf.turnover);
+            document.getElementById('sidebar-turnover-rate').textContent = formatPercent(etf.turnover_rate);
+            document.getElementById('sidebar-amplitude').textContent = formatPercent(etf.amplitude);
+            
+            document.getElementById('etf-sidebar').classList.add('open');
+            
+            // 加载图表
+            const activePeriod = document.querySelector('.period-tabs .tab.active').dataset.period;
+            loadETFChart(etf.etf_code, activePeriod);
+        }
+
+        // 关闭侧边栏
+        function closeSidebar() {
+            document.getElementById('etf-sidebar').classList.remove('open');
+            selectedETF = null;
+        }
+
+        // 加载ETF图表
+        async function loadETFChart(etfCode, period) {
+            try {
+                const response = await fetch(`/api/etf/${etfCode}/history?period=${period}`);
+                const result = await response.json();
+                
+                if (result.success && result.data.length > 0) {
+                    renderChart(result.data);
+                } else {
+                    console.log('无历史数据');
+                }
+            } catch (error) {
+                console.error('获取历史数据失败:', error);
+            }
+        }
+
+        // 渲染图表
+        function renderChart(data) {
+            const ctx = document.getElementById('etf-chart').getContext('2d');
+            
+            if (etfChart) {
+                etfChart.destroy();
+            }
+            
+            const labels = data.map(d => d.date);
+            const prices = data.map(d => d.close || d.current_price);
+            
+            etfChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '收盘价',
+                        data: prices,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: { display: false },
+                            ticks: { maxTicksLimit: 6, font: { size: 10 } }
+                        },
+                        y: {
+                            display: true,
+                            grid: { color: '#f0f0f0' },
+                            ticks: { font: { size: 10 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // 列排序
+        function sortByColumn(column) {
+            if (currentSortColumn === column) {
+                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortColumn = column;
+                currentSortOrder = 'desc';
+            }
+            
+            // 更新排序指示器
+            document.querySelectorAll('.etf-table th').forEach(th => {
+                th.classList.remove('sorted');
+                const indicator = th.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.classList.remove('asc', 'desc');
+                }
+            });
+            
+            const th = document.querySelector(`.etf-table th[data-column="${column}"]`);
+            if (th) {
+                th.classList.add('sorted');
+                const indicator = th.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.classList.add(currentSortOrder);
+                }
+            }
+            
+            // 前端排序
+            sortETFs(column, currentSortOrder);
+        }
+
+        // 前端排序
+        function sortETFs(column, order) {
+            const sorted = [...allETFs].sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                // 处理空值
+                if (aVal == null) return order === 'asc' ? 1 : -1;
+                if (bVal == null) return order === 'asc' ? -1 : 1;
+                
+                // 数字比较
+                if (typeof aVal === 'number' && typeof bVal === 'number') {
+                    return order === 'asc' ? aVal - bVal : bVal - aVal;
+                }
+                
+                // 字符串比较
+                return order === 'asc' 
+                    ? String(aVal).localeCompare(String(bVal), 'zh-CN')
+                    : String(bVal).localeCompare(String(aVal), 'zh-CN');
+            });
+            
+            renderETFTable(sorted);
+        }
+
+        // 刷新数据
+        function refreshData() {
+            loadETFs();
+        }
+
+        // 显示/隐藏加载状态
+        function showLoading(show) {
+            const tableWrapper = document.querySelector('.table-wrapper');
+            let overlay = tableWrapper.querySelector('.loading-overlay');
+            
+            if (show) {
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.className = 'loading-overlay';
+                    overlay.innerHTML = '<div><div class="spinner"></div><span>加载中...</span></div>';
+                    tableWrapper.appendChild(overlay);
+                }
+                overlay.style.display = 'flex';
+            } else {
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+            }
+        }
+
+        // 格式化函数
+        function formatPrice(value) {
+            if (value == null || isNaN(value)) return '--';
+            return parseFloat(value).toFixed(3);
+        }
+
+        function formatPercent(value) {
+            if (value == null || isNaN(value)) return '--';
+            const sign = value >= 0 ? '+' : '';
+            return sign + parseFloat(value).toFixed(2) + '%';
+        }
+
+        function formatVolume(value) {
+            if (value == null || isNaN(value)) return '--';
+            if (value >= 100000000) {
+                return (value / 100000000).toFixed(2) + '亿';
+            } else if (value >= 10000) {
+                return (value / 10000).toFixed(2) + '万';
+            }
+            return value.toString();
+        }
+
+        function formatTurnover(value) {
+            if (value == null || isNaN(value)) return '--';
+            if (value >= 100000000) {
+                return (value / 100000000).toFixed(2) + '亿';
+            } else if (value >= 10000) {
+                return (value / 10000).toFixed(2) + '万';
+            }
+            return value.toFixed(2);
+        }
+
+        function truncate(str, len) {
+            if (!str) return '--';
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+    </script>
