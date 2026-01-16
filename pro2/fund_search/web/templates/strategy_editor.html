@@ -756,6 +756,63 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* 内置策略按钮行样式 */
+        .builtin-strategies {
+            padding: 10px 15px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-light);
+        }
+        .builtin-strategies-title {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .builtin-strategies-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .builtin-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            color: var(--text-dark);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+        .builtin-btn:hover {
+            border-color: var(--primary-red);
+            color: var(--primary-red);
+            background: var(--light-red);
+        }
+        .builtin-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .builtin-btn .spinner-small {
+            width: 12px;
+            height: 12px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-red);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .builtin-strategies-loading {
+            text-align: center;
+            padding: 10px;
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
         /* 响应式设计 */
         @media (max-width: 1200px) {
             .main-container { flex-wrap: wrap; }
@@ -932,6 +989,18 @@
                 <button class="btn-new-strategy" onclick="createNewStrategy()">
                     <i class="bi bi-plus"></i> 新建
                 </button>
+            </div>
+            <!-- 内置策略按钮行 -->
+            <div class="builtin-strategies" id="builtin-strategies-container">
+                <div class="builtin-strategies-title">
+                    <i class="bi bi-lightning"></i> 快速应用内置策略
+                </div>
+                <div class="builtin-strategies-list" id="builtin-strategies-list">
+                    <div class="builtin-strategies-loading">
+                        <div class="spinner" style="width:16px;height:16px;margin:0 auto;"></div>
+                        <div style="margin-top:5px;">加载中...</div>
+                    </div>
+                </div>
             </div>
             <div class="strategy-list" id="strategy-list">
                 <!-- 策略列表将通过JS动态加载 -->
@@ -1269,6 +1338,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             initDateInputs();
             loadStrategies();
+            loadBuiltinStrategies();
         });
 
         function initDateInputs() {
@@ -1278,6 +1348,77 @@
             
             document.getElementById('backtest-end').value = today.toISOString().split('T')[0];
             document.getElementById('backtest-start').value = oneYearAgo.toISOString().split('T')[0];
+        }
+
+        // ==================== 内置策略管理 ====================
+        async function loadBuiltinStrategies() {
+            const container = document.getElementById('builtin-strategies-list');
+            
+            try {
+                const response = await fetch('/api/builtin-strategies');
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    container.innerHTML = result.data.map(strategy => `
+                        <button class="builtin-btn" 
+                                data-key="${escapeHtml(strategy.key)}" 
+                                onclick="applyBuiltinStrategy('${escapeHtml(strategy.key)}')"
+                                title="${escapeHtml(strategy.description || strategy.name)}">
+                            <i class="bi bi-lightning-charge"></i>
+                            ${escapeHtml(strategy.name)}
+                        </button>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div class="builtin-strategies-loading">暂无内置策略</div>';
+                }
+            } catch (error) {
+                console.error('加载内置策略失败:', error);
+                container.innerHTML = '<div class="builtin-strategies-loading">加载失败</div>';
+            }
+        }
+
+        async function applyBuiltinStrategy(key) {
+            // 获取按钮元素
+            const btn = document.querySelector(`.builtin-btn[data-key="${key}"]`);
+            if (!btn) return;
+            
+            // 保存原始内容
+            const originalContent = btn.innerHTML;
+            
+            // 显示加载状态
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-small"></span> 应用中...';
+            
+            try {
+                const response = await fetch(`/api/builtin-strategies/${key}/apply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(`已创建策略: ${result.data.name}`);
+                    
+                    // 刷新策略列表
+                    await loadStrategies();
+                    
+                    // 选中新创建的策略
+                    if (result.data.id) {
+                        await selectStrategy(result.data.id);
+                    }
+                } else {
+                    showError('应用策略失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('应用内置策略失败:', error);
+                showError('应用策略失败: ' + error.message);
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
         }
 
         // ==================== 策略列表管理 ====================
