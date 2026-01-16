@@ -1,22 +1,57 @@
-"""
-回测分析模块
+#!/usr/bin/env python
+# coding: utf-8
 
-该模块包含所有与基金回测和策略分析相关的功能：
-- 回测引擎
-- 投资策略
-- 绩效分析
-- 基金相似性分析
-- 策略回测
+"""
+回测模块
+包含投资策略、风险管理和回测引擎
+
+主要组件：
+- StrategyConfig: 策略配置管理
+- StopLossManager: 止损管理
+- TrendAnalyzer: 趋势分析
+- PositionManager: 仓位管理
+- StrategyEvaluator: 策略评估
+- UnifiedStrategyEngine: 统一策略引擎
+- StrategyAdapter: 策略适配器（向后兼容）
 """
 
-from .backtest_engine import FundBacktest
-from .enhanced_strategy import EnhancedInvestmentStrategy
-from .enhanced_analytics import EnhancedFundAnalytics
-from .fund_similarity import FundSimilarityAnalyzer
+from .strategy_config import StrategyConfig, get_strategy_config
+from .stop_loss_manager import StopLossManager, StopLossLevel, StopLossResult
+from .trend_analyzer import TrendAnalyzer, TrendType, TrendResult
+from .position_manager import PositionManager, VolatilityLevel, PositionAdjustment
+from .strategy_evaluator import StrategyEvaluator, EvaluationResult
+from .unified_strategy_engine import UnifiedStrategyEngine, UnifiedStrategyResult
+from .strategy_adapter import StrategyAdapter, create_strategy_adapter
 
 __all__ = [
-    'FundBacktest',
-    'EnhancedInvestmentStrategy',
-    'EnhancedFundAnalytics', 
-    'FundSimilarityAnalyzer'
+    # 配置
+    'StrategyConfig',
+    'get_strategy_config',
+    
+    # 止损管理
+    'StopLossManager',
+    'StopLossLevel',
+    'StopLossResult',
+    
+    # 趋势分析
+    'TrendAnalyzer',
+    'TrendType',
+    'TrendResult',
+    
+    # 仓位管理
+    'PositionManager',
+    'VolatilityLevel',
+    'PositionAdjustment',
+    
+    # 策略评估
+    'StrategyEvaluator',
+    'EvaluationResult',
+    
+    # 统一策略引擎
+    'UnifiedStrategyEngine',
+    'UnifiedStrategyResult',
+    
+    # 策略适配器
+    'StrategyAdapter',
+    'create_strategy_adapter',
 ]

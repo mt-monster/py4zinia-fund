@@ -7,7 +7,7 @@
 该模块实现了一个完整的基金回测框架，支持单基金和基金组合的定投策略回测。
 核心功能包括：
 1. 从akshare获取基金历史数据
-2. 实现基于search_01.py的投资策略
+2. 实现基于search_01.py的投资策略（已升级为统一策略引擎）
 3. 单基金定投回测
 4. 基金组合定投回测
 5. 全面的绩效指标计算
@@ -18,6 +18,9 @@
 - 调用backtest_single_fund或backtest_portfolio方法执行回测
 - 调用calculate_performance_metrics计算绩效指标
 - 调用visualize_backtest或visualize_portfolio可视化结果
+
+更新日志：
+- 2026-01-16: 集成统一策略引擎，支持止损、趋势分析、动态仓位管理
 """
 
 # 导入必要的库
@@ -28,6 +31,13 @@ import akshare as ak  # 用于获取金融数据
 import datetime       # 用于日期处理
 from data_retrieval.fund_realtime import FundRealTime  # 导入实时基金数据模块
 
+# 导入统一策略引擎适配器
+try:
+    from .strategy_adapter import StrategyAdapter
+    UNIFIED_STRATEGY_AVAILABLE = True
+except ImportError:
+    UNIFIED_STRATEGY_AVAILABLE = False
+
 class FundBacktest:
     """
     基金回测核心类
@@ -36,7 +46,7 @@ class FundBacktest:
     支持单基金和基金组合的回测，可自定义回测时间范围、基准定投金额等参数。
     """
     
-    def __init__(self, base_amount=100, start_date='2020-01-01', end_date=None, initial_cash=None):
+    def __init__(self, base_amount=100, start_date='2020-01-01', end_date=None, initial_cash=None, use_unified_strategy=True):
         """
         初始化回测引擎
         
@@ -45,6 +55,7 @@ class FundBacktest:
         start_date: str, 回测开始日期，格式为'YYYY-MM-DD'，默认为'2020-01-01'
         end_date: str, 回测结束日期，格式为'YYYY-MM-DD'，默认为当前日期
         initial_cash: float, 初始现金，默认为base_amount
+        use_unified_strategy: bool, 是否使用统一策略引擎，默认为True
         """
         self.base_amount = base_amount  # 基准定投金额
         self.start_date = start_date  # 回测开始日期
@@ -52,6 +63,12 @@ class FundBacktest:
         self.end_date = end_date if end_date else datetime.datetime.now().strftime('%Y-%m-%d')
         # 如果未指定初始现金，则使用基准定投金额
         self.initial_cash = initial_cash if initial_cash is not None else base_amount
+        
+        # 初始化统一策略引擎适配器
+        self.use_unified_strategy = use_unified_strategy and UNIFIED_STRATEGY_AVAILABLE
+        self._strategy_adapter = None
+        if self.use_unified_strategy:
+            self._strategy_adapter = StrategyAdapter(base_amount=base_amount)
         
     def get_fund_history(self, fund_code):
         """
@@ -134,7 +151,11 @@ class FundBacktest:
         获取投资策略建议
         
         基于今日和昨日收益率，生成定投策略建议，包括是否买入、买入金额、
-        赎回金额等。该策略复制自search_01.py中的逻辑。
+        赎回金额等。
+        
+        如果启用了统一策略引擎（use_unified_strategy=True），将使用增强版策略，
+        包含止损管理、趋势分析和动态仓位调整功能。
+        否则使用原始的基础策略逻辑。
         
         参数：
         today_return: float, 当日收益率（小数形式，如0.01表示1%）
@@ -149,6 +170,27 @@ class FundBacktest:
             operation_suggestion: str, 操作建议文本
             execution_amount: float, 执行金额（正为买入，负为赎回）
             buy_multiplier: float, 买入乘数（基准金额的倍数）
+        """
+        # 如果启用了统一策略引擎，使用适配器
+        if self.use_unified_strategy and self._strategy_adapter is not None:
+            return self._strategy_adapter.get_investment_strategy(today_return, prev_day_return)
+        
+        # 否则使用原始策略逻辑（向后兼容）
+        return self._get_legacy_strategy(today_return, prev_day_return)
+    
+    def _get_legacy_strategy(self, today_return, prev_day_return):
+        """
+        原始投资策略逻辑（向后兼容）
+        
+        基于今日和昨日收益率，生成定投策略建议。
+        该策略复制自search_01.py中的逻辑。
+        
+        参数：
+        today_return: float, 当日收益率（小数形式，如0.01表示1%）
+        prev_day_return: float, 前一日收益率（小数形式）
+        
+        返回：
+        tuple: 包含7个元素
         """
         # 初始化策略返回值
         status_label = ""          # 策略状态标签
@@ -257,6 +299,48 @@ class FundBacktest:
             execution_amount = self.base_amount * buy_multiplier
         
         return status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, buy_multiplier
+    
+    def reset_strategy(self):
+        """
+        重置策略状态
+        
+        在开始新的回测之前调用，清除策略适配器的历史状态
+        """
+        if self._strategy_adapter is not None:
+            self._strategy_adapter.reset()
+    
+    def update_cumulative_pnl(self, pnl: float):
+        """
+        更新累计盈亏率
+        
+        用于止损管理功能，在回测过程中更新当前持仓的累计盈亏
+        
+        参数：
+        pnl: float, 累计盈亏率（小数形式）
+        """
+        if self._strategy_adapter is not None:
+            self._strategy_adapter.update_cumulative_pnl(pnl)
+    
+    def get_full_analysis(self, today_return, prev_day_return, returns_history=None, cumulative_pnl=None):
+        """
+        获取完整的策略分析结果
+        
+        返回统一策略引擎的完整分析结果，包含趋势、波动率、止损状态等详细信息
+        
+        参数：
+        today_return: float, 当日收益率（小数形式）
+        prev_day_return: float, 前一日收益率（小数形式）
+        returns_history: list, 历史收益率序列（可选）
+        cumulative_pnl: float, 累计盈亏率（可选）
+        
+        返回：
+        UnifiedStrategyResult 或 None（如果未启用统一策略引擎）
+        """
+        if self._strategy_adapter is not None:
+            return self._strategy_adapter.get_full_analysis(
+                today_return, prev_day_return, returns_history, cumulative_pnl
+            )
+        return None
     
     def backtest_single_fund(self, fund_code):
         """

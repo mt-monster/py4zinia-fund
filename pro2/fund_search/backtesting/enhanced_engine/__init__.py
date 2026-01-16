@@ -9,18 +9,43 @@ Monte Carlo simulations, and portfolio optimization.
 __version__ = "1.0.0"
 __author__ = "Enhanced Backtesting Team"
 
-from .attribution import MultiFactorAttribution
-from .data_validator import DataValidator
-from .monitoring import RealTimeMonitor
-from .monte_carlo import MonteCarloEngine
-from .optimization import PortfolioOptimizer
+# Core modules - always available
+from .risk_metrics import EnhancedRiskMetrics, RiskMetrics
 
-# Core modules
-from .risk_metrics import EnhancedRiskMetrics
-from .visualization import AdvancedVisualization
+# Optional modules - may have additional dependencies
+try:
+    from .attribution import MultiFactorAttribution
+except ImportError:
+    MultiFactorAttribution = None
+
+try:
+    from .data_validator import DataValidator
+except ImportError:
+    DataValidator = None
+
+try:
+    from .monitoring import RealTimeMonitor
+except ImportError:
+    RealTimeMonitor = None
+
+try:
+    from .monte_carlo import MonteCarloEngine
+except ImportError:
+    MonteCarloEngine = None
+
+try:
+    from .optimization import PortfolioOptimizer
+except ImportError:
+    PortfolioOptimizer = None
+
+try:
+    from .visualization import AdvancedVisualization
+except ImportError:
+    AdvancedVisualization = None
 
 __all__ = [
     "EnhancedRiskMetrics",
+    "RiskMetrics",
     "MultiFactorAttribution",
     "MonteCarloEngine",
     "PortfolioOptimizer",
