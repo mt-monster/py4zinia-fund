@@ -145,13 +145,13 @@
             font-weight: 600;
         }
         
-        /* 颜色类 - 红涨绿跌（中国市场习惯）*/
+        /* 颜色类 - 红涨绿跌（中国市场标准）*/
         .text-up {
-            color: #e74c3c;
+            color: #e74c3c;  /* 红色表示上涨 */
         }
         
         .text-down {
-            color: #27ae60;
+            color: #27ae60;  /* 绿色表示下跌 */
         }
         
         .text-neutral {
@@ -674,11 +674,13 @@
         let chartDataCache = {};
 
         // 工具函数：格式化收益率并返回颜色类名
+        // 红涨绿跌：正值（上涨）用红色，负值（下跌）用绿色
         function formatReturn(value, suffix = '%') {
             if (value === null || value === undefined || isNaN(value)) {
                 return { text: '--', colorClass: 'text-neutral' };
             }
             const num = parseFloat(value);
+            // 正值（上涨）-> text-up（红色），负值（下跌）-> text-down（绿色）
             const colorClass = num >= 0 ? 'text-up' : 'text-down';
             const sign = num >= 0 ? '+' : '';
             return { 
