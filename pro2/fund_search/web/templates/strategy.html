@@ -7,17 +7,43 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        :root { --primary-color: #3498db; --success-color: #27ae60; --danger-color: #e74c3c; }
+        :root { 
+            --primary-color: #3498db; 
+            --success-color: #27ae60; 
+            --danger-color: #e74c3c; 
+            --warning-color: #f39c12;
+            --info-color: #17a2b8;
+        }
         body { background-color: #f5f6fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .strategy-card { border-left: 4px solid var(--primary-color); }
+        .card-header { background: white; border-bottom: 1px solid #eee; font-weight: 600; }
+        .strategy-card { border-left: 4px solid var(--primary-color); transition: all 0.3s; }
+        .strategy-card:hover { transform: translateX(5px); }
         .strategy-card.buy { border-left-color: var(--success-color); }
         .strategy-card.sell { border-left-color: var(--danger-color); }
         .result-box { background: #f8f9fa; border-radius: 8px; padding: 20px; margin-top: 15px; }
-        .positive { color: #e74c3c; }  /* 红色表示上涨 */
-        .negative { color: #27ae60; }  /* 绿色表示下跌 */
+        .positive { color: #e74c3c; }
+        .negative { color: #27ae60; }
         .btn-analyze { border-radius: 20px; padding: 10px 30px; }
+        .metric-card { text-align: center; padding: 15px; border-radius: 8px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+        .metric-value { font-size: 1.5rem; font-weight: bold; }
+        .metric-label { font-size: 0.85rem; color: #666; }
+        .trend-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; }
+        .trend-up { background: #d4edda; color: #155724; }
+        .trend-down { background: #f8d7da; color: #721c24; }
+        .trend-sideways { background: #fff3cd; color: #856404; }
+        .stop-loss-warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 15px; border-radius: 4px; }
+        .stop-loss-triggered { background: #f8d7da; border-left: 4px solid #dc3545; padding: 10px 15px; border-radius: 4px; }
+        .volatility-high { color: #dc3545; }
+        .volatility-low { color: #28a745; }
+        .volatility-normal { color: #6c757d; }
+        .config-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+        .config-item:last-child { border-bottom: none; }
+        .evaluation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .eval-item { background: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center; }
+        .eval-value { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .eval-label { font-size: 0.8rem; color: #666; }
     </style>
 </head>
 <body>
@@ -33,39 +59,61 @@
 
     <div class="container">
         <div class="row">
-            <!-- 策略列表 -->
+            <!-- 左侧：策略列表和配置 -->
             <div class="col-md-4">
+                <!-- 策略列表 -->
                 <div class="card">
-                    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-list-check me-2"></i>可用策略</h5></div>
+                    <div class="card-header"><h6 class="mb-0"><i class="bi bi-list-check me-2"></i>可用策略</h6></div>
                     <div class="card-body p-0">
-                        <div class="list-group list-group-flush" id="strategy-list"></div>
+                        <div class="list-group list-group-flush" id="strategy-list" style="max-height: 300px; overflow-y: auto;"></div>
+                    </div>
+                </div>
+
+                <!-- 策略配置 -->
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-2"></i>策略配置</h6></div>
+                    <div class="card-body" id="strategy-config">
+                        <div class="text-center text-muted py-3">
+                            <div class="spinner-border spinner-border-sm me-2"></div>加载中...
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 策略测试 -->
+            <!-- 右侧：策略测试和回测 -->
             <div class="col-md-8">
-                <!-- 手动测试 -->
+                <!-- 统一策略测试 -->
                 <div class="card">
-                    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-calculator me-2"></i>策略测试</h5></div>
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-calculator me-2"></i>统一策略分析</h6>
+                    </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-5">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">基金代码</label>
+                                <input type="text" class="form-control" id="analyze-fund-code" placeholder="如: 000001">
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label">今日收益率 (%)</label>
                                 <input type="number" class="form-control" id="today-return" step="0.01" value="0.5">
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-3">
                                 <label class="form-label">昨日收益率 (%)</label>
                                 <input type="number" class="form-control" id="prev-day-return" step="0.01" value="-0.3">
                             </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button class="btn btn-primary btn-analyze w-100" onclick="analyzeStrategy()">
-                                    <i class="bi bi-play-fill"></i> 分析
-                                </button>
+                            <div class="col-md-3">
+                                <label class="form-label">累计盈亏 (%)</label>
+                                <input type="number" class="form-control" id="cumulative-pnl" step="0.01" placeholder="可选">
                             </div>
                         </div>
+                        <div class="mt-3">
+                            <button class="btn btn-primary btn-analyze" onclick="analyzeUnifiedStrategy()">
+                                <i class="bi bi-play-fill me-1"></i>分析策略
+                            </button>
+                        </div>
+                        
+                        <!-- 分析结果 -->
                         <div class="result-box" id="analyze-result" style="display:none;">
-                            <h6><i class="bi bi-check-circle me-1"></i>分析结果</h6>
                             <div id="analyze-result-content"></div>
                         </div>
                     </div>
@@ -73,23 +121,28 @@
 
                 <!-- 策略回测 -->
                 <div class="card">
-                    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>策略回测</h5></div>
+                    <div class="card-header"><h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>策略回测</h6></div>
                     <div class="card-body">
-                        <div class="row mb-3">
-                            <div class="col-md-4">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
                                 <label class="form-label">基金代码</label>
                                 <input type="text" class="form-control" id="backtest-fund" placeholder="如: 000001">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label">初始金额 (元)</label>
                                 <input type="number" class="form-control" id="initial-amount" value="10000">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <label class="form-label">基准定投 (元)</label>
+                                <input type="number" class="form-control" id="base-invest" value="100">
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label">回测天数</label>
                                 <select class="form-select" id="backtest-days">
                                     <option value="30">近30天</option>
                                     <option value="60">近60天</option>
                                     <option value="90" selected>近90天</option>
+                                    <option value="180">近180天</option>
                                 </select>
                             </div>
                         </div>
@@ -97,7 +150,6 @@
                             <i class="bi bi-play-circle me-1"></i>开始回测
                         </button>
                         <div class="result-box" id="backtest-result" style="display:none;">
-                            <h6><i class="bi bi-bar-chart me-1"></i>回测结果</h6>
                             <div id="backtest-result-content"></div>
                         </div>
                     </div>
@@ -108,7 +160,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', loadStrategies);
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStrategies();
+            loadStrategyConfig();
+        });
 
         async function loadStrategies() {
             try {
@@ -123,49 +178,138 @@
                                 <span class="badge ${s.action.includes('buy') ? 'bg-success' : s.action.includes('sell') ? 'bg-danger' : 'bg-secondary'}">${s.action}</span>
                             </div>
                             <small class="text-muted">${s.description}</small>
-                            ${s.redeem_amount > 0 ? `<br><small class="text-danger">赎回: ¥${s.redeem_amount}</small>` : ''}
                         </div>
                     `).join('');
                 }
             } catch (error) { console.error('加载策略失败:', error); }
         }
 
-        async function analyzeStrategy() {
+        async function loadStrategyConfig() {
+            try {
+                const response = await fetch('/api/strategy/config');
+                const result = await response.json();
+                if (result.success && result.data) {
+                    const config = result.data;
+                    document.getElementById('strategy-config').innerHTML = `
+                        <div class="mb-3">
+                            <h6 class="text-danger"><i class="bi bi-shield-exclamation me-1"></i>止损配置</h6>
+                            <div class="config-item"><span>警告阈值</span><span class="text-warning">${(config.stop_loss.warning_threshold * 100).toFixed(0)}%</span></div>
+                            <div class="config-item"><span>止损阈值</span><span class="text-danger">${(config.stop_loss.stop_loss_threshold * 100).toFixed(0)}%</span></div>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-info"><i class="bi bi-activity me-1"></i>波动率配置</h6>
+                            <div class="config-item"><span>高波动阈值</span><span>${(config.volatility.high_threshold * 100).toFixed(0)}%</span></div>
+                            <div class="config-item"><span>低波动阈值</span><span>${(config.volatility.low_threshold * 100).toFixed(0)}%</span></div>
+                            <div class="config-item"><span>高波动调整</span><span class="text-danger">×${config.volatility.high_adjustment}</span></div>
+                            <div class="config-item"><span>低波动调整</span><span class="text-success">×${config.volatility.low_adjustment}</span></div>
+                        </div>
+                        <div>
+                            <h6 class="text-primary"><i class="bi bi-graph-up me-1"></i>趋势配置</h6>
+                            <div class="config-item"><span>短期均线</span><span>${config.trend.ma_short_period}日</span></div>
+                            <div class="config-item"><span>长期均线</span><span>${config.trend.ma_long_period}日</span></div>
+                            <div class="config-item"><span>上涨调整</span><span class="text-success">×${config.trend.uptrend_adjustment}</span></div>
+                            <div class="config-item"><span>下跌调整</span><span class="text-danger">×${config.trend.downtrend_adjustment}</span></div>
+                        </div>
+                    `;
+                }
+            } catch (error) { 
+                console.error('加载配置失败:', error);
+                document.getElementById('strategy-config').innerHTML = '<div class="text-danger">加载配置失败</div>';
+            }
+        }
+
+        async function analyzeUnifiedStrategy() {
+            const fundCode = document.getElementById('analyze-fund-code').value.trim();
             const todayReturn = parseFloat(document.getElementById('today-return').value);
             const prevDayReturn = parseFloat(document.getElementById('prev-day-return').value);
+            const cumulativePnl = document.getElementById('cumulative-pnl').value;
+            
             try {
-                const response = await fetch('/api/strategy/analyze', {
+                const response = await fetch('/api/strategy/unified-analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ today_return: todayReturn, prev_day_return: prevDayReturn })
+                    body: JSON.stringify({ 
+                        fund_code: fundCode || null,
+                        today_return: todayReturn, 
+                        prev_day_return: prevDayReturn,
+                        cumulative_pnl: cumulativePnl ? parseFloat(cumulativePnl) / 100 : null
+                    })
                 });
                 const result = await response.json();
+                
                 if (result.success && result.data) {
                     const d = result.data;
                     document.getElementById('analyze-result').style.display = 'block';
+                    
+                    // 趋势徽章
+                    const trendBadge = d.trend === 'uptrend' ? '<span class="trend-badge trend-up">📈 上涨趋势</span>' :
+                                       d.trend === 'downtrend' ? '<span class="trend-badge trend-down">📉 下跌趋势</span>' :
+                                       '<span class="trend-badge trend-sideways">➡️ 横盘整理</span>';
+                    
+                    // 波动率样式
+                    const volClass = d.volatility_level === 'high' ? 'volatility-high' :
+                                     d.volatility_level === 'low' ? 'volatility-low' : 'volatility-normal';
+                    
+                    // 止损状态
+                    let stopLossHtml = '';
+                    if (d.stop_loss_triggered) {
+                        stopLossHtml = `<div class="stop-loss-triggered mb-3"><i class="bi bi-exclamation-triangle-fill me-2"></i>${d.stop_loss_label}</div>`;
+                    } else if (d.stop_loss_level === 'warning') {
+                        stopLossHtml = `<div class="stop-loss-warning mb-3"><i class="bi bi-exclamation-triangle me-2"></i>${d.stop_loss_label}</div>`;
+                    }
+                    
                     document.getElementById('analyze-result-content').innerHTML = `
-                        <table class="table table-sm mb-0">
-                            <tr><td>策略名称</td><td><strong>${d.strategy_name}</strong></td></tr>
+                        ${stopLossHtml}
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <div class="metric-value ${d.action.includes('buy') ? 'text-success' : d.action.includes('sell') ? 'text-danger' : ''}">${d.final_buy_multiplier.toFixed(1)}×</div>
+                                    <div class="metric-label">最终买入倍数</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <div class="metric-value">${trendBadge}</div>
+                                    <div class="metric-label">趋势判断</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="metric-card">
+                                    <div class="metric-value ${volClass}">${(d.volatility * 100).toFixed(1)}%</div>
+                                    <div class="metric-label">波动率 (${d.volatility_level})</div>
+                                </div>
+                            </div>
+                        </div>
+                        <table class="table table-sm mb-3">
+                            <tr><td width="30%">策略名称</td><td><strong>${d.strategy_name}</strong></td></tr>
                             <tr><td>状态标签</td><td>${d.status_label}</td></tr>
                             <tr><td>操作建议</td><td>${d.operation_suggestion}</td></tr>
-                            <tr><td>买入倍数</td><td class="positive">${d.buy_multiplier}×</td></tr>
-                            <tr><td>赎回金额</td><td class="negative">¥${d.redeem_amount}</td></tr>
+                            <tr><td>基础倍数</td><td>${d.base_buy_multiplier}×</td></tr>
+                            <tr><td>趋势调整</td><td>×${d.trend_adjustment.toFixed(2)}</td></tr>
+                            <tr><td>波动率调整</td><td>×${d.volatility_adjustment.toFixed(2)}</td></tr>
+                            <tr><td>赎回金额</td><td>¥${d.redeem_amount}</td></tr>
                             <tr><td>执行金额</td><td>${d.execution_amount}</td></tr>
                         </table>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-lightbulb me-2"></i><strong>综合建议：</strong>${d.final_suggestion}
+                        </div>
                     `;
                 }
-            } catch (error) { console.error('策略分析失败:', error); alert('分析失败: ' + error.message); }
+            } catch (error) { 
+                console.error('策略分析失败:', error); 
+                alert('分析失败: ' + error.message); 
+            }
         }
 
         async function runBacktest() {
             const fundCode = document.getElementById('backtest-fund').value.trim();
             const initialAmount = parseFloat(document.getElementById('initial-amount').value);
+            const baseInvest = parseFloat(document.getElementById('base-invest').value);
             const backtestDays = parseInt(document.getElementById('backtest-days').value);
             
             if (!fundCode) { alert('请输入基金代码'); return; }
             if (isNaN(initialAmount) || initialAmount <= 0) { alert('请输入有效的初始金额'); return; }
             
-            // 显示加载状态
             const btn = document.querySelector('.btn-success');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>回测中...';
@@ -178,16 +322,17 @@
                     body: JSON.stringify({ 
                         fund_code: fundCode, 
                         initial_amount: initialAmount,
+                        base_invest: baseInvest,
                         days: backtestDays
                     })
                 });
                 const result = await response.json();
                 
-                console.log('回测结果:', result);  // 调试日志
-                
                 if (result.success && result.data) {
                     const d = result.data;
+                    const e = d.evaluation || {};
                     const returnClass = d.total_return >= 0 ? 'positive' : 'negative';
+                    
                     document.getElementById('backtest-result').style.display = 'block';
                     document.getElementById('backtest-result-content').innerHTML = `
                         <div class="row text-center mb-3">
@@ -208,6 +353,36 @@
                                 <small class="text-muted">交易次数</small>
                             </div>
                         </div>
+                        
+                        <hr>
+                        <h6><i class="bi bi-bar-chart me-2"></i>策略评估指标</h6>
+                        <div class="evaluation-grid mb-3">
+                            <div class="eval-item">
+                                <div class="eval-value">${(e.hit_rate * 100 || 0).toFixed(1)}%</div>
+                                <div class="eval-label">命中率</div>
+                            </div>
+                            <div class="eval-item">
+                                <div class="eval-value">${(e.profit_factor || 0).toFixed(2)}</div>
+                                <div class="eval-label">盈亏比</div>
+                            </div>
+                            <div class="eval-item">
+                                <div class="eval-value">${e.max_consecutive_losses || 0}</div>
+                                <div class="eval-label">最大连亏</div>
+                            </div>
+                            <div class="eval-item">
+                                <div class="eval-value">${e.max_consecutive_wins || 0}</div>
+                                <div class="eval-label">最大连赢</div>
+                            </div>
+                            <div class="eval-item">
+                                <div class="eval-value">¥${(e.avg_profit_per_trade || 0).toFixed(2)}</div>
+                                <div class="eval-label">平均每笔收益</div>
+                            </div>
+                            <div class="eval-item">
+                                <div class="eval-value">¥${(e.expectancy || 0).toFixed(2)}</div>
+                                <div class="eval-label">期望值</div>
+                            </div>
+                        </div>
+                        
                         <hr>
                         <div class="row">
                             <div class="col-md-6">
@@ -215,23 +390,38 @@
                                 <p><strong>持仓价值:</strong> ¥${d.final_holdings.toFixed(2)}</p>
                             </div>
                             <div class="col-md-6">
-                                <p><strong>回测天数:</strong> ${d.backtest_days || backtestDays}天</p>
-                                <p><strong>数据条数:</strong> ${d.data_count || '--'}条</p>
+                                <p><strong>回测天数:</strong> ${d.backtest_days}天</p>
+                                <p><strong>数据条数:</strong> ${d.data_count}条</p>
                             </div>
                         </div>
+                        
                         ${d.trades && d.trades.length > 0 ? `
                             <hr>
                             <details>
                                 <summary class="mb-2"><strong>交易记录 (${d.trades.length}条)</strong></summary>
                                 <div class="table-responsive mt-2">
                                     <table class="table table-sm table-striped">
-                                        <thead><tr><th>日期</th><th>操作</th><th>金额</th><th>余额</th><th>持仓</th></tr></thead>
+                                        <thead>
+                                            <tr>
+                                                <th>日期</th>
+                                                <th>操作</th>
+                                                <th>金额</th>
+                                                <th>倍数</th>
+                                                <th>趋势</th>
+                                                <th>余额</th>
+                                                <th>持仓</th>
+                                            </tr>
+                                        </thead>
                                         <tbody>
                                             ${d.trades.map(t => `
                                                 <tr>
                                                     <td>${t.date}</td>
-                                                    <td class="${t.action === 'buy' ? 'positive' : 'negative'}">${t.action === 'buy' ? '买入' : '卖出'}</td>
+                                                    <td class="${t.action === 'buy' ? 'positive' : t.action === 'stop_loss' ? 'text-danger fw-bold' : 'negative'}">
+                                                        ${t.action === 'buy' ? '买入' : t.action === 'stop_loss' ? '止损' : '卖出'}
+                                                    </td>
                                                     <td>¥${t.amount.toFixed(2)}</td>
+                                                    <td>${t.multiplier ? t.multiplier.toFixed(1) + '×' : '-'}</td>
+                                                    <td>${t.trend === 'uptrend' ? '📈' : t.trend === 'downtrend' ? '📉' : t.trend ? '➡️' : '-'}</td>
                                                     <td>¥${t.balance.toFixed(2)}</td>
                                                     <td>¥${t.holdings.toFixed(2)}</td>
                                                 </tr>
