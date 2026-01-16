@@ -94,6 +94,12 @@ class EnhancedDatabaseManager:
             # 创建用户持仓表
             self._create_user_holdings_table()
             
+            # 创建用户策略表
+            self._create_user_strategies_table()
+            
+            # 创建策略回测结果表
+            self._create_strategy_backtest_results_table()
+            
             logger.info("数据库表结构初始化完成")
             
         except Exception as e:
@@ -242,6 +248,50 @@ class EnhancedDatabaseManager:
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """
         self.execute_sql(sql)
+
+    def _create_user_strategies_table(self):
+        """
+        创建用户策略表
+        存储用户自定义的投资策略配置
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS user_strategies (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
+            name VARCHAR(100) NOT NULL,
+            description TEXT,
+            config JSON NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_name (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """
+        self.execute_sql(sql)
+        logger.info("用户策略表 user_strategies 创建/检查完成")
+
+    def _create_strategy_backtest_results_table(self):
+        """
+        创建策略回测结果表
+        存储策略回测的执行状态和结果数据
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS strategy_backtest_results (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            strategy_id INT NOT NULL,
+            task_id VARCHAR(50) NOT NULL UNIQUE,
+            status VARCHAR(20) DEFAULT 'pending',
+            result JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP NULL,
+            FOREIGN KEY (strategy_id) REFERENCES user_strategies(id) ON DELETE CASCADE,
+            INDEX idx_task_id (task_id),
+            INDEX idx_strategy_id (strategy_id),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """
+        self.execute_sql(sql)
+        logger.info("策略回测结果表 strategy_backtest_results 创建/检查完成")
 
 
     def execute_query_raw(self, sql: str, params: Optional[Tuple] = None) -> Optional[List]:

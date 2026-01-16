@@ -412,6 +412,232 @@ class EnhancedFundData:
         return pd.DataFrame(results)
 
 
+    @staticmethod
+    def get_etf_list() -> pd.DataFrame:
+        """
+        获取全市场ETF列表（实时行情）
+        
+        返回：
+        DataFrame: ETF列表数据
+        """
+        try:
+            # 使用akshare获取ETF实时行情
+            etf_df = ak.fund_etf_spot_em()
+            
+            if etf_df is None or etf_df.empty:
+                logger.warning("ETF列表API返回空数据")
+                return pd.DataFrame()
+            
+            # 重命名列以统一格式
+            column_mapping = {
+                '代码': 'etf_code',
+                '名称': 'etf_name',
+                '最新价': 'current_price',
+                '涨跌幅': 'change_percent',
+                '涨跌额': 'change_amount',
+                '成交量': 'volume',
+                '成交额': 'turnover',
+                '开盘价': 'open_price',
+                '最高价': 'high_price',
+                '最低价': 'low_price',
+                '昨收': 'prev_close',
+                '换手率': 'turnover_rate',
+                '量比': 'volume_ratio',
+                '振幅': 'amplitude'
+            }
+            
+            # 只保留存在的列
+            existing_columns = {k: v for k, v in column_mapping.items() if k in etf_df.columns}
+            etf_df = etf_df.rename(columns=existing_columns)
+            
+            # 确保数值类型正确
+            numeric_columns = ['current_price', 'change_percent', 'change_amount', 'volume', 
+                             'turnover', 'open_price', 'high_price', 'low_price', 'prev_close',
+                             'turnover_rate', 'volume_ratio', 'amplitude']
+            for col in numeric_columns:
+                if col in etf_df.columns:
+                    etf_df[col] = pd.to_numeric(etf_df[col], errors='coerce')
+            
+            logger.info(f"成功获取 {len(etf_df)} 只ETF数据")
+            return etf_df
+            
+        except Exception as e:
+            logger.error(f"获取ETF列表失败: {str(e)}")
+            return pd.DataFrame()
+    
+    @staticmethod
+    def get_etf_history(etf_code: str, days: int = 365) -> pd.DataFrame:
+        """
+        获取ETF历史行情数据
+        
+        参数：
+        etf_code: ETF代码
+        days: 历史数据天数
+        
+        返回：
+        DataFrame: ETF历史数据
+        """
+        try:
+            end_date = datetime.now().strftime('%Y%m%d')
+            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')
+            
+            # 使用akshare获取ETF历史数据
+            etf_hist = ak.fund_etf_hist_em(
+                symbol=etf_code,
+                period="daily",
+                start_date=start_date,
+                end_date=end_date,
+                adjust="qfq"  # 前复权
+            )
+            
+            if etf_hist is None or etf_hist.empty:
+                logger.warning(f"ETF {etf_code} 历史数据API返回空")
+                return pd.DataFrame()
+            
+            # 重命名列
+            column_mapping = {
+                '日期': 'date',
+                '开盘': 'open',
+                '收盘': 'close',
+                '最高': 'high',
+                '最低': 'low',
+                '成交量': 'volume',
+                '成交额': 'turnover',
+                '振幅': 'amplitude',
+                '涨跌幅': 'change_percent',
+                '涨跌额': 'change_amount',
+                '换手率': 'turnover_rate'
+            }
+            
+            existing_columns = {k: v for k, v in column_mapping.items() if k in etf_hist.columns}
+            etf_hist = etf_hist.rename(columns=existing_columns)
+            
+            # 转换日期格式
+            if 'date' in etf_hist.columns:
+                etf_hist['date'] = pd.to_datetime(etf_hist['date'])
+            
+            return etf_hist
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 历史数据失败: {str(e)}")
+            return pd.DataFrame()
+    
+    @staticmethod
+    def get_etf_nav_history(etf_code: str, days: int = 365, start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        获取ETF基金净值历史数据（单位净值、累计净值）
+        
+        参数：
+        etf_code: ETF代码
+        days: 历史数据天数（当start_date和end_date未指定时使用）
+        start_date: 开始日期 (YYYY-MM-DD格式)
+        end_date: 结束日期 (YYYY-MM-DD格式)
+        
+        返回：
+        DataFrame: ETF净值历史数据，包含单位净值、累计净值、日增长率
+        """
+        try:
+            # 处理日期参数
+            if end_date:
+                end_date_str = end_date.replace('-', '')
+            else:
+                end_date_str = datetime.now().strftime('%Y%m%d')
+            
+            if start_date:
+                start_date_str = start_date.replace('-', '')
+            else:
+                start_date_str = (datetime.now() - timedelta(days=days)).strftime('%Y%m%d')
+            
+            # 使用akshare获取ETF基金净值历史数据
+            nav_hist = ak.fund_etf_fund_info_em(
+                fund=etf_code,
+                start_date=start_date_str,
+                end_date=end_date_str
+            )
+            
+            if nav_hist is None or nav_hist.empty:
+                logger.warning(f"ETF {etf_code} 净值历史数据API返回空")
+                return pd.DataFrame()
+            
+            # 重命名列
+            column_mapping = {
+                '净值日期': 'date',
+                '单位净值': 'unit_nav',
+                '累计净值': 'acc_nav',
+                '日增长率': 'change_percent',
+                '申购状态': 'purchase_status',
+                '赎回状态': 'redeem_status'
+            }
+            
+            existing_columns = {k: v for k, v in column_mapping.items() if k in nav_hist.columns}
+            nav_hist = nav_hist.rename(columns=existing_columns)
+            
+            # 转换日期格式
+            if 'date' in nav_hist.columns:
+                nav_hist['date'] = pd.to_datetime(nav_hist['date'])
+            
+            # 确保数值类型正确
+            for col in ['unit_nav', 'acc_nav', 'change_percent']:
+                if col in nav_hist.columns:
+                    nav_hist[col] = pd.to_numeric(nav_hist[col], errors='coerce')
+            
+            # 计算复权净值（基于累计净值和单位净值的比例调整）
+            # 复权净值 = 单位净值 * (累计净值 / 单位净值的历史调整因子)
+            # 简化处理：使用累计净值作为复权净值的近似
+            if 'unit_nav' in nav_hist.columns and 'acc_nav' in nav_hist.columns:
+                # 计算复权因子
+                nav_hist['adj_nav'] = nav_hist['acc_nav']
+            
+            logger.info(f"成功获取ETF {etf_code} 的 {len(nav_hist)} 条净值历史数据")
+            return nav_hist
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 净值历史数据失败: {str(e)}")
+            return pd.DataFrame()
+    
+    @staticmethod
+    def get_etf_performance(etf_code: str, days: int = 365) -> Dict:
+        """
+        计算ETF绩效指标
+        
+        参数：
+        etf_code: ETF代码
+        days: 历史数据天数
+        
+        返回：
+        dict: ETF绩效指标
+        """
+        try:
+            hist_data = EnhancedFundData.get_etf_history(etf_code, days)
+            
+            if hist_data.empty or len(hist_data) < 2:
+                return EnhancedFundData._get_default_metrics()
+            
+            # 计算日收益率
+            if 'close' in hist_data.columns:
+                daily_returns = hist_data['close'].pct_change().dropna()
+            elif 'change_percent' in hist_data.columns:
+                daily_returns = hist_data['change_percent'] / 100
+                daily_returns = daily_returns.dropna()
+            else:
+                return EnhancedFundData._get_default_metrics()
+            
+            if len(daily_returns) < 2:
+                return EnhancedFundData._get_default_metrics()
+            
+            # 创建一个模拟的hist_data用于计算
+            calc_data = pd.DataFrame({
+                'nav': hist_data['close'] if 'close' in hist_data.columns else hist_data['current_price'],
+                'daily_return': daily_returns
+            })
+            
+            return EnhancedFundData._calculate_metrics(daily_returns, calc_data)
+            
+        except Exception as e:
+            logger.error(f"计算ETF {etf_code} 绩效指标失败: {str(e)}")
+            return EnhancedFundData._get_default_metrics()
+
+
 if __name__ == "__main__":
     # 测试代码
     test_codes = ['025833', '012061']
