@@ -20,6 +20,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+from backtesting.unified_strategy_engine import UnifiedStrategyEngine
+from backtesting.strategy_evaluator import StrategyEvaluator
 from data_retrieval.enhanced_fund_data import EnhancedFundData
 
 # 设置日志
@@ -33,16 +35,20 @@ CORS(app)
 # 初始化组件
 db_manager = None
 strategy_engine = None
+unified_strategy_engine = None
+strategy_evaluator = None
 fund_data_manager = None
 
 def init_components():
     """初始化系统组件"""
-    global db_manager, strategy_engine, fund_data_manager
+    global db_manager, strategy_engine, unified_strategy_engine, strategy_evaluator, fund_data_manager
     try:
         db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
         strategy_engine = EnhancedInvestmentStrategy()
+        unified_strategy_engine = UnifiedStrategyEngine()
+        strategy_evaluator = StrategyEvaluator()
         fund_data_manager = EnhancedFundData()
-        logger.info("系统组件初始化完成")
+        logger.info("系统组件初始化完成（含统一策略引擎）")
     except Exception as e:
         logger.error(f"系统组件初始化失败: {str(e)}")
 
@@ -501,33 +507,133 @@ def get_strategies():
 
 @app.route('/api/strategy/analyze', methods=['POST'])
 def analyze_strategy():
-    """执行策略分析"""
+    """执行策略分析（使用统一策略引擎）"""
     try:
         data = request.get_json()
         today_return = data.get('today_return', 0)
         prev_day_return = data.get('prev_day_return', 0)
+        returns_history = data.get('returns_history', None)
+        cumulative_pnl = data.get('cumulative_pnl', None)
         performance_metrics = data.get('performance_metrics', None)
-        result = strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
-        return jsonify({'success': True, 'data': result})
+        
+        # 使用统一策略引擎进行分析
+        result = unified_strategy_engine.analyze(
+            today_return=today_return,
+            prev_day_return=prev_day_return,
+            returns_history=returns_history,
+            cumulative_pnl=cumulative_pnl,
+            performance_metrics=performance_metrics
+        )
+        
+        # 转换为字典格式
+        result_dict = unified_strategy_engine.to_dict(result)
+        
+        return jsonify({'success': True, 'data': result_dict})
     except Exception as e:
         logger.error(f"策略分析失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@app.route('/api/strategy/unified-analyze', methods=['POST'])
+def unified_analyze_strategy():
+    """统一策略分析（包含止损、趋势、波动率调整）"""
+    try:
+        data = request.get_json()
+        fund_code = data.get('fund_code')
+        today_return = data.get('today_return', 0)
+        prev_day_return = data.get('prev_day_return', 0)
+        cumulative_pnl = data.get('cumulative_pnl', None)
+        
+        # 获取历史收益率数据
+        returns_history = None
+        if fund_code:
+            try:
+                hist_data = fund_data_manager.get_historical_data(fund_code, days=30)
+                if hist_data is not None and not hist_data.empty and 'nav' in hist_data.columns:
+                    hist_data = hist_data.sort_values('date')
+                    navs = hist_data['nav'].values
+                    if len(navs) > 1:
+                        returns_history = [(navs[i] - navs[i-1]) / navs[i-1] for i in range(1, len(navs))]
+            except Exception as e:
+                logger.warning(f"获取历史数据失败: {str(e)}")
+        
+        # 使用统一策略引擎
+        result = unified_strategy_engine.analyze(
+            today_return=today_return,
+            prev_day_return=prev_day_return,
+            returns_history=returns_history,
+            cumulative_pnl=cumulative_pnl
+        )
+        
+        result_dict = unified_strategy_engine.to_dict(result)
+        
+        return jsonify({'success': True, 'data': result_dict})
+    except Exception as e:
+        logger.error(f"统一策略分析失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy/config', methods=['GET'])
+def get_strategy_config():
+    """获取策略配置"""
+    try:
+        config = unified_strategy_engine.config
+        return jsonify({
+            'success': True,
+            'data': {
+                'stop_loss': config.get_stop_loss_config(),
+                'volatility': config.get_volatility_config(),
+                'trend': config.get_trend_config(),
+                'risk_metrics': config.get_risk_metrics_config()
+            }
+        })
+    except Exception as e:
+        logger.error(f"获取策略配置失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy/evaluate', methods=['POST'])
+def evaluate_strategy():
+    """评估策略有效性"""
+    try:
+        data = request.get_json()
+        trades = data.get('trades', [])
+        
+        if not trades:
+            return jsonify({'success': False, 'error': '没有交易数据'}), 400
+        
+        result = strategy_evaluator.evaluate(trades)
+        result_dict = strategy_evaluator.to_dict(result)
+        
+        # 清理 Infinity 值（JSON 不支持）
+        import math
+        for key, value in result_dict.items():
+            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
+                result_dict[key] = None
+        
+        return jsonify({'success': True, 'data': result_dict})
+    except Exception as e:
+        logger.error(f"策略评估失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/strategy/backtest', methods=['POST'])
 def backtest_strategy():
-    """策略回测"""
+    """策略回测（使用统一策略引擎）"""
     try:
         data = request.get_json()
         fund_code = data.get('fund_code')
         initial_amount = data.get('initial_amount', 10000)
         days = data.get('days', 90)
+        base_invest = data.get('base_invest', 100)  # 基准定投金额
         
         if not fund_code:
             return jsonify({'success': False, 'error': '请输入基金代码'})
         
+        # 获取历史数据
         sql = f"""
-        SELECT analysis_date, today_return, prev_day_return, status_label, 
-               operation_suggestion, buy_multiplier, redeem_amount
+        SELECT analysis_date, today_return, prev_day_return, yesterday_return,
+               status_label, operation_suggestion, buy_multiplier, redeem_amount,
+               current_estimate as current_nav, yesterday_nav as previous_nav
         FROM fund_analysis_results WHERE fund_code = '{fund_code}'
         ORDER BY analysis_date DESC LIMIT {days}
         """
@@ -537,45 +643,125 @@ def backtest_strategy():
             return jsonify({'success': False, 'error': f'没有找到基金 {fund_code} 的历史数据'})
         
         df = df.sort_values('analysis_date', ascending=True)
+        
+        # 准备历史收益率序列
+        returns_history = []
         balance = initial_amount
         holdings = 0
         trades = []
+        cumulative_pnl = 0.0
         
-        for _, row in df.iterrows():
+        for idx, row in df.iterrows():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
-            buy_multiplier = float(row['buy_multiplier']) if pd.notna(row['buy_multiplier']) else 0
-            redeem_amount = float(row['redeem_amount']) if pd.notna(row['redeem_amount']) else 0
+            prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0
             
+            # 更新历史收益率
+            returns_history.append(today_return / 100)  # 转换为小数
+            
+            # 计算累计盈亏率
+            if holdings > 0:
+                cumulative_pnl = (holdings - initial_amount + balance) / initial_amount - 1
+            
+            # 使用统一策略引擎分析
+            result = unified_strategy_engine.analyze(
+                today_return=today_return,
+                prev_day_return=prev_day_return,
+                returns_history=returns_history[-30:] if len(returns_history) > 30 else returns_history,
+                cumulative_pnl=cumulative_pnl if holdings > 0 else None
+            )
+            
+            # 检查止损
+            if result.stop_loss_triggered:
+                if holdings > 0:
+                    balance += holdings
+                    trades.append({
+                        'date': str(row['analysis_date']),
+                        'action': 'stop_loss',
+                        'amount': holdings,
+                        'balance': round(balance, 2),
+                        'holdings': 0,
+                        'profit': holdings - (initial_amount - balance),
+                        'reason': result.stop_loss_label
+                    })
+                    holdings = 0
+                continue
+            
+            # 执行买入
+            buy_multiplier = result.final_buy_multiplier
             if buy_multiplier > 0:
-                buy_amount = 100 * buy_multiplier
+                buy_amount = base_invest * buy_multiplier
                 if balance >= buy_amount:
                     balance -= buy_amount
                     holdings += buy_amount
-                    trades.append({'date': str(row['analysis_date']), 'action': 'buy', 'amount': buy_amount,
-                                   'balance': round(balance, 2), 'holdings': round(holdings, 2)})
+                    trades.append({
+                        'date': str(row['analysis_date']),
+                        'action': 'buy',
+                        'amount': buy_amount,
+                        'balance': round(balance, 2),
+                        'holdings': round(holdings, 2),
+                        'profit': 0,
+                        'multiplier': buy_multiplier,
+                        'trend': result.trend,
+                        'volatility_adj': result.volatility_adjustment
+                    })
             
+            # 执行赎回
+            redeem_amount = result.redeem_amount
             if redeem_amount > 0 and holdings >= redeem_amount:
                 holdings -= redeem_amount
                 balance += redeem_amount
-                trades.append({'date': str(row['analysis_date']), 'action': 'sell', 'amount': redeem_amount,
-                               'balance': round(balance, 2), 'holdings': round(holdings, 2)})
+                trades.append({
+                    'date': str(row['analysis_date']),
+                    'action': 'sell',
+                    'amount': redeem_amount,
+                    'balance': round(balance, 2),
+                    'holdings': round(holdings, 2),
+                    'profit': 0
+                })
             
-            holdings *= (1 + today_return)
+            # 更新持仓价值
+            holdings *= (1 + today_return / 100)
         
+        # 计算最终结果
         total_value = balance + holdings
         total_return = (total_value - initial_amount) / initial_amount * 100
+        
+        # 计算交易盈亏
+        for i, trade in enumerate(trades):
+            if trade['action'] == 'sell' or trade['action'] == 'stop_loss':
+                # 简化计算：假设卖出时的盈亏
+                trade['profit'] = trade['amount'] * (total_return / 100) / len([t for t in trades if t['action'] in ['sell', 'stop_loss']] or [1])
+        
+        # 使用策略评估器评估
+        evaluation = strategy_evaluator.evaluate(trades)
+        evaluation_dict = strategy_evaluator.to_dict(evaluation)
+        
+        # 清理 Infinity 值（JSON 不支持）
+        import math
+        for key, value in evaluation_dict.items():
+            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
+                evaluation_dict[key] = None
         
         return jsonify({
             'success': True,
             'data': {
-                'fund_code': fund_code, 'initial_amount': initial_amount,
-                'final_balance': round(balance, 2), 'final_holdings': round(holdings, 2),
-                'total_value': round(total_value, 2), 'total_return': round(total_return, 2),
-                'trades_count': len(trades), 'trades': trades, 'backtest_days': days, 'data_count': len(df)
+                'fund_code': fund_code,
+                'initial_amount': initial_amount,
+                'final_balance': round(balance, 2),
+                'final_holdings': round(holdings, 2),
+                'total_value': round(total_value, 2),
+                'total_return': round(total_return, 2),
+                'trades_count': len(trades),
+                'trades': trades,
+                'backtest_days': days,
+                'data_count': len(df),
+                'evaluation': evaluation_dict
             }
         })
     except Exception as e:
         logger.error(f"策略回测失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/summary', methods=['GET'])
