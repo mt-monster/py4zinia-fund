@@ -331,6 +331,159 @@ def get_fund_history(fund_code):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/fund/<fund_code>/holdings', methods=['GET'])
+def get_fund_holdings(fund_code):
+    """获取基金持仓数据（股票持仓）"""
+    try:
+        import akshare as ak
+        
+        # 使用akshare获取基金持仓数据
+        # fund_portfolio_hold_em: 天天基金网-基金档案-投资组合-基金持仓
+        try:
+            holdings_df = ak.fund_portfolio_hold_em(symbol=fund_code, date="2024")
+            
+            if holdings_df is None or holdings_df.empty:
+                # 尝试获取2023年数据
+                holdings_df = ak.fund_portfolio_hold_em(symbol=fund_code, date="2023")
+            
+            if holdings_df is not None and not holdings_df.empty:
+                # 只取最新一期的前10大持仓
+                # 按季度分组，取最新季度
+                if '季度' in holdings_df.columns:
+                    latest_quarter = holdings_df['季度'].iloc[0]
+                    holdings_df = holdings_df[holdings_df['季度'] == latest_quarter]
+                
+                holdings = []
+                total_ratio = 0
+                
+                for _, row in holdings_df.head(10).iterrows():
+                    stock_code = str(row.get('股票代码', ''))
+                    stock_name = str(row.get('股票名称', ''))
+                    ratio = row.get('占净值比例', 0)
+                    ratio_change = row.get('较上期变化', None)
+                    
+                    # 清理数据
+                    if pd.notna(ratio):
+                        ratio = float(ratio)
+                        total_ratio += ratio
+                    else:
+                        ratio = None
+                    
+                    if pd.notna(ratio_change):
+                        ratio_change = float(ratio_change)
+                    else:
+                        ratio_change = None
+                    
+                    holdings.append({
+                        'stock_code': stock_code,
+                        'stock_name': stock_name,
+                        'ratio': round(ratio, 2) if ratio else None,
+                        'ratio_change': round(ratio_change, 2) if ratio_change else None,
+                        'stock_return': None,  # 暂不获取实时涨幅，避免超时
+                        'change_direction': 'up' if ratio_change and ratio_change > 0 else ('down' if ratio_change and ratio_change < 0 else 'new' if ratio_change is None else 'same')
+                    })
+                
+                # 获取更新日期
+                update_date = None
+                if '季度' in holdings_df.columns:
+                    update_date = str(holdings_df['季度'].iloc[0])
+                
+                return jsonify({
+                    'success': True, 
+                    'data': {
+                        'holdings': holdings,
+                        'total_ratio': round(total_ratio, 2),
+                        'update_date': update_date
+                    }
+                })
+        except Exception as e:
+            logger.warning(f"从akshare获取基金持仓失败: {str(e)}")
+        
+        return jsonify({'success': True, 'data': {'holdings': [], 'total_ratio': 0, 'update_date': None}})
+        
+    except Exception as e:
+        logger.error(f"获取基金持仓失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/fund/<fund_code>/stage-returns', methods=['GET'])
+def get_fund_stage_returns(fund_code):
+    """获取基金阶段涨幅数据（与沪深300对比）"""
+    try:
+        from datetime import datetime, timedelta
+        today = datetime.now()
+        
+        # 定义各阶段的天数
+        stages = {
+            'week': 7,
+            'month': 30,
+            'quarter': 90,
+            'half_year': 180,
+            'year': 365,
+            'three_year': 1095
+        }
+        
+        result = {}
+        
+        # 获取基金历史数据
+        try:
+            fund_hist = fund_data_manager.get_historical_data(fund_code, days=1100)
+            if fund_hist is not None and not fund_hist.empty:
+                fund_hist = fund_hist.dropna(subset=['nav'])
+                fund_hist = fund_hist.sort_values('date')
+                
+                if not fund_hist.empty:
+                    latest_nav = fund_hist.iloc[-1]['nav']
+                    
+                    for stage_name, days in stages.items():
+                        target_date = today - timedelta(days=days)
+                        # 找到最接近目标日期的数据
+                        past_data = fund_hist[fund_hist['date'] <= target_date]
+                        if not past_data.empty:
+                            past_nav = past_data.iloc[-1]['nav']
+                            if past_nav and past_nav != 0:
+                                stage_return = ((latest_nav - past_nav) / past_nav) * 100
+                                result[f'{stage_name}_return'] = round(stage_return, 2)
+                            else:
+                                result[f'{stage_name}_return'] = None
+                        else:
+                            result[f'{stage_name}_return'] = None
+        except Exception as e:
+            logger.warning(f"获取基金阶段涨幅失败: {str(e)}")
+        
+        # 获取沪深300数据作为对比
+        try:
+            import akshare as ak
+            hs300_hist = ak.index_zh_a_hist(symbol="000300", period="daily", 
+                                           start_date=(today - timedelta(days=1100)).strftime('%Y%m%d'),
+                                           end_date=today.strftime('%Y%m%d'))
+            if hs300_hist is not None and not hs300_hist.empty:
+                hs300_hist['date'] = pd.to_datetime(hs300_hist['日期'])
+                hs300_hist = hs300_hist.sort_values('date')
+                latest_close = hs300_hist.iloc[-1]['收盘']
+                
+                for stage_name, days in stages.items():
+                    target_date = today - timedelta(days=days)
+                    past_data = hs300_hist[hs300_hist['date'] <= target_date]
+                    if not past_data.empty:
+                        past_close = past_data.iloc[-1]['收盘']
+                        if past_close and past_close != 0:
+                            stage_return = ((latest_close - past_close) / past_close) * 100
+                            result[f'hs300_{stage_name}_return'] = round(stage_return, 2)
+                        else:
+                            result[f'hs300_{stage_name}_return'] = None
+                    else:
+                        result[f'hs300_{stage_name}_return'] = None
+        except Exception as e:
+            logger.warning(f"获取沪深300阶段涨幅失败: {str(e)}")
+        
+        return jsonify({'success': True, 'data': result})
+        
+    except Exception as e:
+        logger.error(f"获取阶段涨幅失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/strategies', methods=['GET'])
 def get_strategies():
     """获取可用的策略列表"""

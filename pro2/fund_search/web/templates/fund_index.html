@@ -115,6 +115,21 @@
             font-size: 13px;
         }
         .toolbar .btn-filter:hover { background: #c0392b; }
+        .toolbar .btn-settings {
+            background: transparent;
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s;
+        }
+        .toolbar .btn-settings:hover {
+            background: #f5f5f5;
+            border-color: #bbb;
+            color: #333;
+        }
         /* 表格样式 */
         .table-wrapper {
             flex: 1;
@@ -895,6 +910,9 @@
                 <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
                     共 <span id="total-count">0</span> 只基金
                 </span>
+                <button class="btn-settings" onclick="openSettingsModal()" title="表头管理">
+                    <i class="bi bi-gear"></i>
+                </button>
             </div>
 
             <!-- 表格 -->
@@ -1165,13 +1183,88 @@
             renderTableRows(funds) {
                 const tbody = document.getElementById('fund-table-body');
                 
+                // 获取列配置（如果存在）
+                const config = typeof columnConfig !== 'undefined' ? columnConfig : null;
+                const visibleColCount = config ? config.filter(c => c.visible).length + 1 : 15; // +1 for checkbox
+                
                 if (!funds || funds.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = `<tr><td colspan="${visibleColCount}" class="empty-state">暂无数据</td></tr>`;
                     return;
                 }
 
                 // 使用文档片段提高性能
                 const fragment = document.createDocumentFragment();
+                
+                // 定义列数据映射
+                const columnDataMap = {
+                    'fund_code': (fund) => ({ value: fund.fund_code, class: 'fund-code' }),
+                    'fund_name': (fund) => ({ value: this.truncate(fund.fund_name || '--', 12), class: '' }),
+                    'today_return': (fund) => {
+                        const val = fund.today_return || 0;
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'yesterday_return': (fund) => {
+                        const val = fund.yesterday_return || 0;
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'holding_amount': (fund) => ({ value: fund.holding_amount != null ? fund.holding_amount.toFixed(2) : '--', class: '' }),
+                    'today_profit': (fund) => {
+                        const val = fund.today_profit;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: val.toFixed(2), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'today_profit_rate': (fund) => {
+                        const val = fund.today_profit_rate;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'yesterday_profit': (fund) => {
+                        const val = fund.yesterday_profit;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: val.toFixed(2), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'yesterday_profit_rate': (fund) => {
+                        const val = fund.yesterday_profit_rate;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'holding_profit': (fund) => {
+                        const val = fund.holding_profit;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: val.toFixed(2), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'holding_profit_rate': (fund) => {
+                        const val = fund.holding_profit_rate;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'total_profit': (fund) => {
+                        const val = fund.total_profit;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: val.toFixed(2), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'total_profit_rate': (fund) => {
+                        const val = fund.total_profit_rate;
+                        if (val == null) return { value: '--', class: '' };
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'annualized_return': (fund) => {
+                        const val = fund.annualized_return || 0;
+                        return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
+                    },
+                    'sharpe_ratio': (fund) => {
+                        const val = fund.sharpe_ratio || 0;
+                        return { value: val.toFixed(2), class: '' };
+                    },
+                    'max_drawdown': (fund) => {
+                        const val = fund.max_drawdown || 0;
+                        return { value: this.formatPercent(val), class: 'negative' };
+                    },
+                    'composite_score': (fund) => {
+                        const val = fund.composite_score || 0;
+                        return { value: `<strong>${val.toFixed(4)}</strong>`, class: '' };
+                    }
+                };
                 
                 funds.forEach((fund, index) => {
                     const tr = document.createElement('tr');
@@ -1194,37 +1287,54 @@
                     tr.style.cursor = 'pointer';
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
                     
-                    const todayReturn = fund.today_return || 0;
-                    const yesterdayReturn = fund.yesterday_return || 0;
-                    const annualReturn = fund.annualized_return || 0;
-                    const maxDrawdown = fund.max_drawdown || 0;
-                    const sharpe = fund.sharpe_ratio || 0;
-                    const score = fund.composite_score || 0;
+                    // 生成单元格HTML
+                    let cellsHtml = '<td data-column="checkbox"><input type="checkbox"></td>';
                     
-                    tr.innerHTML = `
-                        <td><input type="checkbox"></td>
-                        <td class="fund-code">${fund.fund_code}</td>
-                        <td>${this.truncate(fund.fund_name || '--', 12)}</td>
-                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
-                        <td class="${yesterdayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(yesterdayReturn)}</td>
-                        <td>--</td>
-                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">--</td>
-                        <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">--</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
-                        <td>--</td>
-                        <td class="${annualReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(annualReturn)}</td>
-                        <td>${sharpe.toFixed(2)}</td>
-                        <td class="negative">${this.formatPercent(maxDrawdown)}</td>
-                        <td><strong>${score.toFixed(4)}</strong></td>
-                    `;
+                    if (config) {
+                        // 使用列配置生成单元格
+                        config.forEach(col => {
+                            const display = col.visible ? '' : 'style="display: none;"';
+                            const dataFn = columnDataMap[col.key];
+                            if (dataFn) {
+                                const data = dataFn(fund);
+                                cellsHtml += `<td data-column="${col.key}" class="${data.class}" ${display}>${data.value}</td>`;
+                            }
+                        });
+                    } else {
+                        // 默认列顺序（兼容旧代码）
+                        const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'yesterday_return', 
+                            'holding_amount', 'today_profit', 'today_profit_rate', 'holding_profit', 
+                            'holding_profit_rate', 'total_profit', 'total_profit_rate', 'sharpe_ratio', 
+                            'max_drawdown', 'composite_score'];
+                        defaultOrder.forEach(key => {
+                            const dataFn = columnDataMap[key];
+                            if (dataFn) {
+                                const data = dataFn(fund);
+                                cellsHtml += `<td data-column="${key}" class="${data.class}">${data.value}</td>`;
+                            }
+                        });
+                    }
                     
+                    tr.innerHTML = cellsHtml;
                     fragment.appendChild(tr);
                 });
                 
                 // 一次性添加所有行，提高性能
                 tbody.innerHTML = '';
                 tbody.appendChild(fragment);
+            }
+            
+            // 更新表头显示状态（仅更新显示/隐藏，不改变顺序）
+            updateHeaderVisibility(config) {
+                const headerRow = document.querySelector('.fund-table thead tr');
+                if (!headerRow) return;
+                
+                config.forEach(col => {
+                    const th = headerRow.querySelector(`th[data-column="${col.key}"]`);
+                    if (th) {
+                        th.style.display = col.visible ? '' : 'none';
+                    }
+                });
             }
 
             // 辅助方法：格式化百分比
@@ -2266,6 +2376,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initDatePicker();
             initSorting();  // 初始化排序功能
+            initColumnConfig();  // 初始化列配置
             loadFunds();
             
             document.getElementById('search-input').addEventListener('keypress', function(e) {
@@ -2284,6 +2395,21 @@
             });
             */
         });
+        
+        // 初始化列配置
+        function initColumnConfig() {
+            // 从localStorage加载列配置
+            const savedConfig = localStorage.getItem('fundColumnConfig');
+            if (savedConfig) {
+                try {
+                    columnConfig = JSON.parse(savedConfig);
+                    // 应用保存的列配置到表头
+                    updateTableColumns();
+                } catch (e) {
+                    console.error('加载列配置失败:', e);
+                }
+            }
+        }
 
         // 初始化排序功能
         function initSorting() {
@@ -2574,10 +2700,12 @@
         let resizeStartX = 0;
         let resizeStartWidth = 0;
         let sidebarChart = null;
+        let currentChartType = 'trend'; // 'trend' = 业绩走势, 'nav' = 单位净值
 
         // 显示基金详情侧边栏
         async function showFundSidebar(fund) {
             currentSidebarFund = fund;
+            currentChartType = 'trend'; // 重置图表类型为业绩走势
             const sidebar = document.getElementById('fund-sidebar');
             const sidebarContent = document.getElementById('sidebar-content');
             
@@ -2616,65 +2744,669 @@
         async function generateSidebarContent(fund) {
             const todayReturn = fund.today_return || 0;
             const yearReturn = fund.annualized_return || 0;
+            const todayReturnColor = todayReturn >= 0 ? '#e74c3c' : '#27ae60';
+            const yearReturnColor = yearReturn >= 0 ? '#e74c3c' : '#27ae60';
             
             return `
                 <!-- 页面头部 -->
                 <div style="background: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ecf0f1; position: sticky; top: 0; z-index: 100;">
                     <button style="background: none; border: none; font-size: 1.2rem; color: #333; cursor: pointer; padding: 8px;" onclick="hideSidebar()">
-                        <i class="bi bi-chevron-left"></i>
+                        <i class="bi bi-x-lg"></i>
                     </button>
                     <div style="flex: 1; text-align: center;">
                         <h1 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: #333;">${fund.fund_name || fund.fund_code}</h1>
                         <div style="font-size: 0.8rem; color: #7f8c8d; margin-top: 2px;">${fund.fund_code}</div>
                     </div>
                     <button style="background: #ff6b6b; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; cursor: pointer;">
-                        <i class="bi bi-plus"></i> 加自选
+                        加自选
                     </button>
                 </div>
 
                 <!-- 核心指标区域 -->
-                <div style="background: white; padding: 20px 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <div style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 4px;">当日涨幅</div>
-                        <div style="font-size: 2.5rem; font-weight: bold; color: ${todayReturn >= 0 ? '#e74c3c' : '#27ae60'};">
-                            ${todayReturn >= 0 ? '+' : ''}${todayReturn.toFixed(2)}%
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div style="background: white; padding: 16px; border-bottom: 1px solid #ecf0f1;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="flex: 1;">
-                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 4px;">近一年</div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: ${yearReturn >= 0 ? '#e74c3c' : '#27ae60'};">
-                                ${yearReturn >= 0 ? '+' : ''}${yearReturn.toFixed(2)}%
+                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 4px;">当日涨幅</div>
+                            <div style="font-size: 2rem; font-weight: bold; color: ${todayReturnColor};">
+                                ${todayReturn >= 0 ? '+' : ''}${todayReturn.toFixed(2)}%
                             </div>
                         </div>
-                        <div style="flex: 1;">
-                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 4px;">最新净值</div>
-                            <div style="font-size: 1.1rem; font-weight: 600; color: #333;">
-                                ${fund.current_nav ? fund.current_nav.toFixed(4) : '--'}
+                        <div style="text-align: right;">
+                            <div style="margin-bottom: 4px;">
+                                <span style="font-size: 0.75rem; color: #7f8c8d; margin-right: 8px;">近一年</span>
+                                <span style="font-size: 1rem; font-weight: 600; color: ${yearReturnColor};">
+                                    ${yearReturn >= 0 ? '+' : ''}${yearReturn.toFixed(2)}%
+                                </span>
+                            </div>
+                            <div>
+                                <span style="font-size: 0.75rem; color: #7f8c8d; margin-right: 8px;">最新净值</span>
+                                <span style="font-size: 1rem; font-weight: 600; color: #333;">
+                                    ${fund.current_nav ? fund.current_nav.toFixed(4) : '--'}
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 简单的持仓信息 -->
-                <div style="background: white; padding: 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; padding: 20px; color: #7f8c8d;">
-                        <i class="bi bi-inbox"></i> 暂无持仓数据
+                <!-- 持仓信息区域 -->
+                <div id="sidebar-holding-section" style="background: white; padding: 16px; border-bottom: 8px solid #f5f6fa;">
+                    <div id="sidebar-holding-grid" style="display: none;">
+                        <div style="display: flex; margin-bottom: 12px;">
+                            <div style="flex: 1; display: flex;">
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">当日盈亏</div>
+                                    <div id="sidebar-today-profit" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">当日盈亏率</div>
+                                    <div id="sidebar-today-profit-rate" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                            </div>
+                            <div style="width: 1px; background: #ecf0f1; margin: 0 16px;"></div>
+                            <div style="flex: 1; display: flex;">
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">持有盈亏</div>
+                                    <div id="sidebar-holding-profit" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">持有盈亏率</div>
+                                    <div id="sidebar-holding-profit-rate" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex;">
+                            <div style="flex: 1; display: flex;">
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">持有金额</div>
+                                    <div id="sidebar-holding-amount" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">累计盈亏</div>
+                                    <div id="sidebar-total-profit" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                            </div>
+                            <div style="width: 1px; background: #ecf0f1; margin: 0 16px;"></div>
+                            <div style="flex: 1; display: flex;">
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">持有份额</div>
+                                    <div id="sidebar-holding-shares" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                                <div style="flex: 1; padding: 0 8px;">
+                                    <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 2px;">持仓成本</div>
+                                    <div id="sidebar-holding-cost" style="font-size: 0.95rem; font-weight: 600;">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="sidebar-no-holding" style="text-align: center; padding: 20px; color: #7f8c8d;">
+                        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+                        <div>暂无持仓数据</div>
                     </div>
                 </div>
 
-                <!-- 图表区域占位 -->
-                <div style="background: white; padding: 16px; border-bottom: 8px solid #f5f6fa;">
-                    <div style="text-align: center; padding: 40px; color: #7f8c8d;">
-                        <i class="bi bi-graph-up"></i> 图表功能开发中...
+                <!-- 图表区域 -->
+                <div style="background: white; border-bottom: 8px solid #f5f6fa;">
+                    <div style="display: flex; border-bottom: 1px solid #ecf0f1; padding: 0 16px;">
+                        <div class="sidebar-chart-tab active" data-type="trend" style="padding: 12px 16px; font-size: 0.9rem; color: #e74c3c; cursor: pointer; border-bottom: 2px solid #e74c3c;">业绩走势</div>
+                        <div class="sidebar-chart-tab" data-type="nav" style="padding: 12px 16px; font-size: 0.9rem; color: #7f8c8d; cursor: pointer; border-bottom: 2px solid transparent;">单位净值</div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; padding: 8px 16px; font-size: 0.8rem; gap: 16px;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #e74c3c;"></span>
+                            <span>本基金 <span id="sidebar-fund-return" style="color: #e74c3c;">--</span></span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 16px 16px; height: 220px;">
+                        <canvas id="sidebar-chart"></canvas>
+                    </div>
+                    <div style="display: flex; justify-content: center; padding: 12px 16px; gap: 8px; border-top: 1px solid #ecf0f1;">
+                        <button class="sidebar-period-btn" data-period="1m" style="padding: 6px 14px; border: 1px solid #ecf0f1; border-radius: 20px; background: white; font-size: 0.85rem; color: #666; cursor: pointer;">近一月</button>
+                        <button class="sidebar-period-btn" data-period="6m" style="padding: 6px 14px; border: 1px solid #ecf0f1; border-radius: 20px; background: white; font-size: 0.85rem; color: #666; cursor: pointer;">近半年</button>
+                        <button class="sidebar-period-btn active" data-period="1y" style="padding: 6px 14px; border: 1px solid #3498db; border-radius: 20px; background: #3498db; font-size: 0.85rem; color: white; cursor: pointer;">近一年</button>
+                        <button class="sidebar-period-btn" data-period="ytd" style="padding: 6px 14px; border: 1px solid #ecf0f1; border-radius: 20px; background: white; font-size: 0.85rem; color: #666; cursor: pointer;">今年来</button>
+                    </div>
+                </div>
+
+                <!-- 标签页导航 -->
+                <div style="background: white; display: flex; border-bottom: 1px solid #ecf0f1;">
+                    <div class="sidebar-tab-nav" data-tab="stage-returns" style="flex: 1; text-align: center; padding: 14px 0; font-size: 0.9rem; color: #7f8c8d; cursor: pointer; position: relative;">阶段涨幅</div>
+                    <div class="sidebar-tab-nav" data-tab="fund-holdings" style="flex: 1; text-align: center; padding: 14px 0; font-size: 0.9rem; color: #7f8c8d; cursor: pointer; position: relative;">基金持仓</div>
+                    <div class="sidebar-tab-nav active" data-tab="nav-history" style="flex: 1; text-align: center; padding: 14px 0; font-size: 0.9rem; color: #333; font-weight: 600; cursor: pointer; position: relative;">
+                        历史净值
+                        <span style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 3px; background: #e74c3c; border-radius: 2px;"></span>
+                    </div>
+                    <div class="sidebar-tab-nav" data-tab="transactions" style="flex: 1; text-align: center; padding: 14px 0; font-size: 0.9rem; color: #7f8c8d; cursor: pointer; position: relative;">交易记录</div>
+                </div>
+
+                <!-- 标签页内容 -->
+                <div style="background: white;">
+                    <!-- 阶段涨幅 -->
+                    <div id="sidebar-stage-returns" class="sidebar-tab-pane" style="display: none;">
+                        <div style="display: flex; padding: 12px 16px; background: #fafafa; font-size: 0.8rem; color: #7f8c8d; border-bottom: 1px solid #ecf0f1;">
+                            <span style="flex: 1; text-align: left;">日期</span>
+                            <span style="flex: 1; text-align: center;">涨跌幅</span>
+                            <span style="flex: 1; text-align: right;">沪深300</span>
+                        </div>
+                        <div id="sidebar-stage-returns-list">
+                            <div style="text-align: center; padding: 40px; color: #7f8c8d;">加载中...</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 基金持仓 -->
+                    <div id="sidebar-fund-holdings" class="sidebar-tab-pane" style="display: none; max-height: 350px; overflow-y: auto;">
+                        <div id="sidebar-holdings-header" style="padding: 8px 16px; background: #fafafa; border-bottom: 1px solid #ecf0f1;">
+                            <span style="font-size: 0.85rem; color: #333;">重仓股票 <span id="sidebar-total-ratio" style="color: #e74c3c;">--</span></span>
+                            <span id="sidebar-holdings-date" style="float: right; font-size: 0.75rem; color: #7f8c8d;">更新于--</span>
+                        </div>
+                        <div style="display: flex; padding: 10px 16px; background: #fafafa; font-size: 0.75rem; color: #7f8c8d; border-bottom: 1px solid #ecf0f1;">
+                            <span style="flex: 2; text-align: left;">股票名称</span>
+                            <span style="flex: 1; text-align: center;">涨幅</span>
+                            <span style="flex: 1; text-align: center;">持仓占比</span>
+                            <span style="flex: 1; text-align: right;">较上期占比</span>
+                        </div>
+                        <div id="sidebar-holdings-list">
+                            <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                                <div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>
+                                加载中...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 历史净值 -->
+                    <div id="sidebar-nav-history" class="sidebar-tab-pane active" style="max-height: 300px; overflow-y: auto;">
+                        <div style="display: flex; padding: 12px 16px; background: #fafafa; font-size: 0.8rem; color: #7f8c8d; position: sticky; top: 0;">
+                            <span style="flex: 1; text-align: left;">日期</span>
+                            <span style="flex: 1; text-align: center;">单位净值</span>
+                            <span style="flex: 1; text-align: right;">日涨幅</span>
+                        </div>
+                        <div id="sidebar-nav-history-list">
+                            <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: #7f8c8d;">
+                                <div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px;"></div>
+                                <div>加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 交易记录 -->
+                    <div id="sidebar-transactions" class="sidebar-tab-pane" style="display: none;">
+                        <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                            <i class="bi bi-receipt" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+                            <div>暂无交易记录</div>
+                        </div>
                     </div>
                 </div>
             `;
         }
 
-        // 初始化侧边栏功能（简化版）
-        function initializeSidebarFeatures(fund) {
-            // 这里可以添加更多功能
+        // 初始化侧边栏功能
+        async function initializeSidebarFeatures(fund) {
+            // 加载持仓数据
+            await loadSidebarHolding(fund.fund_code);
+            
+            // 加载图表数据
+            await loadSidebarChart(fund.fund_code, '1y');
+            
+            // 加载历史净值
+            await loadSidebarNavHistory(fund.fund_code, '1y');
+            
+            // 加载阶段涨幅
+            loadSidebarStageReturns(fund);
+            
+            // 加载基金持仓（股票持仓）
+            loadSidebarFundHoldings(fund.fund_code);
+            
+            // 绑定时间周期按钮事件
+            document.querySelectorAll('.sidebar-period-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const period = btn.dataset.period;
+                    document.querySelectorAll('.sidebar-period-btn').forEach(b => {
+                        b.style.background = 'white';
+                        b.style.color = '#666';
+                        b.style.borderColor = '#ecf0f1';
+                    });
+                    btn.style.background = '#3498db';
+                    btn.style.color = 'white';
+                    btn.style.borderColor = '#3498db';
+                    await loadSidebarChart(fund.fund_code, period);
+                    await loadSidebarNavHistory(fund.fund_code, period);
+                });
+            });
+            
+            // 绑定图表类型切换事件（业绩走势/单位净值）
+            document.querySelectorAll('.sidebar-chart-tab').forEach(tab => {
+                tab.addEventListener('click', async () => {
+                    const chartType = tab.dataset.type;
+                    currentChartType = chartType;
+                    
+                    // 更新标签页样式
+                    document.querySelectorAll('.sidebar-chart-tab').forEach(t => {
+                        t.style.color = '#7f8c8d';
+                        t.style.borderBottom = '2px solid transparent';
+                    });
+                    tab.style.color = '#e74c3c';
+                    tab.style.borderBottom = '2px solid #e74c3c';
+                    
+                    // 重新渲染图表
+                    const period = document.querySelector('.sidebar-period-btn.active')?.dataset.period || '1y';
+                    await loadSidebarChart(fund.fund_code, period);
+                });
+            });
+            
+            // 绑定标签页切换事件
+            document.querySelectorAll('.sidebar-tab-nav').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.dataset.tab;
+                    document.querySelectorAll('.sidebar-tab-nav').forEach(t => {
+                        t.style.color = '#7f8c8d';
+                        t.style.fontWeight = 'normal';
+                        const indicator = t.querySelector('span');
+                        if (indicator) indicator.remove();
+                    });
+                    tab.style.color = '#333';
+                    tab.style.fontWeight = '600';
+                    const indicator = document.createElement('span');
+                    indicator.style.cssText = 'position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 3px; background: #e74c3c; border-radius: 2px;';
+                    tab.appendChild(indicator);
+                    
+                    document.querySelectorAll('.sidebar-tab-pane').forEach(pane => {
+                        pane.style.display = 'none';
+                    });
+                    document.getElementById('sidebar-' + tabId).style.display = 'block';
+                });
+            });
+        }
+        
+        // 加载侧边栏持仓数据
+        async function loadSidebarHolding(fundCode) {
+            try {
+                const res = await fetch('/api/holdings?user_id=default_user');
+                const result = await res.json();
+                if (result.success && result.data) {
+                    const holding = result.data.find(h => h.fund_code === fundCode);
+                    renderSidebarHolding(holding);
+                }
+            } catch (e) {
+                console.error('加载持仓数据失败:', e);
+            }
+        }
+        
+        // 渲染侧边栏持仓信息
+        function renderSidebarHolding(holding) {
+            const gridEl = document.getElementById('sidebar-holding-grid');
+            const noHoldingEl = document.getElementById('sidebar-no-holding');
+            
+            if (!holding) {
+                if (gridEl) gridEl.style.display = 'none';
+                if (noHoldingEl) noHoldingEl.style.display = 'block';
+                return;
+            }
+            
+            if (gridEl) gridEl.style.display = 'block';
+            if (noHoldingEl) noHoldingEl.style.display = 'none';
+            
+            const formatValue = (val, suffix = '', colorize = false) => {
+                if (val === null || val === undefined || isNaN(val)) return '--';
+                const num = parseFloat(val);
+                const color = colorize ? (num >= 0 ? '#e74c3c' : '#27ae60') : '#333';
+                const sign = colorize && num >= 0 ? '+' : '';
+                return `<span style="color: ${color};">${sign}${num.toFixed(2)}${suffix}</span>`;
+            };
+            
+            const setEl = (id, html) => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = html;
+            };
+            
+            setEl('sidebar-today-profit', formatValue(holding.today_profit, '', true));
+            setEl('sidebar-today-profit-rate', formatValue(holding.today_profit_rate, '%', true));
+            setEl('sidebar-holding-profit', formatValue(holding.holding_profit, '', true));
+            setEl('sidebar-holding-profit-rate', formatValue(holding.holding_profit_rate, '%', true));
+            setEl('sidebar-total-profit', formatValue(holding.total_profit, '', true));
+            setEl('sidebar-holding-amount', holding.holding_amount ? holding.holding_amount.toFixed(2) : '--');
+            setEl('sidebar-holding-shares', holding.holding_shares ? holding.holding_shares.toFixed(2) : '--');
+            setEl('sidebar-holding-cost', holding.cost_price && holding.holding_shares ? (holding.cost_price * holding.holding_shares).toFixed(2) : '--');
+        }
+        
+        // 加载侧边栏图表
+        async function loadSidebarChart(fundCode, period) {
+            try {
+                const res = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await res.json();
+                if (result.success && result.data && result.data.length > 0) {
+                    renderSidebarChart(result.data);
+                }
+            } catch (e) {
+                console.error('加载图表数据失败:', e);
+            }
+        }
+        
+        // 渲染侧边栏图表
+        function renderSidebarChart(data) {
+            const ctx = document.getElementById('sidebar-chart');
+            if (!ctx) return;
+            
+            if (sidebarChart) {
+                sidebarChart.destroy();
+            }
+            
+            const sortedData = [...data].sort((a, b) => 
+                (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date)
+            );
+            
+            const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
+            const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
+            
+            const firstNav = navData.find(n => n !== null) || 1;
+            const returnData = navData.map(nav => 
+                nav === null ? null : ((nav - firstNav) / firstNav * 100).toFixed(2)
+            );
+            
+            // 根据图表类型选择数据和配置
+            const isNavChart = currentChartType === 'nav';
+            const chartData = isNavChart ? navData : returnData;
+            
+            // 更新图例显示
+            const fundReturnEl = document.getElementById('sidebar-fund-return');
+            if (fundReturnEl) {
+                if (isNavChart) {
+                    // 单位净值模式：显示最新净值
+                    const lastNav = navData[navData.length - 1];
+                    fundReturnEl.textContent = lastNav ? lastNav.toFixed(4) : '--';
+                    fundReturnEl.style.color = '#333';
+                } else {
+                    // 业绩走势模式：显示涨幅
+                    const lastReturn = returnData[returnData.length - 1];
+                    if (lastReturn !== null) {
+                        const num = parseFloat(lastReturn);
+                        fundReturnEl.textContent = (num >= 0 ? '+' : '') + num.toFixed(2) + '%';
+                        fundReturnEl.style.color = num >= 0 ? '#e74c3c' : '#27ae60';
+                    } else {
+                        fundReturnEl.textContent = '--';
+                        fundReturnEl.style.color = '#333';
+                    }
+                }
+            }
+            
+            sidebarChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: isNavChart ? '单位净值' : '本基金',
+                        data: chartData,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                title: (ctx) => ctx[0].label,
+                                label: (ctx) => isNavChart 
+                                    ? `净值: ${ctx.parsed.y.toFixed(4)}`
+                                    : `涨幅: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            grid: { display: false },
+                            ticks: { maxTicksLimit: 5, color: '#999', font: { size: 10 } }
+                        },
+                        y: {
+                            display: true,
+                            position: 'right',
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { 
+                                callback: (v) => isNavChart ? v.toFixed(2) : v + '%', 
+                                color: '#999', 
+                                font: { size: 10 } 
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 加载侧边栏历史净值
+        async function loadSidebarNavHistory(fundCode, period) {
+            const listEl = document.getElementById('sidebar-nav-history-list');
+            if (!listEl) return;
+            
+            listEl.innerHTML = '<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px;"></div><div>加载中...</div></div>';
+            
+            try {
+                const res = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
+                const result = await res.json();
+                if (result.success && result.data && result.data.length > 0) {
+                    renderSidebarNavHistory(result.data);
+                } else {
+                    listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-inbox"></i><div>暂无数据</div></div>';
+                }
+            } catch (e) {
+                listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
+            }
+        }
+        
+        // 渲染侧边栏历史净值
+        function renderSidebarNavHistory(data) {
+            const listEl = document.getElementById('sidebar-nav-history-list');
+            if (!listEl || !data || data.length === 0) return;
+            
+            const sortedData = [...data].sort((a, b) => 
+                (b.date || b.analysis_date).localeCompare(a.date || a.analysis_date)
+            );
+            
+            let html = '';
+            let prevNav = null;
+            
+            // 计算日涨幅
+            const dataWithReturn = sortedData.map((item, index) => {
+                const nav = parseFloat(item.nav || item.current_nav || item.yesterday_nav) || null;
+                let dailyReturn = item.daily_return !== undefined ? item.daily_return : item.today_return;
+                
+                // 如果没有日涨幅数据，尝试从相邻数据计算
+                if (dailyReturn === undefined && nav !== null && index < sortedData.length - 1) {
+                    const nextItem = sortedData[index + 1];
+                    const nextNav = parseFloat(nextItem.nav || nextItem.current_nav || nextItem.yesterday_nav) || null;
+                    if (nextNav !== null && nextNav !== 0) {
+                        dailyReturn = ((nav - nextNav) / nextNav * 100);
+                    }
+                }
+                
+                return { ...item, calculatedReturn: dailyReturn };
+            });
+            
+            dataWithReturn.forEach(item => {
+                const date = (item.date || item.analysis_date || '').substring(0, 10);
+                const nav = parseFloat(item.nav || item.current_nav || item.yesterday_nav);
+                const navStr = nav ? nav.toFixed(4) : '--';
+                const dailyReturn = item.calculatedReturn;
+                
+                let returnStr = '--';
+                let returnColor = '#333';
+                if (dailyReturn !== null && dailyReturn !== undefined && !isNaN(dailyReturn)) {
+                    returnColor = dailyReturn >= 0 ? '#e74c3c' : '#27ae60';
+                    returnStr = (dailyReturn >= 0 ? '+' : '') + dailyReturn.toFixed(2) + '%';
+                }
+                
+                html += `<div style="display: flex; padding: 14px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.9rem;">
+                    <span style="flex: 1; text-align: left;">${date}</span>
+                    <span style="flex: 1; text-align: center;">${navStr}</span>
+                    <span style="flex: 1; text-align: right; color: ${returnColor};">${returnStr}</span>
+                </div>`;
+            });
+            
+            listEl.innerHTML = html;
+        }
+        
+        // 加载阶段涨幅数据
+        async function loadSidebarStageReturns(fund) {
+            const listEl = document.getElementById('sidebar-stage-returns-list');
+            if (!listEl) return;
+            
+            // 显示加载状态
+            listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>加载中...</div>';
+            
+            try {
+                // 调用API获取阶段涨幅数据
+                const res = await fetch(`/api/fund/${fund.fund_code}/stage-returns`);
+                const result = await res.json();
+                
+                if (result.success && result.data) {
+                    const data = result.data;
+                    
+                    // 阶段涨幅数据 - 基金和沪深300对比
+                    const stages = [
+                        { label: '近一周', fund: data.week_return, hs300: data.hs300_week_return },
+                        { label: '近一月', fund: data.month_return, hs300: data.hs300_month_return },
+                        { label: '近三月', fund: data.quarter_return, hs300: data.hs300_quarter_return },
+                        { label: '近六月', fund: data.half_year_return, hs300: data.hs300_half_year_return },
+                        { label: '近一年', fund: data.year_return, hs300: data.hs300_year_return },
+                        { label: '近三年', fund: data.three_year_return, hs300: data.hs300_three_year_return }
+                    ];
+                    
+                    renderStageReturns(stages);
+                } else {
+                    // 如果API失败，使用基金数据中的字段（如果有）
+                    const stages = [
+                        { label: '近一周', fund: fund.week_return, hs300: null },
+                        { label: '近一月', fund: fund.month_return, hs300: null },
+                        { label: '近三月', fund: fund.quarter_return, hs300: null },
+                        { label: '近六月', fund: fund.half_year_return, hs300: null },
+                        { label: '近一年', fund: fund.annualized_return, hs300: null },
+                        { label: '近三年', fund: fund.three_year_return, hs300: null }
+                    ];
+                    renderStageReturns(stages);
+                }
+            } catch (e) {
+                console.error('加载阶段涨幅失败:', e);
+                listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
+            }
+        }
+        
+        // 渲染阶段涨幅列表
+        function renderStageReturns(stages) {
+            const listEl = document.getElementById('sidebar-stage-returns-list');
+            if (!listEl) return;
+            
+            const formatReturn = (val) => {
+                if (val === null || val === undefined || isNaN(val)) return { text: '--', color: '#333' };
+                const num = parseFloat(val);
+                const color = num >= 0 ? '#e74c3c' : '#27ae60';
+                const sign = num >= 0 ? '+' : '';
+                return { text: sign + num.toFixed(2) + '%', color };
+            };
+            
+            let html = '';
+            stages.forEach(stage => {
+                const fundReturn = formatReturn(stage.fund);
+                const hs300Return = formatReturn(stage.hs300);
+                
+                html += `<div style="display: flex; padding: 14px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.9rem;">
+                    <span style="flex: 1; text-align: left; color: #333;">${stage.label}</span>
+                    <span style="flex: 1; text-align: center; color: ${fundReturn.color};">${fundReturn.text}</span>
+                    <span style="flex: 1; text-align: right; color: ${hs300Return.color};">${hs300Return.text}</span>
+                </div>`;
+            });
+            
+            listEl.innerHTML = html;
+        }
+        
+        // 加载基金持仓（股票持仓）
+        async function loadSidebarFundHoldings(fundCode) {
+            const listEl = document.getElementById('sidebar-holdings-list');
+            const totalRatioEl = document.getElementById('sidebar-total-ratio');
+            const dateEl = document.getElementById('sidebar-holdings-date');
+            
+            if (!listEl) return;
+            
+            // 显示加载状态
+            listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>加载中...</div>';
+            
+            try {
+                const res = await fetch(`/api/fund/${fundCode}/holdings`);
+                const result = await res.json();
+                
+                if (result.success && result.data && result.data.holdings && result.data.holdings.length > 0) {
+                    const data = result.data;
+                    
+                    // 更新头部信息
+                    if (totalRatioEl) {
+                        totalRatioEl.textContent = data.total_ratio ? data.total_ratio.toFixed(2) + '%' : '--';
+                    }
+                    if (dateEl && data.update_date) {
+                        dateEl.textContent = '更新于' + data.update_date;
+                    }
+                    
+                    // 渲染持仓列表
+                    renderFundHoldings(data.holdings);
+                } else {
+                    listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-pie-chart" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i><div>暂无持仓数据</div></div>';
+                    if (totalRatioEl) totalRatioEl.textContent = '--';
+                    if (dateEl) dateEl.textContent = '';
+                }
+            } catch (e) {
+                console.error('加载基金持仓失败:', e);
+                listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
+            }
+        }
+        
+        // 渲染基金持仓列表
+        function renderFundHoldings(holdings) {
+            const listEl = document.getElementById('sidebar-holdings-list');
+            if (!listEl || !holdings || holdings.length === 0) return;
+            
+            const formatReturn = (val) => {
+                if (val === null || val === undefined || isNaN(val)) return { text: '--', color: '#333' };
+                const num = parseFloat(val);
+                const color = num >= 0 ? '#e74c3c' : '#27ae60';
+                const sign = num >= 0 ? '+' : '';
+                return { text: sign + num.toFixed(2) + '%', color };
+            };
+            
+            let html = '';
+            holdings.forEach(item => {
+                const stockReturn = formatReturn(item.stock_return);
+                const ratio = item.ratio !== null ? item.ratio.toFixed(2) + '%' : '--';
+                
+                // 较上期变化显示
+                let changeHtml = '--';
+                if (item.change_direction === 'new') {
+                    changeHtml = '<span style="color: #e74c3c;">新增</span>';
+                } else if (item.ratio_change !== null) {
+                    const changeColor = item.ratio_change >= 0 ? '#e74c3c' : '#27ae60';
+                    const changeSign = item.ratio_change >= 0 ? '+' : '';
+                    const arrow = item.ratio_change >= 0 ? '↑' : '↓';
+                    changeHtml = `<span style="color: ${changeColor};">${changeSign}${item.ratio_change.toFixed(2)}%${arrow}</span>`;
+                }
+                
+                html += `<div style="display: flex; padding: 12px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.85rem; align-items: center;">
+                    <div style="flex: 2; text-align: left;">
+                        <div style="color: #333; font-weight: 500;">${item.stock_name || '--'}</div>
+                        <div style="color: #7f8c8d; font-size: 0.75rem;">${item.stock_code || ''}</div>
+                    </div>
+                    <span style="flex: 1; text-align: center; color: ${stockReturn.color};">${stockReturn.text}</span>
+                    <span style="flex: 1; text-align: center; color: #333;">${ratio}</span>
+                    <span style="flex: 1; text-align: right;">${changeHtml}</span>
+                </div>`;
+            });
+            
+            listEl.innerHTML = html;
         }
 
         // 初始化侧边栏拖拽调整大小功能
@@ -2729,5 +3461,458 @@
             <!-- 侧边栏内容将通过JavaScript动态加载 -->
         </div>
     </div>
+
+    <!-- 管理设置弹窗 -->
+    <div class="settings-modal-overlay" id="settings-modal-overlay" style="display: none;">
+        <div class="settings-modal">
+            <div class="settings-modal-header">
+                <h3>管理设置</h3>
+                <button class="settings-modal-close" onclick="closeSettingsModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="settings-modal-tabs">
+                <button class="settings-tab" data-tab="holdings" onclick="switchSettingsTab('holdings')">持仓管理</button>
+                <button class="settings-tab active" data-tab="columns" onclick="switchSettingsTab('columns')">表头管理</button>
+            </div>
+            <div class="settings-modal-content">
+                <!-- 持仓管理 -->
+                <div class="settings-pane" id="settings-holdings" style="display: none;">
+                    <div style="text-align: center; padding: 40px; color: #7f8c8d;">
+                        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
+                        <div>持仓管理功能开发中...</div>
+                    </div>
+                </div>
+                <!-- 表头管理 -->
+                <div class="settings-pane" id="settings-columns">
+                    <div class="column-list-header">
+                        <span style="flex: 2;">名称</span>
+                        <span style="flex: 1; text-align: center;">显示/隐藏</span>
+                        <span style="flex: 1; text-align: center;">置顶</span>
+                        <span style="flex: 1; text-align: center;">排序</span>
+                    </div>
+                    <div class="column-list" id="column-list">
+                        <!-- 列配置将通过JavaScript动态生成 -->
+                    </div>
+                </div>
+            </div>
+            <div class="settings-modal-footer">
+                <button class="btn-reset" onclick="resetColumnSettings()">重置默认</button>
+                <button class="btn-apply" onclick="applyColumnSettings()">应用设置</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* 管理设置弹窗样式 */
+        .settings-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .settings-modal {
+            background: white;
+            border-radius: 12px;
+            width: 480px;
+            max-width: 90vw;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .settings-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .settings-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .settings-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .settings-modal-close:hover {
+            color: #333;
+        }
+        
+        .settings-modal-tabs {
+            display: flex;
+            justify-content: center;
+            padding: 12px 20px;
+            gap: 8px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .settings-tab {
+            padding: 8px 24px;
+            border: 1px solid #ecf0f1;
+            border-radius: 20px;
+            background: white;
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .settings-tab:hover {
+            border-color: #3498db;
+            color: #3498db;
+        }
+        
+        .settings-tab.active {
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+        
+        .settings-modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        
+        .settings-pane {
+            padding: 0;
+        }
+        
+        .column-list-header {
+            display: flex;
+            padding: 12px 20px;
+            background: #fafafa;
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            border-bottom: 1px solid #ecf0f1;
+            position: sticky;
+            top: 0;
+        }
+        
+        .column-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .column-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background 0.2s;
+        }
+        
+        .column-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .column-item.fixed {
+            background: #f0f7ff;
+        }
+        
+        .column-item .column-name {
+            flex: 2;
+            font-size: 0.95rem;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .column-item .column-action {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .column-item .action-btn {
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            color: #bdc3c7;
+            cursor: pointer;
+            padding: 4px 8px;
+            transition: color 0.2s;
+        }
+        
+        .column-item .action-btn:hover {
+            color: #3498db;
+        }
+        
+        .column-item .action-btn.active {
+            color: #3498db;
+        }
+        
+        .column-item .action-btn.disabled {
+            color: #ecf0f1;
+            cursor: not-allowed;
+        }
+        
+        .column-item .drag-handle {
+            cursor: grab;
+            color: #bdc3c7;
+        }
+        
+        .column-item .drag-handle:hover {
+            color: #7f8c8d;
+        }
+        
+        .column-item.dragging {
+            opacity: 0.5;
+            background: #e8f4fc;
+        }
+        
+        .settings-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .btn-reset {
+            padding: 8px 20px;
+            border: 1px solid #ecf0f1;
+            border-radius: 6px;
+            background: white;
+            font-size: 0.9rem;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .btn-reset:hover {
+            border-color: #bdc3c7;
+        }
+        
+        .btn-apply {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 6px;
+            background: #3498db;
+            font-size: 0.9rem;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .btn-apply:hover {
+            background: #2980b9;
+        }
+    </style>
+
+    <script>
+        // 列配置
+        const defaultColumnConfig = [
+            { key: 'fund_code', name: '代码', visible: true, fixed: true, sortable: true },
+            { key: 'fund_name', name: '名称', visible: true, fixed: true, sortable: true },
+            { key: 'today_return', name: '日涨跌幅', visible: true, fixed: false, sortable: true },
+            { key: 'yesterday_return', name: '昨日盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'holding_amount', name: '持有金额', visible: true, fixed: false, sortable: true },
+            { key: 'today_profit', name: '当日盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'today_profit_rate', name: '当日盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'holding_profit', name: '持有盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'holding_profit_rate', name: '持有盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'total_profit', name: '累计盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'total_profit_rate', name: '累计盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio', name: '夏普比率', visible: true, fixed: false, sortable: true },
+            { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
+            { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
+        ];
+        
+        let columnConfig = JSON.parse(localStorage.getItem('fundColumnConfig')) || JSON.parse(JSON.stringify(defaultColumnConfig));
+        let draggedItem = null;
+        
+        // 打开管理设置弹窗
+        function openSettingsModal() {
+            document.getElementById('settings-modal-overlay').style.display = 'flex';
+            renderColumnList();
+        }
+        
+        // 关闭管理设置弹窗
+        function closeSettingsModal() {
+            document.getElementById('settings-modal-overlay').style.display = 'none';
+        }
+        
+        // 切换设置标签页
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.settings-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            document.querySelectorAll('.settings-pane').forEach(p => {
+                p.style.display = 'none';
+            });
+            document.getElementById('settings-' + tab).style.display = 'block';
+        }
+        
+        // 渲染列配置列表
+        function renderColumnList() {
+            const listEl = document.getElementById('column-list');
+            if (!listEl) return;
+            
+            let html = '';
+            columnConfig.forEach((col, index) => {
+                const isFixed = col.fixed;
+                const visibleIcon = col.visible ? 'bi-eye' : 'bi-eye-slash';
+                const visibleClass = col.visible ? 'active' : '';
+                const pinnedIcon = col.pinned ? 'bi-pin-fill' : 'bi-pin';
+                const pinnedClass = col.pinned ? 'active' : '';
+                
+                html += `
+                    <div class="column-item ${isFixed ? 'fixed' : ''}" data-index="${index}" draggable="${!isFixed}">
+                        <span class="column-name">${col.name}</span>
+                        <span class="column-action">
+                            ${isFixed ? '' : `<button class="action-btn ${visibleClass}" onclick="toggleColumnVisible(${index})" title="显示/隐藏">
+                                <i class="bi ${visibleIcon}"></i>
+                            </button>`}
+                        </span>
+                        <span class="column-action">
+                            ${isFixed ? '' : `<button class="action-btn ${pinnedClass}" onclick="toggleColumnPinned(${index})" title="置顶">
+                                <i class="bi ${pinnedIcon}"></i>
+                            </button>`}
+                        </span>
+                        <span class="column-action">
+                            ${isFixed ? '' : `<span class="drag-handle" title="拖拽排序">
+                                <i class="bi bi-list"></i>
+                            </span>`}
+                        </span>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html;
+            
+            // 绑定拖拽事件
+            initDragAndDrop();
+        }
+        
+        // 切换列显示/隐藏
+        function toggleColumnVisible(index) {
+            columnConfig[index].visible = !columnConfig[index].visible;
+            renderColumnList();
+        }
+        
+        // 切换列置顶
+        function toggleColumnPinned(index) {
+            columnConfig[index].pinned = !columnConfig[index].pinned;
+            renderColumnList();
+        }
+        
+        // 初始化拖拽排序
+        function initDragAndDrop() {
+            const items = document.querySelectorAll('.column-item[draggable="true"]');
+            
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    draggedItem = item;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('dragging');
+                    draggedItem = null;
+                });
+                
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (!draggedItem || draggedItem === item) return;
+                    
+                    const fromIndex = parseInt(draggedItem.dataset.index);
+                    const toIndex = parseInt(item.dataset.index);
+                    
+                    // 不能移动到固定列的位置
+                    if (columnConfig[toIndex].fixed) return;
+                    
+                    // 交换位置
+                    const temp = columnConfig[fromIndex];
+                    columnConfig.splice(fromIndex, 1);
+                    columnConfig.splice(toIndex, 0, temp);
+                    
+                    renderColumnList();
+                });
+            });
+        }
+        
+        // 重置列配置
+        function resetColumnSettings() {
+            columnConfig = JSON.parse(JSON.stringify(defaultColumnConfig));
+            localStorage.removeItem('fundColumnConfig');
+            renderColumnList();
+            applyColumnSettings();
+        }
+        
+        // 应用列配置
+        function applyColumnSettings() {
+            localStorage.setItem('fundColumnConfig', JSON.stringify(columnConfig));
+            updateTableColumns();
+            closeSettingsModal();
+        }
+        
+        // 更新表格列显示（包括顺序）
+        function updateTableColumns() {
+            // 重新排列表头
+            reorderTableHeader();
+            
+            // 重新渲染表格数据以应用列配置
+            if (typeof allFunds !== 'undefined' && allFunds.length > 0) {
+                uiRenderer.renderTableRows(allFunds);
+            }
+        }
+        
+        // 重新排列表头
+        function reorderTableHeader() {
+            const headerRow = document.querySelector('.fund-table thead tr');
+            if (!headerRow) return;
+            
+            // 保存checkbox列的HTML（始终在最前面）
+            const checkboxHtml = '<th style="width: 30px;" data-column="checkbox"></th>';
+            
+            // 清空表头
+            headerRow.innerHTML = '';
+            
+            // 先添加checkbox列
+            headerRow.innerHTML = checkboxHtml;
+            
+            // 按照columnConfig顺序添加其他列
+            columnConfig.forEach(col => {
+                const th = document.createElement('th');
+                th.className = 'sortable';
+                th.setAttribute('data-column', col.key);
+                th.style.display = col.visible ? '' : 'none';
+                th.innerHTML = `${col.name} <span class="sort-indicator"></span>`;
+                headerRow.appendChild(th);
+            });
+            
+            // 重新绑定排序事件
+            initSorting();
+        }
+        
+        // 点击弹窗外部关闭
+        document.getElementById('settings-modal-overlay')?.addEventListener('click', (e) => {
+            if (e.target.id === 'settings-modal-overlay') {
+                closeSettingsModal();
+            }
+        });
+    </script>
 </body>
 </html>

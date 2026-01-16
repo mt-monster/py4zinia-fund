@@ -14,19 +14,17 @@
             --warning-color: #f39c12;
             --bg-color: #f5f6fa;
             --card-bg: #ffffff;
-            --text-muted: #7f8c8d;
+            --text-muted: #95a5a6;
             --border-color: #eee;
+            --red-color: #e74c3c;
+            --green-color: #27ae60;
         }
         
-        * { 
-            box-sizing: border-box; 
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body { 
             background-color: var(--bg-color); 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.5;
         }
         
@@ -41,7 +39,6 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         
         .back-btn {
@@ -51,139 +48,131 @@
             color: #333;
             cursor: pointer;
             padding: 8px;
-            display: flex;
-            align-items: center;
-            transition: color 0.2s;
-        }
-        
-        .back-btn:hover {
-            color: var(--primary-color);
         }
         
         .header-title {
             flex: 1;
             text-align: center;
-            padding: 0 10px;
         }
         
         .header-title h1 {
             font-size: 1.1rem;
             font-weight: 600;
             margin: 0;
-            color: #333;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         
         .header-title .fund-code {
             font-size: 0.8rem;
             color: var(--text-muted);
-            margin-top: 2px;
         }
-        
+</style>
+</head>
+<body>
+
+<style>
         .add-watchlist-btn {
             background: #ff6b6b;
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: 4px;
             font-size: 0.85rem;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: background 0.2s;
-            white-space: nowrap;
         }
         
-        .add-watchlist-btn:hover {
-            background: #ee5a5a;
-        }
-        
-        /* 核心指标区域 */
+        /* 核心指标区域 - 参考图片布局 */
         .core-metrics {
             background: var(--card-bg);
-            padding: 20px 16px;
-            border-bottom: 8px solid var(--bg-color);
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
         }
         
-        .main-return {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .main-return .label {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        
-        .main-return .value {
-            font-size: 2.5rem;
-            font-weight: bold;
-        }
-        
-        .metrics-row {
+        .metrics-top {
             display: flex;
-            justify-content: space-around;
-            text-align: center;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
         }
         
-        .metric-item {
+        .metrics-left {
             flex: 1;
         }
         
-        .metric-item .label {
+        .metrics-left .label {
             font-size: 0.75rem;
             color: var(--text-muted);
             margin-bottom: 4px;
         }
         
-        .metric-item .value {
-            font-size: 1.1rem;
+        .metrics-left .main-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .metrics-right {
+            text-align: right;
+        }
+        
+        .metrics-right-item {
+            margin-bottom: 4px;
+        }
+        
+        .metrics-right-item .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-right: 8px;
+        }
+        
+        .metrics-right-item .value {
+            font-size: 1rem;
             font-weight: 600;
         }
         
-        /* 颜色类 - 红涨绿跌（中国市场标准）*/
-        .text-up {
-            color: #e74c3c;  /* 红色表示上涨 */
-        }
-        
-        .text-down {
-            color: #27ae60;  /* 绿色表示下跌 */
-        }
-        
-        .text-neutral {
-            color: #333;
-        }
-        
-        /* 持仓信息区域 */
+        /* 持仓信息 - 两行四列布局 */
         .holding-info {
             background: var(--card-bg);
             padding: 16px;
             border-bottom: 8px solid var(--bg-color);
         }
         
-        .holding-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
+        .holding-row {
+            display: flex;
+            margin-bottom: 12px;
+        }
+        
+        .holding-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .holding-group {
+            flex: 1;
+            display: flex;
         }
         
         .holding-item {
-            text-align: center;
+            flex: 1;
+            padding: 0 8px;
+        }
+        
+        .holding-item:first-child {
+            padding-left: 0;
         }
         
         .holding-item .label {
             font-size: 0.75rem;
             color: var(--text-muted);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
         
         .holding-item .value {
             font-size: 0.95rem;
             font-weight: 600;
+        }
+        
+        .holding-divider {
+            width: 1px;
+            background: var(--border-color);
+            margin: 0 16px;
         }
         
         .no-holding {
@@ -192,13 +181,14 @@
             color: var(--text-muted);
         }
         
-        .no-holding i {
-            font-size: 2rem;
-            display: block;
-            margin-bottom: 8px;
-        }
-        
-        /* 业绩走势图区域 */
+        /* 颜色类 - 红涨绿跌 */
+        .text-up { color: var(--red-color); }
+        .text-down { color: var(--green-color); }
+        .text-neutral { color: #333; }
+</style>
+
+<style>
+        /* 图表区域 */
         .chart-section {
             background: var(--card-bg);
             border-bottom: 8px solid var(--bg-color);
@@ -216,16 +206,11 @@
             color: var(--text-muted);
             cursor: pointer;
             border-bottom: 2px solid transparent;
-            transition: all 0.2s;
         }
         
         .chart-tab.active {
-            color: var(--primary-color);
-            border-bottom-color: var(--primary-color);
-        }
-        
-        .chart-tab:hover:not(.active) {
-            color: #555;
+            color: var(--red-color);
+            border-bottom-color: var(--red-color);
         }
         
         .chart-legend {
@@ -233,25 +218,24 @@
             justify-content: flex-end;
             padding: 8px 16px;
             font-size: 0.8rem;
+            gap: 16px;
         }
         
         .legend-item {
             display: flex;
             align-items: center;
-            margin-left: 16px;
+            gap: 4px;
         }
         
         .legend-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            margin-right: 4px;
         }
         
         .chart-container {
-            padding: 16px;
-            height: 280px;
-            position: relative;
+            padding: 0 16px 16px;
+            height: 260px;
         }
         
         .period-selector {
@@ -270,18 +254,12 @@
             font-size: 0.85rem;
             color: #666;
             cursor: pointer;
-            transition: all 0.2s;
         }
         
         .period-btn.active {
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
-        }
-        
-        .period-btn:hover:not(.active) {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
         }
         
         /* 标签页导航 */
@@ -299,7 +277,6 @@
             color: var(--text-muted);
             cursor: pointer;
             position: relative;
-            transition: color 0.2s;
         }
         
         .tab-nav-item.active {
@@ -315,7 +292,7 @@
             transform: translateX(-50%);
             width: 24px;
             height: 3px;
-            background: var(--primary-color);
+            background: var(--red-color);
             border-radius: 2px;
         }
         
@@ -326,13 +303,14 @@
         
         .tab-pane {
             display: none;
-            padding: 0;
         }
         
         .tab-pane.active {
             display: block;
         }
-        
+</style>
+
+<style>
         /* 历史净值列表 */
         .nav-history {
             max-height: 400px;
@@ -347,7 +325,6 @@
             color: var(--text-muted);
             position: sticky;
             top: 0;
-            z-index: 1;
         }
         
         .nav-history-header span {
@@ -377,15 +354,32 @@
         
         .nav-history-item span:first-child {
             text-align: left;
-            color: #333;
         }
         
         .nav-history-item span:last-child {
             text-align: right;
         }
         
-        .nav-history-item .nav-value {
-            font-weight: 500;
+        /* 阶段涨幅 */
+        .stage-returns {
+            padding: 16px;
+        }
+        
+        .stage-table {
+            width: 100%;
+        }
+        
+        .stage-table th,
+        .stage-table td {
+            padding: 12px 8px;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+        
+        .stage-table th {
+            color: var(--text-muted);
+            font-weight: normal;
+            border-bottom: 1px solid var(--border-color);
         }
         
         /* 加载状态 */
@@ -412,17 +406,10 @@
             to { transform: rotate(360deg); }
         }
         
-        /* 错误提示 */
         .error-message {
             text-align: center;
             padding: 40px 20px;
             color: var(--text-muted);
-        }
-        
-        .error-message i {
-            font-size: 2rem;
-            margin-bottom: 12px;
-            display: block;
         }
         
         .retry-btn {
@@ -435,141 +422,107 @@
             cursor: pointer;
         }
         
-        .retry-btn:hover {
-            background: #2980b9;
-        }
-        
-        /* 阶段涨幅 */
-        .stage-returns {
-            padding: 16px;
-        }
-        
-        .stage-table {
-            width: 100%;
-        }
-        
-        .stage-table th,
-        .stage-table td {
-            padding: 12px 8px;
-            text-align: center;
-            font-size: 0.85rem;
-        }
-        
-        .stage-table th {
-            color: var(--text-muted);
-            font-weight: normal;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .stage-table td {
-            font-weight: 500;
-        }
-        
-        /* 响应式布局 */
         @media (max-width: 768px) {
-            .holding-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .holding-row {
+                flex-direction: column;
             }
-            
-            .period-selector {
-                flex-wrap: wrap;
-            }
-            
-            .period-btn {
-                padding: 6px 12px;
-                font-size: 0.8rem;
-            }
-            
-            .main-return .value {
-                font-size: 2rem;
-            }
-            
-            .header-title h1 {
-                font-size: 1rem;
-            }
-            
-            .add-watchlist-btn span {
+            .holding-divider {
                 display: none;
             }
-            
-            .chart-container {
-                height: 240px;
+            .holding-group {
+                margin-bottom: 12px;
             }
         }
     </style>
 </head>
+
 <body>
     <!-- 页面头部 -->
     <div class="page-header">
-        <button class="back-btn" onclick="history.back()" aria-label="返回">
-            <i class="bi bi-chevron-left"></i>
+        <button class="back-btn" onclick="history.back()">
+            <i class="bi bi-x-lg"></i>
         </button>
         <div class="header-title">
             <h1 id="fund-name">加载中...</h1>
             <div class="fund-code" id="fund-code-display">{{ fund_code }}</div>
         </div>
         <button class="add-watchlist-btn" id="watchlist-btn">
-            <i class="bi bi-plus"></i>
-            <span>加自选</span>
+            加自选
         </button>
     </div>
 
-    <!-- 核心指标区域 -->
+    <!-- 核心指标区域 - 参考图片布局 -->
     <div class="core-metrics">
-        <div class="main-return">
-            <div class="label">当日涨幅</div>
-            <div class="value text-neutral" id="today-return">--</div>
-        </div>
-        <div class="metrics-row">
-            <div class="metric-item">
-                <div class="label">近一年</div>
-                <div class="value text-neutral" id="year-return">--</div>
+        <div class="metrics-top">
+            <div class="metrics-left">
+                <div class="label">当日涨幅</div>
+                <div class="main-value text-neutral" id="today-return">--</div>
             </div>
-            <div class="metric-item">
-                <div class="label" id="nav-date-label">最新净值</div>
-                <div class="value text-neutral" id="current-nav">--</div>
+            <div class="metrics-right">
+                <div class="metrics-right-item">
+                    <span class="label">近一年</span>
+                    <span class="value text-neutral" id="year-return">--</span>
+                </div>
+                <div class="metrics-right-item">
+                    <span class="label" id="nav-date-label">最新净值</span>
+                    <span class="value text-neutral" id="current-nav">--</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 持仓信息区域 -->
+    <!-- 持仓信息区域 - 两行四列布局 -->
     <div class="holding-info" id="holding-section">
-        <div class="holding-grid" id="holding-grid">
-            <div class="holding-item">
-                <div class="label">当日盈亏</div>
-                <div class="value text-neutral" id="today-profit">--</div>
+        <div id="holding-grid">
+            <div class="holding-row">
+                <div class="holding-group">
+                    <div class="holding-item">
+                        <div class="label">当日盈亏</div>
+                        <div class="value text-neutral" id="today-profit">--</div>
+                    </div>
+                    <div class="holding-item">
+                        <div class="label">当日盈亏率</div>
+                        <div class="value text-neutral" id="today-profit-rate">--</div>
+                    </div>
+                </div>
+                <div class="holding-divider"></div>
+                <div class="holding-group">
+                    <div class="holding-item">
+                        <div class="label">持有盈亏</div>
+                        <div class="value text-neutral" id="holding-profit">--</div>
+                    </div>
+                    <div class="holding-item">
+                        <div class="label">持有盈亏率</div>
+                        <div class="value text-neutral" id="holding-profit-rate">--</div>
+                    </div>
+                </div>
             </div>
-            <div class="holding-item">
-                <div class="label">当日盈亏率</div>
-                <div class="value text-neutral" id="today-profit-rate">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">持有盈亏</div>
-                <div class="value text-neutral" id="holding-profit">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">持有盈亏率</div>
-                <div class="value text-neutral" id="holding-profit-rate">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">持有金额</div>
-                <div class="value text-neutral" id="holding-amount">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">累计盈亏</div>
-                <div class="value text-neutral" id="total-profit">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">持有份额</div>
-                <div class="value text-neutral" id="holding-shares">--</div>
-            </div>
-            <div class="holding-item">
-                <div class="label">持仓成本</div>
-                <div class="value text-neutral" id="holding-cost">--</div>
+            <div class="holding-row">
+                <div class="holding-group">
+                    <div class="holding-item">
+                        <div class="label">持有金额</div>
+                        <div class="value" id="holding-amount">--</div>
+                    </div>
+                    <div class="holding-item">
+                        <div class="label">累计盈亏</div>
+                        <div class="value text-neutral" id="total-profit">--</div>
+                    </div>
+                </div>
+                <div class="holding-divider"></div>
+                <div class="holding-group">
+                    <div class="holding-item">
+                        <div class="label">持有份额</div>
+                        <div class="value" id="holding-shares">--</div>
+                    </div>
+                    <div class="holding-item">
+                        <div class="label">持仓成本</div>
+                        <div class="value" id="holding-cost">--</div>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="no-holding" id="no-holding" style="display: none;">
-            <i class="bi bi-inbox"></i>
+            <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
             <div>暂无持仓数据</div>
         </div>
     </div>
@@ -588,7 +541,7 @@
             </div>
             <div class="legend-item">
                 <span class="legend-dot" style="background: #3498db;"></span>
-                <span>沪深300 <span class="text-up" id="benchmark-return-legend">--</span></span>
+                <span>沪深300 <span id="benchmark-return-legend">--</span></span>
             </div>
         </div>
         <div class="chart-container">
@@ -596,9 +549,9 @@
         </div>
         <div class="period-selector">
             <button class="period-btn" data-period="1d">当日(估)</button>
-            <button class="period-btn active" data-period="1m">近一月</button>
+            <button class="period-btn" data-period="1m">近一月</button>
             <button class="period-btn" data-period="6m">近半年</button>
-            <button class="period-btn" data-period="1y">近一年</button>
+            <button class="period-btn active" data-period="1y">近一年</button>
             <button class="period-btn" data-period="ytd">今年来</button>
         </div>
     </div>
@@ -624,12 +577,7 @@
                         </tr>
                     </thead>
                     <tbody id="stage-returns-body">
-                        <tr>
-                            <td colspan="3" class="loading">
-                                <div class="loading-spinner"></div>
-                                <div>加载中...</div>
-                            </td>
-                        </tr>
+                        <tr><td colspan="3" class="loading"><div class="loading-spinner"></div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -648,10 +596,7 @@
                     <span>日涨幅</span>
                 </div>
                 <div id="nav-history-list">
-                    <div class="loading">
-                        <div class="loading-spinner"></div>
-                        <div>加载中...</div>
-                    </div>
+                    <div class="loading"><div class="loading-spinner"></div><div>加载中...</div></div>
                 </div>
             </div>
         </div>
@@ -665,35 +610,29 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         const fundCode = '{{ fund_code }}';
         let fundData = null;
         let holdingData = null;
         let performanceChart = null;
-        let currentPeriod = '1m';
+        let currentPeriod = '1y';
         let chartDataCache = {};
 
-        // 工具函数：格式化收益率并返回颜色类名
-        // 红涨绿跌：正值（上涨）用红色，负值（下跌）用绿色
+        // 工具函数：格式化收益率（红涨绿跌）
         function formatReturn(value, suffix = '%') {
             if (value === null || value === undefined || isNaN(value)) {
                 return { text: '--', colorClass: 'text-neutral' };
             }
             const num = parseFloat(value);
-            // 正值（上涨）-> text-up（红色），负值（下跌）-> text-down（绿色）
             const colorClass = num >= 0 ? 'text-up' : 'text-down';
             const sign = num >= 0 ? '+' : '';
-            return { 
-                text: `${sign}${num.toFixed(2)}${suffix}`, 
-                colorClass: colorClass 
-            };
+            return { text: `${sign}${num.toFixed(2)}${suffix}`, colorClass };
         }
 
         // 工具函数：格式化金额
         function formatAmount(value, decimals = 2) {
-            if (value === null || value === undefined || isNaN(value)) {
-                return '--';
-            }
+            if (value === null || value === undefined || isNaN(value)) return '--';
             return parseFloat(value).toFixed(decimals);
         }
 
@@ -702,11 +641,10 @@
             return dateStr ? dateStr.substring(0, 10) : '--';
         }
         
-        // 工具函数：更新元素内容和样式
+        // 更新元素
         function updateElement(id, value, suffix = '', colorize = false) {
             const el = document.getElementById(id);
             if (!el) return;
-            
             if (colorize) {
                 const formatted = formatReturn(value, suffix);
                 el.textContent = formatted.text;
@@ -716,18 +654,15 @@
             }
         }
 
-        // 加载基金详情数据
+        // 加载基金详情
         async function loadFundDetail() {
             try {
                 const res = await fetch(`/api/fund/${fundCode}`);
                 const result = await res.json();
-                
                 if (result.success && result.data) {
                     fundData = result.data;
                     renderFundHeader();
-                    loadStageReturns(); // 加载阶段涨幅数据
-                } else {
-                    throw new Error(result.error || '加载失败');
+                    loadStageReturns();
                 }
             } catch (e) {
                 console.error('加载基金详情失败:', e);
@@ -740,77 +675,62 @@
             try {
                 const res = await fetch(`/api/holdings?user_id=default_user`);
                 const result = await res.json();
-                
                 if (result.success && result.data) {
-                    // 查找当前基金的持仓数据
                     holdingData = result.data.find(h => h.fund_code === fundCode);
                     renderHoldingInfo();
-                } else {
-                    throw new Error(result.error || '加载失败');
                 }
             } catch (e) {
                 console.error('加载持仓数据失败:', e);
-                // 显示无持仓状态
                 document.getElementById('no-holding').style.display = 'block';
                 document.getElementById('holding-grid').style.display = 'none';
             }
         }
 
-        // 渲染基金头部信息
+        // 渲染基金头部
         function renderFundHeader() {
             if (!fundData) return;
-            
-            // 设置基金名称
             document.getElementById('fund-name').textContent = fundData.fund_name || fundCode;
             document.getElementById('fund-code-display').textContent = fundCode;
             
-            // 设置当日涨幅
             const todayReturn = formatReturn(fundData.today_return, '%');
             const todayEl = document.getElementById('today-return');
             todayEl.textContent = todayReturn.text;
-            todayEl.className = `value ${todayReturn.colorClass}`;
+            todayEl.className = `main-value ${todayReturn.colorClass}`;
             
-            // 设置近一年收益
             const yearReturn = formatReturn(fundData.annualized_return, '%');
             const yearEl = document.getElementById('year-return');
             yearEl.textContent = yearReturn.text;
             yearEl.className = `value ${yearReturn.colorClass}`;
             
-            // 设置最新净值
             const navValue = fundData.current_nav || fundData.yesterday_nav;
             document.getElementById('current-nav').textContent = navValue ? formatAmount(navValue, 4) : '--';
             
-            // 设置净值日期
             if (fundData.analysis_date) {
-                const dateStr = formatDate(fundData.analysis_date).substring(5); // 只显示月-日
+                const dateStr = formatDate(fundData.analysis_date).substring(5);
                 document.getElementById('nav-date-label').textContent = `最新净值 (${dateStr})`;
             }
         }
-        
+
         // 渲染持仓信息
         function renderHoldingInfo() {
             const gridEl = document.getElementById('holding-grid');
             const noHoldingEl = document.getElementById('no-holding');
             
             if (!holdingData) {
-                // 没有持仓数据
                 gridEl.style.display = 'none';
                 noHoldingEl.style.display = 'block';
                 return;
             }
             
-            // 有持仓数据，显示网格
-            gridEl.style.display = 'grid';
+            gridEl.style.display = 'block';
             noHoldingEl.style.display = 'none';
             
-            // 更新各项数据
             updateElement('today-profit', holdingData.today_profit, '', true);
             updateElement('today-profit-rate', holdingData.today_profit_rate, '%', true);
             updateElement('holding-profit', holdingData.holding_profit, '', true);
             updateElement('holding-profit-rate', holdingData.holding_profit_rate, '%', true);
             updateElement('total-profit', holdingData.total_profit, '', true);
             
-            // 持有金额、份额、成本不需要颜色编码
             document.getElementById('holding-amount').textContent = 
                 holdingData.holding_amount ? formatAmount(holdingData.holding_amount, 2) : '--';
             document.getElementById('holding-shares').textContent = 
@@ -822,15 +742,10 @@
         
         // 加载图表数据
         async function loadChartData(period) {
-            // 如果缓存中有数据，直接返回
-            if (chartDataCache[period]) {
-                return chartDataCache[period];
-            }
-            
+            if (chartDataCache[period]) return chartDataCache[period];
             try {
                 const res = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
                 const result = await res.json();
-                
                 if (result.success && result.data) {
                     chartDataCache[period] = result.data;
                     return result.data;
@@ -851,32 +766,21 @@
         // 渲染图表
         function renderChart(data) {
             const ctx = document.getElementById('performanceChart').getContext('2d');
+            if (performanceChart) performanceChart.destroy();
+            if (!data || data.length === 0) return;
             
-            // 销毁旧图表
-            if (performanceChart) {
-                performanceChart.destroy();
-            }
-            
-            if (!data || data.length === 0) {
-                return;
-            }
-            
-            // 按日期升序排序
             const sortedData = [...data].sort((a, b) => 
                 (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date)
             );
             
-            // 准备图表数据
-            const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5)); // 只显示月-日
+            const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
             const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
             
-            // 计算收益率（相对于第一个净值）
             const firstNav = navData.find(n => n !== null) || 1;
             const returnData = navData.map(nav => 
                 nav === null ? null : ((nav - firstNav) / firstNav * 100).toFixed(2)
             );
             
-            // 更新图例中的收益率
             const lastReturn = returnData[returnData.length - 1];
             if (lastReturn !== null) {
                 const formatted = formatReturn(parseFloat(lastReturn), '%');
@@ -884,7 +788,6 @@
                 document.getElementById('fund-return-legend').className = formatted.colorClass;
             }
             
-            // 创建图表
             performanceChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -904,14 +807,9 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
+                    interaction: { intersect: false, mode: 'index' },
                     plugins: {
-                        legend: {
-                            display: false
-                        },
+                        legend: { display: false },
                         tooltip: {
                             backgroundColor: 'rgba(0,0,0,0.8)',
                             padding: 12,
@@ -925,30 +823,14 @@
                     scales: {
                         x: {
                             display: true,
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                maxTicksLimit: 5,
-                                color: '#999',
-                                font: {
-                                    size: 11
-                                }
-                            }
+                            grid: { display: false },
+                            ticks: { maxTicksLimit: 5, color: '#999', font: { size: 11 } }
                         },
                         y: {
                             display: true,
                             position: 'right',
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            },
-                            ticks: {
-                                callback: (value) => value + '%',
-                                color: '#999',
-                                font: {
-                                    size: 11
-                                }
-                            }
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { callback: (v) => v + '%', color: '#999', font: { size: 11 } }
                         }
                     }
                 }
@@ -961,24 +843,18 @@
                 alert('加自选功能开发中...');
             });
             
-            // 绑定时间周期按钮
             document.querySelectorAll('.period-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const period = btn.dataset.period;
                     currentPeriod = period;
-                    
-                    // 更新按钮状态
                     document.querySelectorAll('.period-btn').forEach(b => 
                         b.classList.toggle('active', b.dataset.period === period)
                     );
-                    
-                    // 加载并渲染新数据
                     const data = await loadChartData(period);
                     renderChart(data);
                 });
             });
             
-            // 绑定图表标签页（暂时只是切换样式）
             document.querySelectorAll('.chart-tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
@@ -986,66 +862,48 @@
                 });
             });
             
-            // 绑定底部标签页
             document.querySelectorAll('.tab-nav-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const tabId = item.dataset.tab;
-                    switchTab(tabId);
-                });
+                item.addEventListener('click', () => switchTab(item.dataset.tab));
             });
         }
         
         // 切换标签页
         function switchTab(tabId) {
-            // 更新导航项状态
             document.querySelectorAll('.tab-nav-item').forEach(item => 
                 item.classList.toggle('active', item.dataset.tab === tabId)
             );
-            
-            // 更新内容面板状态
             document.querySelectorAll('.tab-pane').forEach(pane => 
                 pane.classList.toggle('active', pane.id === tabId)
             );
-            
-            // 如果切换到历史净值标签页，加载数据
-            if (tabId === 'nav-history') {
-                loadNavHistory(currentPeriod);
-            }
+            if (tabId === 'nav-history') loadNavHistory(currentPeriod);
         }
         
-        // 加载历史净值数据
-        async function loadNavHistory(period = '1m') {
+        // 加载历史净值
+        async function loadNavHistory(period = '1y') {
             const listEl = document.getElementById('nav-history-list');
             listEl.innerHTML = '<div class="loading"><div class="loading-spinner"></div><div>加载中...</div></div>';
             
             try {
                 const res = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
                 const result = await res.json();
-                
                 if (result.success && result.data && result.data.length > 0) {
                     renderNavHistory(result.data);
-                    return result.data;
                 } else {
                     listEl.innerHTML = '<div class="error-message"><i class="bi bi-inbox"></i><div>暂无数据</div></div>';
-                    return [];
                 }
             } catch (e) {
-                console.error('加载历史净值失败:', e);
-                listEl.innerHTML = `<div class="error-message"><i class="bi bi-exclamation-circle"></i><div>加载失败</div><button class="retry-btn" onclick="loadNavHistory('${period}')">重试</button></div>`;
-                return [];
+                listEl.innerHTML = '<div class="error-message"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
             }
         }
         
-        // 渲染历史净值列表
+        // 渲染历史净值
         function renderNavHistory(data) {
             const listEl = document.getElementById('nav-history-list');
-            
             if (!data || data.length === 0) {
                 listEl.innerHTML = '<div class="error-message"><i class="bi bi-inbox"></i><div>暂无数据</div></div>';
                 return;
             }
             
-            // 按日期降序排序（最新日期在前）
             const sortedData = [...data].sort((a, b) => 
                 (b.date || b.analysis_date).localeCompare(a.date || a.analysis_date)
             );
@@ -1057,24 +915,19 @@
                 const dailyReturn = item.daily_return !== undefined ? item.daily_return : item.today_return;
                 const returnFormatted = formatReturn(dailyReturn, '%');
                 
-                html += `
-                    <div class="nav-history-item">
-                        <span>${date}</span>
-                        <span class="nav-value">${nav}</span>
-                        <span class="${returnFormatted.colorClass}">${returnFormatted.text}</span>
-                    </div>
-                `;
+                html += `<div class="nav-history-item">
+                    <span>${date}</span>
+                    <span>${nav}</span>
+                    <span class="${returnFormatted.colorClass}">${returnFormatted.text}</span>
+                </div>`;
             });
-            
             listEl.innerHTML = html;
         }
         
-        // 加载阶段涨幅数据
+        // 加载阶段涨幅
         function loadStageReturns() {
             if (!fundData) return;
-            
             const tbody = document.getElementById('stage-returns-body');
-            
             const stages = [
                 { label: '近1周', fund: fundData.week_return },
                 { label: '近1月', fund: fundData.month_return },
@@ -1087,17 +940,12 @@
             let html = '';
             stages.forEach(stage => {
                 const fundReturn = formatReturn(stage.fund, '%');
-                const benchmarkReturn = formatReturn(null, '%'); // 暂无基准数据
-                
-                html += `
-                    <tr>
-                        <td>${stage.label}</td>
-                        <td class="${fundReturn.colorClass}">${fundReturn.text}</td>
-                        <td class="${benchmarkReturn.colorClass}">${benchmarkReturn.text}</td>
-                    </tr>
-                `;
+                html += `<tr>
+                    <td>${stage.label}</td>
+                    <td class="${fundReturn.colorClass}">${fundReturn.text}</td>
+                    <td>--</td>
+                </tr>`;
             });
-            
             tbody.innerHTML = html;
         }
 
