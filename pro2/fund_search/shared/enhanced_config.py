@@ -51,8 +51,14 @@ NOTIFICATION_CONFIG = {
     },
     'email': {
         'enabled': os.environ.get('EMAIL_ENABLED', 'True').lower() == 'true',
-        'token': os.environ.get('EMAIL_TOKEN', 'fb0dfd5592ed4eb19cd886d737b6cc6a'),  # 使用与微信相同的token或单独设置
-        'channel': os.environ.get('EMAIL_CHANNEL', 'mail')
+        'token': os.environ.get('EMAIL_TOKEN', 'fb0dfd5592ed4eb19cd886d737b6cc6a'),  # PushPlus token
+        'channel': os.environ.get('EMAIL_CHANNEL', 'mail'), # 'mail' for PushPlus, 'smtp' for standard SMTP
+        # SMTP配置 (仅当 channel='smtp' 时需要)
+        'smtp_host': os.environ.get('SMTP_HOST', 'smtp.qq.com'),
+        'smtp_port': int(os.environ.get('SMTP_PORT', 465)),
+        'smtp_user': os.environ.get('SMTP_USER', ''),
+        'smtp_password': os.environ.get('SMTP_PASSWORD', ''),
+        'smtp_receivers': os.environ.get('SMTP_RECEIVERS', '').split(',') if os.environ.get('SMTP_RECEIVERS') else []
     }
 }
 

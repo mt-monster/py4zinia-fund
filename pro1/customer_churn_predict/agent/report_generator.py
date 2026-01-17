@@ -12,13 +12,18 @@ from pathlib import Path
 class ReportGenerator:
     """报告生成器"""
     
-    def __init__(self, output_dir: str = "reports"):
+    def __init__(self, output_dir: str = None):
         """
         初始化报告生成器
         
         Args:
-            output_dir: 报告输出目录
+            output_dir: 报告输出目录（默认使用项目根目录的reports文件夹）
         """
+        if output_dir is None:
+            # 使用项目根目录的reports目录
+            project_root = Path(__file__).parent.parent.parent.parent
+            output_dir = project_root / 'reports'
+        
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
     

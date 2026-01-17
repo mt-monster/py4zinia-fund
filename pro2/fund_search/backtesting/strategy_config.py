@@ -11,7 +11,16 @@ import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    # 尝试使用完整路径导入或其他替代方案
+    import sys
+    # 检查是否在某些特殊环境中运行
+    try:
+        from yaml import safe_load, safe_dump
+    except ImportError:
+        raise ImportError("Could not import yaml. Please ensure PyYAML is installed: pip install PyYAML")
 
 logger = logging.getLogger(__name__)
 

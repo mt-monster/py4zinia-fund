@@ -13,8 +13,14 @@ from typing import Dict, List, Optional
 import logging
 import requests
 import json
+import re
 import base64
 import time
+import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.header import Header
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -398,6 +404,68 @@ class EnhancedNotificationManager:
             logger.error(f"生成Markdown报告失败: {str(e)}")
             return f"报告生成失败: {str(e)}"
     
+    def save_html_report(self, title: str, content: str, filename_prefix: str = "report") -> str:
+        """
+        将报告保存为本地HTML文件
+        
+        参数：
+        title: 报告标题
+        content: 报告内容（HTML）
+        filename_prefix: 文件名前缀
+        
+        返回：
+        str: 保存的文件路径，失败则返回空字符串
+        """
+        try:
+            # 使用统一的reports目录（项目根目录）
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            reports_dir = os.path.join(project_root, 'reports')
+            if not os.path.exists(reports_dir):
+                os.makedirs(reports_dir)
+                
+            # 生成文件名
+            current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{filename_prefix}_{current_time}.html"
+            file_path = os.path.join(reports_dir, filename)
+            
+            # 确保内容包含基本的HTML结构（如果尚未包含）
+            if "<html" not in content.lower():
+                full_content = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>{title}</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                        table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+                        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                        th {{ background-color: #f2f2f2; }}
+                        tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                        .container {{ max-width: 1200px; margin: 0 auto; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>{title}</h1>
+                        {content}
+                    </div>
+                </body>
+                </html>
+                """
+            else:
+                full_content = content
+                
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(full_content)
+                
+            logger.info(f"HTML报告已保存至: {file_path}")
+            return file_path
+            
+        except Exception as e:
+            logger.error(f"保存HTML报告失败: {str(e)}")
+            return ""
+
     def send_wechat_notification(self, title: str, content: str, template: str = 'html') -> bool:
         """
         发送微信通知
@@ -442,6 +510,63 @@ class EnhancedNotificationManager:
             logger.error(f"发送微信通知失败: {str(e)}")
             return False
     
+    def _send_via_smtp(self, title: str, content: str, template: str = 'html') -> bool:
+        """
+        通过SMTP发送邮件
+        """
+        try:
+            smtp_host = self.email_config.get('smtp_host')
+            smtp_port = self.email_config.get('smtp_port')
+            smtp_user = self.email_config.get('smtp_user')
+            smtp_password = self.email_config.get('smtp_password')
+            receivers = self.email_config.get('smtp_receivers')
+            
+            if not all([smtp_host, smtp_port, smtp_user, smtp_password, receivers]):
+                logger.warning("SMTP配置不完整，无法发送邮件。请在配置文件中设置 smtp_host, smtp_port, smtp_user, smtp_password, smtp_receivers")
+                return False
+                
+            message = MIMEMultipart()
+            message['From'] = Header(f"基金分析助手 <{smtp_user}>", 'utf-8')
+            # 如果receivers是列表，将其转换为逗号分隔的字符串用于Header，但sendmail需要列表
+            if isinstance(receivers, list):
+                receivers_list = receivers
+                receivers_str = ",".join(receivers)
+            else:
+                receivers_list = [receivers]
+                receivers_str = receivers
+                
+            message['To'] = Header(receivers_str, 'utf-8')
+            message['Subject'] = Header(title, 'utf-8')
+            
+            if template == 'html':
+                message.attach(MIMEText(content, 'html', 'utf-8'))
+            else:
+                message.attach(MIMEText(content, 'plain', 'utf-8'))
+                
+            try:
+                if smtp_port == 465:
+                    smtp = smtplib.SMTP_SSL(smtp_host, smtp_port)
+                else:
+                    smtp = smtplib.SMTP(smtp_host, smtp_port)
+                    # 尝试启动TLS，如果服务器支持
+                    try:
+                        smtp.starttls()
+                    except:
+                        pass
+                    
+                smtp.login(smtp_user, smtp_password)
+                smtp.sendmail(smtp_user, receivers_list, message.as_string())
+                smtp.quit()
+                logger.info("SMTP邮件发送成功")
+                return True
+            except Exception as e:
+                logger.error(f"SMTP连接或发送失败: {str(e)}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"构建SMTP邮件失败: {str(e)}")
+            return False
+
     def send_email_notification(self, title: str, content: str, template: str = 'html') -> bool:
         """
         发送邮件通知
@@ -458,6 +583,11 @@ class EnhancedNotificationManager:
             if not self.email_config.get('enabled', False):
                 logger.info("邮件通知已禁用")
                 return True
+            
+            # 检查发送渠道
+            channel = self.email_config.get('channel', 'mail')
+            if channel == 'smtp':
+                return self._send_via_smtp(title, content, template)
             
             token = self.email_config.get('token', '')  # 使用邮件配置中的token
             if not token:
@@ -512,6 +642,11 @@ class EnhancedNotificationManager:
             email_content = report_data.get('html', '报告生成失败')
             
             email_success = self.send_email_notification(email_title, email_content)
+            
+            # 如果发送失败，或者为了备份，保存本地HTML
+            if not email_success:
+                logger.warning("邮件发送失败，正在生成本地HTML报告...")
+                self.save_html_report(email_title, email_content, "fund_analysis_report")
             
             # 记录发送结果
             if wechat_success and email_success:
@@ -593,6 +728,11 @@ class EnhancedNotificationManager:
             wechat_success = self.send_wechat_notification(title, full_content, 'html')
             email_success = self.send_email_notification(title, full_content)
             
+            # 如果发送失败，保存本地HTML
+            if not email_success:
+                logger.warning("邮件发送失败，正在生成本地HTML报告...")
+                self.save_html_report(title, full_content, "fund_table_report")
+            
             return wechat_success or email_success
             
         except Exception as e:
@@ -662,6 +802,11 @@ class EnhancedNotificationManager:
             
             # 发送邮件通知（使用专业的绩效分析模板）
             email_success = self.send_email_notification(title, full_content)
+            
+            # 如果发送失败，保存本地HTML
+            if not email_success:
+                logger.warning("邮件发送失败，正在生成本地HTML报告...")
+                self.save_html_report(title, full_content, "performance_analysis_report")
             
             return email_success
             
@@ -738,7 +883,7 @@ class EnhancedNotificationManager:
             'calmar_ratio', 'sortino_ratio', 'var_95',
             'win_rate', 'profit_loss_ratio', 'composite_score',
             'status_label', 'operation_suggestion', 'redeem_amount',
-            'execution_amount', 'execute_amount'
+            'execution_amount'
         ]
         
         # 确定实际可用的列，按照优先级排序
@@ -924,6 +1069,85 @@ class EnhancedNotificationManager:
         html_table += "</tbody></table></div>"
         return html_table
     
+    def _extract_first_number(self, value: object) -> float:
+        try:
+            if pd.isna(value):
+                return 0.0
+            text = str(value)
+            match = re.search(r"(-?\d+(?:\.\d+)?)", text.replace(",", ""))
+            if not match:
+                return 0.0
+            return float(match.group(1))
+        except Exception:
+            return 0.0
+    
+    def _execution_amount_priority(self, text: str) -> int:
+        t = str(text or "")
+        if "买入" in t:
+            return 0
+        if "赎回" in t or "卖出" in t:
+            return 1
+        if "持有" in t or "不动" in t or "不买入" in t:
+            return 2
+        return 3
+    
+    def _operation_suggestion_priority(self, text: str) -> int:
+        t = str(text or "")
+        if "强烈买入" in t or "积极买入" in t or "强势" in t:
+            return 0
+        if "买入" in t:
+            return 1
+        if "持有" in t or "观望" in t or "不买入" in t:
+            return 2
+        if "赎回" in t or "卖出" in t:
+            return 3
+        return 4
+    
+    def _sort_fund_data_for_report(self, fund_data: pd.DataFrame) -> pd.DataFrame:
+        if fund_data.empty:
+            return fund_data
+        
+        sort_by = self.email_config.get("sort_by") or self.config.get("sort_by") or "execution_amount"
+        sort_by = str(sort_by).lower()
+        if sort_by in {"execution_amount", "execution", "amount"}:
+            mode = "execution_amount"
+        elif sort_by in {"operation_suggestion", "suggestion", "operation"}:
+            mode = "operation_suggestion"
+        else:
+            mode = "execution_amount"
+        
+        df = fund_data.copy()
+        
+        has_amount = "execution_amount" in df.columns
+        has_suggestion = "operation_suggestion" in df.columns
+        
+        if has_amount:
+            df["_sort_exec_priority"] = df["execution_amount"].map(self._execution_amount_priority)
+            df["_sort_exec_amount"] = df["execution_amount"].map(self._extract_first_number).abs()
+        else:
+            df["_sort_exec_priority"] = 999
+            df["_sort_exec_amount"] = 0.0
+        
+        if has_suggestion:
+            df["_sort_suggestion_priority"] = df["operation_suggestion"].map(self._operation_suggestion_priority)
+        else:
+            df["_sort_suggestion_priority"] = 999
+        
+        if mode == "operation_suggestion":
+            sort_cols = ["_sort_suggestion_priority", "_sort_exec_priority", "_sort_exec_amount"]
+            ascending = [True, True, False]
+        else:
+            sort_cols = ["_sort_exec_priority", "_sort_exec_amount", "_sort_suggestion_priority"]
+            ascending = [True, False, True]
+        
+        if "today_return" in df.columns:
+            sort_cols.append("today_return")
+            ascending.append(False)
+        
+        df = df.sort_values(by=sort_cols, ascending=ascending, kind="mergesort")
+        df = df.drop(columns=["_sort_exec_priority", "_sort_exec_amount", "_sort_suggestion_priority"], errors="ignore")
+        return df
+    
     def _format_fund_data_to_table(self, fund_data: pd.DataFrame) -> str:
         """
         将基金数据格式化为HTML表格（匹配参考图片样式）
@@ -937,10 +1161,12 @@ class EnhancedNotificationManager:
         if fund_data.empty:
             return "<p>没有基金数据可显示</p>"
         
+        fund_data = self._sort_fund_data_for_report(fund_data)
+        
         # 选择要显示的列（与参考图片一致的顺序）
         display_columns = [
             'fund_code', 'fund_name', 'today_return', 'yesterday_return', 
-            'trend_status', 'operation_suggestion', 'execute_amount'
+            'status_label', 'operation_suggestion', 'execution_amount'
         ]
         
         # 确保所需的列存在
@@ -949,84 +1175,76 @@ class EnhancedNotificationManager:
         # 创建HTML表格（匹配参考图片样式）
         html_table = """
         <div style="width: 100%; overflow-x: auto;">
-        <table border="1" style="border-collapse: collapse; width: 100%; text-align: center; font-size: 12px;">
+        <table border="1" style="border-collapse: collapse; width: 100%; text-align: center; font-size: 14px; font-family: 'Arial', sans-serif;">
             <thead>
-                <tr style="background-color: #f5f5f5; color: #333; font-weight: bold;">
+                <tr style="background-color: #f5f5f5; color: #333; font-weight: bold; height: 40px;">
         """
         
         # 添加表头
         for col in available_columns:
             display_name = self._get_column_display_name(col)
-            html_table += f"<th style='padding: 6px; border: 1px solid #ddd;'>{display_name}</th>"
+            width_style = ""
+            if col == 'fund_name':
+                width_style = "min-width: 180px;"
+            elif col == 'operation_suggestion':
+                width_style = "min-width: 120px;"
+            elif col == 'status_label':
+                width_style = "min-width: 100px;"
+                
+            html_table += f"<th style='padding: 8px; border: 1px solid #ddd; {width_style}'>{display_name}</th>"
         
         html_table += "</tr></thead><tbody>"
         
         # 添加数据行
         for _, row in fund_data.iterrows():
-            html_table += "<tr>"
+            html_table += "<tr style='height: 35px;'>"
             for col in available_columns:
                 value = row[col] if col in row else "N/A"
                 
                 # 根据列类型格式化值
                 if col in ['today_return', 'yesterday_return']:
-                    # 百分比格式
                     if pd.notna(value):
                         formatted_value = f"{value*100:.2f}%"
-                        # 根据数值正负设置颜色
-                        color = '#FF6B6B' if value < 0 else '#4ECDC4' if value > 0 else 'black'
-                        html_table += f"<td style='padding: 6px; border: 1px solid #ddd; color: {color};'>{formatted_value}</td>"
+                        color = '#e74c3c' if value > 0 else '#27ae60' if value < 0 else 'black'
+                        html_table += f"<td style='padding: 8px; border: 1px solid #ddd; color: {color}; font-weight: 500;'>{formatted_value}</td>"
                     else:
-                        html_table += "<td style='padding: 6px; border: 1px solid #ddd;'>N/A</td>"
+                        html_table += "<td style='padding: 8px; border: 1px solid #ddd;'>N/A</td>"
                 
-                elif col == 'trend_status':
-                    # 趋势状态格式化（带有颜色标识）
+                elif col in ['trend_status', 'status_label']:
                     if pd.notna(value):
                         status = str(value)
-                        # 根据趋势状态设置不同的颜色标识
-                        if '连涨回落' in status or '反转转弱' in status:
-                            icon = '<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #FF6B6B; margin-right: 4px;"></span>'
-                            color = '#FF6B6B'
-                        elif '连涨放缓' in status:
-                            icon = '<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #FFA726; margin-right: 4px;"></span>'
-                            color = '#FFA726'
-                        elif '连涨加速' in status:
-                            icon = '<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #FFEE58; margin-right: 4px;"></span>'
-                            color = '#FFEE58'
-                        elif '大涨' in status:
-                            icon = '<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #66BB6A; margin-right: 4px;"></span>'
-                            color = '#66BB6A'
+                        clean_status = re.sub(r'<[^>]+>', '', status)
+                        
+                        if '连涨回落' in clean_status or '反转转弱' in clean_status or '转跌' in clean_status:
+                            icon_color = '#27ae60'
+                        elif '连涨放缓' in clean_status:
+                            icon_color = '#e67e22'
+                        elif '连涨加速' in clean_status or '大涨' in clean_status:
+                            icon_color = '#e74c3c'
+                        elif '震荡' in clean_status:
+                            icon_color = '#7f8c8d'
                         else:
-                            icon = '<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #9E9E9E; margin-right: 4px;"></span>'
-                            color = 'black'
-                        html_table += f"<td style='padding: 6px; border: 1px solid #ddd; color: {color};'>{icon}{status}</td>"
+                            icon_color = '#e67e22'
+                            
+                        icon = f'<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {icon_color}; margin-right: 6px; vertical-align: middle;"></span>'
+                        
+                        html_table += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: left; padding-left: 15px;'>{icon}<strong>{clean_status}</strong></td>"
                     else:
-                        html_table += "<td style='padding: 6px; border: 1px solid #ddd;'>N/A</td>"
+                        html_table += "<td style='padding: 8px; border: 1px solid #ddd;'>N/A</td>"
                 
                 elif col == 'operation_suggestion':
-                    # 操作建议格式化
                     suggestion = str(value) if pd.notna(value) else "N/A"
-                    # 根据建议内容设置颜色
-                    if "买入" in suggestion or "持有" in suggestion:
-                        color = "#4ECDC4"
-                    elif "赎回" in suggestion or "卖出" in suggestion:
-                        color = "#FF6B6B"
-                    else:
-                        color = "black"
-                    html_table += f"<td style='padding: 6px; border: 1px solid #ddd; color: {color};'>{suggestion}</td>"
+                    html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{suggestion}</td>"
                 
-                elif col == 'execute_amount':
-                    # 执行金额格式化
+                elif col in ['execute_amount', 'execution_amount']:
                     amount = str(value) if pd.notna(value) else "N/A"
-                    # 根据金额内容设置颜色
-                    if "赎回" in amount:
-                        color = "#FF6B6B"
-                    else:
-                        color = "black"
-                    html_table += f"<td style='padding: 6px; border: 1px solid #ddd; color: {color};'>{amount}</td>"
+                    html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{amount}</td>"
                 
+                elif col == 'fund_name':
+                     html_table += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: left;'>{value if pd.notna(value) else 'N/A'}</td>"
+
                 else:
-                    # 普通文本格式
-                    html_table += f"<td style='padding: 6px; border: 1px solid #ddd;'>{value if pd.notna(value) else 'N/A'}</td>"
+                    html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{value if pd.notna(value) else 'N/A'}</td>"
             
             html_table += "</tr>"
         
@@ -1131,7 +1349,7 @@ class EnhancedNotificationManager:
             'composite_score': '综合绩效评分',
             
             # 交易建议字段
-            'status_label': '状态标签',
+            'status_label': '趋势状态',
             'is_buy': '是否买入',
             'redeem_amount': '赎回金额',
             'comparison_value': '比较值',
@@ -1148,6 +1366,14 @@ class EnhancedNotificationManager:
 
 if __name__ == "__main__":
     # 测试代码
+    import sys
+    import os
+    
+    # 添加项目根目录到路径，以便导入shared模块
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    sys.path.append(parent_dir)
+    
     from shared.enhanced_config import NOTIFICATION_CONFIG
     
     # 创建通知管理器
