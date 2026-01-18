@@ -11,7 +11,7 @@ import os
 FUND_POSITION_FILE_PATH = os.environ.get('FUND_POSITION_FILE_PATH', 'd:/codes/py4zinia/pro2/fund_search/京东金融.xlsx')
 
 # 报告输出目录配置
-REPORT_DIR = os.environ.get('REPORT_DIR', 'd:/codes/py4zinia/pro2/fund_search/reports')
+REPORT_DIR = os.environ.get('REPORT_DIR', 'D:\coding\trae_project\py4zinia\pro2\reports')
 
 # 数据库配置
 DB_CONFIG = {
