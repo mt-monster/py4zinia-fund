@@ -50,8 +50,8 @@ class FundTopPicker:
             # 按日增长率降序排序
             fund_rank_sorted = fund_rank.sort_values(by='日增长率', ascending=False)
             
-            # 获取排名前top_n的基金
-            top_funds = fund_rank_sorted.head(top_n)
+            # 获取排名前top_n的基金，如果top_n<=0则返回所有基金
+            top_funds = fund_rank_sorted.head(top_n) if top_n > 0 else fund_rank_sorted
             
             # 重置索引
             top_funds = top_funds.reset_index(drop=True)
@@ -87,8 +87,8 @@ class FundTopPicker:
             # 按周增长率降序排序
             fund_rank_sorted = fund_rank.sort_values(by='近1周', ascending=False)
             
-            # 获取排名前top_n的基金
-            top_funds = fund_rank_sorted.head(top_n)
+            # 获取排名前top_n的基金，如果top_n<=0则返回所有基金
+            top_funds = fund_rank_sorted.head(top_n) if top_n > 0 else fund_rank_sorted
             
             # 重置索引
             top_funds = top_funds.reset_index(drop=True)
@@ -124,8 +124,8 @@ class FundTopPicker:
             # 按月增长率降序排序
             fund_rank_sorted = fund_rank.sort_values(by='近1月', ascending=False)
             
-            # 获取排名前top_n的基金
-            top_funds = fund_rank_sorted.head(top_n)
+            # 获取排名前top_n的基金，如果top_n<=0则返回所有基金
+            top_funds = fund_rank_sorted.head(top_n) if top_n > 0 else fund_rank_sorted
             
             # 重置索引
             top_funds = top_funds.reset_index(drop=True)

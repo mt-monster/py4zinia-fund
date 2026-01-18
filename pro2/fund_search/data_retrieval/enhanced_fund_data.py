@@ -25,36 +25,37 @@ class EnhancedFundData:
     def get_fund_basic_info(fund_code: str) -> Dict:
         """
         获取基金基本信息
-        
+
         参数：
         fund_code: 基金代码（6位数字）
-        
+
         返回：
         dict: 基金基本信息
         """
         try:
             # 获取基金基本信息
             fund_info = ak.fund_open_fund_info_em(symbol=fund_code, indicator="基本信息")
-            
+
             if fund_info.empty:
-                # API返回空数据，但不一定是无效基金，可能是API限制或延迟
-                logger.debug(f"基金 {fund_code} 基本信息API返回空，使用默认值")
+                # API返回空数据，尝试从净值历史获取成立日期作为备选
+                logger.debug(f"基金 {fund_code} 基本信息API返回空，尝试从净值历史获取")
+                establish_date = EnhancedFundData._get_establish_date_from_nav(fund_code)
                 return {
                     'fund_code': fund_code,
                     'fund_name': f'基金{fund_code}',
                     'fund_type': '未知',
-                    'establish_date': None,  # 返回None而不是空字符串
+                    'establish_date': establish_date,
                     'fund_company': '未知',
                     'fund_manager': '未知',
                     'management_fee': 0.0,
                     'custody_fee': 0.0
                 }
-            
+
             # 提取基本信息
             info_dict = {}
             for _, row in fund_info.iterrows():
                 info_dict[row['项目']] = row['数值']
-            
+
             return {
                 'fund_code': fund_code,
                 'fund_name': info_dict.get('基金简称', f'基金{fund_code}'),
@@ -71,16 +72,43 @@ class EnhancedFundData:
                 logger.debug(f"基金 {fund_code} API返回错误页面，使用默认值")
             else:
                 logger.debug(f"获取基金 {fund_code} 基本信息失败: {error_msg}，使用默认值")
+            # 尝试从净值历史获取成立日期
+            establish_date = EnhancedFundData._get_establish_date_from_nav(fund_code)
             return {
                 'fund_code': fund_code,
                 'fund_name': f'基金{fund_code}',
                 'fund_type': '未知',
-                'establish_date': None,  # 返回None而不是空字符串
+                'establish_date': establish_date,
                 'fund_company': '未知',
                 'fund_manager': '未知',
                 'management_fee': 0.0,
                 'custody_fee': 0.0
             }
+
+    @staticmethod
+    def _get_establish_date_from_nav(fund_code: str) -> Optional[str]:
+        """
+        从净值历史数据获取基金成立日期（第一个净值日期作为成立日期的近似值）
+
+        参数：
+        fund_code: 基金代码
+
+        返回：
+        str: 成立日期字符串，格式为YYYY-MM-DD，失败返回None
+        """
+        try:
+            fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+            if fund_nav.empty:
+                return None
+
+            # 获取第一行的净值日期
+            first_date = fund_nav.iloc[0].get('净值日期', None)
+            if first_date:
+                return str(first_date)
+            return None
+        except Exception as e:
+            logger.debug(f"获取基金 {fund_code} 净值历史失败: {e}")
+            return None
     
     @staticmethod
     def get_realtime_data(fund_code: str) -> Dict:
@@ -117,8 +145,30 @@ class EnhancedFundData:
             if len(fund_nav) > 1:
                 previous_data = fund_nav.iloc[-2]
                 previous_nav = float(previous_data.get('单位净值', 0))
-                # 获取昨日盈亏率（前一日的日增长率）
-                yesterday_return = float(previous_data.get('日增长率', 0))
+                # 获取昨日盈亏率（前一日的日增长率），添加异常处理
+                try:
+                    yesterday_return_raw = previous_data.get('日增长率', 0)
+                    if pd.notna(yesterday_return_raw):
+                        yesterday_return = float(yesterday_return_raw)
+                        # 检查昨日收益率是否异常（超过±100%）
+                        if abs(yesterday_return) > 100:
+                            logger.warning(f"基金 {fund_code} 昨日日增长率异常: {yesterday_return}%，使用计算值")
+                            # 使用净值计算更可靠的昨日收益率
+                            if previous_nav != 0:
+                                # 获取前前一日的单位净值
+                                if len(fund_nav) > 2:
+                                    day_before_yesterday_nav = float(fund_nav.iloc[-3].get('单位净值', 0))
+                                    if day_before_yesterday_nav != 0:
+                                        yesterday_return = (previous_nav - day_before_yesterday_nav) / day_before_yesterday_nav * 100
+                                    else:
+                                        yesterday_return = 0.0
+                                else:
+                                    yesterday_return = 0.0
+                    else:
+                        yesterday_return = 0.0
+                except (ValueError, TypeError):
+                    logger.warning(f"基金 {fund_code} 昨日日增长率解析失败，使用默认值")
+                    yesterday_return = 0.0
             else:
                 previous_nav = float(latest_data.get('单位净值', 0))
                 yesterday_return = 0.0
@@ -129,7 +179,23 @@ class EnhancedFundData:
             # 优先使用日增长率字段（已是百分比格式）
             daily_return_raw = latest_data.get('日增长率', None)
             if daily_return_raw is not None and pd.notna(daily_return_raw):
-                daily_return = float(daily_return_raw)
+                try:
+                    daily_return = float(daily_return_raw)
+                    # 检查收益率是否异常（超过±100%）
+                    if abs(daily_return) > 100:
+                        logger.warning(f"基金 {fund_code} 日增长率异常: {daily_return}%，使用计算值")
+                        # 使用净值计算更可靠的收益率
+                        if previous_nav != 0:
+                            daily_return = (current_nav - previous_nav) / previous_nav * 100
+                        else:
+                            daily_return = 0.0
+                except (ValueError, TypeError):
+                    logger.warning(f"基金 {fund_code} 日增长率解析失败，使用计算值")
+                    # 使用净值计算更可靠的收益率
+                    if previous_nav != 0:
+                        daily_return = (current_nav - previous_nav) / previous_nav * 100
+                    else:
+                        daily_return = 0.0
             else:
                 # 如果日增长率不可用，使用净值计算
                 if previous_nav != 0:
@@ -222,13 +288,13 @@ class EnhancedFundData:
             return pd.DataFrame()
     
     @staticmethod
-    def get_performance_metrics(fund_code: str, days: int = 365) -> Dict:
+    def get_performance_metrics(fund_code: str, days: int = 3650) -> Dict:
         """
         获取基金绩效指标
-    
+
         参数：
         fund_code: 基金代码（6位数字）
-        days: 历史数据天数（默认365天）
+        days: 历史数据天数（默认3650天，约10年，确保能获取完整历史数据）
         
         返回：
         dict: 基金绩效指标
@@ -286,8 +352,46 @@ class EnhancedFundData:
         # 计算年化波动率
         volatility = daily_returns.std() * np.sqrt(trading_days)
         
-        # 计算夏普比率
+        # 计算夏普比率（默认使用全部数据）
         sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0.0
+        
+        # 计算今年以来的夏普比率（YTD - Year to Date）
+        current_date = hist_data['date'].iloc[-1]
+        year_start_date = pd.Timestamp(year=current_date.year, month=1, day=1)
+        ytd_data = hist_data[hist_data['date'] >= year_start_date]
+        if len(ytd_data) >= 2:
+            ytd_returns = ytd_data['daily_return'].dropna()
+            ytd_volatility = ytd_returns.std() * np.sqrt(trading_days)
+            ytd_start_nav = ytd_data['nav'].iloc[0]
+            ytd_end_nav = ytd_data['nav'].iloc[-1]
+            ytd_total_return = (ytd_end_nav - ytd_start_nav) / ytd_start_nav if ytd_start_nav != 0 else 0.0
+            ytd_annualized_return = (1 + ytd_total_return) ** (trading_days / len(ytd_data)) - 1
+            sharpe_ratio_ytd = (ytd_annualized_return - risk_free_rate) / ytd_volatility if ytd_volatility != 0 else 0.0
+        else:
+            sharpe_ratio_ytd = 0.0
+        
+        # 计算近一年的夏普比率（1Y - 1 Year）
+        one_year_ago = current_date - pd.Timedelta(days=365)
+        one_year_data = hist_data[hist_data['date'] >= one_year_ago]
+        if len(one_year_data) >= 2:
+            one_year_returns = one_year_data['daily_return'].dropna()
+            one_year_volatility = one_year_returns.std() * np.sqrt(trading_days)
+            one_year_start_nav = one_year_data['nav'].iloc[0]
+            one_year_end_nav = one_year_data['nav'].iloc[-1]
+            one_year_total_return = (one_year_end_nav - one_year_start_nav) / one_year_start_nav if one_year_start_nav != 0 else 0.0
+            one_year_annualized_return = (1 + one_year_total_return) ** (trading_days / len(one_year_data)) - 1
+            sharpe_ratio_1y = (one_year_annualized_return - risk_free_rate) / one_year_volatility if one_year_volatility != 0 else 0.0
+        else:
+            sharpe_ratio_1y = 0.0
+        
+        # 计算成立以来的夏普比率（All - All Time）
+        if len(hist_data) >= 2:
+            all_returns = daily_returns
+            all_volatility = volatility
+            all_annualized_return = annualized_return
+            sharpe_ratio_all = (all_annualized_return - risk_free_rate) / all_volatility if all_volatility != 0 else 0.0
+        else:
+            sharpe_ratio_all = 0.0
         
         # 计算最大回撤
         cumulative_returns = (1 + daily_returns).cumprod()
@@ -329,6 +433,9 @@ class EnhancedFundData:
         return {
             'annualized_return': annualized_return,
             'sharpe_ratio': sharpe_ratio,
+            'sharpe_ratio_ytd': sharpe_ratio_ytd,
+            'sharpe_ratio_1y': sharpe_ratio_1y,
+            'sharpe_ratio_all': sharpe_ratio_all,
             'max_drawdown': max_drawdown,
             'volatility': volatility,
             'calmar_ratio': calmar_ratio,
@@ -352,6 +459,9 @@ class EnhancedFundData:
         return {
             'annualized_return': 0.0,
             'sharpe_ratio': 0.0,
+            'sharpe_ratio_ytd': 0.0,
+            'sharpe_ratio_1y': 0.0,
+            'sharpe_ratio_all': 0.0,
             'max_drawdown': 0.0,
             'volatility': 0.0,
             'calmar_ratio': 0.0,

@@ -228,11 +228,141 @@ class GridTradingStrategy(BaseStrategy):
         else:
             return StrategySignal('hold', 0, "网格内波动", f"当前波动 {change*100:.2f}% 未触发网格")
 
+
+# 5. 增强规则基准策略 (Enhanced Rule-Based Strategy)
+class EnhancedRuleBasedAdapter(BaseStrategy):
+    """
+    增强规则基准策略适配器
+    
+    逻辑：
+    - 适配当前系统使用的 EnhancedInvestmentStrategy
+    - 基于短期涨跌幅规则 (如: 连涨、反转、大跌等)
+    - 结合滚动绩效指标 (夏普、回撤等) 进行增强
+    """
+    
+    def __init__(self):
+        super().__init__(
+            name="增强规则基准策略", 
+            description="当前系统使用的复合规则策略，基于短期涨跌幅与趋势判断"
+        )
+        # 延迟导入以避免循环依赖或路径问题
+        try:
+            from enhanced_strategy import EnhancedInvestmentStrategy
+            self.strategy = EnhancedInvestmentStrategy()
+        except ImportError:
+            # 尝试从当前包导入
+            from .enhanced_strategy import EnhancedInvestmentStrategy
+            self.strategy = EnhancedInvestmentStrategy()
+        
+    def generate_signal(self, history_df: pd.DataFrame, current_index: int, current_holdings: float = 0, **kwargs) -> StrategySignal:
+        # 需要至少2天历史数据计算当日和昨日收益率
+        if current_index < 2:
+            return StrategySignal('hold', 0, "数据不足")
+        
+        nav = self._get_nav(history_df)
+        
+        # 获取价格
+        current_nav = nav.iloc[current_index]
+        prev_nav = nav.iloc[current_index - 1]
+        prev2_nav = nav.iloc[current_index - 2]
+        
+        # 计算百分比收益率
+        today_return = (current_nav - prev_nav) / prev_nav * 100
+        prev_day_return = (prev_nav - prev2_nav) / prev2_nav * 100
+        
+        # 计算简单的滚动绩效指标 (模拟EnhancedData的performance_metrics)
+        # 使用过去252天的数据 (约一年)
+        metrics = None
+        lookback = 252
+        start_idx = max(0, current_index - lookback)
+        
+        # 只有数据足够时才计算完整指标，否则使用默认值或None
+        if current_index - start_idx > 30:
+            subset_nav = nav.iloc[start_idx : current_index + 1]
+            returns = subset_nav.pct_change().dropna()
+            
+            if not returns.empty:
+                # 年化波动率
+                volatility = returns.std() * np.sqrt(252)
+                
+                # 年化收益率
+                total_ret = (subset_nav.iloc[-1] / subset_nav.iloc[0]) - 1
+                days = len(subset_nav)
+                annualized_return = (1 + total_ret) ** (252 / days) - 1
+                
+                # 夏普比率 (假设无风险利率3%)
+                rf = 0.03
+                sharpe_ratio = (annualized_return - rf) / volatility if volatility > 0 else 0
+                
+                # 最大回撤
+                cum_ret = (1 + returns).cumprod()
+                rolling_max = cum_ret.expanding().max()
+                drawdowns = (cum_ret - rolling_max) / rolling_max
+                max_drawdown = drawdowns.min()
+                
+                # 胜率
+                win_rate = (returns > 0).mean()
+                
+                # 简单综合评分 (示例)
+                composite_score = (sharpe_ratio * 0.4 + (1 if total_ret > 0 else 0) * 0.3 + (1 + max_drawdown) * 0.3)
+                
+                metrics = {
+                    'sharpe_ratio': sharpe_ratio,
+                    'max_drawdown': max_drawdown,
+                    'volatility': volatility,
+                    'win_rate': win_rate,
+                    'composite_score': composite_score
+                }
+        
+        # 调用原始策略
+        result = self.strategy.analyze_strategy(today_return, prev_day_return, metrics)
+        
+        action = result['action']
+        buy_multiplier = result['buy_multiplier']
+        description = result['operation_suggestion']
+        status_label = result['status_label']
+        redeem_amount = result['redeem_amount']
+        
+        # 转换为 StrategySignal
+        signal_action = 'hold'
+        signal_multiplier = 0.0
+        
+        if action in ['strong_buy', 'buy', 'weak_buy']:
+            signal_action = 'buy'
+            signal_multiplier = buy_multiplier
+        elif action in ['sell', 'weak_sell']:
+            signal_action = 'sell'
+            # 策略返回的是固定赎回金额(redeem_amount)，在此框架下需要转换为持有比例
+            # 这比较困难，因为需要知道当前持仓总值
+            # 幸好 generate_signal 接收 current_holdings
+            if current_holdings > 0:
+                # 计算赎回比例 (限制在 0-1 之间)
+                # 如果redeem_amount为0但action是sell，可能意味着全仓卖出? 
+                # 查看 enhanced_strategy 源码，redeem_amount 通常是 30, 15 等固定小额
+                # 或者全仓卖出逻辑。
+                if redeem_amount > 0:
+                    sell_ratio = min(redeem_amount / current_holdings, 1.0)
+                else:
+                    # 如果没有指定金额但要求卖出，假设卖出 10% 或根据 multiplier?
+                    # 原始策略中 action='sell' 对应 '反转下跌'，redeem_amount=30
+                    # 只有极度情况可能大额卖出。
+                    # 为了回测效果，我们假设 multiplier 用于卖出比例?
+                    # 原始策略中 sell 没有用到 multiplier (default 1.0 in config maybe?)
+                    # 让我们保守一点，如果 redeem_amount > 0 用金额，否则用 20%?
+                    sell_ratio = 0.2 
+                signal_multiplier = sell_ratio
+            else:
+                signal_multiplier = 0.0
+        
+        return StrategySignal(signal_action, signal_multiplier, status_label, description)
+
 def get_all_advanced_strategies() -> Dict[str, BaseStrategy]:
     """获取所有高级策略实例"""
     return {
         'dual_ma': DualMAStrategy(),
         'mean_reversion': MeanReversionStrategy(),
         'target_value': TargetValueStrategy(),
-        'grid': GridTradingStrategy()
+        'grid': GridTradingStrategy(),
+        'enhanced_rule_based': EnhancedRuleBasedAdapter()
     }
+

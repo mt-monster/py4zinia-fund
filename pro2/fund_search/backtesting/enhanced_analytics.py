@@ -608,37 +608,48 @@ class EnhancedFundAnalytics:
         try:
             fig, ax = plt.subplots(1, 1, figsize=(16, 10))
             fig.suptitle(f'投资建议汇总 - {date_str}', fontsize=20, fontweight='bold')
-            
+
             # 创建投资建议表格
             if not fund_data.empty:
                 # 选择重要指标进行展示，处理可能缺失的列
-                display_cols = ['fund_code', 'fund_name', 'annualized_return', 
-                               'sharpe_ratio', 'max_drawdown', 'composite_score']
-                
+                display_cols = ['fund_code', 'fund_name', 'annualized_return',
+                               'sharpe_ratio_ytd', 'sharpe_ratio_all', 'sharpe_ratio_1y', 'max_drawdown', 'composite_score']
+
+                # 如果establish_date列存在，则添加到显示列中
+                if 'establish_date' in fund_data.columns:
+                    display_cols.insert(2, 'establish_date')
+
                 # 如果daily_return列存在，则添加到显示列中
                 if 'daily_return' in fund_data.columns:
-                    display_cols.insert(2, 'daily_return')
-                
+                    display_cols.insert(3, 'daily_return')
+
                 # 按综合评分排序
                 summary_data = fund_data[display_cols].dropna(subset=['composite_score']).sort_values('composite_score', ascending=False)
                 
                 if not summary_data.empty:
-                    # 格式化数据
+                     # 格式化数据
                     summary_display = summary_data.copy()
                     if 'daily_return' in summary_display.columns:
                         summary_display['daily_return'] = summary_display['daily_return'].map('{:.2f}%'.format)
+                    if 'establish_date' in summary_display.columns:
+                        summary_display['establish_date'] = summary_display['establish_date'].astype(str)
                     summary_display['annualized_return'] = summary_display['annualized_return'].map('{:.2f}%'.format)
-                    summary_display['sharpe_ratio'] = summary_display['sharpe_ratio'].map('{:.3f}'.format)
+                    summary_display['sharpe_ratio_ytd'] = summary_display['sharpe_ratio_ytd'].map('{:.3f}'.format)
+                    summary_display['sharpe_ratio_all'] = summary_display['sharpe_ratio_all'].map('{:.3f}'.format)
+                    summary_display['sharpe_ratio_1y'] = summary_display['sharpe_ratio_1y'].map('{:.3f}'.format)
                     summary_display['max_drawdown'] = summary_display['max_drawdown'].map('{:.2f}%'.format)
                     summary_display['composite_score'] = summary_display['composite_score'].map('{:.3f}'.format)
                     
-                    # 重命名列（动态根据实际列名）
+                     # 重命名列（动态根据实际列名）
                     column_mapping = {
                         'fund_code': '基金代码',
                         'fund_name': '基金名称',
+                        'establish_date': '成立时间',
                         'daily_return': '日收益',
                         'annualized_return': '年化收益',
-                        'sharpe_ratio': '夏普比率',
+                        'sharpe_ratio_ytd': '夏普比率(今年以来)',
+                        'sharpe_ratio_all': '夏普比率(成立以来)',
+                        'sharpe_ratio_1y': '夏普比率(近一年)',
                         'max_drawdown': '最大回撤',
                         'composite_score': '综合评分'
                     }

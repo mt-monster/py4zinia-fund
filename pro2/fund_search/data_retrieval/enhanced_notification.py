@@ -1204,7 +1204,7 @@ class EnhancedNotificationManager:
                 # 根据列类型格式化值
                 if col in ['today_return', 'yesterday_return']:
                     if pd.notna(value):
-                        formatted_value = f"{value*100:.2f}%"
+                        formatted_value = f"{value:.2f}%"
                         color = '#e74c3c' if value > 0 else '#27ae60' if value < 0 else 'black'
                         html_table += f"<td style='padding: 8px; border: 1px solid #ddd; color: {color}; font-weight: 500;'>{formatted_value}</td>"
                     else:
@@ -1215,16 +1215,33 @@ class EnhancedNotificationManager:
                         status = str(value)
                         clean_status = re.sub(r'<[^>]+>', '', status)
                         
-                        if '连涨回落' in clean_status or '反转转弱' in clean_status or '转跌' in clean_status:
-                            icon_color = '#27ae60'
-                        elif '连涨放缓' in clean_status:
-                            icon_color = '#e67e22'
-                        elif '连涨加速' in clean_status or '大涨' in clean_status:
-                            icon_color = '#e74c3c'
-                        elif '震荡' in clean_status:
-                            icon_color = '#7f8c8d'
+                        # 根据状态标签中的emoji设置颜色
+                        if '🟢' in status:
+                            icon_color = '#27ae60'  # 绿色 - 上涨相关
+                        elif '🟡' in status:
+                            icon_color = '#f39c12'  # 黄色 - 连涨加速
+                        elif '🟠' in status:
+                            icon_color = '#e67e22'  # 橙色 - 上涨放缓
+                        elif '🔵' in status:
+                            icon_color = '#3498db'  # 蓝色 - 反转相关
+                        elif '🔴' in status:
+                            icon_color = '#e74c3c'  # 红色 - 下跌或警告
+                        elif '🟣' in status:
+                            icon_color = '#9b59b6'  # 紫色 - 下跌相关
+                        elif '⚪' in status:
+                            icon_color = '#bdc3c7'  # 灰色 - 平稳
                         else:
-                            icon_color = '#e67e22'
+                            # 根据文字内容判断颜色
+                            if '上涨' in clean_status or '突破' in clean_status:
+                                icon_color = '#27ae60'
+                            elif '下跌' in clean_status or '回调' in clean_status:
+                                icon_color = '#e74c3c'
+                            elif '震荡' in clean_status:
+                                icon_color = '#95a5a6'
+                            elif '平稳' in clean_status:
+                                icon_color = '#bdc3c7'
+                            else:
+                                icon_color = '#e67e22'  # 默认橙色
                             
                         icon = f'<span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: {icon_color}; margin-right: 6px; vertical-align: middle;"></span>'
                         
