@@ -133,8 +133,8 @@ class EnhancedFundAnalysisSystem:
                 portfolio_size=6
             )
             
-            # 使用少量基金快速对比
-            results = engine.run_strategy_comparison(top_n=10, rank_type='daily')
+            # 使用所有基金进行对比
+            results = engine.run_strategy_comparison(top_n=0, rank_type='daily')
             
             if not results or 'comparison_report' not in results:
                 logger.warning("策略对比未返回有效结果")
@@ -150,19 +150,42 @@ class EnhancedFundAnalysisSystem:
             report_lines = []
             report_lines.append("# 基金定投策略最优性分析报告")
             report_lines.append(f"分析日期: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            report_lines.append("\n## 1. 策略对比结果 (基于四种标准策略)")
-            report_lines.append(f"本次回测对比了以下四种经典策略在当前市场环境下的表现：")
-            report_lines.append(f"- **dual_ma**: 双均线趋势跟踪")
-            report_lines.append(f"- **mean_reversion**: 均值回归")
-            report_lines.append(f"- **target_value**: 目标市值")
-            report_lines.append(f"- **grid**: 网格交易")
+            report_lines.append(f"\n## 1. 策略对比结果 (基于{len(results.get('strategy_metrics', []))}种策略)")
+            report_lines.append(f"本次回测对比了多种策略在当前市场环境下的表现，包括系统当前使用的策略：")
+            
+            # 动态列出所有参与对比的策略
+            strategy_descriptions = {
+                'dual_ma': '双均线趋势跟踪',
+                'mean_reversion': '均值回归',
+                'target_value': '目标市值',
+                'grid': '网格交易',
+                'enhanced_rule_based': '增强规则基准策略 (当前系统使用)'
+            }
+            
+            for strategy_key in results.get('strategy_metrics', {}).keys():
+                desc = strategy_descriptions.get(strategy_key, strategy_key)
+                report_lines.append(f"- **{strategy_key}**: {desc}")
             
             if results.get('strategy_metrics'):
                 report_lines.append("\n### 绩效指标对比")
-                report_lines.append("| 策略名称 | 年化收益率 | 最大回撤 | 夏普比率 |")
-                report_lines.append("|---|---|---|---|")
+                report_lines.append("| 策略名称 | 年化收益率 | 最大回撤 | 夏普比率 | 综合评分 |")
+                report_lines.append("|---|---|---|---|---|")
+                
+                # 计算简单的综合评分用于展示 (如果metrics里没有)
+                # 其实 results['comparison_report']['best_strategy'] 里有 score
+                # 这里我们重新遍历
                 for name, metrics in results['strategy_metrics'].items():
-                    report_lines.append(f"| {name} | {metrics['annualized_return']:.2%} | {metrics['max_drawdown']:.2%} | {metrics['sharpe_ratio']:.2f} |")
+                    # 尝试从metrics获取score，如果没有则简单计算
+                    score = metrics.get('composite_score', 0)
+                    if score == 0 and metrics.get('volatility', 0) > 0:
+                         # 简单的近似计算，与StrategyComparisonEngine保持一致
+                         sharpe_score = min(metrics['sharpe_ratio'] / 2.0, 1.0) * 0.4
+                         return_score = min(max(metrics['total_return'], 0) / 0.5, 1.0) * 0.3
+                         drawdown_score = (1 - min(abs(metrics['max_drawdown']), 0.5) / 0.5) * 0.2
+                         winrate_score = metrics['win_rate'] * 0.1
+                         score = sharpe_score + return_score + drawdown_score + winrate_score
+                         
+                    report_lines.append(f"| {name} | {metrics['annualized_return']:.2%} | {metrics['max_drawdown']:.2%} | {metrics['sharpe_ratio']:.2f} | {score:.3f} |")
             
             report_lines.append(f"\n### 最优策略: {best_strategy_name}")
             report_lines.append(f"**综合评分**: {best_backtest_strategy.get('score', 0):.3f}")
@@ -172,13 +195,22 @@ class EnhancedFundAnalysisSystem:
             report_lines.append(f"**策略名称**: {current_strategy_name}")
             report_lines.append("**策略描述**: 基于短期价格行为（当日/昨日涨跌幅）和基金绩效指标的复合规则型策略。")
             
+            # 获取当前策略的回测表现
+            current_metrics = results.get('strategy_metrics', {}).get('enhanced_rule_based', {})
+            if current_metrics:
+                report_lines.append(f"**回测表现**: 年化收益 {current_metrics.get('annualized_return', 0):.2%}, 最大回撤 {current_metrics.get('max_drawdown', 0):.2%}")
+
             report_lines.append("\n## 3. 结论与建议")
-            if best_strategy_name == current_strategy_name:
-                report_lines.append("✅ **结论**: 当前流程使用的策略与回测最优策略一致。")
+            
+            # 判断最优策略是否是当前策略 (enhanced_rule_based)
+            is_optimal = (best_strategy_name == 'enhanced_rule_based')
+            
+            if is_optimal:
+                report_lines.append("✅ **结论**: 当前流程使用的策略 (`enhanced_rule_based`) 在回测中表现最优，建议继续保持。")
             else:
-                report_lines.append("⚠️ **结论**: 当前流程使用的策略与回测最优策略 **不一致**。")
-                report_lines.append(f"\n- **回测显示**: 在当前选定的时间窗口和市场环境下，`{best_strategy_name}` 表现最佳。")
-                report_lines.append(f"- **系统现状**: 目前系统主要依据 `{current_strategy_name}` 进行定投信号判断。")
+                report_lines.append(f"⚠️ **结论**: 当前流程使用的策略与回测最优策略 **不一致**。")
+                report_lines.append(f"\n- **回测显示**: `{best_strategy_name}` 表现最佳 (综合评分 {best_backtest_strategy.get('score', 0):.3f})。")
+                report_lines.append(f"- **系统现状**: 当前策略 (`enhanced_rule_based`) 表现次之或欠佳。")
                 
                 report_lines.append("\n### 改进建议")
                 if best_strategy_name == 'target_value':
@@ -284,23 +316,95 @@ class EnhancedFundAnalysisSystem:
             historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
             
             # 计算今日和昨日收益率
+            # 从实时数据获取今日收益率，并添加验证
             today_return = realtime_data.get('daily_return', 0.0)
+            try:
+                today_return = float(today_return)
+                # 检查今日收益率是否异常（超过±100%）
+                if abs(today_return) > 100:
+                    logger.warning(f"基金 {fund_code} 今日收益率异常: {today_return}%，使用默认值0.0%")
+                    today_return = 0.0
+            except (ValueError, TypeError):
+                logger.warning(f"基金 {fund_code} 今日收益率解析失败，使用默认值0.0%")
+                today_return = 0.0
+            
             yesterday_return = 0.0
             
-            # 从历史数据获取昨日收益率
-            if not historical_data.empty and 'daily_growth_rate' in historical_data.columns:
-                recent_growth = historical_data['daily_growth_rate'].dropna().tail(2)
-                if len(recent_growth) >= 2:
-                    yesterday_return = float(recent_growth.iloc[-2]) if pd.notna(recent_growth.iloc[-2]) else 0.0
-                elif len(recent_growth) == 1:
-                    yesterday_return = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
-            elif not historical_data.empty and 'daily_return' in historical_data.columns:
-                # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
-                recent_returns = historical_data['daily_return'].dropna().tail(2)
-                if len(recent_returns) >= 2:
-                    yesterday_return = recent_returns.iloc[-2] * 100
-                elif len(recent_returns) == 1:
-                    yesterday_return = recent_returns.iloc[-1] * 100
+            # 首先尝试从实时数据获取昨日收益率（更可靠）
+            if 'yesterday_return' in realtime_data:
+                yesterday_return = realtime_data['yesterday_return']
+                try:
+                    yesterday_return = float(yesterday_return)
+                    # 检查昨日收益率是否异常（超过±100%）
+                    if abs(yesterday_return) > 100:
+                        logger.warning(f"基金 {fund_code} 实时数据中的昨日收益率异常: {yesterday_return}%，从历史数据获取")
+                        yesterday_return = 0.0
+                    else:
+                        # 如果实时数据中的昨日收益率正常，直接使用
+                        logger.debug(f"基金 {fund_code} 从实时数据获取昨日收益率: {yesterday_return}%")
+                except (ValueError, TypeError):
+                    logger.warning(f"基金 {fund_code} 实时数据中的昨日收益率解析失败，从历史数据获取")
+                    yesterday_return = 0.0
+            
+            # 如果实时数据中的昨日收益率不可用或异常，从历史数据获取
+            if yesterday_return == 0.0 and not historical_data.empty:
+                if 'daily_growth_rate' in historical_data.columns:
+                    recent_growth = historical_data['daily_growth_rate'].dropna().tail(2)
+                    if len(recent_growth) >= 2:
+                        try:
+                            yesterday_return = float(recent_growth.iloc[-2]) if pd.notna(recent_growth.iloc[-2]) else 0.0
+                            # 检查昨日收益率是否异常（超过±100%）
+                            if abs(yesterday_return) > 100:
+                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
+                                yesterday_return = 0.0
+                            else:
+                                logger.debug(f"基金 {fund_code} 从历史数据daily_growth_rate获取昨日收益率: {yesterday_return}%")
+                        except (ValueError, TypeError):
+                            logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败，使用默认值")
+                            yesterday_return = 0.0
+                    elif len(recent_growth) == 1:
+                        try:
+                            yesterday_return = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+                            # 检查昨日收益率是否异常（超过±100%）
+                            if abs(yesterday_return) > 100:
+                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
+                                yesterday_return = 0.0
+                            else:
+                                logger.debug(f"基金 {fund_code} 从历史数据daily_growth_rate获取昨日收益率: {yesterday_return}%")
+                        except (ValueError, TypeError):
+                            logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败，使用默认值")
+                            yesterday_return = 0.0
+                elif 'daily_return' in historical_data.columns:
+                    # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
+                    recent_returns = historical_data['daily_return'].dropna().tail(2)
+                    if len(recent_returns) >= 2:
+                        try:
+                            yesterday_return = recent_returns.iloc[-2] * 100
+                            # 检查昨日收益率是否异常（超过±100%）
+                            if abs(yesterday_return) > 100:
+                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
+                                yesterday_return = 0.0
+                            else:
+                                logger.debug(f"基金 {fund_code} 从历史数据daily_return获取昨日收益率: {yesterday_return}%")
+                        except (ValueError, TypeError):
+                            logger.warning(f"基金 {fund_code} 历史数据daily_return解析失败，使用默认值")
+                            yesterday_return = 0.0
+                    elif len(recent_returns) == 1:
+                        try:
+                            yesterday_return = recent_returns.iloc[-1] * 100
+                            # 检查昨日收益率是否异常（超过±100%）
+                            if abs(yesterday_return) > 100:
+                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
+                                yesterday_return = 0.0
+                            else:
+                                logger.debug(f"基金 {fund_code} 从历史数据daily_return获取昨日收益率: {yesterday_return}%")
+                        except (ValueError, TypeError):
+                            logger.warning(f"基金 {fund_code} 历史数据daily_return解析失败，使用默认值")
+                            yesterday_return = 0.0
+            
+            # 确保收益率格式正确，保留两位小数
+            today_return = round(today_return, 2)
+            yesterday_return = round(yesterday_return, 2)
             
             # 投资策略分析 - 使用策略引擎
             strategy_result = self.strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
@@ -323,9 +427,6 @@ class EnhancedFundAnalysisSystem:
                 'fund_code': fund_code,
                 'fund_name': fund_name,  # 优先使用传入的基金名称
                 'analysis_date': analysis_date,
-                'today_return': today_return,
-                'yesterday_return': yesterday_return,  # 使用yesterday_return字段
-                'prev_day_return': yesterday_return,  # 兼容字段
                 'strategy_name': strategy_name,  # 使用策略引擎返回的策略名称
                 'status_label': status_label,
                 'operation_suggestion': operation_suggestion,
@@ -334,11 +435,15 @@ class EnhancedFundAnalysisSystem:
                 'redeem_amount': redeem_amount,
                 'buy_multiplier': buy_multiplier,
                 'action': action,  # 添加action字段供策略引擎使用
-                'daily_return': today_return,  # 用于收益率分析图表
                 'comparison_value': comparison_value,  # 添加比较值字段
                 **basic_info,
                 **realtime_data,
-                **performance_metrics
+                **performance_metrics,
+                # 最后设置收益率相关字段，确保不会被覆盖
+                'today_return': today_return,
+                'yesterday_return': yesterday_return,  # 使用yesterday_return字段
+                'prev_day_return': yesterday_return,  # 兼容字段
+                'daily_return': today_return,  # 用于收益率分析图表
             }
             
             # 确保使用传入的基金名称覆盖API获取的名称
@@ -1245,6 +1350,10 @@ class EnhancedFundAnalysisSystem:
 
 def main():
     """主函数"""
+    # 计算默认输出目录 (相对于脚本位置: ../reports/)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    default_output_dir = os.path.join(script_dir, '..', 'reports')
+    
     # 设置命令行参数解析
     parser = argparse.ArgumentParser(
         description='增强版基金分析系统',
@@ -1276,8 +1385,8 @@ def main():
     parser.add_argument(
         '--output', '-o',
         type=str,
-        default='../reports/',
-        help='输出目录（默认: .../reports/）'
+        default=default_output_dir,
+        help=f'输出目录（默认: {default_output_dir}）'
     )
     
     parser.add_argument(
@@ -1391,7 +1500,7 @@ def main():
         # 检查策略最优性
         if args.all or args.strategy_analysis:
             logger.info("检查当前策略最优性...")
-            system.check_current_strategy_optimality()
+            system.check_current_strategy_optimality(output_dir=args.output)
         
         if args.test:
             # 运行测试模式

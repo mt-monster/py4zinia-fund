@@ -90,6 +90,11 @@ def etf_detail_page(etf_code):
     """ETF详情页"""
     return render_template('etf_detail.html', etf_code=etf_code)
 
+@app.route('/my-holdings')
+def my_holdings():
+    """我的持仓页"""
+    return render_template('my_holdings.html')
+
 
 # ==================== API 路由 ====================
 
@@ -118,9 +123,11 @@ def get_funds():
         sql = f"""
         SELECT DISTINCT 
             far.fund_code, far.fund_name, far.today_return, far.yesterday_return, far.prev_day_return,
-            far.annualized_return, far.sharpe_ratio, far.max_drawdown, far.volatility,
+            far.annualized_return, far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
+            far.max_drawdown, far.volatility,
             far.composite_score, far.status_label, far.operation_suggestion, far.analysis_date,
             far.current_estimate as current_nav, far.yesterday_nav as previous_nav,
+            far.execution_amount, far.buy_multiplier, far.redeem_amount,
             h.holding_shares, h.cost_price, h.holding_amount, h.buy_date
         FROM fund_analysis_results far
         LEFT JOIN user_holdings h ON far.fund_code = h.fund_code AND h.user_id = 'default_user'

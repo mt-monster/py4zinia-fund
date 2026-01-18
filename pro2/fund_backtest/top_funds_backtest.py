@@ -69,29 +69,67 @@ class TopFundsBacktest:
     
     def get_top_funds(self, top_n=20, rank_type='daily'):
         """
-        获取排名前top_n的基金
+        获取排名前top_n的基金 - 从京东金融Excel文件中读取
         
         参数：
-        top_n: int, 要获取的基金数量，默认为20
+        top_n: int, 要获取的基金数量，默认为20；如果top_n<=0，则返回所有基金
         rank_type: str, 排名类型，可选值为'daily'、'weekly'、'monthly'，默认为'daily'
         
         返回：
         pandas.DataFrame, 排名前top_n的基金数据
         """
         try:
-            if rank_type == 'daily':
-                top_funds = self.picker.get_top_funds_by_daily_return(top_n=top_n)
-            elif rank_type == 'weekly':
-                top_funds = self.picker.get_top_funds_by_weekly_return(top_n=top_n)
-            elif rank_type == 'monthly':
-                top_funds = self.picker.get_top_funds_by_monthly_return(top_n=top_n)
-            else:
-                print(f"不支持的排名类型: {rank_type}")
-                return None
+            import pandas as pd
+            import os
             
-            return top_funds
+            # 从京东金融Excel文件中读取基金数据
+            file_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'fund_search',
+                '京东金融.xlsx'
+            )
+            
+            # 读取持仓数据工作表
+            funds_df = pd.read_excel(file_path, sheet_name='持仓数据')
+            
+            # 确保代码列是字符串类型
+            funds_df['代码'] = funds_df['代码'].astype(str)
+            
+            # 根据排名类型进行排序
+            if rank_type == 'daily':
+                # 按当日涨幅排序
+                funds_df['当日涨幅'] = pd.to_numeric(funds_df['当日涨幅'].str.strip('%'), errors='coerce')
+                sorted_funds = funds_df.sort_values(by='当日涨幅', ascending=False)
+            elif rank_type == 'weekly':
+                # 按近1周涨幅排序
+                funds_df['近1周'] = pd.to_numeric(funds_df['近1月'].str.strip('%'), errors='coerce')
+                sorted_funds = funds_df.sort_values(by='近1周', ascending=False)
+            elif rank_type == 'monthly':
+                # 按近1月涨幅排序
+                funds_df['近1月'] = pd.to_numeric(funds_df['近1月涨幅'].str.strip('%'), errors='coerce')
+                sorted_funds = funds_df.sort_values(by='近1月', ascending=False)
+            else:
+                # 默认按当日涨幅排序
+                funds_df['当日涨幅'] = pd.to_numeric(funds_df['当日涨幅'].str.strip('%'), errors='coerce')
+                sorted_funds = funds_df.sort_values(by='当日涨幅', ascending=False)
+            
+            # 获取前top_n的基金，如果top_n<=0则返回所有基金
+            if top_n > 0:
+                result_funds = sorted_funds.head(top_n)
+            else:
+                result_funds = sorted_funds
+            
+            # 重置索引
+            result_funds = result_funds.reset_index(drop=True)
+            
+            # 重命名列，确保与原有接口兼容
+            if '代码' in result_funds.columns:
+                result_funds = result_funds.rename(columns={'代码': '基金代码'})
+            
+            print(f"从京东金融Excel文件获取了 {len(result_funds)} 只基金")
+            return result_funds
         except Exception as e:
-            print(f"获取排名前{top_n}的基金时出错: {e}")
+            print(f"从京东金融Excel文件获取基金时出错: {e}")
             return None
     
     def build_portfolio(self, fund_codes, method='diversified'):

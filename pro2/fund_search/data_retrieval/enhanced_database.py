@@ -207,6 +207,9 @@ class EnhancedDatabaseManager:
             buy_multiplier FLOAT DEFAULT NULL,
             annualized_return FLOAT DEFAULT NULL,
             sharpe_ratio FLOAT DEFAULT NULL,
+            sharpe_ratio_ytd FLOAT DEFAULT NULL,
+            sharpe_ratio_1y FLOAT DEFAULT NULL,
+            sharpe_ratio_all FLOAT DEFAULT NULL,
             max_drawdown FLOAT DEFAULT NULL,
             volatility FLOAT DEFAULT NULL,
             calmar_ratio FLOAT DEFAULT NULL,
@@ -225,6 +228,50 @@ class EnhancedDatabaseManager:
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """
         self.execute_sql(sql)
+        
+        # 添加新的夏普比率字段（如果表已存在）
+        self._add_sharpe_ratio_columns()
+    
+    def _add_sharpe_ratio_columns(self):
+        """添加新的夏普比率字段到fund_analysis_results表"""
+        try:
+            # 先检查表结构，确定哪些字段需要添加
+            check_sql = """
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'fund_analysis_results'
+            """
+            existing_columns = set()
+            try:
+                result = self.execute_query_raw(check_sql)
+                if result:
+                    existing_columns = {row[0] for row in result}
+            except Exception as e:
+                logger.warning(f"检查表结构时出现错误: {str(e)}")
+            
+            # 定义需要添加的字段
+            columns_to_add = [
+                ('sharpe_ratio_ytd', 'FLOAT DEFAULT NULL AFTER sharpe_ratio'),
+                ('sharpe_ratio_1y', 'FLOAT DEFAULT NULL AFTER sharpe_ratio_ytd'),
+                ('sharpe_ratio_all', 'FLOAT DEFAULT NULL AFTER sharpe_ratio_1y')
+            ]
+            
+            # 只添加不存在的字段
+            for column_name, column_def in columns_to_add:
+                if column_name not in existing_columns:
+                    alter_sql = f"ALTER TABLE fund_analysis_results ADD COLUMN {column_name} {column_def}"
+                    try:
+                        self.execute_sql(alter_sql)
+                        logger.info(f"成功添加字段: {column_name}")
+                    except Exception as e:
+                        logger.warning(f"添加字段 {column_name} 时出现错误: {str(e)}")
+                else:
+                    logger.info(f"字段 {column_name} 已存在，跳过")
+            
+            logger.info("夏普比率字段检查完成")
+        except Exception as e:
+            logger.warning(f"添加夏普比率字段时出现错误: {str(e)}")
     
     def _create_user_holdings_table(self):
         """
@@ -328,6 +375,21 @@ class EnhancedDatabaseManager:
         bool: 执行是否成功
         """
         try:
+            # 转换numpy类型为Python原生类型
+            if params:
+                import numpy as np
+                converted_params = {}
+                for key, value in params.items():
+                    if isinstance(value, np.floating):
+                        converted_params[key] = float(value)
+                    elif isinstance(value, np.integer):
+                        converted_params[key] = int(value)
+                    elif isinstance(value, np.bool_):
+                        converted_params[key] = bool(value)
+                    else:
+                        converted_params[key] = value
+                params = converted_params
+            
             with self.engine.connect() as conn:
                 if params:
                     conn.execute(text(sql), params)
@@ -586,6 +648,9 @@ class EnhancedDatabaseManager:
                     'execution_amount': fund_data.get('execution_amount', ''),
                     'annualized_return': fund_data.get('annualized_return', 0.0),
                     'sharpe_ratio': fund_data.get('sharpe_ratio', 0.0),
+                    'sharpe_ratio_ytd': fund_data.get('sharpe_ratio_ytd', 0.0),
+                    'sharpe_ratio_1y': fund_data.get('sharpe_ratio_1y', 0.0),
+                    'sharpe_ratio_all': fund_data.get('sharpe_ratio_all', 0.0),
                     'max_drawdown': fund_data.get('max_drawdown', 0.0),
                     'volatility': fund_data.get('volatility', 0.0),
                     'calmar_ratio': fund_data.get('calmar_ratio', 0.0),
@@ -1003,14 +1068,16 @@ class EnhancedDatabaseManager:
                 fund_code, fund_name, yesterday_nav, current_estimate, today_return, 
                 yesterday_return, prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
                 operation_suggestion, execution_amount, analysis_date, buy_multiplier, 
-                annualized_return, sharpe_ratio, max_drawdown, volatility, calmar_ratio, 
+                annualized_return, sharpe_ratio, sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all,
+                max_drawdown, volatility, calmar_ratio, 
                 sortino_ratio, var_95, win_rate, profit_loss_ratio, daily_return, 
                 total_return, composite_score
             ) VALUES (
                 :fund_code, :fund_name, :yesterday_nav, :current_estimate, :today_return,
                 :yesterday_return, :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
                 :operation_suggestion, :execution_amount, :analysis_date, :buy_multiplier,
-                :annualized_return, :sharpe_ratio, :max_drawdown, :volatility, :calmar_ratio,
+                :annualized_return, :sharpe_ratio, :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all,
+                :max_drawdown, :volatility, :calmar_ratio,
                 :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, :daily_return, 
                 :total_return, :composite_score
             ) ON DUPLICATE KEY UPDATE
@@ -1029,6 +1096,9 @@ class EnhancedDatabaseManager:
                 buy_multiplier = VALUES(buy_multiplier),
                 annualized_return = VALUES(annualized_return),
                 sharpe_ratio = VALUES(sharpe_ratio),
+                sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
+                sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
+                sharpe_ratio_all = VALUES(sharpe_ratio_all),
                 max_drawdown = VALUES(max_drawdown),
                 volatility = VALUES(volatility),
                 calmar_ratio = VALUES(calmar_ratio),
@@ -1043,33 +1113,36 @@ class EnhancedDatabaseManager:
             
             # 准备插入的数据，映射到实际表的列
             prepared_data = {
-                'fund_code': analysis_data.get('fund_code', ''),
-                'fund_name': analysis_data.get('fund_name', ''),
-                'yesterday_nav': analysis_data.get('yesterday_nav', 0.0),
-                'current_estimate': analysis_data.get('current_estimate', 0.0),
-                'today_return': analysis_data.get('today_return', 0.0),
-                'yesterday_return': analysis_data.get('yesterday_return', 0.0),
-                'prev_day_return': analysis_data.get('prev_day_return', 0.0),
-                'status_label': analysis_data.get('status_label', ''),
-                'is_buy': analysis_data.get('is_buy', 0),
-                'redeem_amount': analysis_data.get('redeem_amount', 0.0),
-                'comparison_value': analysis_data.get('comparison_value', 0.0),
-                'operation_suggestion': analysis_data.get('operation_suggestion', ''),
-                'execution_amount': analysis_data.get('execution_amount', ''),
+                'fund_code': str(analysis_data.get('fund_code', '')),
+                'fund_name': str(analysis_data.get('fund_name', '')),
+                'yesterday_nav': float(analysis_data.get('yesterday_nav', 0.0)),
+                'current_estimate': float(analysis_data.get('current_estimate', 0.0)),
+                'today_return': float(analysis_data.get('today_return', 0.0)),
+                'yesterday_return': float(analysis_data.get('yesterday_return', 0.0)),
+                'prev_day_return': float(analysis_data.get('prev_day_return', 0.0)),
+                'status_label': str(analysis_data.get('status_label', '')),
+                'is_buy': int(analysis_data.get('is_buy', 0)),
+                'redeem_amount': float(analysis_data.get('redeem_amount', 0.0)),
+                'comparison_value': float(analysis_data.get('comparison_value', 0.0)),
+                'operation_suggestion': str(analysis_data.get('operation_suggestion', '')),
+                'execution_amount': str(analysis_data.get('execution_amount', '')),
                 'analysis_date': analysis_data.get('analysis_date', datetime.now().date()),
-                'buy_multiplier': analysis_data.get('buy_multiplier', 0.0),
-                'annualized_return': analysis_data.get('annualized_return', 0.0),
-                'sharpe_ratio': analysis_data.get('sharpe_ratio', 0.0),
-                'max_drawdown': analysis_data.get('max_drawdown', 0.0),
-                'volatility': analysis_data.get('volatility', 0.0),
-                'calmar_ratio': analysis_data.get('calmar_ratio', 0.0),
-                'sortino_ratio': analysis_data.get('sortino_ratio', 0.0),
-                'var_95': analysis_data.get('var_95', 0.0),
-                'win_rate': analysis_data.get('win_rate', 0.0),
-                'profit_loss_ratio': analysis_data.get('profit_loss_ratio', 0.0),
-                'daily_return': analysis_data.get('daily_return', 0.0),
-                'total_return': analysis_data.get('total_return', 0.0),
-                'composite_score': analysis_data.get('composite_score', 0.0)
+                'buy_multiplier': float(analysis_data.get('buy_multiplier', 0.0)),
+                'annualized_return': float(analysis_data.get('annualized_return', 0.0)),
+                'sharpe_ratio': float(analysis_data.get('sharpe_ratio', 0.0)),
+                'sharpe_ratio_ytd': float(analysis_data.get('sharpe_ratio_ytd', 0.0)),
+                'sharpe_ratio_1y': float(analysis_data.get('sharpe_ratio_1y', 0.0)),
+                'sharpe_ratio_all': float(analysis_data.get('sharpe_ratio_all', 0.0)),
+                'max_drawdown': float(analysis_data.get('max_drawdown', 0.0)),
+                'volatility': float(analysis_data.get('volatility', 0.0)),
+                'calmar_ratio': float(analysis_data.get('calmar_ratio', 0.0)),
+                'sortino_ratio': float(analysis_data.get('sortino_ratio', 0.0)),
+                'var_95': float(analysis_data.get('var_95', 0.0)),
+                'win_rate': float(analysis_data.get('win_rate', 0.0)),
+                'profit_loss_ratio': float(analysis_data.get('profit_loss_ratio', 0.0)),
+                'daily_return': float(analysis_data.get('daily_return', 0.0)),
+                'total_return': float(analysis_data.get('total_return', 0.0)),
+                'composite_score': float(analysis_data.get('composite_score', 0.0))
             }
             
             self.execute_sql(sql, prepared_data)

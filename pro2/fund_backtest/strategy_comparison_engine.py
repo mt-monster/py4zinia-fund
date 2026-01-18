@@ -18,6 +18,9 @@ import os
 
 # 添加路径以导入advanced_strategies
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'fund_search', 'backtesting'))
+# 添加路径以导入shared (for enhanced_strategy)
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'fund_search'))
+
 from advanced_strategies import get_all_advanced_strategies, BaseStrategy, StrategySignal
 
 # 导入现有模块
