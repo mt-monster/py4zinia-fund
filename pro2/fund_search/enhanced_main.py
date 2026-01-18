@@ -26,6 +26,15 @@ from backtesting.enhanced_analytics import EnhancedFundAnalytics
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
 from data_retrieval.enhanced_notification import EnhancedNotificationManager
 
+# 导入策略对比分析系统
+STRATEGY_ANALYZER_AVAILABLE = False
+try:
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
+    from complete_strategy_analyzer import CompleteStrategyAnalyzer
+    STRATEGY_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    pass  # 静默处理，避免logger未定义错误
+
 # 设置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -52,6 +61,12 @@ class EnhancedFundAnalysisSystem:
         # 配置中文字体显示
         self.setup_chinese_font()
         
+        # 检查策略对比分析系统是否可用
+        if STRATEGY_ANALYZER_AVAILABLE:
+            logger.info("策略对比分析系统已加载")
+        else:
+            logger.warning("策略对比分析系统不可用，将跳过相关功能")
+
         logger.info("增强版基金分析系统初始化完成")
     
     def setup_chinese_font(self):
@@ -95,6 +110,100 @@ class EnhancedFundAnalysisSystem:
         except ImportError:
             logger.warning("matplotlib未安装，跳过字体设置")
     
+    def check_current_strategy_optimality(self, output_dir: str = '../reports/') -> None:
+        """
+        检查当前使用的策略是否为最优策略，并生成分析报告
+        """
+        try:
+            logger.info("开始检查策略最优性...")
+            
+            # 尝试导入策略对比引擎
+            try:
+                sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
+                from strategy_comparison_engine import StrategyComparisonEngine
+            except ImportError:
+                logger.warning("无法导入 StrategyComparisonEngine，跳过策略最优性检查")
+                return
+
+            # 运行策略对比
+            engine = StrategyComparisonEngine(
+                backtest_start_date='2024-01-01',
+                backtest_end_date=datetime.now().strftime('%Y-%m-%d'),
+                base_amount=1000,
+                portfolio_size=6
+            )
+            
+            # 使用少量基金快速对比
+            results = engine.run_strategy_comparison(top_n=10, rank_type='daily')
+            
+            if not results or 'comparison_report' not in results:
+                logger.warning("策略对比未返回有效结果")
+                return
+                
+            best_backtest_strategy = results['comparison_report'].get('best_strategy', {})
+            best_strategy_name = best_backtest_strategy.get('name', 'Unknown')
+            
+            # 当前策略信息
+            current_strategy_name = "Enhanced Rule-Based Strategy"
+            
+            # 生成报告内容
+            report_lines = []
+            report_lines.append("# 基金定投策略最优性分析报告")
+            report_lines.append(f"分析日期: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            report_lines.append("\n## 1. 策略对比结果 (基于四种标准策略)")
+            report_lines.append(f"本次回测对比了以下四种经典策略在当前市场环境下的表现：")
+            report_lines.append(f"- **dual_ma**: 双均线趋势跟踪")
+            report_lines.append(f"- **mean_reversion**: 均值回归")
+            report_lines.append(f"- **target_value**: 目标市值")
+            report_lines.append(f"- **grid**: 网格交易")
+            
+            if results.get('strategy_metrics'):
+                report_lines.append("\n### 绩效指标对比")
+                report_lines.append("| 策略名称 | 年化收益率 | 最大回撤 | 夏普比率 |")
+                report_lines.append("|---|---|---|---|")
+                for name, metrics in results['strategy_metrics'].items():
+                    report_lines.append(f"| {name} | {metrics['annualized_return']:.2%} | {metrics['max_drawdown']:.2%} | {metrics['sharpe_ratio']:.2f} |")
+            
+            report_lines.append(f"\n### 最优策略: {best_strategy_name}")
+            report_lines.append(f"**综合评分**: {best_backtest_strategy.get('score', 0):.3f}")
+            report_lines.append(f"**表现描述**: {best_backtest_strategy.get('description', '')}")
+
+            report_lines.append("\n## 2. 当前系统使用的策略")
+            report_lines.append(f"**策略名称**: {current_strategy_name}")
+            report_lines.append("**策略描述**: 基于短期价格行为（当日/昨日涨跌幅）和基金绩效指标的复合规则型策略。")
+            
+            report_lines.append("\n## 3. 结论与建议")
+            if best_strategy_name == current_strategy_name:
+                report_lines.append("✅ **结论**: 当前流程使用的策略与回测最优策略一致。")
+            else:
+                report_lines.append("⚠️ **结论**: 当前流程使用的策略与回测最优策略 **不一致**。")
+                report_lines.append(f"\n- **回测显示**: 在当前选定的时间窗口和市场环境下，`{best_strategy_name}` 表现最佳。")
+                report_lines.append(f"- **系统现状**: 目前系统主要依据 `{current_strategy_name}` 进行定投信号判断。")
+                
+                report_lines.append("\n### 改进建议")
+                if best_strategy_name == 'target_value':
+                    report_lines.append("- **推荐方案**: 建议在定期定投中引入**目标市值法**。设定资产增长目标，若资产超过目标则减少投入或赎回，若低于目标则增加投入。")
+                    report_lines.append("- **操作提示**: 可以在现有定投基础上，每月检查一次总持仓市值，动态调整下期定投金额。")
+                elif best_strategy_name == 'mean_reversion':
+                    report_lines.append("- **推荐方案**: 建议关注**均值回归**机会。当市场出现极端偏离（如连续大跌或大涨）时，敢于逆向操作。")
+                elif best_strategy_name == 'grid':
+                    report_lines.append("- **推荐方案**: 建议对波动较大的基金采用**网格交易**。")
+                elif best_strategy_name == 'dual_ma':
+                    report_lines.append("- **推荐方案**: 建议关注**趋势信号**。在均线金叉时加大投入，死叉时暂停定投。")
+
+            # 保存报告
+            os.makedirs(output_dir, exist_ok=True)
+            report_path = os.path.join(output_dir, 'strategy_optimality_analysis.md')
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            
+            logger.info(f"策略最优性分析报告已生成: {report_path}")
+            print(f"\n[策略检查] 最优策略分析报告已生成: {report_path}")
+            print(f"[策略检查] 回测最优策略: {best_strategy_name} | 当前策略: {current_strategy_name}")
+            
+        except Exception as e:
+            logger.error(f"检查策略最优性时出错: {str(e)}")
+
     def load_fund_data_from_excel(self, file_path: str, sheet_name: str = None) -> pd.DataFrame:
         """
         从Excel文件加载基金数据
@@ -377,7 +486,7 @@ class EnhancedFundAnalysisSystem:
                 'lowest_volatility_fund': ''
             }
     
-    def generate_analytics_reports(self, results_df: pd.DataFrame, output_dir: str = "./reports/") -> Dict:
+    def generate_analytics_reports(self, results_df: pd.DataFrame, output_dir: str = "../reports/") -> Dict:
         """
         生成分析图表报告
         
@@ -754,7 +863,7 @@ class EnhancedFundAnalysisSystem:
         execution_amount = f"买入{buy_multiplier}×定额"
         return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
     
-    def run_complete_analysis(self, excel_file_path: str = None, output_dir: str = "./reports/") -> bool:
+    def run_complete_analysis(self, excel_file_path: str = None, output_dir: str = "../reports/") -> bool:
         """
         运行完整的基金分析流程
         
@@ -958,7 +1067,7 @@ class EnhancedFundAnalysisSystem:
             strategy_summary = self.generate_strategy_summary(results)
             
             # 4. 生成分析图表报告
-            report_files = self.generate_analytics_reports(results_df, "./reports/")
+            report_files = self.generate_analytics_reports(results_df, "../reports/")
             
             # 5. 保存结果到数据库
             db_success = self.save_results_to_database(results, strategy_summary, report_files)
@@ -1036,7 +1145,7 @@ class EnhancedFundAnalysisSystem:
                 return pd.DataFrame()
             
             # 生成对比图表
-            self.analytics_engine.generate_comprehensive_report(df, './reports/')
+            self.analytics_engine.generate_comprehensive_report(df, '../reports/')
             
             return df
             
@@ -1044,6 +1153,86 @@ class EnhancedFundAnalysisSystem:
             logger.error(f"进行基金绩效对比时出错: {str(e)}")
             return pd.DataFrame()
     
+    def run_strategy_comparison_analysis(self,
+                                        start_date: str = '2024-01-01',
+                                        end_date: str = None,
+                                        base_amount: float = 1000,
+                                        portfolio_size: int = 8,
+                                        risk_profile: str = 'moderate',
+                                        top_n: int = 20,
+                                        rank_type: str = 'daily',
+                                        output_dir: str = './strategy_analysis_results',
+                                        generate_report: bool = True,
+                                        generate_charts: bool = True) -> bool:
+        """
+        运行策略对比分析
+
+        参数：
+        start_date: 回测开始日期
+        end_date: 回测结束日期
+        base_amount: 基准定投金额
+        portfolio_size: 基金组合大小
+        risk_profile: 风险偏好 ('conservative', 'moderate', 'aggressive')
+        top_n: 获取前N只基金
+        rank_type: 排名类型 ('daily', 'weekly', 'monthly')
+        output_dir: 输出目录
+
+        返回：
+        bool: 分析是否成功
+        """
+        try:
+            if not STRATEGY_ANALYZER_AVAILABLE:
+                logger.error("策略对比分析系统不可用，请检查模块导入")
+                return False
+
+            logger.info("开始运行策略对比分析")
+            logger.info(f"分析参数: 日期 {start_date} 至 {end_date or '当前'}, 基准金额 {base_amount}, 组合大小 {portfolio_size}")
+
+            # 创建策略分析器
+            analyzer = CompleteStrategyAnalyzer(
+                start_date=start_date,
+                end_date=end_date,
+                base_amount=base_amount,
+                portfolio_size=portfolio_size,
+                risk_profile=risk_profile
+            )
+
+            # 运行完整分析
+            results = analyzer.run_complete_analysis(
+                top_n=top_n,
+                rank_type=rank_type,
+                output_dir=output_dir,
+                generate_report=generate_report,
+                generate_charts=generate_charts
+            )
+
+            if 'error' in results:
+                logger.error(f"策略对比分析失败: {results['error']}")
+                return False
+            else:
+                logger.info("策略对比分析完成")
+                print("\n" + "="*80)
+                print("🎯 策略对比分析结果")
+                print("="*80)
+
+                if 'ranking' in results and 'recommendation' in results['ranking']:
+                    rec = results['ranking']['recommendation']
+                    print(f"🏆 推荐策略: {rec.get('recommended_strategy', {}).get('strategy_name', '未知')}")
+                    print(f"🔍 置信度: {rec.get('confidence_level', '中等')}")
+                    print(f"📊 总收益率: {rec.get('recommended_strategy', {}).get('raw_metrics', {}).get('total_return', 0):.2%}")
+
+                if 'comparison' in results and 'strategy_results' in results['comparison']:
+                    print(f"📈 对比策略数量: {len(results['comparison']['strategy_results'])}")
+
+                print(f"📁 结果保存路径: {output_dir}")
+                print("="*80)
+
+                return True
+
+        except Exception as e:
+            logger.error(f"运行策略对比分析失败: {str(e)}")
+            return False
+
     def cleanup(self):
         """清理资源"""
         try:
@@ -1061,14 +1250,20 @@ def main():
         description='增强版基金分析系统',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-示例用法:
-  python enhanced_main.py                    # 使用默认配置文件运行完整分析
-  python enhanced_main.py --file path/to/excel.xlsx  # 指定Excel文件路径
-  python enhanced_main.py --output ./my_reports/     # 指定输出目录
-  python enhanced_main.py --test                    # 运行测试模式
-  python enhanced_main.py --analyze                 # 分析持仓基金
-  python enhanced_main.py --compare                 # 对比基金绩效
-  python enhanced_main.py --all                     # 执行完整分析流程
+ 示例用法:
+   python enhanced_main.py                         # 使用默认配置文件运行完整分析
+   python enhanced_main.py --file path/to/excel.xlsx   # 指定Excel文件路径
+   python enhanced_main.py --output ./my_reports/      # 指定输出目录
+   python enhanced_main.py --test                     # 运行测试模式
+   python enhanced_main.py --analyze                  # 分析持仓基金
+   python enhanced_main.py --compare                  # 对比基金绩效
+   python enhanced_main.py --all                      # 执行完整分析流程
+
+ 策略对比分析示例:
+   python enhanced_main.py --strategy-analysis                              # 运行策略对比分析
+   python enhanced_main.py -S --strategy-risk-profile aggressive         # 激进风险偏好
+   python enhanced_main.py -S --strategy-base-amount 2000 --strategy-portfolio-size 10  # 自定义参数
+   python enhanced_main.py -S --strategy-start-date 2023-01-01 --strategy-output-dir ./strategy_results  # 指定日期和输出
         """
     )
     
@@ -1081,8 +1276,8 @@ def main():
     parser.add_argument(
         '--output', '-o',
         type=str,
-        default='./reports/',
-        help='输出目录（默认: ./reports/）'
+        default='../reports/',
+        help='输出目录（默认: .../reports/）'
     )
     
     parser.add_argument(
@@ -1114,6 +1309,74 @@ def main():
         action='store_true',
         help='执行完整分析流程（等同于run_complete_analysis）'
     )
+
+    parser.add_argument(
+        '--strategy-analysis', '-S',
+        action='store_true',
+        help='运行策略对比分析（测试高级策略）'
+    )
+
+    parser.add_argument(
+        '--strategy-start-date',
+        type=str,
+        default='2024-01-01',
+        help='策略分析开始日期（默认: 2024-01-01）'
+    )
+
+    parser.add_argument(
+        '--strategy-end-date',
+        type=str,
+        default=None,
+        help='策略分析结束日期（默认: 当前日期）'
+    )
+
+    parser.add_argument(
+        '--strategy-base-amount',
+        type=float,
+        default=1000,
+        help='策略分析基准定投金额（默认: 1000）'
+    )
+
+    parser.add_argument(
+        '--strategy-portfolio-size',
+        type=int,
+        default=8,
+        help='策略分析基金组合大小（默认: 8）'
+    )
+
+    parser.add_argument(
+        '--strategy-risk-profile',
+        type=str,
+        default='moderate',
+        choices=['conservative', 'moderate', 'aggressive'],
+        help='策略分析风险偏好（默认: moderate）'
+    )
+
+    parser.add_argument(
+        '--strategy-top-n',
+        type=int,
+        default=20,
+        help='策略分析获取前N只基金（默认: 20）'
+    )
+
+    parser.add_argument(
+        '--strategy-output-dir',
+        type=str,
+        default='./strategy_analysis_results',
+        help='策略分析输出目录（默认: ./strategy_analysis_results）'
+    )
+
+    parser.add_argument(
+        '--strategy-no-charts',
+        action='store_true',
+        help='策略分析不生成图表'
+    )
+
+    parser.add_argument(
+        '--strategy-no-report',
+        action='store_true',
+        help='策略分析不生成详细报告'
+    )
     
     args = parser.parse_args()
     
@@ -1124,6 +1387,11 @@ def main():
     try:
         # 创建基金分析系统
         system = EnhancedFundAnalysisSystem()
+        
+        # 检查策略最优性
+        if args.all or args.strategy_analysis:
+            logger.info("检查当前策略最优性...")
+            system.check_current_strategy_optimality()
         
         if args.test:
             # 运行测试模式
@@ -1155,12 +1423,34 @@ def main():
             # 执行完整分析流程
             logger.info("执行完整分析流程")
             success = system.run_complete_analysis(args.file, args.output)
-            
+
             if success:
                 logger.info("基金分析任务成功完成")
                 sys.exit(0)
             else:
                 logger.error("基金分析任务失败")
+                sys.exit(1)
+        elif args.strategy_analysis:
+            # 运行策略对比分析
+            logger.info("运行策略对比分析")
+            success = system.run_strategy_comparison_analysis(
+                start_date=args.strategy_start_date,
+                end_date=args.strategy_end_date,
+                base_amount=args.strategy_base_amount,
+                portfolio_size=args.strategy_portfolio_size,
+                risk_profile=args.strategy_risk_profile,
+                top_n=args.strategy_top_n,
+                rank_type='daily',  # 使用默认的daily排名
+                output_dir=args.strategy_output_dir,
+                generate_report=not args.strategy_no_report,
+                generate_charts=not args.strategy_no_charts
+            )
+
+            if success:
+                logger.info("策略对比分析任务成功完成")
+                sys.exit(0)
+            else:
+                logger.error("策略对比分析任务失败")
                 sys.exit(1)
         else:
             # 默认运行完整分析
