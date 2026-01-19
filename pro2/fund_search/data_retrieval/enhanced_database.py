@@ -217,7 +217,6 @@ class EnhancedDatabaseManager:
             var_95 FLOAT DEFAULT NULL,
             win_rate FLOAT DEFAULT NULL,
             profit_loss_ratio FLOAT DEFAULT NULL,
-            daily_return FLOAT DEFAULT NULL,
             total_return FLOAT DEFAULT NULL,
             composite_score FLOAT DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -641,7 +640,6 @@ class EnhancedDatabaseManager:
                     'analysis_date': fund_data.get('analysis_date', datetime.now().date()),
                     'today_return': fund_data.get('today_return', 0.0),
                     'prev_day_return': fund_data.get('prev_day_return', 0.0),
-                    'daily_return': fund_data.get('daily_return', 0.0),
                     'status_label': fund_data.get('status_label', ''),
                     'operation_suggestion': fund_data.get('operation_suggestion', ''),
                     'execution_amount': fund_data.get('execution_amount', ''),
@@ -854,7 +852,6 @@ class EnhancedDatabaseManager:
                     'win_rate': analysis_data.get('win_rate', 0.0),
                     'profit_loss_ratio': analysis_data.get('profit_loss_ratio', 0.0),
                     'composite_score': analysis_data.get('composite_score', 0.0),
-                    'daily_return': analysis_data.get('daily_return', 0.0),
                     'total_return': analysis_data.get('total_return', 0.0),
                     # 修复字段名不匹配的问题
                     'yesterday_nav': analysis_data.get('previous_nav', 0.0),
@@ -1069,7 +1066,7 @@ class EnhancedDatabaseManager:
                 operation_suggestion, execution_amount, analysis_date, buy_multiplier, 
                 annualized_return, sharpe_ratio, sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all,
                 max_drawdown, volatility, calmar_ratio, 
-                sortino_ratio, var_95, win_rate, profit_loss_ratio, daily_return, 
+                sortino_ratio, var_95, win_rate, profit_loss_ratio, 
                 total_return, composite_score
             ) VALUES (
                 :fund_code, :fund_name, :yesterday_nav, :current_estimate, :today_return,
@@ -1077,7 +1074,7 @@ class EnhancedDatabaseManager:
                 :operation_suggestion, :execution_amount, :analysis_date, :buy_multiplier,
                 :annualized_return, :sharpe_ratio, :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all,
                 :max_drawdown, :volatility, :calmar_ratio,
-                :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, :daily_return, 
+                :sortino_ratio, :var_95, :win_rate, :profit_loss_ratio, 
                 :total_return, :composite_score
             ) ON DUPLICATE KEY UPDATE
                 fund_name = VALUES(fund_name),
@@ -1104,7 +1101,6 @@ class EnhancedDatabaseManager:
                 var_95 = VALUES(var_95),
                 win_rate = VALUES(win_rate),
                 profit_loss_ratio = VALUES(profit_loss_ratio),
-                daily_return = VALUES(daily_return),
                 total_return = VALUES(total_return),
                 composite_score = VALUES(composite_score)
             """
@@ -1137,7 +1133,6 @@ class EnhancedDatabaseManager:
                 'var_95': float(analysis_data.get('var_95', 0.0)),
                 'win_rate': float(analysis_data.get('win_rate', 0.0)),
                 'profit_loss_ratio': float(analysis_data.get('profit_loss_ratio', 0.0)),
-                'daily_return': float(analysis_data.get('daily_return', 0.0)),
                 'total_return': float(analysis_data.get('total_return', 0.0)),
                 'composite_score': float(analysis_data.get('composite_score', 0.0))
             }

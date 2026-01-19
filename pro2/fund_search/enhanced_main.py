@@ -317,7 +317,7 @@ class EnhancedFundAnalysisSystem:
             
             # 计算今日和昨日收益率
             # 从实时数据获取今日收益率，并添加验证
-            today_return = realtime_data.get('daily_return', 0.0)
+            today_return = realtime_data.get('today_return', 0.0)
             try:
                 today_return = float(today_return)
                 # 检查今日收益率是否异常（超过±100%）
@@ -371,22 +371,6 @@ class EnhancedFundAnalysisSystem:
                         except (ValueError, TypeError):
                             logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败，使用默认值")
                             yesterday_return = 0.0
-                elif 'daily_return' in historical_data.columns:
-                    # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
-                    recent_returns = historical_data['daily_return'].dropna().tail(1)
-                    if len(recent_returns) >= 1:
-                        try:
-                            # 昨日盈亏率直接从最新一条数据获取
-                            yesterday_return = recent_returns.iloc[-1] * 100
-                            # 检查昨日收益率是否异常（超过±100%）
-                            if abs(yesterday_return) > 100:
-                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
-                                yesterday_return = 0.0
-                            else:
-                                logger.debug(f"基金 {fund_code} 从历史数据daily_return获取昨日收益率: {yesterday_return}%")
-                        except (ValueError, TypeError):
-                            logger.warning(f"基金 {fund_code} 历史数据daily_return解析失败，使用默认值")
-                            yesterday_return = 0.0
             
             # 确保收益率格式正确，保留两位小数
             today_return = round(today_return, 2)
@@ -428,7 +412,6 @@ class EnhancedFundAnalysisSystem:
                 # 最后设置收益率相关字段，确保不会被覆盖
                 'today_return': today_return,
                 'prev_day_return': prev_day_return,
-                'daily_return': today_return,  # 用于收益率分析图表
             }
             
             # 确保使用传入的基金名称覆盖API获取的名称
@@ -446,7 +429,6 @@ class EnhancedFundAnalysisSystem:
                 'analysis_date': analysis_date,
                 'today_return': 0.0,
                 'prev_day_return': 0.0,
-                'daily_return': 0.0,
                 'strategy_name': 'default_strategy',  # 添加默认策略名称
                 'status_label': "🔴 分析失败",
                 'operation_suggestion': "数据获取失败，建议人工核查",
@@ -481,12 +463,6 @@ class EnhancedFundAnalysisSystem:
                 # 分析单个基金
                 result = self.analyze_single_fund(fund_code, fund_name, analysis_date)
                 results.append(result)
-            
-            # 确保所有结果都包含必要字段
-            for i, result in enumerate(results):
-                # 确保daily_return字段存在
-                if 'daily_return' not in result:
-                    results[i]['daily_return'] = result.get('today_return', 0.0)
             
             logger.info(f"所有基金分析完成，共分析 {len(results)} 只基金")
             return results
@@ -1214,7 +1190,7 @@ class EnhancedFundAnalysisSystem:
                     result = {
                         'fund_code': fund_code,
                         'fund_name': fund_name,
-                        'today_return': float(fund_info.get('daily_return', 0)),
+                        'today_return': float(fund_info.get('today_return', 0)),
                         'nav': float(fund_info.get('nav', 0)),
                         **metrics
                     }
