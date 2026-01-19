@@ -5,7 +5,7 @@
 # 策略阈值配置 (Strategy Thresholds)
 # ============================================
 strategies:
-  # 强势突破策略 - 降低买入倍数，增加风险控制
+  # 强势突破策略 - 上涨时持有，不追高
   strong_bull:
     conditions:
       - today_return_min: 1.0
@@ -16,14 +16,14 @@ strategies:
         today_return_max: .inf
         prev_day_return_min: 1.0
         prev_day_return_max: .inf
-    action: strong_buy
-    buy_multiplier: 2.0  # 从3.0降到2.0，降低风险
+    action: hold  # 改为持有，不追高
+    buy_multiplier: 0.0  # 不买入
     redeem_amount: 0
-    max_position_ratio: 0.8  # 最大仓位比例80%
-    label: "🟢 **强势突破** 🛡️ 📉"
-    description: "基金强势上涨，建议积极买入（考虑回撤风险，谨慎操作）"
+    max_position_ratio: 1.0
+    label: "🟢 **强势突破**"
+    description: "基金强势上涨，建议持有不动（让利润奔跑）"
 
-  # 持续上涨策略 - 调整赎回逻辑
+  # 持续上涨策略 - 上涨时持有
   bull_continuation:
     conditions:
       - today_return_min: 0.3
@@ -34,12 +34,12 @@ strategies:
         today_return_max: 0.5
         prev_day_return_min: 0.5
         prev_day_return_max: 1.0
-    action: buy
-    buy_multiplier: 1.5
-    redeem_amount: 0.02  # 改为比例赎回（2%）
-    max_position_ratio: 0.7
+    action: hold  # 改为持有
+    buy_multiplier: 0.0
+    redeem_amount: 0
+    max_position_ratio: 1.0
     label: "🟡 **连涨加速**"
-    description: "基金持续上涨，建议适量买入（胜率偏低，谨慎操作）"
+    description: "基金持续上涨，建议持有不动（让利润奔跑）"
 
   # 上涨放缓策略
   bull_slowing:
@@ -58,20 +58,20 @@ strategies:
     label: "🟠 **连涨放缓**"
     description: "上涨势头放缓，建议持有观望"
 
-  # 反转上涨策略
+  # 反转上涨策略 - 由跌转涨，持有观望
   bull_reversal:
     conditions:
       - today_return_min: 0.3
         today_return_max: .inf
         prev_day_return_min: -.inf
         prev_day_return_max: 0.0
-    action: buy
-    buy_multiplier: 1.5
+    action: hold  # 改为持有观望
+    buy_multiplier: 0.0
     redeem_amount: 0
     label: "🔵 **反转上涨**"
-    description: "基金由跌转涨，建议买入"
+    description: "基金由跌转涨，建议持有观望（确认趋势）"
 
-  # 转势休整策略 - 改为比例赎回
+  # 转势休整策略 - 上涨后休整，部分止盈
   consolidation:
     conditions:
       - today_return_min: 0.0
@@ -80,12 +80,12 @@ strategies:
         prev_day_return_max: .inf
     action: weak_sell
     buy_multiplier: 0.0
-    redeem_amount: 0.05  # 改为比例赎回（5%）
+    redeem_amount: 0.05  # 赎回5%仓位止盈
     max_position_ratio: 0.9
-    label: "🔴 **转势休整**"
-    description: "上涨后休整，建议部分赎回（5%仓位）"
+    label: "🟠 **转势休整**"
+    description: "上涨后休整，建议部分止盈（赎回5%仓位）"
 
-  # 反转下跌策略 - 改为比例赎回
+  # 反转下跌策略 - 由涨转跌时止盈
   bear_reversal:
     conditions:
       - today_return_min: -.inf
@@ -94,54 +94,54 @@ strategies:
         prev_day_return_max: .inf
     action: sell
     buy_multiplier: 0.0
-    redeem_amount: 0.08  # 改为比例赎回（8%）
+    redeem_amount: 0.08  # 赎回8%仓位止盈
     max_position_ratio: 1.0
     label: "🔴 **反转下跌**"
-    description: "基金由涨转跌，建议卖出（8%仓位）"
+    description: "基金由涨转跌，建议止盈（赎回8%仓位）"
 
-  # 绝对企稳策略 - 降低买入倍数，增加观察期
+  # 绝对企稳策略 - 企稳后买入
   absolute_bottom:
     conditions:
       - today_return_min: 0.0
         today_return_max: 0.01
         prev_day_return_min: -0.3
         prev_day_return_max: 0.0
-    action: buy  # 从strong_buy改为buy
-    buy_multiplier: 1.2  # 从3.0降到1.2
+    action: buy
+    buy_multiplier: 1.8  # 企稳后买入
     redeem_amount: 0
-    observation_period: 3  # 增加3天观察期确认
-    max_position_ratio: 0.6
+    observation_period: 3
+    max_position_ratio: 0.8
     label: "⚪ **绝对企稳**"
-    description: "基金企稳，建议适量买入（需观察确认）"
+    description: "基金企稳，建议买入（抄底机会）"
 
-  # 首次大跌策略
+  # 首次大跌策略 - 大跌时积极买入
   first_major_drop:
     conditions:
       - today_return_min: -.inf
         today_return_max: -2.0
         prev_day_return_min: -0.1
         prev_day_return_max: 0.1
-    action: buy
-    buy_multiplier: 1.5
+    action: strong_buy  # 改为强烈买入
+    buy_multiplier: 2.5  # 加大买入力度
     redeem_amount: 0
     label: "🔴 **首次大跌**"
-    description: "基金首次大跌，建议逢低买入"
+    description: "基金首次大跌，建议积极买入（抄底良机）"
 
-  # 持续下跌策略 - 改为持有，避免在下跌中买入
+  # 持续下跌策略 - 下跌时买入补仓
   bear_continuation:
     conditions:
       - today_return_min: -.inf
         today_return_max: -0.5
         prev_day_return_min: -.inf
         prev_day_return_max: -0.5
-    action: hold  # 从weak_buy改为hold
-    buy_multiplier: 0.0  # 不买入
+    action: buy  # 改为买入
+    buy_multiplier: 1.5  # 逢低买入
     redeem_amount: 0
-    max_position_ratio: 0.5  # 控制仓位不超过50%
+    max_position_ratio: 1.0
     label: "🟣 **持续下跌**"
-    description: "基金持续下跌，建议持有观望（避免抄底风险）"
+    description: "基金持续下跌，建议逢低买入（摊低成本）"
 
-  # 跌速放缓策略
+  # 跌速放缓策略 - 下跌放缓时买入
   bear_slowing:
     conditions:
       - today_return_min: -0.5
@@ -149,21 +149,21 @@ strategies:
         prev_day_return_min: -.inf
         prev_day_return_max: -1.0
     action: buy
-    buy_multiplier: 1.5
+    buy_multiplier: 2.0  # 加大买入力度
     redeem_amount: 0
     label: "🟦 **跌速放缓**"
-    description: "下跌速度放缓，建议买入"
+    description: "下跌速度放缓，建议积极买入（抄底机会）"
 
 # ============================================
-# 买入倍数配置 (Buy Multipliers) - 已优化降低风险
+# 买入倍数配置 (Buy Multipliers) - 优化为"上涨持有，下跌补仓"策略
 # ============================================
 buy_multipliers:
-  strong_buy: 2.0      # 强烈买入（从3.0降到2.0）
-  buy: 1.5             # 正常买入
-  weak_buy: 1.0        # 谨慎买入
-  hold: 0.0            # 持有
-  sell: 0.0            # 卖出
-  weak_sell: 0.0       # 弱卖出
+  strong_buy: 2.5      # 强烈买入（大跌时）
+  buy: 1.8             # 正常买入（下跌时）
+  weak_buy: 1.2        # 谨慎买入（小跌时）
+  hold: 0.0            # 持有（上涨或观望时）
+  sell: 0.0            # 卖出（极端情况）
+  weak_sell: 0.0       # 弱卖出（极端情况）
   stop_loss: 0.0       # 止损
 
 # ============================================
