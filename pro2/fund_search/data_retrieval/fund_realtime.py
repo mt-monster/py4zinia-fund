@@ -38,6 +38,8 @@ class FundRealTime:
             fund_info = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
             
             if not fund_info.empty:
+                # 按日期排序（最新的在前）
+                fund_info = fund_info.sort_values('净值日期', ascending=False)
                 # 获取最新的净值数据
                 latest_data = fund_info.iloc[0]
                 

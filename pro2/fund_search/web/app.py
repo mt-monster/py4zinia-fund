@@ -122,7 +122,7 @@ def get_funds():
         # 联合查询基金数据和持仓数据
         sql = f"""
         SELECT DISTINCT 
-            far.fund_code, far.fund_name, far.today_return, far.yesterday_return, far.prev_day_return,
+            far.fund_code, far.fund_name, far.today_return, far.prev_day_return,
             far.annualized_return, far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
             far.max_drawdown, far.volatility,
             far.composite_score, far.status_label, far.operation_suggestion, far.analysis_date,
@@ -139,7 +139,7 @@ def get_funds():
         
         # 如果不是持仓相关字段，使用数据库排序
         if sort_by not in ['today_profit_rate', 'holding_profit_rate', 'holding_amount']:
-            valid_sort_fields = ['composite_score', 'today_return', 'yesterday_return', 'annualized_return', 
+            valid_sort_fields = ['composite_score', 'today_return', 'prev_day_return', 'annualized_return', 
                                 'sharpe_ratio', 'max_drawdown', 'fund_code']
             if sort_by in valid_sort_fields:
                 sql += f" ORDER BY far.{sort_by} {'DESC' if sort_order == 'desc' else 'ASC'}"
@@ -164,7 +164,7 @@ def get_funds():
                 if fund.get(key) is not None and pd.notna(fund[key]):
                     fund[key] = round(float(fund[key]) * 100, 2)
             
-            for key in ['today_return', 'yesterday_return', 'prev_day_return']:
+            for key in ['today_return', 'prev_day_return']:
                 if fund.get(key) is not None and pd.notna(fund[key]):
                     fund[key] = round(float(fund[key]), 2)
             
@@ -510,6 +510,83 @@ def get_fund_stage_returns(fund_code):
         
     except Exception as e:
         logger.error(f"获取阶段涨幅失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/fund/<fund_code>/info', methods=['GET'])
+def get_fund_info(fund_code):
+    """获取基金基本信息（包括成立日期等）"""
+    try:
+        import akshare as ak
+        
+        # 使用 akshare 获取基金基本信息
+        try:
+            # fund_individual_basic_info_xq: 雪球-基金-基本信息
+            fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            
+            if fund_info is not None and not fund_info.empty:
+                info_dict = {}
+                for _, row in fund_info.iterrows():
+                    item = row.get('item', '')
+                    value = row.get('value', '')
+                    # 处理NaN值和NAType
+                    if pd.isna(value):
+                        value = None
+                    else:
+                        value = str(value).strip()
+                    info_dict[item] = value
+                
+                # 提取成立日期
+                inception_date = info_dict.get('成立日期', None)
+                fund_manager = info_dict.get('基金经理', None)
+                fund_company = info_dict.get('基金公司', None)
+                fund_type = info_dict.get('基金类型', None)
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'inception_date': inception_date,
+                        'fund_manager': fund_manager,
+                        'fund_company': fund_company,
+                        'fund_type': fund_type,
+                        'raw_info': info_dict
+                    }
+                })
+        except Exception as e:
+            logger.warning(f"从雪球获取基金信息失败: {str(e)}, 尝试其他数据源")
+        
+        # 备用方案：从天天基金网获取
+        try:
+            # 使用正确的方法名：fund_open_fund_info_em
+            fund_info_em = ak.fund_open_fund_info_em(symbol=fund_code, indicator="基本信息")
+            if fund_info_em is not None and not fund_info_em.empty:
+                info_dict = {}
+                for _, row in fund_info_em.iterrows():
+                    item = row.get('项目', '')
+                    value = row.get('数值', '')
+                    # 处理NaN值
+                    if pd.isna(value):
+                        value = None
+                    else:
+                        value = str(value).strip()
+                    info_dict[item] = value
+                
+                inception_date = info_dict.get('成立日期', None)
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'inception_date': inception_date,
+                        'raw_info': info_dict
+                    }
+                })
+        except Exception as e:
+            logger.warning(f"从天天基金网获取基金信息失败: {str(e)}")
+        
+        return jsonify({'success': False, 'error': '无法获取基金信息'})
+        
+    except Exception as e:
+        logger.error(f"获取基金信息失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

@@ -640,7 +640,6 @@ class EnhancedDatabaseManager:
                     'fund_name': fund_data.get('fund_name', ''),
                     'analysis_date': fund_data.get('analysis_date', datetime.now().date()),
                     'today_return': fund_data.get('today_return', 0.0),
-                    'yesterday_return': fund_data.get('yesterday_return', 0.0),
                     'prev_day_return': fund_data.get('prev_day_return', 0.0),
                     'daily_return': fund_data.get('daily_return', 0.0),
                     'status_label': fund_data.get('status_label', ''),
@@ -1066,7 +1065,7 @@ class EnhancedDatabaseManager:
             sql = """
             INSERT INTO fund_analysis_results (
                 fund_code, fund_name, yesterday_nav, current_estimate, today_return, 
-                yesterday_return, prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
+                prev_day_return, status_label, is_buy, redeem_amount, comparison_value, 
                 operation_suggestion, execution_amount, analysis_date, buy_multiplier, 
                 annualized_return, sharpe_ratio, sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all,
                 max_drawdown, volatility, calmar_ratio, 
@@ -1074,7 +1073,7 @@ class EnhancedDatabaseManager:
                 total_return, composite_score
             ) VALUES (
                 :fund_code, :fund_name, :yesterday_nav, :current_estimate, :today_return,
-                :yesterday_return, :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
+                :prev_day_return, :status_label, :is_buy, :redeem_amount, :comparison_value,
                 :operation_suggestion, :execution_amount, :analysis_date, :buy_multiplier,
                 :annualized_return, :sharpe_ratio, :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all,
                 :max_drawdown, :volatility, :calmar_ratio,
@@ -1085,7 +1084,6 @@ class EnhancedDatabaseManager:
                 yesterday_nav = VALUES(yesterday_nav),
                 current_estimate = VALUES(current_estimate),
                 today_return = VALUES(today_return),
-                yesterday_return = VALUES(yesterday_return),
                 prev_day_return = VALUES(prev_day_return),
                 status_label = VALUES(status_label),
                 is_buy = VALUES(is_buy),
@@ -1118,7 +1116,6 @@ class EnhancedDatabaseManager:
                 'yesterday_nav': float(analysis_data.get('yesterday_nav', 0.0)),
                 'current_estimate': float(analysis_data.get('current_estimate', 0.0)),
                 'today_return': float(analysis_data.get('today_return', 0.0)),
-                'yesterday_return': float(analysis_data.get('yesterday_return', 0.0)),
                 'prev_day_return': float(analysis_data.get('prev_day_return', 0.0)),
                 'status_label': str(analysis_data.get('status_label', '')),
                 'is_buy': int(analysis_data.get('is_buy', 0)),

@@ -901,7 +901,7 @@
                 <select id="sort-select">
                     <option value="composite_score">综合评分</option>
                     <option value="today_return">今日收益</option>
-                    <option value="yesterday_return">昨日收益</option>
+                    <option value="prev_day_return">昨日收益</option>
                     <option value="annualized_return">年化收益</option>
                     <option value="sharpe_ratio">夏普比率</option>
                     <option value="max_drawdown">最大回撤</option>
@@ -927,7 +927,7 @@
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="yesterday_return">昨日盈亏率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="prev_day_return">昨日盈亏率 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span class="sort-indicator"></span></th>
@@ -1041,7 +1041,7 @@
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
-            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
+            'prev_day_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
             'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏率' },
@@ -1206,8 +1206,8 @@
                         const val = fund.today_return || 0;
                         return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
                     },
-                    'yesterday_return': (fund) => {
-                        const val = fund.yesterday_return || 0;
+                    'prev_day_return': (fund) => {
+                        const val = fund.prev_day_return || 0;
                         return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
                     },
                     'holding_amount': (fund) => ({ value: fund.holding_amount != null ? fund.holding_amount.toFixed(2) : '--', class: '' }),
@@ -1305,7 +1305,7 @@
                         });
                     } else {
                         // 默认列顺序（兼容旧代码）
-                        const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'yesterday_return', 
+                        const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'prev_day_return', 
                             'holding_amount', 'today_profit', 'today_profit_rate', 'holding_profit', 
                             'holding_profit_rate', 'total_profit', 'total_profit_rate', 'sharpe_ratio', 
                             'max_drawdown', 'composite_score'];
@@ -2843,9 +2843,76 @@
                             </div>
                         </div>
                     </div>
-                    <div id="sidebar-no-holding" style="text-align: center; padding: 20px; color: #7f8c8d;">
-                        <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 8px;"></i>
-                        <div>暂无持仓数据</div>
+                    <!-- 无持仓时显示基金绩效指标 -->
+                    <div id="sidebar-no-holding" style="display: none;">
+                        <div style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ecf0f1;">
+                            <div style="font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 8px;">
+                                <i class="bi bi-graph-up" style="color: #e74c3c; margin-right: 4px;"></i>
+                                基金绩效指标
+                            </div>
+                        </div>
+                        
+                        <!-- 基金成立日期 -->
+                        <div style="background: #fff3cd; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-calendar-event" style="color: #856404;"></i>
+                            <div style="flex: 1;">
+                                <span style="font-size: 0.7rem; color: #856404;">成立日期：</span>
+                                <span id="sidebar-perf-inception-date" style="font-size: 0.8rem; font-weight: 600; color: #856404;">加载中...</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 夏普比率 - 三个时间段 -->
+                        <div style="margin-bottom: 12px;">
+                            <div style="font-size: 0.75rem; color: #7f8c8d; margin-bottom: 8px; font-weight: 600;">
+                                <i class="bi bi-lightning-charge" style="color: #3498db;"></i>
+                                夏普比率（风险调整后收益）
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <div style="flex: 1; background: #e8f4fc; padding: 10px; border-radius: 6px; border-left: 3px solid #3498db;">
+                                    <div style="font-size: 0.65rem; color: #7f8c8d; margin-bottom: 4px;">今年以来</div>
+                                    <div id="sidebar-perf-sharpe-ytd" style="font-size: 1.1rem; font-weight: 700; color: #3498db;">--</div>
+                                </div>
+                                <div style="flex: 1; background: #e8f4fc; padding: 10px; border-radius: 6px; border-left: 3px solid #2980b9;">
+                                    <div style="font-size: 0.65rem; color: #7f8c8d; margin-bottom: 4px;">近一年</div>
+                                    <div id="sidebar-perf-sharpe-1y" style="font-size: 1.1rem; font-weight: 700; color: #2980b9;">--</div>
+                                </div>
+                                <div style="flex: 1; background: #e8f4fc; padding: 10px; border-radius: 6px; border-left: 3px solid #1f618d;">
+                                    <div style="font-size: 0.65rem; color: #7f8c8d; margin-bottom: 4px;">成立以来</div>
+                                    <div id="sidebar-perf-sharpe-all" style="font-size: 1.1rem; font-weight: 700; color: #1f618d;">--</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 0.65rem; color: #95a5a6; margin-top: 6px; padding-left: 4px;">
+                                <i class="bi bi-info-circle"></i> 夏普比率越高，表示单位风险获得的超额回报越高
+                            </div>
+                        </div>
+                        
+                        <!-- 其他绩效指标 -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <div style="flex: 1; min-width: 45%; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                                <div style="font-size: 0.7rem; color: #7f8c8d; margin-bottom: 4px;">年化收益率</div>
+                                <div id="sidebar-perf-annualized" style="font-size: 1rem; font-weight: 600; color: #333;">--</div>
+                            </div>
+                            <div style="flex: 1; min-width: 45%; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                                <div style="font-size: 0.7rem; color: #7f8c8d; margin-bottom: 4px;">最大回撤</div>
+                                <div id="sidebar-perf-drawdown" style="font-size: 1rem; font-weight: 600; color: #333;">--</div>
+                            </div>
+                            <div style="flex: 1; min-width: 45%; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                                <div style="font-size: 0.7rem; color: #7f8c8d; margin-bottom: 4px;">波动率</div>
+                                <div id="sidebar-perf-volatility" style="font-size: 1rem; font-weight: 600; color: #333;">--</div>
+                            </div>
+                            <div style="flex: 1; min-width: 45%; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                                <div style="font-size: 0.7rem; color: #7f8c8d; margin-bottom: 4px;">综合评分</div>
+                                <div id="sidebar-perf-score" style="font-size: 1rem; font-weight: 600; color: #333;">--</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 投资建议 -->
+                        <div style="margin-top: 12px; background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%); padding: 12px; border-radius: 6px;">
+                            <div style="font-size: 0.7rem; color: #6c5ce7; margin-bottom: 4px; font-weight: 600;">
+                                <i class="bi bi-lightbulb"></i> 投资建议
+                            </div>
+                            <div id="sidebar-perf-suggestion" style="font-size: 1.05rem; font-weight: 700; color: #2d3436;">--</div>
+                        </div>
                     </div>
                 </div>
 
@@ -3041,8 +3108,15 @@
             const noHoldingEl = document.getElementById('sidebar-no-holding');
             
             if (!holding) {
+                // 没有持仓数据，显示基金绩效指标
                 if (gridEl) gridEl.style.display = 'none';
-                if (noHoldingEl) noHoldingEl.style.display = 'block';
+                if (noHoldingEl) {
+                    noHoldingEl.style.display = 'block';
+                    // 填充基金绩效数据
+                    if (currentSidebarFund) {
+                        renderFundPerformance(currentSidebarFund);
+                    }
+                }
                 return;
             }
             
@@ -3070,6 +3144,89 @@
             setEl('sidebar-holding-amount', holding.holding_amount ? holding.holding_amount.toFixed(2) : '--');
             setEl('sidebar-holding-shares', holding.holding_shares ? holding.holding_shares.toFixed(2) : '--');
             setEl('sidebar-holding-cost', holding.cost_price && holding.holding_shares ? (holding.cost_price * holding.holding_shares).toFixed(2) : '--');
+        }
+        
+        // 渲染基金绩效指标（无持仓时显示）
+        async function renderFundPerformance(fund) {
+            const setEl = (id, value, isPercent = false, colorize = false) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                
+                if (value === null || value === undefined || isNaN(value)) {
+                    el.textContent = '--';
+                    el.style.color = '#333';
+                    return;
+                }
+                
+                const num = parseFloat(value);
+                let displayValue = isPercent ? num.toFixed(2) + '%' : num.toFixed(4);
+                
+                if (colorize) {
+                    const color = num >= 0 ? '#e74c3c' : '#27ae60';
+                    const sign = num >= 0 ? '+' : '';
+                    displayValue = sign + displayValue;
+                    el.style.color = color;
+                } else {
+                    el.style.color = '#333';
+                }
+                
+                el.textContent = displayValue;
+            };
+            
+            // 年化收益率
+            setEl('sidebar-perf-annualized', fund.annualized_return, true, true);
+            
+            // 三个时间段的夏普比率
+            setEl('sidebar-perf-sharpe-ytd', fund.sharpe_ratio_ytd, false, false);
+            setEl('sidebar-perf-sharpe-1y', fund.sharpe_ratio_1y, false, false);
+            setEl('sidebar-perf-sharpe-all', fund.sharpe_ratio_all, false, false);
+            
+            // 最大回撤
+            setEl('sidebar-perf-drawdown', fund.max_drawdown, true, true);
+            
+            // 波动率
+            setEl('sidebar-perf-volatility', fund.volatility, true, false);
+            
+            // 综合评分
+            setEl('sidebar-perf-score', fund.composite_score, false, false);
+            
+            // 投资建议
+            const suggestionEl = document.getElementById('sidebar-perf-suggestion');
+            if (suggestionEl && fund.operation_suggestion) {
+                suggestionEl.textContent = fund.operation_suggestion;
+                // 根据建议类型设置颜色
+                if (fund.operation_suggestion.includes('买入') || fund.operation_suggestion.includes('加仓')) {
+                    suggestionEl.style.color = '#e74c3c';
+                } else if (fund.operation_suggestion.includes('卖出') || fund.operation_suggestion.includes('减仓')) {
+                    suggestionEl.style.color = '#27ae60';
+                } else {
+                    suggestionEl.style.color = '#f39c12';
+                }
+            }
+            
+            // 获取基金成立日期
+            await loadFundInceptionDate(fund.fund_code);
+        }
+        
+        // 加载基金成立日期
+        async function loadFundInceptionDate(fundCode) {
+            const dateEl = document.getElementById('sidebar-perf-inception-date');
+            if (!dateEl) return;
+            
+            try {
+                // 尝试从API获取基金基本信息
+                const response = await fetch(`/api/fund/${fundCode}/info`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.inception_date) {
+                    dateEl.textContent = result.data.inception_date;
+                } else {
+                    dateEl.textContent = '暂无数据';
+                }
+            } catch (e) {
+                console.error('获取基金成立日期失败:', e);
+                dateEl.textContent = '暂无数据';
+            }
         }
         
         // 加载侧边栏图表
@@ -3749,7 +3906,7 @@
             { key: 'fund_code', name: '代码', visible: true, fixed: true, sortable: true },
             { key: 'fund_name', name: '名称', visible: true, fixed: true, sortable: true },
             { key: 'today_return', name: '日涨跌幅', visible: true, fixed: false, sortable: true },
-            { key: 'yesterday_return', name: '昨日盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'prev_day_return', name: '昨日盈亏率', visible: true, fixed: false, sortable: true },
             { key: 'holding_amount', name: '持有金额', visible: true, fixed: false, sortable: true },
             { key: 'today_profit', name: '当日盈亏', visible: true, fixed: false, sortable: true },
             { key: 'today_profit_rate', name: '当日盈亏率', visible: true, fixed: false, sortable: true },
