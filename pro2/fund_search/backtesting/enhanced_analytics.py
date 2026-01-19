@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import logging
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
 # 设置日志和中文字体
@@ -187,7 +188,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}基金绩效概览_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"基金绩效概览_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             
@@ -318,7 +319,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}收益率分析_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"收益率分析_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             
@@ -414,7 +415,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}风险分析_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"风险分析_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             
@@ -528,7 +529,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}综合评分分析_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"综合评分分析_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             
@@ -590,7 +591,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}相关性分析_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"相关性分析_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             
@@ -694,7 +695,7 @@ class EnhancedFundAnalytics:
             plt.tight_layout()
             
             # 保存图表
-            chart_path = f"{output_dir}投资建议汇总_{date_str}.png"
+            chart_path = os.path.join(output_dir, f"投资建议汇总_{date_str}.png")
             plt.savefig(chart_path, dpi=self.chart_config['dpi'], bbox_inches='tight')
             plt.close()
             

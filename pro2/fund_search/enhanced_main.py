@@ -349,22 +349,19 @@ class EnhancedFundAnalysisSystem:
             # 如果实时数据中的昨日收益率不可用或异常，从历史数据获取
             if yesterday_return == 0.0 and not historical_data.empty:
                 if 'daily_growth_rate' in historical_data.columns:
-                    recent_growth = historical_data['daily_growth_rate'].dropna().tail(2)
-                    if len(recent_growth) >= 2:
+                    recent_growth = historical_data['daily_growth_rate'].dropna().tail(1)
+                    if len(recent_growth) >= 1:
                         try:
-                            yesterday_return = float(recent_growth.iloc[-2]) if pd.notna(recent_growth.iloc[-2]) else 0.0
-                            # 检查昨日收益率是否异常（超过±100%）
-                            if abs(yesterday_return) > 100:
-                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
-                                yesterday_return = 0.0
+                            # 昨日盈亏率直接从最新一条数据的日增长率获取
+                            raw_value = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+                            
+                            # 如果值的绝对值小于1，说明是小数格式（如0.0475），需要乘100
+                            # 如果值的绝对值大于等于1，说明已经是百分比格式（如4.75）
+                            if abs(raw_value) < 1:
+                                yesterday_return = raw_value * 100
                             else:
-                                logger.debug(f"基金 {fund_code} 从历史数据daily_growth_rate获取昨日收益率: {yesterday_return}%")
-                        except (ValueError, TypeError):
-                            logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败，使用默认值")
-                            yesterday_return = 0.0
-                    elif len(recent_growth) == 1:
-                        try:
-                            yesterday_return = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+                                yesterday_return = raw_value
+                            
                             # 检查昨日收益率是否异常（超过±100%）
                             if abs(yesterday_return) > 100:
                                 logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
@@ -376,21 +373,10 @@ class EnhancedFundAnalysisSystem:
                             yesterday_return = 0.0
                 elif 'daily_return' in historical_data.columns:
                     # 备用方案：使用pct_change计算的收益率（小数格式，需要乘100）
-                    recent_returns = historical_data['daily_return'].dropna().tail(2)
-                    if len(recent_returns) >= 2:
+                    recent_returns = historical_data['daily_return'].dropna().tail(1)
+                    if len(recent_returns) >= 1:
                         try:
-                            yesterday_return = recent_returns.iloc[-2] * 100
-                            # 检查昨日收益率是否异常（超过±100%）
-                            if abs(yesterday_return) > 100:
-                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
-                                yesterday_return = 0.0
-                            else:
-                                logger.debug(f"基金 {fund_code} 从历史数据daily_return获取昨日收益率: {yesterday_return}%")
-                        except (ValueError, TypeError):
-                            logger.warning(f"基金 {fund_code} 历史数据daily_return解析失败，使用默认值")
-                            yesterday_return = 0.0
-                    elif len(recent_returns) == 1:
-                        try:
+                            # 昨日盈亏率直接从最新一条数据获取
                             yesterday_return = recent_returns.iloc[-1] * 100
                             # 检查昨日收益率是否异常（超过±100%）
                             if abs(yesterday_return) > 100:
@@ -404,10 +390,10 @@ class EnhancedFundAnalysisSystem:
             
             # 确保收益率格式正确，保留两位小数
             today_return = round(today_return, 2)
-            yesterday_return = round(yesterday_return, 2)
+            prev_day_return = round(yesterday_return, 2)
             
             # 投资策略分析 - 使用策略引擎
-            strategy_result = self.strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
+            strategy_result = self.strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
             
             # 从策略结果中提取字段
             strategy_name = strategy_result.get('strategy_name', 'momentum_strategy')
@@ -417,7 +403,7 @@ class EnhancedFundAnalysisSystem:
             status_label = strategy_result.get('status_label', '🔴 未知状态')
             operation_suggestion = strategy_result.get('operation_suggestion', '持有不动')
             execution_amount = strategy_result.get('execution_amount', '持有不动')
-            comparison_value = strategy_result.get('comparison_value', today_return - yesterday_return)
+            comparison_value = strategy_result.get('comparison_value', today_return - prev_day_return)
             
             # 兼容性：设置is_buy字段
             is_buy = action in ['buy', 'strong_buy', 'weak_buy']
@@ -441,8 +427,7 @@ class EnhancedFundAnalysisSystem:
                 **performance_metrics,
                 # 最后设置收益率相关字段，确保不会被覆盖
                 'today_return': today_return,
-                'yesterday_return': yesterday_return,  # 使用yesterday_return字段
-                'prev_day_return': yesterday_return,  # 兼容字段
+                'prev_day_return': prev_day_return,
                 'daily_return': today_return,  # 用于收益率分析图表
             }
             
@@ -460,7 +445,6 @@ class EnhancedFundAnalysisSystem:
                 'fund_name': fund_name,
                 'analysis_date': analysis_date,
                 'today_return': 0.0,
-                'yesterday_return': 0.0,
                 'prev_day_return': 0.0,
                 'daily_return': 0.0,
                 'strategy_name': 'default_strategy',  # 添加默认策略名称
@@ -734,18 +718,18 @@ class EnhancedFundAnalysisSystem:
                 fund_code = row.get('fund_code', '')
                 fund_name = row.get('fund_name', '')
                 today_return = row.get('today_return', 0)
-                yesterday_return = row.get('yesterday_return', 0)
+                prev_day_return = row.get('prev_day_return', 0)
                 status_label = row.get('status_label', '')
                 operation_suggestion = row.get('operation_suggestion', '')
                 execution_amount = row.get('execution_amount', '')
                 
                 # 格式化收益率显示
                 today_return_str = f"{today_return:.2f}%" if isinstance(today_return, (int, float)) else str(today_return)
-                yesterday_return_str = f"{yesterday_return:.2f}%" if isinstance(yesterday_return, (int, float)) else str(yesterday_return)
+                prev_day_return_str = f"{prev_day_return:.2f}%" if isinstance(prev_day_return, (int, float)) else str(prev_day_return)
                 
                 # 根据收益率设置颜色
                 today_color = '#28a745' if today_return > 0 else '#dc3545' if today_return < 0 else '#6c757d'
-                yesterday_color = '#28a745' if yesterday_return > 0 else '#dc3545' if yesterday_return < 0 else '#6c757d'
+                prev_day_color = '#28a745' if prev_day_return > 0 else '#dc3545' if prev_day_return < 0 else '#6c757d'
                 
                 # 根据趋势状态生成彩色圆点和文字（模仿图示样式）
                 status_display = ""
@@ -774,7 +758,7 @@ class EnhancedFundAnalysisSystem:
                 message += f"<td style='text-align: center; padding: 6px; border-right: 1px solid #dee2e6; font-family: monospace;'>{fund_code}</td>\n"
                 message += f"<td style='text-align: left; padding: 6px; border-right: 1px solid #dee2e6;'>{fund_name}</td>\n"
                 message += f"<td style='text-align: center; padding: 6px; border-right: 1px solid #dee2e6; color: {today_color}; font-weight: bold;'>{today_return_str}</td>\n"
-                message += f"<td style='text-align: center; padding: 6px; border-right: 1px solid #dee2e6; color: {yesterday_color}; font-weight: bold;'>{yesterday_return_str}</td>\n"
+                message += f"<td style='text-align: center; padding: 6px; border-right: 1px solid #dee2e6; color: {prev_day_color}; font-weight: bold;'>{prev_day_return_str}</td>\n"
                 message += f"<td style='text-align: center; padding: 6px; border-right: 1px solid #dee2e6; color: {status_color}; font-weight: bold;'>{status_display}</td>\n"
                 message += f"<td style='text-align: left; padding: 6px; border-right: 1px solid #dee2e6;'>{operation_suggestion}</td>\n"
                 message += f"<td style='text-align: center; padding: 6px; font-weight: bold;'>{execution_amount}</td>\n"
@@ -792,21 +776,21 @@ class EnhancedFundAnalysisSystem:
             logger.error(f"生成微信消息失败: {str(e)}")
             return f"<h3>基金分析报告</h3><p>数据生成失败: {str(e)}</p>"
     
-    def get_investment_strategy(self, today_return: float, yesterday_return: float) -> tuple:
+    def get_investment_strategy(self, today_return: float, prev_day_return: float) -> tuple:
         """
         根据当日收益率和昨日收益率，返回投资策略结果
         
         参数：
         today_return: 当日收益率（%）
-        yesterday_return: 昨日收益率（%）
+        prev_day_return: 昨日收益率（%）
         
         返回：
         tuple: (status_label, is_buy, redeem_amount, comparison_value, operation_suggestion, execution_amount, buy_multiplier)
         """
-        return_diff = today_return - yesterday_return
+        return_diff = today_return - prev_day_return
         
         # 1. 今日>0 昨日>0 today-prev>1%
-        if today_return > 0 and yesterday_return > 0:
+        if today_return > 0 and prev_day_return > 0:
             if return_diff > 1:
                 status_label = "🟢 大涨"
                 is_buy = False
@@ -844,7 +828,7 @@ class EnhancedFundAnalysisSystem:
                 return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 5. 今日>0 昨日≤0
-        elif today_return > 0 and yesterday_return <= 0:
+        elif today_return > 0 and prev_day_return <= 0:
             status_label = "🔵 反转涨"
             is_buy = True
             redeem_amount = 0
@@ -854,7 +838,7 @@ class EnhancedFundAnalysisSystem:
             return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 6. 今日=0 昨日>0
-        elif today_return == 0 and yesterday_return > 0:
+        elif today_return == 0 and prev_day_return > 0:
             status_label = "🔴 转势休整"
             is_buy = False
             redeem_amount = 30
@@ -864,7 +848,7 @@ class EnhancedFundAnalysisSystem:
             return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 7. 今日<0 昨日>0
-        elif today_return < 0 and yesterday_return > 0:
+        elif today_return < 0 and prev_day_return > 0:
             status_label = "🔴 反转跌"
             is_buy = False
             redeem_amount = 30
@@ -874,7 +858,7 @@ class EnhancedFundAnalysisSystem:
             return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 8. 今日=0 昨日≤0
-        elif today_return == 0 and yesterday_return <= 0:
+        elif today_return == 0 and prev_day_return <= 0:
             status_label = "⚪ 持平"
             is_buy = True
             redeem_amount = 0
@@ -884,7 +868,7 @@ class EnhancedFundAnalysisSystem:
             return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 9. 今日<0 昨日=0 today≤-2%
-        elif today_return < 0 and yesterday_return == 0:
+        elif today_return < 0 and prev_day_return == 0:
             if today_return <= -2:
                 status_label = "🔴 首次大跌"
                 is_buy = True
@@ -913,7 +897,7 @@ class EnhancedFundAnalysisSystem:
                 return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
         
         # 12. 今日<0 昨日<0 (today-prev)>1% & today≤-2%
-        elif today_return < 0 and yesterday_return < 0:
+        elif today_return < 0 and prev_day_return < 0:
             if return_diff > 1 and today_return <= -2:
                 status_label = "🔴 暴跌加速"
                 is_buy = True
@@ -932,7 +916,7 @@ class EnhancedFundAnalysisSystem:
                 execution_amount = f"买入{buy_multiplier}×定额"
                 return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
             # 14. 今日<0 昨日<0 (prev-today)>0 & prev≤-2%
-            elif (yesterday_return - today_return) > 0 and yesterday_return <= -2:
+            elif (prev_day_return - today_return) > 0 and prev_day_return <= -2:
                 status_label = "🔵 暴跌回升"
                 is_buy = True
                 redeem_amount = 0
@@ -941,7 +925,7 @@ class EnhancedFundAnalysisSystem:
                 execution_amount = f"买入{buy_multiplier}×定额"
                 return status_label, is_buy, redeem_amount, return_diff, operation_suggestion, execution_amount, buy_multiplier
             # 15. 今日<0 昨日<0 (prev-today)>0 & prev>-2%
-            elif (yesterday_return - today_return) > 0 and yesterday_return > -2:
+            elif (prev_day_return - today_return) > 0 and prev_day_return > -2:
                 status_label = "🟦 跌速放缓"
                 is_buy = True
                 redeem_amount = 0
