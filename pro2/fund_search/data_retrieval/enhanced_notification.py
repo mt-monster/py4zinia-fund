@@ -250,7 +250,7 @@ class EnhancedNotificationManager:
                 text_content += f"""
 基金代码: {fund.get('fund_code', 'N/A')}
 基金名称: {fund.get('fund_name', 'N/A')}
-日收益率: {fund.get('daily_return', 0)*100:.2f}%
+日收益率: {fund.get('today_return', 0)*100:.2f}%
 年化收益率: {fund.get('annualized_return', 0)*100:.2f}%
 夏普比率: {fund.get('sharpe_ratio', 0):.3f}
 最大回撤: {fund.get('max_drawdown', 0)*100:.2f}%
@@ -358,7 +358,7 @@ class EnhancedNotificationManager:
             # 添加基金详细数据
             for _, fund in fund_data.iterrows():
                 markdown_content += f"| {fund.get('fund_code', 'N/A')} | {fund.get('fund_name', 'N/A')} | "
-                markdown_content += f"{fund.get('daily_return', 0)*100:.2f}% | {fund.get('annualized_return', 0)*100:.2f}% | "
+                markdown_content += f"{fund.get('today_return', 0)*100:.2f}% | {fund.get('annualized_return', 0)*100:.2f}% | "
                 markdown_content += f"{fund.get('sharpe_ratio', 0):.3f} | {fund.get('max_drawdown', 0)*100:.2f}% | "
                 markdown_content += f"{fund.get('volatility', 0)*100:.2f}% | {fund.get('win_rate', 0)*100:.1f}% | "
                 markdown_content += f"{fund.get('composite_score', 0):.3f} | {fund.get('operation_suggestion', 'N/A')} |\n"
@@ -919,7 +919,7 @@ class EnhancedNotificationManager:
                 
                 # 根据列类型格式化值
                 if col in ['today_return', 'prev_day_return', 'yesterday_return', 
-                           'annualized_return', 'daily_return', 'total_return',
+                           'annualized_return', 'total_return',
                            'volatility', 'win_rate']:
                     # 百分比格式的收益率和波动率
                     if pd.notna(value):
@@ -1345,7 +1345,6 @@ class EnhancedNotificationManager:
             # 净值相关字段
             'yesterday_nav': '昨日净值',
             'current_estimate': '今日估值',
-            'daily_return': '日收益率',
             'total_return': '总收益率',
             
             # 收益率相关字段
@@ -1400,7 +1399,7 @@ if __name__ == "__main__":
     test_fund_data = pd.DataFrame({
         'fund_code': ['000001', '000002', '000003'],
         'fund_name': ['测试基金1', '测试基金2', '测试基金3'],
-        'daily_return': [0.5, 1.2, -0.8],
+        'today_return': [0.5, 1.2, -0.8],
         'annualized_return': [0.15, 0.25, -0.05],
         'sharpe_ratio': [1.2, 1.8, -0.2],
         'max_drawdown': [-0.08, -0.12, -0.25],

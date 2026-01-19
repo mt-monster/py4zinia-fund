@@ -620,18 +620,12 @@ class EnhancedFundAnalytics:
                 if 'establish_date' in fund_data.columns:
                     display_cols.insert(2, 'establish_date')
 
-                # 如果daily_return列存在，则添加到显示列中
-                if 'daily_return' in fund_data.columns:
-                    display_cols.insert(3, 'daily_return')
-
                 # 按综合评分排序
                 summary_data = fund_data[display_cols].dropna(subset=['composite_score']).sort_values('composite_score', ascending=False)
                 
                 if not summary_data.empty:
                      # 格式化数据
                     summary_display = summary_data.copy()
-                    if 'daily_return' in summary_display.columns:
-                        summary_display['daily_return'] = summary_display['daily_return'].map('{:.2f}%'.format)
                     if 'establish_date' in summary_display.columns:
                         summary_display['establish_date'] = summary_display['establish_date'].astype(str)
                     summary_display['annualized_return'] = summary_display['annualized_return'].map('{:.2f}%'.format)
@@ -646,7 +640,6 @@ class EnhancedFundAnalytics:
                         'fund_code': '基金代码',
                         'fund_name': '基金名称',
                         'establish_date': '成立时间',
-                        'daily_return': '日收益',
                         'annualized_return': '年化收益',
                         'sharpe_ratio_ytd': '夏普比率(今年以来)',
                         'sharpe_ratio_all': '夏普比率(成立以来)',
