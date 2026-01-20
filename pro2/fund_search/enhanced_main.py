@@ -305,12 +305,20 @@ class EnhancedFundAnalysisSystem:
             
             # 获取基金基本信息
             basic_info = self.fund_data_manager.get_fund_basic_info(fund_code)
+            logger.debug(f"基金 {fund_code} 基本信息: {basic_info}")
             
             # 获取实时数据
             realtime_data = self.fund_data_manager.get_realtime_data(fund_code)
+            logger.info(f"基金 {fund_code} 实时数据: current_nav={realtime_data.get('current_nav')}, "
+                       f"previous_nav={realtime_data.get('previous_nav')}, "
+                       f"daily_return={realtime_data.get('daily_return')}, "
+                       f"yesterday_return={realtime_data.get('yesterday_return')}, "
+                       f"data_source={realtime_data.get('data_source')}")
             
             # 获取绩效指标
             performance_metrics = self.fund_data_manager.get_performance_metrics(fund_code)
+            logger.debug(f"基金 {fund_code} 绩效指标: sharpe_ratio={performance_metrics.get('sharpe_ratio')}, "
+                        f"composite_score={performance_metrics.get('composite_score')}")
             
             # 获取历史数据用于策略分析
             historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
@@ -376,6 +384,9 @@ class EnhancedFundAnalysisSystem:
             today_return = round(today_return, 2)
             prev_day_return = round(yesterday_return, 2)
             
+            # 记录最终计算的收益率
+            logger.info(f"基金 {fund_code} 收益率计算完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+            
             # 投资策略分析 - 使用策略引擎
             strategy_result = self.strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
             
@@ -417,7 +428,8 @@ class EnhancedFundAnalysisSystem:
             # 确保使用传入的基金名称覆盖API获取的名称
             fund_result['fund_name'] = fund_name
             
-            logger.info(f"基金 {fund_code} 分析完成")
+            logger.info(f"基金 {fund_code} 分析完成: status={status_label}, action={action}, "
+                       f"buy_multiplier={buy_multiplier}, redeem_amount={redeem_amount}")
             return fund_result
             
         except Exception as e:
