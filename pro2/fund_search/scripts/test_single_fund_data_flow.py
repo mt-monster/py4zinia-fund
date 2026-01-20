@@ -102,10 +102,8 @@ def test_fund_data_flow(fund_code: str, fund_name: str):
                 try:
                     import pandas as pd
                     raw_value = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
-                    if abs(raw_value) < 1:
-                        yesterday_return = raw_value * 100
-                    else:
-                        yesterday_return = raw_value
+                    # AKShare返回的日增长率已经是百分比格式，不需要额外处理
+                    yesterday_return = raw_value
                     
                     if abs(yesterday_return) > 100:
                         print(f"⚠️  历史数据中的昨日收益率异常: {yesterday_return}%")

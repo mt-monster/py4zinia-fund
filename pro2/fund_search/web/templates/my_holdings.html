@@ -775,6 +775,33 @@
         /* 加载状态 */
         .loading { text-align: center; padding: 40px; color: var(--text-muted); }
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+        /* 截图导入样式 */
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: var(--primary-red);
+            background: rgba(231, 76, 60, 0.05);
+        }
+        .upload-area.drag-over {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: var(--primary-red);
+        }
+        .upload-placeholder {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .upload-placeholder i {
+            font-size: 48px;
+            color: #ddd;
+            margin-bottom: 15px;
+        }
+        .modal-xl {
+            max-width: 1200px;
+        }
         
         /* 性能优化：加载指示器 */
         .loading-overlay {
@@ -909,6 +936,9 @@
                 <input type="date" id="date-select">
                 <button class="btn-filter" onclick="loadFunds()">
                     <i class="bi bi-funnel"></i> 筛选
+                </button>
+                <button class="btn-filter" onclick="openScreenshotModal()" style="background: #27ae60;" title="上传截图导入持仓">
+                    <i class="bi bi-camera"></i> 截图导入
                 </button>
                 <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
                     共 <span id="total-count">0</span> 只基金
@@ -1343,8 +1373,21 @@
             // 辅助方法：格式化百分比
             formatPercent(value) {
                 if (value === null || value === undefined || isNaN(value)) return '--';
-                const sign = value >= 0 ? '+' : '';
-                return sign + value.toFixed(2) + '%';
+                
+                // 修复：如果数值很小（小于1），可能是小数形式的收益率，需要乘以100
+                // 例如：0.09 表示 0.09%，但如果数值很大（大于等于1），可能是已经是百分比数值
+                // 注意：这里需要判断数值是否过大，比如是否大于1%（1.0）
+                let displayValue;
+                if (Math.abs(value) < 0.1) {
+                    // 如果数值很小（小于0.1），可能是小数形式的收益率（比如0.09表示0.09%），保持不变
+                    displayValue = value;
+                } else {
+                    // 如果数值较大（大于等于0.1），可能是被错误地放大了100倍（比如9表示0.09%），需要除以100
+                    displayValue = value / 100;
+                }
+                
+                const sign = displayValue >= 0 ? '+' : '';
+                return sign + displayValue.toFixed(2) + '%';
             }
 
             // 辅助方法：截断文本
@@ -2683,8 +2726,21 @@
 
         function formatPercent(value) {
             if (value === null || value === undefined || isNaN(value)) return '--';
-            const sign = value >= 0 ? '+' : '';
-            return sign + value.toFixed(2) + '%';
+            
+            // 修复：如果数值很小（小于1），可能是小数形式的收益率，需要乘以100
+            // 例如：0.09 表示 0.09%，但如果数值很大（大于等于1），可能是已经是百分比数值
+            // 注意：这里需要判断数值是否过大，比如是否大于1%（1.0）
+            let displayValue;
+            if (Math.abs(value) < 0.1) {
+                // 如果数值很小（小于0.1），可能是小数形式的收益率（比如0.09表示0.09%），保持不变
+                displayValue = value;
+            } else {
+                // 如果数值较大（大于等于0.1），可能是被错误地放大了100倍（比如9表示0.09%），需要除以100
+                displayValue = value / 100;
+            }
+            
+            const sign = displayValue >= 0 ? '+' : '';
+            return sign + displayValue.toFixed(2) + '%';
         }
 
         function truncate(str, len) {
@@ -3094,6 +3150,8 @@
                 const res = await fetch('/api/holdings?user_id=default_user');
                 const result = await res.json();
                 if (result.success && result.data) {
+                    // 调试：查看持仓数据
+                    console.log('持仓数据:', result.data);
                     const holding = result.data.find(h => h.fund_code === fundCode);
                     renderSidebarHolding(holding);
                 }
@@ -4098,6 +4156,1047 @@
                 closeSettingsModal();
             }
         });
+    </script>
+
+    <!-- 截图识别导入弹窗 -->
+    <div id="screenshot-import-overlay" class="modal-overlay" style="display: none;">
+        <div class="import-modal">
+            <div class="import-modal-header">
+                <h3><i class="bi bi-camera"></i> 截图识别导入</h3>
+                <button class="import-modal-close" onclick="closeScreenshotImport()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="import-modal-content">
+                <!-- OCR状态 -->
+                <div id="ocr-status" class="ocr-status">
+                    <div class="ocr-checking"><i class="bi bi-arrow-repeat spin"></i> 正在检查OCR功能...</div>
+                </div>
+
+                <!-- 上传区域 -->
+                <div id="upload-section" class="upload-section">
+                    <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+                        <i class="bi bi-cloud-upload" style="font-size: 3rem; color: #3498db; margin-bottom: 12px;"></i>
+                        <p style="color: #666; margin: 0;">点击或拖拽上传截图</p>
+                        <p style="color: #999; font-size: 0.85rem; margin-top: 4px;">支持 PNG、JPG 格式，最大 10MB</p>
+                    </div>
+                    <div class="upload-tips">
+                        <h4><i class="bi bi-lightbulb"></i> 识别提示</h4>
+                        <ul>
+                            <li>请上传清晰的基金持仓截图</li>
+                            <li>确保基金代码、名称清晰可见</li>
+                            <li>建议包含份额和成本价信息</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 预览区域 -->
+                <div id="preview-section" class="preview-section" style="display: none;">
+                    <div class="preview-image-container">
+                        <img id="preview-image" src="" alt="预览">
+                        <div class="preview-actions">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="resetUpload()">
+                                <i class="bi bi-arrow-counterclockwise"></i> 重新选择
+                            </button>
+                            <button class="btn btn-primary btn-sm" id="recognize-btn" onclick="startRecognition()">
+                                <i class="bi bi-search"></i> 开始识别
+                            </button>
+                        </div>
+                    </div>
+                    <div id="recognition-progress" class="recognition-progress" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">识别中...</span>
+                        </div>
+                        <p>正在识别图片中的基金信息...</p>
+                    </div>
+                </div>
+
+                <!-- 识别结果区域 -->
+                <div id="result-section" class="result-section" style="display: none;">
+                    <h4><i class="bi bi-check-circle text-success"></i> 识别结果</h4>
+                    <div id="result-list" class="result-list"></div>
+                    <div class="result-actions">
+                        <button class="btn btn-outline-secondary" onclick="resetUpload()">
+                            <i class="bi bi-arrow-counterclockwise"></i> 重新上传
+                        </button>
+                        <button class="btn btn-primary" id="import-btn" onclick="confirmImport()">
+                            <i class="bi bi-check"></i> 确认导入
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入成功弹窗 -->
+    <div id="import-success-overlay" class="modal-overlay" style="display: none;">
+        <div class="success-modal">
+            <div class="success-icon text-success">
+                <i class="bi bi-check-circle-fill" style="font-size: 4rem;"></i>
+            </div>
+            <h3 style="margin: 20px 0 10px;">导入成功</h3>
+            <p id="import-success-msg" style="color: #666; margin-bottom: 20px;"></p>
+            <button class="btn btn-primary" onclick="closeImportSuccess(); loadFunds();">
+                <i class="bi bi-check"></i> 完成
+            </button>
+        </div>
+    </div>
+
+    <style>
+        /* 截图导入弹窗样式 */
+        .import-modal {
+            background: white;
+            border-radius: 12px;
+            width: 520px;
+            max-width: 90vw;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        
+        .import-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .import-modal-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .import-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #7f8c8d;
+            cursor: pointer;
+            padding: 4px;
+        }
+        
+        .import-modal-close:hover {
+            color: #333;
+        }
+        
+        .import-modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        /* OCR状态 */
+        .ocr-status {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+        
+        .ocr-status .ocr-ready {
+            color: #27ae60;
+        }
+        
+        .ocr-status .ocr-unavailable {
+            color: #e74c3c;
+        }
+        
+        .ocr-checking {
+            color: #666;
+        }
+        
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 上传区域 */
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8fbfd;
+        }
+        
+        .upload-area:hover {
+            border-color: #2980b9;
+            background: #eef6fb;
+        }
+        
+        .upload-area.dragover {
+            border-color: #27ae60;
+            background: #e8f8f0;
+        }
+        
+        .upload-tips {
+            margin-top: 16px;
+            padding: 12px 16px;
+            background: #fff9e6;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .upload-tips h4 {
+            margin: 0 0 8px;
+            font-size: 0.9rem;
+            color: #f39c12;
+        }
+        
+        .upload-tips ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #666;
+        }
+        
+        .upload-tips li {
+            margin-bottom: 4px;
+        }
+        
+        /* 预览区域 */
+        .preview-image-container {
+            text-align: center;
+        }
+        
+        .preview-image-container img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            border: 1px solid #ecf0f1;
+        }
+        
+        .preview-actions {
+            margin-top: 16px;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+        
+        .recognition-progress {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .recognition-progress p {
+            margin-top: 12px;
+            color: #666;
+        }
+        
+        /* 识别结果 */
+        .result-section h4 {
+            margin-bottom: 16px;
+            font-size: 1rem;
+        }
+        
+        .result-list {
+            border: 1px solid #ecf0f1;
+            border-radius: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .result-item-code {
+            font-weight: 600;
+            color: #e74c3c;
+        }
+        
+        .result-item-confidence {
+            font-size: 0.85rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #e8f8f0;
+            color: #27ae60;
+        }
+        
+        .result-item-confidence.low {
+            background: #fef3e6;
+            color: #f39c12;
+        }
+        
+        .result-item-name {
+            font-size: 0.9rem;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .result-item-fields {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+        
+        .result-field {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .result-field-label {
+            color: #7f8c8d;
+        }
+        
+        .result-field-value {
+            font-weight: 500;
+        }
+        
+        .result-field-value input {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px 8px;
+            width: 100px;
+            text-align: right;
+            font-size: 0.85rem;
+        }
+        
+        .result-field-value input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .result-actions {
+            margin-top: 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        /* 成功弹窗 */
+        .success-modal {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+
+    <script>
+        // 截图导入相关变量
+        let selectedImageBase64 = null;
+        let recognizedFunds = [];
+
+        // 打开截图导入弹窗
+        async function openScreenshotImport() {
+            document.getElementById('screenshot-import-overlay').style.display = 'flex';
+            await checkOcrStatus();
+            resetUpload();
+        }
+
+        // 关闭截图导入弹窗
+        function closeScreenshotImport() {
+            document.getElementById('screenshot-import-overlay').style.display = 'none';
+        }
+
+        // 检查OCR状态
+        async function checkOcrStatus() {
+            const statusEl = document.getElementById('ocr-status');
+            try {
+                const response = await fetch('/api/holdings/import/ocr-status');
+                const result = await response.json();
+                if (result.success && result.data) {
+                    if (result.data.ocr_available) {
+                        statusEl.innerHTML = `
+                            <div class="ocr-ready">
+                                <i class="bi bi-check-circle"></i> OCR识别功能已就绪
+                            </div>
+                        `;
+                    } else {
+                        statusEl.innerHTML = `
+                            <div class="ocr-unavailable">
+                                <i class="bi bi-x-circle"></i> OCR功能未安装，请运行: pip install easyocr
+                            </div>
+                        `;
+                    }
+                }
+            } catch (e) {
+                statusEl.innerHTML = `
+                    <div class="ocr-unavailable">
+                        <i class="bi bi-x-circle"></i> 无法连接OCR服务
+                    </div>
+                `;
+            }
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        // 处理拖拽上传
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadArea = document.getElementById('upload-area');
+            if (uploadArea) {
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+                
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+                
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        processFile(file);
+                    }
+                });
+            }
+        });
+
+        // 处理文件
+        function processFile(file) {
+            if (file.size > 10 * 1024 * 1024) {
+                alert('文件大小不能超过10MB');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageBase64 = e.target.result;
+                showPreview();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 显示预览
+        function showPreview() {
+            document.getElementById('upload-section').style.display = 'none';
+            document.getElementById('preview-section').style.display = 'block';
+            document.getElementById('preview-image').src = selectedImageBase64;
+            document.getElementById('result-section').style.display = 'none';
+        }
+
+        // 重置上传
+        function resetUpload() {
+            selectedImageBase64 = null;
+            recognizedFunds = [];
+            document.getElementById('upload-section').style.display = 'block';
+            document.getElementById('preview-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('file-input').value = '';
+        }
+
+        // 开始识别
+        async function startRecognition() {
+            if (!selectedImageBase64) {
+                alert('请先选择图片');
+                return;
+            }
+
+            document.getElementById('recognition-progress').style.display = 'block';
+            document.getElementById('recognize-btn').disabled = true;
+
+            try {
+                const response = await fetch('/api/holdings/import/screenshot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image: selectedImageBase64,
+                        use_gpu: true
+                    })
+                });
+
+                const result = await response.json();
+
+                document.getElementById('recognition-progress').style.display = 'none';
+                document.getElementById('recognize-btn').disabled = false;
+
+                if (result.success) {
+                    recognizedFunds = result.data;
+                    showResults(result.data);
+                } else {
+                    alert(result.error || '识别失败，请重试');
+                }
+            } catch (e) {
+                document.getElementById('recognition-progress').style.display = 'none';
+                document.getElementById('recognize-btn').disabled = false;
+                alert('识别请求失败: ' + e.message);
+            }
+        }
+
+        // 显示识别结果
+        function showResults(funds) {
+            document.getElementById('result-section').style.display = 'block';
+            const listEl = document.getElementById('result-list');
+            
+            let html = '';
+            funds.forEach((fund, index) => {
+                const confidence = (fund.confidence * 100).toFixed(0);
+                const confidenceClass = confidence >= 80 ? '' : 'low';
+                
+                html += `
+                    <div class="result-item" data-index="${index}">
+                        <div class="result-item-header">
+                            <span class="result-item-code">${fund.fund_code || '未知'}</span>
+                            <span class="result-item-confidence ${confidenceClass}">置信度: ${confidence}%</span>
+                        </div>
+                        <div class="result-item-name">${fund.fund_name || '未能识别基金名称'}</div>
+                        <div class="result-item-fields">
+                            <div class="result-field">
+                                <span class="result-field-label">持有份额:</span>
+                                <span class="result-field-value">
+                                    <input type="number" step="0.01" id="shares-${index}" value="${fund.holding_shares || ''}" placeholder="请输入">
+                                </span>
+                            </div>
+                            <div class="result-field">
+                                <span class="result-field-label">成本价:</span>
+                                <span class="result-field-value">
+                                    <input type="number" step="0.0001" id="cost-${index}" value="${fund.cost_price || ''}" placeholder="请输入">
+                                </span>
+                            </div>
+                            <div class="result-field">
+                                <span class="result-field-label">购买日期:</span>
+                                <span class="result-field-value">
+                                    <input type="date" id="date-${index}" value="${fund.buy_date || ''}" style="width: 130px;">
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html || '<div style="padding: 20px; text-align: center; color: #999;">未能识别到基金信息</div>';
+        }
+
+        // 确认导入
+        async function confirmImport() {
+            if (recognizedFunds.length === 0) {
+                alert('没有可导入的基金');
+                return;
+            }
+
+            // 收集用户编辑后的数据
+            const fundsToImport = recognizedFunds.map((fund, index) => {
+                const sharesInput = document.getElementById(`shares-${index}`);
+                const costInput = document.getElementById(`cost-${index}`);
+                const dateInput = document.getElementById(`date-${index}`);
+                
+                return {
+                    ...fund,
+                    holding_shares: sharesInput ? parseFloat(sharesInput.value) || 0 : 0,
+                    cost_price: costInput ? parseFloat(costInput.value) || 0 : 0,
+                    buy_date: dateInput ? dateInput.value : ''
+                };
+            });
+
+            try {
+                const response = await fetch('/api/holdings/import/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        funds: fundsToImport
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    closeScreenshotImport();
+                    showImportSuccess(result);
+                } else {
+                    alert(result.message || '导入失败');
+                }
+            } catch (e) {
+                alert('导入请求失败: ' + e.message);
+            }
+        }
+
+        // 显示导入成功
+        function showImportSuccess(result) {
+            const msgEl = document.getElementById('import-success-msg');
+            msgEl.innerHTML = `
+                成功导入 <strong>${result.imported.length}</strong> 个基金<br>
+                ${result.failed.length > 0 ? `导入失败: ${result.failed.length} 个` : ''}
+            `;
+            document.getElementById('import-success-overlay').style.display = 'flex';
+        }
+
+        // 关闭导入成功弹窗
+        function closeImportSuccess() {
+            document.getElementById('import-success-overlay').style.display = 'none';
+        }
+
+        // 替换refreshData函数
+        function refreshData() {
+            openScreenshotModal();
+        }
+
+        // 检查URL参数，如果有import=screenshot则自动打开模态框
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('import') === 'screenshot') {
+                setTimeout(() => {
+                    openScreenshotModal();
+                    // 清理URL参数
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }, 500);
+            }
+        }
+
+        // 页面加载完成后检查URL参数
+        document.addEventListener('DOMContentLoaded', checkUrlParams);
+
+        // ==================== 截图导入功能 ====================
+
+        // 截图导入模态框
+        const screenshotModalHtml = `
+        <div class="modal fade" id="screenshotModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-camera"></i> 上传基金持仓截图</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-placeholder">
+                                <i class="bi bi-cloud-upload" style="font-size: 48px; color: #ddd;"></i>
+                                <p style="margin: 20px 0 10px 0; color: var(--text-muted);">点击选择图片或拖拽图片到此处</p>
+                                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
+                                    支持 JPG、PNG 格式，建议上传清晰的基金持仓截图
+                                </p>
+                                <input type="file" id="screenshotInput" accept="image/*" style="display: none;">
+                                <button class="btn btn-primary" onclick="document.getElementById('screenshotInput').click()">
+                                    <i class="bi bi-folder-open"></i> 选择图片
+                                </button>
+                            </div>
+                        </div>
+                        <div class="preview-area" id="previewArea" style="display: none; margin-top: 20px;">
+                            <h6>预览图片：</h6>
+                            <img id="imagePreview" style="max-width: 100%; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="recognition-result" id="recognitionResult" style="display: none; margin-top: 20px;">
+                            <h6>识别结果：</h6>
+                            <div id="resultContent"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" id="recognizeBtn" disabled>
+                            <i class="bi bi-search"></i> 开始识别
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        // 识别确认模态框
+        const confirmModalHtml = `
+        <div class="modal fade" id="confirmModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-check-circle"></i> 确认导入基金信息</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            请确认以下识别到的基金信息，必要时可修改数据后导入到您的持仓列表。
+                        </div>
+                        <div id="confirmContent"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-success" id="confirmImportBtn">
+                            <i class="bi bi-download"></i> 确认导入
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        // 添加模态框到页面
+        document.body.insertAdjacentHTML('beforeend', screenshotModalHtml);
+        document.body.insertAdjacentHTML('beforeend', confirmModalHtml);
+
+        let currentBase64Image = null;
+        let recognizedFunds = [];
+
+        // 初始化事件监听器（确保DOM已加载）
+        function initScreenshotModalEvents() {
+            const screenshotInput = document.getElementById('screenshotInput');
+            const uploadArea = document.getElementById('uploadArea');
+            const recognizeBtn = document.getElementById('recognizeBtn');
+            const confirmImportBtn = document.getElementById('confirmImportBtn');
+
+            if (screenshotInput) {
+                screenshotInput.addEventListener('change', handleFileSelect);
+            }
+
+            if (uploadArea) {
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('drag-over');
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('drag-over');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('drag-over');
+
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith('image/')) {
+                        processImageFile(files[0]);
+                    }
+                });
+            }
+
+            if (recognizeBtn) {
+                recognizeBtn.addEventListener('click', recognizeScreenshot);
+            }
+
+            if (confirmImportBtn) {
+                confirmImportBtn.addEventListener('click', confirmImport);
+            }
+        }
+
+        // 页面加载完成后初始化事件
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initScreenshotModalEvents);
+        } else {
+            initScreenshotModalEvents();
+        }
+
+        // 打开截图导入模态框
+        function openScreenshotModal() {
+            const modal = new bootstrap.Modal(document.getElementById('screenshotModal'));
+            modal.show();
+            resetScreenshotModal();
+        }
+
+        // 重置模态框状态
+        function resetScreenshotModal() {
+            const uploadArea = document.getElementById('uploadArea');
+            const previewArea = document.getElementById('previewArea');
+            const recognitionResult = document.getElementById('recognitionResult');
+            const recognizeBtn = document.getElementById('recognizeBtn');
+            const screenshotInput = document.getElementById('screenshotInput');
+
+            if (uploadArea) uploadArea.style.display = 'block';
+            if (previewArea) previewArea.style.display = 'none';
+            if (recognitionResult) recognitionResult.style.display = 'none';
+            if (recognizeBtn) recognizeBtn.disabled = true;
+            if (screenshotInput) screenshotInput.value = '';
+            
+            currentBase64Image = null;
+            recognizedFunds = [];
+        }
+
+        // 处理文件选择
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImageFile(file);
+            }
+        }
+
+        // 处理图片文件
+        function processImageFile(file) {
+            if (file.size > 10 * 1024 * 1024) { // 10MB限制
+                alert('图片文件过大，请选择小于10MB的图片');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentBase64Image = e.target.result;
+                showImagePreview(currentBase64Image);
+                document.getElementById('recognizeBtn').disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 显示图片预览
+        function showImagePreview(base64Data) {
+            const uploadArea = document.getElementById('uploadArea');
+            const previewArea = document.getElementById('previewArea');
+            const imagePreview = document.getElementById('imagePreview');
+            
+            if (uploadArea) uploadArea.style.display = 'none';
+            if (previewArea) previewArea.style.display = 'block';
+            if (imagePreview) imagePreview.src = base64Data;
+        }
+
+        // 开始识别
+        function recognizeScreenshot() {
+            if (!currentBase64Image) return;
+
+            const btn = document.getElementById('recognizeBtn');
+            if (!btn) return;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 识别中...';
+
+            fetch('/api/holdings/import/screenshot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image: currentBase64Image,
+                    use_gpu: false
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    recognizedFunds = data.data;
+                    showRecognitionResult(data.data);
+                } else {
+                    showRecognitionError(data.error, data.suggestion);
+                }
+            })
+            .catch(error => {
+                console.error('识别失败:', error);
+                showRecognitionError('网络错误，请重试');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-search"></i> 开始识别';
+            });
+        }
+
+        // 显示识别结果
+        function showRecognitionResult(funds) {
+            const resultDiv = document.getElementById('recognitionResult');
+            if (!resultDiv) return;
+            
+            resultDiv.style.display = 'block';
+
+            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${funds.length} 个基金</div>`;
+
+            if (funds.length > 0) {
+                html += '<div class="table-responsive" style="margin-top: 15px;">';
+                html += '<table class="table table-sm">';
+                html += '<thead><tr><th>基金代码</th><th>基金名称</th><th>置信度</th></tr></thead>';
+                html += '<tbody>';
+
+                funds.forEach(fund => {
+                    html += `<tr>
+                        <td><strong>${fund.fund_code || '--'}</strong></td>
+                        <td>${fund.fund_name || '--'}</td>
+                        <td>${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}</td>
+                    </tr>`;
+                });
+
+                html += '</tbody></table></div>';
+
+                // 添加确认按钮
+                html += '<div class="text-center" style="margin-top: 20px;">';
+                html += '<button class="btn btn-success" onclick="openConfirmModal()">';
+                html += '<i class="bi bi-check-circle"></i> 确认导入';
+                html += '</button></div>';
+            }
+
+            document.getElementById('resultContent').innerHTML = html;
+        }
+
+        // 显示识别错误
+        function showRecognitionError(error, suggestion = '') {
+            const resultDiv = document.getElementById('recognitionResult');
+            const resultContent = document.getElementById('resultContent');
+            
+            if (!resultDiv || !resultContent) return;
+            
+            resultDiv.style.display = 'block';
+
+            let html = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${error}</div>`;
+            if (suggestion) {
+                html += `<div class="alert alert-info"><i class="bi bi-lightbulb"></i> ${suggestion}</div>`;
+            }
+
+            resultContent.innerHTML = html;
+        }
+
+        // 打开确认模态框
+        function openConfirmModal() {
+            if (recognizedFunds.length === 0) return;
+
+            const screenshotModal = document.getElementById('screenshotModal');
+            const confirmModal = document.getElementById('confirmModal');
+            
+            if (screenshotModal) {
+                bootstrap.Modal.getInstance(screenshotModal)?.hide();
+            }
+            
+            if (confirmModal) {
+                const modal = new bootstrap.Modal(confirmModal);
+                modal.show();
+                showConfirmContent(recognizedFunds);
+            }
+        }
+
+        // 显示确认内容
+        function showConfirmContent(funds) {
+            const confirmContent = document.getElementById('confirmContent');
+            if (!confirmContent) return;
+            
+            let html = '<div class="row">';
+
+            funds.forEach((fund, index) => {
+                html += `
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-header">
+                            <strong>${fund.fund_code || '--'}</strong> - ${fund.fund_name || '--'}
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="form-label">持有份额</label>
+                                    <input type="number" class="form-control" id="shares_${index}"
+                                           value="${fund.holding_shares || ''}" step="0.01" min="0">
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label">成本价(元)</label>
+                                    <input type="number" class="form-control" id="price_${index}"
+                                           value="${fund.cost_price || ''}" step="0.001" min="0">
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label">买入日期</label>
+                                    <input type="date" class="form-control" id="date_${index}"
+                                           value="${fund.buy_date || ''}">
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label">置信度</label>
+                                    <input type="text" class="form-control" readonly
+                                           value="${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            html += '</div>';
+            if (confirmContent) confirmContent.innerHTML = html;
+        }
+
+        // 确认导入
+        function confirmImport() {
+            const fundsToImport = [];
+
+            recognizedFunds.forEach((fund, index) => {
+                const sharesEl = document.getElementById(`shares_${index}`);
+                const priceEl = document.getElementById(`price_${index}`);
+                const dateEl = document.getElementById(`date_${index}`);
+                
+                const shares = sharesEl ? parseFloat(sharesEl.value) || 0 : 0;
+                const price = priceEl ? parseFloat(priceEl.value) || 0 : 0;
+                const buyDate = dateEl ? dateEl.value : '';
+
+                if (shares > 0 && price > 0) {
+                    fundsToImport.push({
+                        fund_code: fund.fund_code,
+                        fund_name: fund.fund_name,
+                        holding_shares: shares,
+                        cost_price: price,
+                        buy_date: buyDate,
+                        confidence: fund.confidence
+                    });
+                }
+            });
+
+            if (fundsToImport.length === 0) {
+                alert('请至少填写一个基金的份额和成本价');
+                return;
+            }
+
+            const btn = document.getElementById('confirmImportBtn');
+            if (!btn) return;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 导入中...';
+
+            fetch('/api/holdings/import/confirm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: 'default_user',
+                    funds: fundsToImport
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`成功导入 ${fundsToImport.length} 个基金到持仓列表`);
+                    const confirmModal = document.getElementById('confirmModal');
+                    if (confirmModal) {
+                        bootstrap.Modal.getInstance(confirmModal)?.hide();
+                    }
+                    loadFunds(); // 重新加载持仓数据
+                } else {
+                    alert('导入失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('导入失败:', error);
+                alert('导入失败，请重试');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-download"></i> 确认导入';
+            });
+        }
+
+        // 添加上传区域的拖拽样式
+        const style = document.createElement('style');
+        style.textContent = `
+        .upload-area.drag-over {
+            background: rgba(231, 76, 60, 0.1);
+            border: 2px dashed var(--primary-red);
+        }
+        .upload-placeholder {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        `;
+        document.head.appendChild(style);
+
     </script>
 </body>
 </html>
