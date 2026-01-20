@@ -291,6 +291,7 @@ class EnhancedFundData:
                 'current_nav': current_nav,
                 'previous_nav': previous_nav,
                 'daily_return': daily_return,
+                'today_return': daily_return,  # 添加别名，与 enhanced_main.py 保持一致
                 'yesterday_return': yesterday_return,
                 'nav_date': nav_date,
                 'estimate_nav': current_nav,  # QDII基金没有实时估算，使用当日净值
@@ -378,6 +379,7 @@ class EnhancedFundData:
                 'current_nav': current_nav,
                 'previous_nav': previous_nav,
                 'daily_return': round(daily_return, 2),
+                'today_return': round(daily_return, 2),  # 添加别名，与 enhanced_main.py 保持一致
                 'yesterday_return': yesterday_return,
                 'nav_date': nav_date,
                 'estimate_nav': estimate_nav,

@@ -230,6 +230,9 @@ class EnhancedDatabaseManager:
         
         # 添加新的夏普比率字段（如果表已存在）
         self._add_sharpe_ratio_columns()
+        
+        # 删除冗余字段（如果存在）
+        self._remove_redundant_columns()
     
     def _add_sharpe_ratio_columns(self):
         """添加新的夏普比率字段到fund_analysis_results表"""
@@ -271,6 +274,46 @@ class EnhancedDatabaseManager:
             logger.info("夏普比率字段检查完成")
         except Exception as e:
             logger.warning(f"添加夏普比率字段时出现错误: {str(e)}")
+    
+    def _remove_redundant_columns(self):
+        """删除fund_analysis_results表中的冗余字段"""
+        try:
+            # 先检查表结构，确定哪些字段需要删除
+            check_sql = """
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'fund_analysis_results'
+            """
+            existing_columns = set()
+            try:
+                result = self.execute_query_raw(check_sql)
+                if result:
+                    existing_columns = {row[0] for row in result}
+            except Exception as e:
+                logger.warning(f"检查表结构时出现错误: {str(e)}")
+                return
+            
+            # 定义需要删除的冗余字段
+            # yesterday_return: 从未使用，与 prev_day_return 重复
+            # daily_return: 历史遗留字段，应该使用 today_return
+            columns_to_remove = ['yesterday_return', 'daily_return']
+            
+            # 只删除存在的字段
+            for column_name in columns_to_remove:
+                if column_name in existing_columns:
+                    alter_sql = f"ALTER TABLE fund_analysis_results DROP COLUMN {column_name}"
+                    try:
+                        self.execute_sql(alter_sql)
+                        logger.info(f"成功删除冗余字段: {column_name}")
+                    except Exception as e:
+                        logger.warning(f"删除字段 {column_name} 时出现错误: {str(e)}")
+                else:
+                    logger.info(f"字段 {column_name} 不存在，跳过删除")
+            
+            logger.info("冗余字段清理完成")
+        except Exception as e:
+            logger.warning(f"删除冗余字段时出现错误: {str(e)}")
     
     def _create_user_holdings_table(self):
         """
