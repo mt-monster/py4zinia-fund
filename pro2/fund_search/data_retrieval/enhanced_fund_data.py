@@ -24,6 +24,37 @@ logger = logging.getLogger(__name__)
 class EnhancedFundData:
     """增强版基金数据类"""
     
+    # QDII基金代码列表（从京东金融表格中识别）
+    QDII_FUND_CODES = {
+        '096001',  # 大成标普500等权重指数(QDII)A人民币
+        '100055',  # 富国全球科技互联网股票(QDII)A
+        '012061',  # 富国全球消费精选混合(QDII)美元现汇
+        '006680',  # 广发道琼斯石油指数(QDII-LOF)C美元现汇
+        '006373',  # 国富全球科技互联混合(QDII)人民币A
+        '006105',  # 宏利印度股票(QDII)A
+        '021540',  # 华安法国CAC40ETF发起式联接(QDII)C
+        '015016',  # 华安国际龙头(DAX)ETF联接C
+        '040047',  # 华安纳斯达克100ETF联接(QDII)A(美元现钞)
+        '007844',  # 华宝油气C
+        '008708',  # 建信富时100指数(QDII)C美元现汇
+        '501225',  # 景顺长城全球半导体芯片股票A(QDII-LOF)(人民币)
+        '162415',  # 美国消费
+        '007721',  # 天弘标普500发起(QDII-FOF)A
+    }
+    
+    @staticmethod
+    def is_qdii_fund(fund_code: str) -> bool:
+        """
+        判断是否为QDII基金
+        
+        参数：
+        fund_code: 基金代码
+        
+        返回：
+        bool: 是否为QDII基金
+        """
+        return fund_code in EnhancedFundData.QDII_FUND_CODES
+    
     @staticmethod
     def get_sina_realtime_estimation(fund_code: str) -> Optional[Dict]:
         """
@@ -167,7 +198,7 @@ class EnhancedFundData:
     @staticmethod
     def get_realtime_data(fund_code: str) -> Dict:
         """
-        获取基金实时数据（仅使用新浪财经实时估算）
+        获取基金实时数据
         
         参数：
         fund_code: 基金代码（6位数字）
@@ -176,8 +207,113 @@ class EnhancedFundData:
         dict: 基金实时数据
         
         数据获取策略：
-        - 仅使用新浪财经实时估算（分钟级更新）
-        - 如果新浪接口失败，抛出异常
+        - 普通基金：使用新浪财经实时估算（分钟级更新）
+        - QDII基金：仅使用AKShare历史净值接口（不使用新浪接口）
+          如果当日数据没有，顺推使用前一天的数据
+        """
+        # 判断是否为QDII基金
+        is_qdii = EnhancedFundData.is_qdii_fund(fund_code)
+        
+        if is_qdii:
+            # QDII基金：仅使用AKShare接口
+            logger.info(f"基金 {fund_code} 是QDII基金，使用AKShare接口获取数据")
+            return EnhancedFundData._get_qdii_realtime_data(fund_code)
+        else:
+            # 普通基金：使用新浪接口
+            return EnhancedFundData._get_normal_fund_realtime_data(fund_code)
+    
+    @staticmethod
+    def _get_qdii_realtime_data(fund_code: str) -> Dict:
+        """
+        获取QDII基金实时数据（仅使用AKShare接口）
+        
+        参数：
+        fund_code: 基金代码
+        
+        返回：
+        dict: 基金实时数据
+        
+        逻辑：
+        - 如果当日盈亏算不到，就用昨日的
+        - 昨日盈亏用前天的，这样顺推一天的数据来计算
+        """
+        try:
+            # 从AKShare获取历史净值数据
+            fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+            
+            if fund_nav.empty:
+                raise ValueError(f"AKShare接口未返回基金 {fund_code} 的净值数据")
+            
+            # 按日期排序
+            fund_nav = fund_nav.sort_values('净值日期', ascending=True)
+            
+            # 获取最新数据（当日或最近一日）
+            latest_data = fund_nav.iloc[-1]
+            nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
+            current_nav = float(latest_data.get('单位净值', 0))
+            
+            # 获取昨日净值（前一日的单位净值）
+            if len(fund_nav) > 1:
+                previous_data = fund_nav.iloc[-2]
+                previous_nav = float(previous_data.get('单位净值', current_nav))
+            else:
+                previous_nav = current_nav
+            
+            # 获取当日盈亏率（从最新一条数据的日增长率获取）
+            daily_return_raw = latest_data.get('日增长率', 0)
+            if pd.notna(daily_return_raw):
+                daily_return = float(daily_return_raw)
+                # 判断格式：如果绝对值 < 0.1，说明是小数格式，需要乘100
+                if abs(daily_return) < 0.1:
+                    daily_return = daily_return * 100
+                daily_return = round(daily_return, 2)
+            else:
+                daily_return = 0.0
+            
+            # 获取昨日盈亏率（从前一条数据的日增长率获取）
+            if len(fund_nav) > 1:
+                yesterday_return_raw = previous_data.get('日增长率', 0)
+                if pd.notna(yesterday_return_raw):
+                    yesterday_return = float(yesterday_return_raw)
+                    # 判断格式
+                    if abs(yesterday_return) < 0.1:
+                        yesterday_return = yesterday_return * 100
+                    yesterday_return = round(yesterday_return, 2)
+                else:
+                    yesterday_return = 0.0
+            else:
+                yesterday_return = 0.0
+            
+            logger.info(f"QDII基金 {fund_code} 使用AKShare数据: 当日净值={current_nav}, 当日盈亏={daily_return}%, 昨日盈亏={yesterday_return}%")
+            
+            return {
+                'fund_code': fund_code,
+                'current_nav': current_nav,
+                'previous_nav': previous_nav,
+                'daily_return': daily_return,
+                'yesterday_return': yesterday_return,
+                'nav_date': nav_date,
+                'estimate_nav': current_nav,  # QDII基金没有实时估算，使用当日净值
+                'estimate_return': daily_return,
+                'data_source': 'akshare_qdii',
+                'estimate_time': ''
+            }
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"获取QDII基金 {fund_code} 数据失败: {error_msg}")
+            raise RuntimeError(f"无法获取QDII基金 {fund_code} 的数据: {error_msg}")
+    
+    @staticmethod
+    def _get_normal_fund_realtime_data(fund_code: str) -> Dict:
+        """
+        获取普通基金实时数据（使用新浪财经实时估算）
+        
+        参数：
+        fund_code: 基金代码
+        
+        返回：
+        dict: 基金实时数据
         """
         try:
             # 从新浪财经获取实时估算
