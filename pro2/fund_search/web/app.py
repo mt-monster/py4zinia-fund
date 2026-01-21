@@ -24,6 +24,7 @@ from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
 from data_retrieval.enhanced_fund_data import EnhancedFundData
+from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -49,9 +50,14 @@ def init_components():
         unified_strategy_engine = UnifiedStrategyEngine()
         strategy_evaluator = StrategyEvaluator()
         fund_data_manager = EnhancedFundData()
+        
         logger.info("系统组件初始化完成（含统一策略引擎）")
+        logger.info(f"db_manager: {db_manager is not None}")
+        logger.info(f"strategy_engine: {strategy_engine is not None}")
+        logger.info(f"fund_data_manager: {fund_data_manager is not None}")
     except Exception as e:
-        logger.error(f"系统组件初始化失败: {str(e)}")
+        logger.error(f"系统组件初始化失败: {str(e)}", exc_info=True)
+        raise
 
 # ==================== 页面路由 ====================
 
@@ -1172,6 +1178,168 @@ def delete_holding(fund_code):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ==================== 截图识别导入 API ====================
+
+@app.route('/api/holdings/import/screenshot', methods=['POST'])
+def import_holding_screenshot():
+    """
+    通过截图识别导入持仓
+    接收Base64格式的图片，识别其中的基金信息
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({'success': False, 'error': '未提供图片数据'}), 400
+        
+        image_data = data['image']
+        use_gpu = data.get('use_gpu', True)
+        
+        logger.info("开始识别基金截图...")
+        
+        recognized_funds = recognize_fund_screenshot(image_data, use_gpu=use_gpu)
+        
+        if not recognized_funds:
+            return jsonify({
+                'success': False, 
+                'error': '未能识别到基金信息，请确保图片清晰可读',
+                'suggestion': '建议上传更清晰的基金持仓截图，确保基金代码和名称清晰可见'
+            }), 400
+        
+        validated_funds = []
+        for fund in recognized_funds:
+            is_valid, error_msg = validate_recognized_fund(fund)
+            if is_valid:
+                validated_funds.append(fund)
+            else:
+                logger.warning(f"识别结果验证失败: {error_msg}, 基金信息: {fund}")
+        
+        if not validated_funds:
+            return jsonify({
+                'success': False,
+                'error': '未能识别到有效的基金代码',
+                'recognized': recognized_funds
+            }), 400
+        
+        logger.info(f"成功识别 {len(validated_funds)} 个基金")
+        
+        return jsonify({
+            'success': True,
+            'data': validated_funds,
+            'message': f'成功识别 {len(validated_funds)} 个基金，请确认信息后导入'
+        })
+        
+    except Exception as e:
+        logger.error(f"截图识别失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'识别失败: {str(e)}'}), 500
+
+
+@app.route('/api/holdings/import/confirm', methods=['POST'])
+def confirm_import_holdings():
+    """
+    确认导入识别到的基金到持仓列表
+    """
+    try:
+        data = request.get_json()
+        if not data or 'funds' not in data:
+            return jsonify({'success': False, 'error': '未提供基金数据'}), 400
+        
+        user_id = data.get('user_id', 'default_user')
+        funds = data['funds']
+        
+        if not funds:
+            return jsonify({'success': False, 'error': '基金列表为空'}), 400
+        
+        imported = []
+        failed = []
+        
+        for fund_info in funds:
+            fund_code = fund_info.get('fund_code', '').strip()
+            fund_name = fund_info.get('fund_name', '').strip()
+            holding_shares = float(fund_info.get('holding_shares', 0) or 0)
+            cost_price = float(fund_info.get('cost_price', 0) or 0)
+            buy_date = fund_info.get('buy_date', '')
+            notes = f"通过截图识别导入 - 置信度: {fund_info.get('confidence', 0):.2%}"
+            
+            if not fund_code:
+                failed.append({'fund': fund_info, 'error': '基金代码为空'})
+                continue
+            
+            holding_amount = holding_shares * cost_price
+            
+            sql = """
+            INSERT INTO user_holdings 
+            (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
+            VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
+            ON DUPLICATE KEY UPDATE
+                holding_shares = holding_shares + :add_shares,
+                holding_amount = holding_amount + :add_amount,
+                notes = CONCAT(notes, '; ', :notes)
+            """
+            
+            try:
+                success = db_manager.execute_sql(sql, {
+                    'user_id': user_id,
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'holding_shares': holding_shares,
+                    'cost_price': cost_price,
+                    'holding_amount': holding_amount,
+                    'buy_date': buy_date,
+                    'notes': notes,
+                    'add_shares': holding_shares,
+                    'add_amount': holding_amount
+                })
+                
+                if success:
+                    imported.append({
+                        'fund_code': fund_code,
+                        'fund_name': fund_name,
+                        'holding_shares': holding_shares,
+                        'cost_price': cost_price
+                    })
+                else:
+                    failed.append({'fund_code': fund_code, 'error': '数据库插入失败'})
+                    
+            except Exception as db_error:
+                logger.error(f"导入基金 {fund_code} 失败: {db_error}")
+                failed.append({'fund_code': fund_code, 'error': str(db_error)})
+        
+        return jsonify({
+            'success': True,
+            'imported': imported,
+            'failed': failed,
+            'message': f'成功导入 {len(imported)} 个基金，{len(failed)} 个失败'
+        })
+        
+    except Exception as e:
+        logger.error(f"确认导入失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/holdings/import/ocr-status', methods=['GET'])
+def get_ocr_status():
+    """检查OCR功能状态"""
+    try:
+        ocr_available = False
+        try:
+            import easyocr
+            ocr_available = True
+        except ImportError:
+            pass
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'ocr_available': ocr_available,
+                'gpu_available': True,
+                'supported_formats': ['png', 'jpg', 'jpeg'],
+                'max_file_size': '10MB'
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ==================== ETF市场 API ====================
 
 @app.route('/api/etf/list', methods=['GET'])
@@ -2185,3 +2353,6 @@ def filter_backtest_trades():
 if __name__ == '__main__':
     init_components()
     app.run(host='0.0.0.0', port=5000, debug=True)
+else:
+    # 当作为模块导入时，自动初始化组件
+    init_components()

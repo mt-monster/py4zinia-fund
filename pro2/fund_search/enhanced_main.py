@@ -363,12 +363,8 @@ class EnhancedFundAnalysisSystem:
                             # 昨日盈亏率直接从最新一条数据的日增长率获取
                             raw_value = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
                             
-                            # 如果值的绝对值小于1，说明是小数格式（如0.0475），需要乘100
-                            # 如果值的绝对值大于等于1，说明已经是百分比格式（如4.75）
-                            if abs(raw_value) < 1:
-                                yesterday_return = raw_value * 100
-                            else:
-                                yesterday_return = raw_value
+                            # AKShare返回的日增长率已经是百分比格式（如-0.20表示-0.20%），不需要额外处理
+                            yesterday_return = raw_value
                             
                             # 检查昨日收益率是否异常（超过±100%）
                             if abs(yesterday_return) > 100:
