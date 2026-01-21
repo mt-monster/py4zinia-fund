@@ -1,0 +1,17 @@
+# OCR识别依赖包
+# 用于基金截图识别功能
+
+# 方案1：PaddleOCR（推荐，中文识别效果好）
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0  # CPU版本
+# paddlepaddle-gpu>=2.5.0  # GPU版本（如果有GPU）
+
+# 方案2：EasyOCR（备用方案）
+easyocr>=1.7.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# 其他依赖
+numpy>=1.24.0
+opencv-python>=4.8.0

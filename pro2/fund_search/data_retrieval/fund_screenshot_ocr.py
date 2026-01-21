@@ -2,294 +2,408 @@
 # coding: utf-8
 
 """
-基金持仓截图识别模块
-通过OCR识别上传的基金持仓截图，自动提取基金代码、名称、份额、成本价等信息
+基金截图OCR识别模块
+使用OCR技术识别基金截图中的基金名称和代码
 """
 
-import os
 import re
-import base64
-import uuid
-import tempfile
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass
-from datetime import datetime
 import logging
+from typing import Dict, List, Optional, Tuple
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 
-OCR_AVAILABLE = False
-easyocr = None
 
-try:
-    import easyocr
-    OCR_AVAILABLE = True
-    logger.info("EasyOCR 库已加载，GPU模式: 可用")
-except ImportError:
-    logger.warning("EasyOCR 未安装，尝试使用其他OCR方案...")
-
-try:
-    from PIL import Image
-    PIL_AVAILABLE = True
-except ImportError:
-    logger.warning("PIL 未安装")
-    PIL_AVAILABLE = False
-
-
-@dataclass
-class RecognizedFund:
-    """识别到的基金信息"""
-    fund_code: str = ""
-    fund_name: str = ""
-    holding_shares: float = 0.0
-    cost_price: float = 0.0
-    buy_date: str = ""
-    confidence: float = 0.0
-    raw_text: str = ""
-
-
-class FundScreenshotRecognizer:
-    """基金持仓截图识别器"""
-    
-    def __init__(self, use_gpu: bool = True):
-        self.reader = None
-        self.use_gpu = use_gpu
-        self._init_reader()
-    
-    def _init_reader(self):
-        """初始化OCR阅读器"""
-        if not OCR_AVAILABLE or not easyocr:
-            logger.warning("OCR库不可用")
-            return
-        
-        try:
-            self.reader = easyocr.Reader(['ch_sim', 'en'], gpu=self.use_gpu)
-            logger.info("EasyOCR 初始化成功")
-        except Exception as e:
-            logger.error(f"EasyOCR 初始化失败: {e}")
-            self.reader = None
-    
-    def _save_base64_image(self, base64_data: str) -> Optional[str]:
-        """保存Base64图片到临时文件"""
-        if not PIL_AVAILABLE:
-            return None
-        
-        try:
-            header, encoded = base64_data.split(',') if ',' in base64_data else ('', base64_data)
-            image_data = base64.b64decode(encoded)
-            
-            temp_dir = tempfile.gettempdir()
-            filename = f"fund_screenshot_{uuid.uuid4().hex[:8]}.jpg"
-            filepath = os.path.join(temp_dir, filename)
-            
-            with open(filepath, 'wb') as f:
-                f.write(image_data)
-            
-            return filepath
-        except Exception as e:
-            logger.error(f"保存图片失败: {e}")
-            return None
-    
-    def _clean_text(self, text: str) -> str:
-        """清理识别文本"""
-        if not text:
-            return ""
-        return text.strip().replace(' ', '').replace('\n', '')
-    
-    def _extract_fund_code(self, text: str) -> Optional[str]:
-        """从文本中提取基金代码（6位数字）"""
-        pattern = r'[0-9]{6}'
-        matches = re.findall(pattern, text)
-        for match in matches:
-            if 100000 <= int(match) <= 999999:
-                return match
-        return None
-    
-    def _extract_money_amount(self, text: str) -> Optional[float]:
-        """从文本中提取金额"""
-        pattern = r'([0-9]+\.?[0-9]*)'
-        matches = re.findall(pattern, text)
-        for match in matches:
-            try:
-                value = float(match)
-                if 0.01 <= value <= 10000000:
-                    return value
-            except ValueError:
-                continue
-        return None
-    
-    def _extract_shares(self, text: str) -> Optional[float]:
-        """从文本中提取份额"""
-        pattern = r'([0-9]+\.?[0-9]*)'
-        matches = re.findall(pattern, text)
-        for match in matches:
-            try:
-                value = float(match)
-                if 0.01 <= value <= 100000000:
-                    return value
-            except ValueError:
-                continue
-        return None
-    
-    def _extract_date(self, text: str) -> Optional[str]:
-        """从文本中提取日期"""
-        patterns = [
-            r'(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})',
-            r'(\d{4}年\d{1,2}月\d{1,2}日)',
-            r'(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})',
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, text)
-            if match:
-                date_str = match.group(1)
-                date_str = date_str.replace('年', '-').replace('月', '-').replace('日', '')
-                date_str = date_str.replace('/', '-').replace('.', '-')
-                try:
-                    datetime.strptime(date_str[:10], '%Y-%m-%d')
-                    return date_str[:10]
-                except ValueError:
-                    continue
-        return None
-    
-    def _find_fund_name_line(self, texts: List[Tuple]) -> Optional[str]:
-        """查找基金名称行"""
-        keywords = ['基金', '混合', '股票', '债券', '指数', 'ETF', 'QDII', 'LOF', 'FOF']
-        
-        for text, bbox, confidence in texts:
-            cleaned = self._clean_text(text)
-            for keyword in keywords:
-                if keyword in cleaned and len(cleaned) >= 4 and len(cleaned) <= 30:
-                    return cleaned
-        return None
-    
-    def _calculate_confidence(self, texts: List[Tuple]) -> float:
-        """计算整体识别置信度"""
-        if not texts:
-            return 0.0
-        
-        total_conf = sum(conf for _, _, conf in texts)
-        avg_conf = total_conf / len(texts)
-        return round(avg_conf, 2)
-    
-    def recognize(self, image_path: str) -> List[RecognizedFund]:
-        """识别图片中的基金信息"""
-        if not self.reader:
-            logger.error("OCR阅读器未初始化")
-            return []
-        
-        if not os.path.exists(image_path):
-            logger.error(f"图片文件不存在: {image_path}")
-            return []
-        
-        try:
-            results = self.reader.readtext(image_path)
-            logger.info(f"OCR识别到 {len(results)} 个文本区域")
-            
-            full_text = ' '.join([text for text, _, _ in results])
-            confidence = self._calculate_confidence(results)
-            
-            fund_code = self._extract_fund_code(full_text)
-            fund_name = self._find_fund_name_line(results)
-            
-            recognized = RecognizedFund(
-                fund_code=fund_code or "",
-                fund_name=fund_name or "",
-                confidence=confidence,
-                raw_text=full_text[:500]
-            )
-            
-            return [recognized]
-            
-        except Exception as e:
-            logger.error(f"OCR识别失败: {e}")
-            return []
-    
-    def recognize_base64(self, base64_data: str) -> List[RecognizedFund]:
-        """识别Base64格式的图片"""
-        image_path = self._save_base64_image(base64_data)
-        if not image_path:
-            return []
-        
-        try:
-            results = self.recognize(image_path)
-            return results
-        finally:
-            self._cleanup_image(image_path)
-    
-    def _cleanup_image(self, image_path: str):
-        """清理临时图片文件"""
-        try:
-            if image_path and os.path.exists(image_path):
-                os.remove(image_path)
-        except Exception as e:
-            logger.warning(f"清理临时图片失败: {e}")
-
-
-def recognize_fund_screenshot(base64_image: str, use_gpu: bool = True) -> List[Dict]:
+def recognize_fund_screenshot(image_data: str, use_gpu: bool = False) -> List[Dict]:
     """
-    识别基金持仓截图
+    识别基金截图中的基金信息
     
     参数：
-    base64_image: Base64编码的图片数据
+    image_data: Base64编码的图片数据或图片二进制数据
     use_gpu: 是否使用GPU加速
     
     返回：
-    List[Dict]: 识别到的基金信息列表
+    list: 识别到的基金列表，每个元素包含 fund_code、fund_name、confidence
     """
-    recognizer = FundScreenshotRecognizer(use_gpu=use_gpu)
-    results = recognizer.recognize_base64(base64_image)
+    from .ocr_config import get_ocr_engine
     
-    return [
-        {
-            'fund_code': r.fund_code,
-            'fund_name': r.fund_name,
-            'holding_shares': r.holding_shares,
-            'cost_price': r.cost_price,
-            'buy_date': r.buy_date,
-            'confidence': r.confidence,
-        }
-        for r in results
-    ]
+    # 根据配置选择OCR引擎
+    ocr_engine = get_ocr_engine()
+    
+    if ocr_engine == 'easyocr':
+        logger.info("使用EasyOCR进行识别")
+        return recognize_with_easyocr(image_data, use_gpu)
+    else:
+        logger.info("使用PaddleOCR进行识别")
+        return recognize_with_paddleocr(image_data, use_gpu)
 
 
-def validate_recognized_fund(fund_info: Dict) -> Tuple[bool, str]:
+def recognize_with_paddleocr(image_data: str, use_gpu: bool = False) -> List[Dict]:
     """
-    验证识别结果的基金信息
+    使用 PaddleOCR 进行识别
+    
+    参数：
+    image_data: Base64编码的图片数据或图片二进制数据
+    use_gpu: 是否使用GPU加速
     
     返回：
-    (是否有效, 错误信息)
+    list: 识别到的基金列表
     """
-    if not fund_info.get('fund_code'):
-        return False, "未能识别到基金代码"
+    try:
+        # 处理Base64编码的图片数据
+        if isinstance(image_data, str):
+            import base64
+            # 移除data:image/xxx;base64,前缀
+            if ',' in image_data:
+                image_data = image_data.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+        else:
+            image_bytes = image_data
+        
+        # 使用 PaddleOCR 进行识别
+        from paddleocr import PaddleOCR
+        
+        # 初始化 OCR
+        ocr = PaddleOCR(use_textline_orientation=True, lang='ch')
+        
+        # 将字节数据转换为图片
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # 执行 OCR 识别 - 新版本需要传入PIL Image或numpy array
+        import numpy as np
+        image_array = np.array(image)
+        result = ocr.ocr(image_array)
+        
+        if not result or not result[0]:
+            logger.warning("OCR识别结果为空")
+            return []
+        
+        # 提取文本
+        texts = []
+        for line in result[0]:
+            text = line[1][0]  # 获取识别的文本
+            confidence = line[1][1]  # 获取置信度
+            
+            from .ocr_config import get_confidence_threshold
+            threshold = get_confidence_threshold()
+            
+            if confidence > threshold:  # 使用配置的置信度阈值
+                texts.append(text)
+        
+        logger.info(f"OCR识别到 {len(texts)} 行文本")
+        
+        # 解析基金信息 - 使用增强版解析器
+        from .enhanced_fund_parser import parse_fund_info_enhanced
+        funds = parse_fund_info_enhanced(texts)
+        
+        # 如果增强版解析器没有结果，尝试原始解析器
+        if not funds:
+            funds = parse_fund_info(texts)
+        
+        return funds
+        
+    except ImportError:
+        logger.error("PaddleOCR 未安装，请运行: pip install paddleocr")
+        # 尝试使用备用方案：easyocr
+        return recognize_with_easyocr(image_data, use_gpu)
+    except Exception as e:
+        logger.error(f"PaddleOCR识别失败: {e}")
+        # 如果PaddleOCR失败，尝试使用EasyOCR作为备用方案
+        logger.info("PaddleOCR失败，尝试使用EasyOCR作为备用方案")
+        return recognize_with_easyocr(image_data, use_gpu)
+
+
+def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]:
+    """
+    使用 EasyOCR 作为备用方案
     
-    if len(fund_info['fund_code']) != 6:
-        return False, f"基金代码长度不正确: {fund_info['fund_code']}"
+    参数：
+    image_data: Base64编码的图片数据或图片二进制数据
+    use_gpu: 是否使用GPU加速
     
-    if not fund_info['fund_code'].isdigit():
-        return False, f"基金代码包含非数字字符: {fund_info['fund_code']}"
+    返回：
+    list: 识别到的基金列表
+    """
+    try:
+        import easyocr
+        
+        # 处理Base64编码的图片数据
+        if isinstance(image_data, str):
+            import base64
+            # 移除data:image/xxx;base64,前缀
+            if ',' in image_data:
+                image_data = image_data.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+        else:
+            image_bytes = image_data
+        
+        # 初始化 EasyOCR
+        reader = easyocr.Reader(['ch_sim', 'en'], gpu=use_gpu)
+        
+        # 将字节数据转换为图片
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # 执行 OCR 识别 - EasyOCR可以接受numpy array
+        import numpy as np
+        image_array = np.array(image)
+        result = reader.readtext(image_array)
+        
+        # 提取文本
+        texts = []
+        for detection in result:
+            text = detection[1]  # 获取识别的文本
+            confidence = detection[2]  # 获取置信度
+            
+            from .ocr_config import get_confidence_threshold
+            threshold = get_confidence_threshold()
+            
+            if confidence > threshold:
+                texts.append(text)
+        
+        logger.info(f"EasyOCR识别到 {len(texts)} 行文本")
+        
+        # 解析基金信息 - 使用增强版解析器
+        from .enhanced_fund_parser import parse_fund_info_enhanced
+        funds = parse_fund_info_enhanced(texts)
+        
+        # 如果增强版解析器没有结果，尝试原始解析器
+        if not funds:
+            funds = parse_fund_info(texts)
+        
+        return funds
+        
+    except ImportError:
+        logger.error("EasyOCR 未安装，请运行: pip install easyocr")
+        # 提供手动输入提示
+        logger.info("所有OCR库都无法使用，建议手动输入基金信息或检查PyTorch安装")
+        return []
+    except Exception as e:
+        logger.error(f"EasyOCR识别失败: {e}")
+        # 提供手动输入提示
+        logger.info("OCR识别失败，请考虑手动输入基金代码和名称")
+        return []
+
+
+def parse_fund_info(texts: List[str]) -> List[Dict]:
+    """
+    从OCR识别的文本中解析基金信息
     
-    if not (100000 <= int(fund_info['fund_code']) <= 999999):
-        return False, f"基金代码范围无效: {fund_info['fund_code']}"
+    参数：
+    texts: OCR识别的文本列表
     
-    return True, ""
+    返回：
+    list: 解析出的基金列表，包含 fund_code、fund_name、confidence
+    """
+    funds = []
+    
+    # 基金代码的正则表达式（6位数字）
+    code_pattern = re.compile(r'\b(\d{6})\b')
+    
+    # 判断是否为纯数字（包括小数、百分号等）
+    def is_numeric_text(text):
+        """判断文本是否主要是数字"""
+        # 移除常见的数字符号
+        cleaned = text.replace('.', '').replace('-', '').replace('+', '').replace('%', '').replace(',', '').strip()
+        # 如果移除后全是数字，或者为空，则认为是数字文本
+        return cleaned.isdigit() or len(cleaned) == 0
+    
+    # 判断是否包含中文或英文字母
+    def has_text_content(text):
+        """判断文本是否包含中文或英文字母"""
+        return bool(re.search(r'[\u4e00-\u9fa5a-zA-Z]', text))
+    
+    # 遍历文本，查找基金代码和名称
+    i = 0
+    while i < len(texts):
+        text = texts[i]
+        
+        # 查找基金代码
+        code_match = code_pattern.search(text)
+        
+        if code_match:
+            fund_code = code_match.group(1)
+            
+            # 尝试从当前行或前一行提取基金名称
+            fund_name = None
+            
+            # 方案1：基金名称在代码前面（同一行）
+            name_before = text[:code_match.start()].strip()
+            if name_before and len(name_before) > 2 and has_text_content(name_before):
+                fund_name = clean_fund_name(name_before)
+            
+            # 方案2：基金名称在代码后面（同一行）
+            if not fund_name:
+                name_after = text[code_match.end():].strip()
+                if name_after and len(name_after) > 2 and has_text_content(name_after):
+                    fund_name = clean_fund_name(name_after)
+            
+            # 方案3：基金名称在上一行
+            if not fund_name and i > 0:
+                prev_text = texts[i - 1].strip()
+                # 确保上一行不是基金代码，也不是纯数字，且包含文字内容
+                if (prev_text and len(prev_text) > 2 and 
+                    not code_pattern.search(prev_text) and 
+                    has_text_content(prev_text) and
+                    not is_numeric_text(prev_text)):
+                    fund_name = clean_fund_name(prev_text)
+            
+            # 方案4：基金名称在下一行
+            if not fund_name and i < len(texts) - 1:
+                next_text = texts[i + 1].strip()
+                # 确保下一行不是基金代码，也不是纯数字，且包含文字内容
+                if (next_text and len(next_text) > 2 and 
+                    not code_pattern.search(next_text) and 
+                    has_text_content(next_text) and
+                    not is_numeric_text(next_text)):
+                    fund_name = clean_fund_name(next_text)
+            
+            # 如果找到了基金名称，添加到结果中
+            if fund_name:
+                funds.append({
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'confidence': 0.85  # 默认置信度
+                })
+                logger.info(f"识别到基金: {fund_code} - {fund_name}")
+        
+        i += 1
+    
+    # 去重
+    unique_funds = []
+    seen_codes = set()
+    for fund in funds:
+        if fund['fund_code'] not in seen_codes:
+            unique_funds.append(fund)
+            seen_codes.add(fund['fund_code'])
+    
+    return unique_funds
+
+
+def clean_fund_name(name: str) -> str:
+    """
+    清理基金名称，移除特殊字符和多余空格
+    
+    参数：
+    name: 原始基金名称
+    
+    返回：
+    str: 清理后的基金名称
+    """
+    # 移除常见的后缀标识
+    name = re.sub(r'\(QDII[^)]*\)', '', name)
+    name = re.sub(r'\(LOF\)', '', name)
+    name = re.sub(r'\(FOF\)', '', name)
+    
+    # 移除多余的空格
+    name = ' '.join(name.split())
+    
+    # 移除特殊字符（保留中文、英文、数字、括号）
+    name = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9()（）\-]', '', name)
+    
+    return name.strip()
+
+
+def validate_recognized_fund(fund: Dict) -> Tuple[bool, str]:
+    """
+    验证识别的基金信息是否有效
+    
+    参数：
+    fund: 基金信息字典，包含 fund_code 和 fund_name
+    
+    返回：
+    tuple: (是否有效, 错误信息或真实基金名称)
+    """
+    fund_code = fund.get('fund_code', '')
+    fund_name = fund.get('fund_name', '')
+    
+    # 验证基金代码格式
+    if not re.match(r'^\d{6}$', fund_code):
+        return False, "基金代码格式错误，应为6位数字"
+    
+    # 验证基金名称长度
+    if not fund_name or len(fund_name) < 2:
+        return False, "基金名称过短"
+    
+    if len(fund_name) > 50:
+        return False, "基金名称过长"
+    
+    # 尝试从数据源验证基金是否存在
+    try:
+        from data_retrieval.enhanced_fund_data import EnhancedFundData
+        
+        # 获取基金基本信息
+        basic_info = EnhancedFundData.get_fund_basic_info(fund_code)
+        
+        if basic_info and basic_info.get('fund_name'):
+            # 基金存在，返回真实的基金名称
+            real_name = basic_info['fund_name']
+            logger.info(f"验证成功: {fund_code} - {real_name}")
+            # 更新基金名称为真实名称
+            fund['fund_name'] = real_name
+            return True, real_name
+        else:
+            return False, f"基金代码 {fund_code} 不存在"
+            
+    except Exception as e:
+        logger.warning(f"验证基金信息时出错: {e}")
+        # 如果验证失败，仍然返回True，允许用户手动确认
+        return True, fund_name
+
+
+def extract_fund_from_text(text: str) -> Optional[Dict]:
+    """
+    从单行文本中提取基金信息（用于简单场景）
+    
+    参数：
+    text: 文本内容
+    
+    返回：
+    dict: 基金信息，包含 fund_code 和 fund_name
+    """
+    # 基金代码的正则表达式
+    code_pattern = re.compile(r'\b(\d{6})\b')
+    
+    code_match = code_pattern.search(text)
+    if not code_match:
+        return None
+    
+    fund_code = code_match.group(1)
+    
+    # 提取基金名称（代码前面的文本）
+    name_before = text[:code_match.start()].strip()
+    if name_before and len(name_before) > 2:
+        fund_name = clean_fund_name(name_before)
+        return {
+            'fund_code': fund_code,
+            'fund_name': fund_name
+        }
+    
+    # 提取基金名称（代码后面的文本）
+    name_after = text[code_match.end():].strip()
+    if name_after and len(name_after) > 2:
+        fund_name = clean_fund_name(name_after)
+        return {
+            'fund_code': fund_code,
+            'fund_name': fund_name
+        }
+    
+    return None
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # 测试代码
+    test_text = """
+    天弘标普500发起(QDII-FOF)A 681.30
+    007721
+    景顺长城全球半导体芯片股票A(QDII-LOF)(人民币) 664.00
+    501225
+    广发北证50成份指数A 568.11
+    """
     
-    print("基金截图识别模块测试")
-    print("=" * 50)
+    texts = test_text.strip().split('\n')
+    funds = parse_fund_info(texts)
     
-    recognizer = FundScreenshotRecognizer(use_gpu=False)
-    
-    if not OCR_AVAILABLE:
-        print("⚠️  EasyOCR 未安装")
-        print("请运行: pip install easyocr")
-    elif not recognizer.reader:
-        print("⚠️  OCR阅读器初始化失败")
-    else:
-        print("✅ OCR识别器准备就绪")
-        
-    print("\n使用方法:")
-    print("1. 调用 recognize_fund_screenshot(base64_image) 识别图片")
-    print("2. 调用 validate_recognized_fund(fund_info) 验证结果")
+    print(f"识别到 {len(funds)} 只基金:")
+    for fund in funds:
+        print(f"  {fund['fund_code']} - {fund['fund_name']}")
