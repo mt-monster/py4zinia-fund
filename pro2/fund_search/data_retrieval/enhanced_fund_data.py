@@ -260,24 +260,20 @@ class EnhancedFundData:
                 previous_nav = current_nav
             
             # 获取当日盈亏率（从最新一条数据的日增长率获取）
+            # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
             daily_return_raw = latest_data.get('日增长率', 0)
             if pd.notna(daily_return_raw):
                 daily_return = float(daily_return_raw)
-                # 判断格式：如果绝对值 < 0.1，说明是小数格式，需要乘100
-                if abs(daily_return) < 0.1:
-                    daily_return = daily_return * 100
                 daily_return = round(daily_return, 2)
             else:
                 daily_return = 0.0
             
             # 获取昨日盈亏率（从前一条数据的日增长率获取）
+            # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
             if len(fund_nav) > 1:
                 yesterday_return_raw = previous_data.get('日增长率', 0)
                 if pd.notna(yesterday_return_raw):
                     yesterday_return = float(yesterday_return_raw)
-                    # 判断格式
-                    if abs(yesterday_return) < 0.1:
-                        yesterday_return = yesterday_return * 100
                     yesterday_return = round(yesterday_return, 2)
                 else:
                     yesterday_return = 0.0
@@ -352,12 +348,10 @@ class EnhancedFundData:
                         previous_nav = sina_previous_nav
                     
                     # 获取昨日盈亏率（直接从最新一条数据的日增长率获取）
+                    # 注意：akshare返回的日增长率已经是百分数格式（如-0.94），不需要再乘以100
                     yesterday_return_raw = latest_data.get('日增长率', 0)
                     if pd.notna(yesterday_return_raw):
                         yesterday_return = float(yesterday_return_raw)
-                        # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
-                        if abs(yesterday_return) < 0.1:
-                            yesterday_return = yesterday_return * 100
                         yesterday_return = round(yesterday_return, 2)
                     else:
                         yesterday_return = 0.0
