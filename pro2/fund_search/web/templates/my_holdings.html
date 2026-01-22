@@ -164,6 +164,14 @@
             font-weight: 500;
         }
         .fund-table .fund-code:hover { text-decoration: underline; }
+        .fund-table .fund-name {
+            white-space: normal;
+            word-wrap: break-word;
+            max-width: 450px;
+            line-height: 1.6;
+            min-height: 50px;
+            padding: 12px 8px;
+        }
         
         /* 展开面板样式 */
         .expansion-panel-row {
@@ -2014,13 +2022,13 @@
                 // 定义列数据映射
                 const columnDataMap = {
                     'fund_code': (fund) => ({ value: fund.fund_code, class: 'fund-code' }),
-                    'fund_name': (fund) => ({ value: this.truncate(fund.fund_name || '--', 12), class: '' }),
+                    'fund_name': (fund) => ({ value: fund.fund_name || '--', class: 'fund-name' }),
                     'today_return': (fund) => {
                         const val = fund.today_return || 0;
                         return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
                     },
                     'prev_day_return': (fund) => {
-                        const val = fund.prev_day_return || 0;
+                        const val = fund.yesterday_return || 0;
                         return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
                     },
                     'holding_amount': (fund) => ({ value: fund.holding_amount != null ? fund.holding_amount.toFixed(2) : '--', class: '' }),
@@ -2157,17 +2165,9 @@
             formatPercent(value) {
                 if (value === null || value === undefined || isNaN(value)) return '--';
                 
-                // 修复：如果数值很小（小于1），可能是小数形式的收益率，需要乘以100
-                // 例如：0.09 表示 0.09%，但如果数值很大（大于等于1），可能是已经是百分比数值
-                // 注意：这里需要判断数值是否过大，比如是否大于1%（1.0）
-                let displayValue;
-                if (Math.abs(value) < 0.1) {
-                    // 如果数值很小（小于0.1），可能是小数形式的收益率（比如0.09表示0.09%），保持不变
-                    displayValue = value;
-                } else {
-                    // 如果数值较大（大于等于0.1），可能是被错误地放大了100倍（比如9表示0.09%），需要除以100
-                    displayValue = value / 100;
-                }
+                // 直接使用值，因为 API 返回的数据已经是百分比值
+                // 例如：0.22 表示 0.22%，-1.11 表示 -1.11%
+                const displayValue = value;
                 
                 const sign = displayValue >= 0 ? '+' : '';
                 return sign + displayValue.toFixed(2) + '%';
@@ -3313,11 +3313,9 @@
             try {
                 const search = document.getElementById('search-input').value.trim();
                 const sortBy = document.getElementById('sort-select').value;
-                const date = document.getElementById('date-select').value;
                 
-                let url = date 
-                    ? `/api/funds/by-date/${date}?sort_by=${sortBy}&sort_order=desc`
-                    : `/api/funds?page=1&per_page=100&sort_by=${sortBy}&sort_order=desc`;
+                // 从/api/holdings获取用户持仓数据
+                let url = `/api/holdings?user_id=default_user`;
                 if (search) url += `&search=${encodeURIComponent(search)}`;
                 
                 const response = await fetch(url);
@@ -3510,16 +3508,12 @@
         function formatPercent(value) {
             if (value === null || value === undefined || isNaN(value)) return '--';
             
-            // 修复：如果数值很小（小于1），可能是小数形式的收益率，需要乘以100
-            // 例如：0.09 表示 0.09%，但如果数值很大（大于等于1），可能是已经是百分比数值
-            // 注意：这里需要判断数值是否过大，比如是否大于1%（1.0）
-            let displayValue;
-            if (Math.abs(value) < 0.1) {
-                // 如果数值很小（小于0.1），可能是小数形式的收益率（比如0.09表示0.09%），保持不变
-                displayValue = value;
-            } else {
-                // 如果数值较大（大于等于0.1），可能是被错误地放大了100倍（比如9表示0.09%），需要除以100
-                displayValue = value / 100;
+            // 处理小数形式的收益率（比如0.09表示9%）
+            let displayValue = value;
+            
+            // 如果数值的绝对值小于1，说明它是小数形式的收益率，需要乘以100转换为百分比
+            if (Math.abs(value) < 1) {
+                displayValue = value * 100;
             }
             
             const sign = displayValue >= 0 ? '+' : '';

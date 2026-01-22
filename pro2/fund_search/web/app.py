@@ -97,6 +97,7 @@ def etf_detail_page(etf_code):
     return render_template('etf_detail.html', etf_code=etf_code)
 
 @app.route('/my-holdings')
+@app.route('/my_holdings')
 def my_holdings():
     """我的持仓页"""
     return render_template('my_holdings.html')
@@ -774,6 +775,31 @@ def backtest_strategy():
         
         for idx, row in df.iterrows():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
+            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
             prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0
             
             # 更新历史收益率
@@ -994,20 +1020,29 @@ def get_holdings():
     """获取用户持仓列表"""
     try:
         user_id = request.args.get('user_id', 'default_user')
+        search = request.args.get('search', '')
         
         sql = """
         SELECT h.*, 
-               far.today_return, far.yesterday_return,
+               far.today_return, far.prev_day_return as yesterday_return,
                far.current_estimate as current_nav,
-               far.yesterday_nav as previous_nav
+               far.yesterday_nav as previous_nav,
+               far.sharpe_ratio, far.max_drawdown, far.volatility,
+               far.annualized_return, far.calmar_ratio, far.sortino_ratio
         FROM user_holdings h
         LEFT JOIN fund_analysis_results far ON h.fund_code = far.fund_code
         WHERE h.user_id = :user_id
-        AND far.analysis_date = (SELECT MAX(analysis_date) FROM fund_analysis_results WHERE fund_code = h.fund_code)
-        ORDER BY h.buy_date DESC
         """
         
-        df = db_manager.execute_query(sql, {'user_id': user_id})
+        params = {'user_id': user_id}
+        
+        if search:
+            sql += " AND (h.fund_code LIKE :search OR h.fund_name LIKE :search)"
+            params['search'] = f'%{search}%'
+        
+        sql += " ORDER BY h.buy_date DESC"
+        
+        df = db_manager.execute_query(sql, params)
         
         if df.empty:
             return jsonify({'success': True, 'data': [], 'total': 0})
@@ -1021,6 +1056,13 @@ def get_holdings():
             current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else cost_price
             previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else cost_price
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
+            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
             
             # 当前市值
             current_value = holding_shares * current_nav
@@ -1057,7 +1099,15 @@ def get_holdings():
                 'holding_profit_rate': round(holding_profit_rate, 2),
                 'total_profit': round(total_profit, 2),
                 'total_profit_rate': round(total_profit_rate, 2),
-                'today_return': round(today_return, 2)
+                'today_return': round(today_return, 2),
+                'yesterday_return': round(yesterday_return, 2),
+                # 绩效指标
+                'sharpe_ratio': round(sharpe_ratio, 4),
+                'max_drawdown': round(max_drawdown * 100, 2),
+                'volatility': round(volatility * 100, 2),
+                'annualized_return': round(annualized_return * 100, 2),
+                'calmar_ratio': round(calmar_ratio, 4),
+                'sortino_ratio': round(sortino_ratio, 4)
             }
             holdings.append(holding)
         
@@ -1381,7 +1431,92 @@ def confirm_import_holdings():
                 })
                 
                 if success:
-                    # 2. 获取最新的基金净值信息（从 fund_analysis_results）
+                    # 2. 检查是否存在分析结果数据，如果不存在则生成
+                    sql_check = """
+                    SELECT COUNT(*) as count 
+                    FROM fund_analysis_results 
+                    WHERE fund_code = :fund_code 
+                    """
+                    check_df = db_manager.execute_query(sql_check, {'fund_code': fund_code})
+                    
+                    # 生成并保存分析结果数据
+                    try:
+                        logger.info(f"为基金 {fund_code} 生成分析结果...")
+                        # 获取基金绩效指标
+                        metrics = EnhancedFundData.get_performance_metrics(fund_code)
+                        
+                        # 获取实时数据
+                        realtime_data = EnhancedFundData.get_realtime_data(fund_code)
+                        logger.info(f"获取基金 {fund_code} 实时数据成功: {realtime_data}")
+                        
+                        # 构造分析结果数据
+                        analysis_data = {
+                            'fund_code': fund_code,
+                            'fund_name': fund_name,
+                            'analysis_date': datetime.now().strftime('%Y-%m-%d'),
+                            'current_estimate': realtime_data.get('current_nav', cost_price),
+                            'yesterday_nav': realtime_data.get('previous_nav', cost_price),
+                            'today_return': realtime_data.get('today_return', 0.0),
+                            'prev_day_return': realtime_data.get('yesterday_return', 0.0),
+                            'annualized_return': metrics.get('annualized_return', 0.0),
+                            'sharpe_ratio': metrics.get('sharpe_ratio', 0.0),
+                            'sharpe_ratio_ytd': metrics.get('sharpe_ratio_ytd', 0.0),
+                            'sharpe_ratio_1y': metrics.get('sharpe_ratio_1y', 0.0),
+                            'sharpe_ratio_all': metrics.get('sharpe_ratio_all', 0.0),
+                            'max_drawdown': metrics.get('max_drawdown', 0.0),
+                            'volatility': metrics.get('volatility', 0.0),
+                            'calmar_ratio': metrics.get('calmar_ratio', 0.0),
+                            'sortino_ratio': metrics.get('sortino_ratio', 0.0),
+                            'var_95': metrics.get('var_95', 0.0),
+                            'win_rate': metrics.get('win_rate', 0.0),
+                            'profit_loss_ratio': metrics.get('profit_loss_ratio', 0.0),
+                            'total_return': metrics.get('total_return', 0.0),
+                            'composite_score': metrics.get('composite_score', 0.0)
+                        }
+                        
+                        # 保存到 fund_analysis_results 表（使用 INSERT ... ON DUPLICATE KEY UPDATE 语句）
+                        sql_insert_analysis = """
+                        INSERT INTO fund_analysis_results (
+                            fund_code, fund_name, analysis_date, current_estimate, yesterday_nav,
+                            today_return, prev_day_return, annualized_return, sharpe_ratio,
+                            sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all, max_drawdown,
+                            volatility, calmar_ratio, sortino_ratio, var_95, win_rate,
+                            profit_loss_ratio, total_return, composite_score
+                        ) VALUES (
+                            :fund_code, :fund_name, :analysis_date, :current_estimate, :yesterday_nav,
+                            :today_return, :prev_day_return, :annualized_return, :sharpe_ratio,
+                            :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all, :max_drawdown,
+                            :volatility, :calmar_ratio, :sortino_ratio, :var_95, :win_rate,
+                            :profit_loss_ratio, :total_return, :composite_score
+                        ) ON DUPLICATE KEY UPDATE
+                            fund_name = VALUES(fund_name),
+                            analysis_date = VALUES(analysis_date),
+                            current_estimate = VALUES(current_estimate),
+                            yesterday_nav = VALUES(yesterday_nav),
+                            today_return = VALUES(today_return),
+                            prev_day_return = VALUES(prev_day_return),
+                            annualized_return = VALUES(annualized_return),
+                            sharpe_ratio = VALUES(sharpe_ratio),
+                            sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
+                            sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
+                            sharpe_ratio_all = VALUES(sharpe_ratio_all),
+                            max_drawdown = VALUES(max_drawdown),
+                            volatility = VALUES(volatility),
+                            calmar_ratio = VALUES(calmar_ratio),
+                            sortino_ratio = VALUES(sortino_ratio),
+                            var_95 = VALUES(var_95),
+                            win_rate = VALUES(win_rate),
+                            profit_loss_ratio = VALUES(profit_loss_ratio),
+                            total_return = VALUES(total_return),
+                            composite_score = VALUES(composite_score)
+                        """
+                        
+                        db_manager.execute_sql(sql_insert_analysis, analysis_data)
+                        logger.info(f"为基金 {fund_code} 生成分析结果成功")
+                    except Exception as e:
+                        logger.error(f"为基金 {fund_code} 生成分析结果失败: {str(e)}")
+                    
+                    # 3. 获取最新的基金净值信息（从 fund_analysis_results）
                     sql_nav = """
                     SELECT current_estimate, yesterday_nav 
                     FROM fund_analysis_results 

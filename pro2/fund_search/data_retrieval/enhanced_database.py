@@ -329,6 +329,7 @@ class EnhancedDatabaseManager:
             cost_price FLOAT DEFAULT 0,
             holding_amount FLOAT DEFAULT 0,
             buy_date DATE DEFAULT NULL,
+            notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uk_user_fund (user_id, fund_code),
@@ -337,6 +338,21 @@ class EnhancedDatabaseManager:
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         """
         self.execute_sql(sql)
+        
+        # 为现有表添加notes列（如果不存在）
+        try:
+            # 先检查notes列是否存在
+            check_sql = "SHOW COLUMNS FROM user_holdings LIKE 'notes'"
+            result = self.execute_query(check_sql)
+            if result.empty:
+                # 如果notes列不存在，添加它
+                alter_sql = "ALTER TABLE user_holdings ADD COLUMN notes TEXT"
+                self.execute_sql(alter_sql)
+                logger.info("user_holdings表notes列添加完成")
+            else:
+                logger.info("user_holdings表notes列已存在")
+        except Exception as e:
+            logger.warning(f"处理notes列失败: {e}")
 
     def _create_user_strategies_table(self):
         """
