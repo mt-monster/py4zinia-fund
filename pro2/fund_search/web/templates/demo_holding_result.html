@@ -1,0 +1,258 @@
+
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>基金持仓识别结果</title>
+        <style>
+            body {
+                font-family: 'Microsoft YaHei', Arial, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            .success-banner {
+                background: linear-gradient(135deg, #28a745, #20c997);
+                color: white;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                text-align: center;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            .summary-card {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+                margin-top: 15px;
+            }
+            .summary-item {
+                text-align: center;
+            }
+            .summary-value {
+                font-size: 24px;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+            .summary-label {
+                font-size: 14px;
+                opacity: 0.9;
+            }
+            .fund-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+                font-size: 14px;
+            }
+            .fund-table th, .fund-table td {
+                border: 1px solid #ddd;
+                padding: 12px;
+                text-align: left;
+            }
+            .fund-table th {
+                background-color: #f8f9fa;
+                font-weight: bold;
+                position: sticky;
+                top: 0;
+            }
+            .fund-table tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+            .fund-table tr:hover {
+                background-color: #e3f2fd;
+            }
+            .positive {
+                color: #28a745;
+                font-weight: bold;
+            }
+            .negative {
+                color: #dc3545;
+                font-weight: bold;
+            }
+            .fund-code {
+                font-family: 'Courier New', monospace;
+                font-weight: bold;
+                color: #007bff;
+            }
+            .fund-name {
+                max-width: 300px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .confidence-badge {
+                background-color: #17a2b8;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+            }
+            .source-badge {
+                background-color: #6c757d;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+            }
+            .performance-highlight {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 15px;
+                padding: 10px;
+                background-color: #f8f9fa;
+                border-radius: 6px;
+            }
+            .best-performer {
+                color: #28a745;
+                font-weight: bold;
+            }
+            .worst-performer {
+                color: #dc3545;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📊 基金持仓识别结果</h1>
+            
+            <div class="success-banner">
+                ✅ 成功识别 5 个基金，请确认信息后导入
+            </div>
+            
+            <!-- 投资组合汇总 -->
+            <div class="summary-card">
+                <h3>📈 投资组合汇总</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value">5</div>
+                        <div class="summary-label">基金数量</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">¥2,780.68</div>
+                        <div class="summary-label">持仓成本</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value positive">¥+168.92</div>
+                        <div class="summary-label">盈亏金额</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value">¥2,949.60</div>
+                        <div class="summary-label">当前市值</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value positive">+6.07%</div>
+                        <div class="summary-label">总盈亏率</div>
+                    </div>
+                </div>
+                
+                <div class="performance-highlight">
+                    <div class="best-performer">
+                        🏆 表现最佳: 景顺长城全球半导体芯片股票A... (+15.08%)
+                    </div>
+                    <div class="worst-performer">
+                        📉 表现最差: 广发北证50成份指数A... (+2.83%)
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 基金详细列表 -->
+            <h3>🎯 基金详细信息</h3>
+            <table class="fund-table">
+                <thead>
+                    <tr>
+                        <th>基金代码</th>
+                        <th>基金名称</th>
+                        <th>持仓金额</th>
+                        <th>盈亏金额</th>
+                        <th>盈亏率</th>
+                        <th>当前市值</th>
+                        <th>置信度</th>
+                        <th>识别来源</th>
+                        <th>原始文本</th>
+                    </tr>
+                </thead>
+                <tbody>
+    
+                    <tr>
+                        <td class="fund-code">007721</td>
+                        <td class="fund-name" title="天弘标普500发起(QDII-FOF)A">天弘标普500发起(QDII-FOF)A</td>
+                        <td>¥681.30</td>
+                        <td class="positive">¥+21.11</td>
+                        <td class="positive">+3.20%</td>
+                        <td>¥702.41</td>
+                        <td><span class="confidence-badge">80.0%</span></td>
+                        <td><span class="source-badge">name_match</span></td>
+                        <td title="天弘标普500发起(QDIIFOF)A">天弘标普500发起(QDIIFOF)A...</td>
+                    </tr>
+        
+                    <tr>
+                        <td class="fund-code">016667</td>
+                        <td class="fund-name" title="景顺长城全球半导体芯片股票A(QDII-LOF)(美元现汇)">景顺长城全球半导体芯片股票A(QDII-LOF)(美元现汇)</td>
+                        <td>¥664.00</td>
+                        <td class="positive">¥+83.08</td>
+                        <td class="positive">+15.08%</td>
+                        <td>¥747.08</td>
+                        <td><span class="confidence-badge">80.0%</span></td>
+                        <td><span class="source-badge">name_match</span></td>
+                        <td title="景顺长城全球半导体芯片股票A(.">景顺长城全球半导体芯片股票A(....</td>
+                    </tr>
+        
+                    <tr>
+                        <td class="fund-code">017512</td>
+                        <td class="fund-name" title="广发北证50成份指数A">广发北证50成份指数A</td>
+                        <td>¥568.11</td>
+                        <td class="positive">¥+15.10</td>
+                        <td class="positive">+2.83%</td>
+                        <td>¥583.21</td>
+                        <td><span class="confidence-badge">80.0%</span></td>
+                        <td><span class="source-badge">name_match</span></td>
+                        <td title="广发北证50成份指数A">广发北证50成份指数A...</td>
+                    </tr>
+        
+                    <tr>
+                        <td class="fund-code">000157</td>
+                        <td class="fund-name" title="富国全球科技互联网股票(QDII)A(后端)">富国全球科技互联网股票(QDII)A(后端)</td>
+                        <td>¥438.25</td>
+                        <td class="positive">¥+28.42</td>
+                        <td class="positive">+7.29%</td>
+                        <td>¥466.67</td>
+                        <td><span class="confidence-badge">80.0%</span></td>
+                        <td><span class="source-badge">name_match</span></td>
+                        <td title="富国全球科技互联网股票(QDII)A">富国全球科技互联网股票(QDII)A...</td>
+                    </tr>
+        
+                    <tr>
+                        <td class="fund-code">010391</td>
+                        <td class="fund-name" title="易方达战略新兴产业股票A">易方达战略新兴产业股票A</td>
+                        <td>¥429.02</td>
+                        <td class="positive">¥+21.21</td>
+                        <td class="positive">+5.33%</td>
+                        <td>¥450.23</td>
+                        <td><span class="confidence-badge">80.0%</span></td>
+                        <td><span class="source-badge">name_match</span></td>
+                        <td title="易方达战略新兴产业股票A">易方达战略新兴产业股票A...</td>
+                    </tr>
+        
+                </tbody>
+            </table>
+        </div>
+    </body>
+    </html>
+    

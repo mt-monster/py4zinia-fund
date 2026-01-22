@@ -29,3 +29,23 @@ seaborn>=0.12.0
 # # 大模型API
 # git+https://github.com/openai/openai-python.git@v1.35.14
 # openai>=2.14.0
+
+
+# 方案1：PaddleOCR（推荐，中文识别效果好）
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0  # CPU版本
+# paddlepaddle-gpu>=2.5.0  # GPU版本（如果有GPU）
+
+# 方案2：EasyOCR（备用方案）
+easyocr>=1.7.0
+
+# PyTorch依赖（兼容版本）
+torch==2.2.0
+torchvision==0.17.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# 其他依赖
+numpy>=1.24.0,<2.0.0
+opencv-python>=4.8.0
