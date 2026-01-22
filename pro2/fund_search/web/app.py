@@ -101,6 +101,21 @@ def my_holdings():
     """我的持仓页"""
     return render_template('my_holdings.html')
 
+@app.route('/test-holding-recognition')
+def test_holding_recognition():
+    """基金持仓识别测试页"""
+    return render_template('test_holding_recognition.html')
+
+@app.route('/demo-holding-result')
+def demo_holding_result():
+    """基金持仓识别结果演示页"""
+    return render_template('demo_holding_result.html')
+
+@app.route('/holding-nav')
+def holding_nav():
+    """基金持仓识别功能导航页"""
+    return render_template('holding_nav.html')
+
 
 # ==================== API 路由 ====================
 
@@ -1206,10 +1221,47 @@ def import_holding_screenshot():
             }), 400
         
         validated_funds = []
+        seen_codes = set()  # 用于去重
+        
+        # 计算汇总信息
+        total_holding_amount = 0
+        total_profit_amount = 0
+        
         for fund in recognized_funds:
+            fund_code = fund.get('fund_code')
+            
+            # 跳过重复的基金代码
+            if fund_code in seen_codes:
+                logger.debug(f"跳过重复基金: {fund_code}")
+                continue
+            
             is_valid, error_msg = validate_recognized_fund(fund)
             if is_valid:
-                validated_funds.append(fund)
+                # 添加持仓信息到返回数据中
+                fund_data = {
+                    'fund_code': fund_code,
+                    'fund_name': fund.get('fund_name', ''),
+                    'confidence': fund.get('confidence', 0),
+                    'source': fund.get('source', ''),
+                    'original_text': fund.get('original_text', ''),
+                    # 持仓相关信息
+                    'holding_amount': fund.get('holding_amount'),
+                    'profit_amount': fund.get('profit_amount'),
+                    'profit_rate': fund.get('profit_rate'),
+                    'nav_value': fund.get('nav_value'),
+                    # 计算当前市值
+                    'current_value': None
+                }
+                
+                # 计算当前市值
+                if fund_data['holding_amount'] is not None and fund_data['profit_amount'] is not None:
+                    fund_data['current_value'] = fund_data['holding_amount'] + fund_data['profit_amount']
+                    total_holding_amount += fund_data['holding_amount']
+                    total_profit_amount += fund_data['profit_amount']
+                
+                validated_funds.append(fund_data)
+                seen_codes.add(fund_code)
+                logger.debug(f"验证通过: {fund_code} - {fund.get('fund_name', 'N/A')}")
             else:
                 logger.warning(f"识别结果验证失败: {error_msg}, 基金信息: {fund}")
         
@@ -1217,15 +1269,47 @@ def import_holding_screenshot():
             return jsonify({
                 'success': False,
                 'error': '未能识别到有效的基金代码',
-                'recognized': recognized_funds
+                'recognized': recognized_funds,
+                'debug_info': f'原始识别数量: {len(recognized_funds)}, 验证通过数量: 0'
             }), 400
         
-        logger.info(f"成功识别 {len(validated_funds)} 个基金")
+        # 计算投资组合汇总
+        total_current_value = total_holding_amount + total_profit_amount
+        total_profit_rate = (total_profit_amount / total_holding_amount * 100) if total_holding_amount > 0 else 0
+        
+        # 找出表现最好和最差的基金
+        best_fund = None
+        worst_fund = None
+        if validated_funds:
+            funds_with_rate = [f for f in validated_funds if f.get('profit_rate') is not None]
+            if funds_with_rate:
+                best_fund = max(funds_with_rate, key=lambda x: x.get('profit_rate', -999))
+                worst_fund = min(funds_with_rate, key=lambda x: x.get('profit_rate', 999))
+        
+        portfolio_summary = {
+            'total_funds': len(validated_funds),
+            'total_holding_amount': round(total_holding_amount, 2) if total_holding_amount > 0 else 0,
+            'total_profit_amount': round(total_profit_amount, 2),
+            'total_current_value': round(total_current_value, 2) if total_current_value > 0 else 0,
+            'total_profit_rate': round(total_profit_rate, 2),
+            'best_fund': {
+                'fund_name': best_fund.get('fund_name', '')[:25] + '...' if best_fund and len(best_fund.get('fund_name', '')) > 25 else best_fund.get('fund_name', '') if best_fund else '',
+                'profit_rate': round(best_fund.get('profit_rate', 0), 2) if best_fund else 0
+            } if best_fund else None,
+            'worst_fund': {
+                'fund_name': worst_fund.get('fund_name', '')[:25] + '...' if worst_fund and len(worst_fund.get('fund_name', '')) > 25 else worst_fund.get('fund_name', '') if worst_fund else '',
+                'profit_rate': round(worst_fund.get('profit_rate', 0), 2) if worst_fund else 0
+            } if worst_fund else None
+        }
+        
+        logger.info(f"成功识别 {len(validated_funds)} 个基金 (原始识别: {len(recognized_funds)} 个)")
         
         return jsonify({
             'success': True,
             'data': validated_funds,
-            'message': f'成功识别 {len(validated_funds)} 个基金，请确认信息后导入'
+            'portfolio_summary': portfolio_summary,
+            'message': f'成功识别 {len(validated_funds)} 个基金，请确认信息后导入',
+            'debug_info': f'原始识别数量: {len(recognized_funds)}, 最终数量: {len(validated_funds)}'
         })
         
     except Exception as e:
@@ -1237,6 +1321,7 @@ def import_holding_screenshot():
 def confirm_import_holdings():
     """
     确认导入识别到的基金到持仓列表
+    同时更新相关的持仓盈亏信息
     """
     try:
         data = request.get_json()
@@ -1258,7 +1343,8 @@ def confirm_import_holdings():
             holding_shares = float(fund_info.get('holding_shares', 0) or 0)
             cost_price = float(fund_info.get('cost_price', 0) or 0)
             buy_date = fund_info.get('buy_date', '')
-            notes = f"通过截图识别导入 - 置信度: {fund_info.get('confidence', 0):.2%}"
+            confidence = fund_info.get('confidence', 0)
+            notes = f"通过截图识别导入 - 置信度: {confidence:.2%}"
             
             if not fund_code:
                 failed.append({'fund': fund_info, 'error': '基金代码为空'})
@@ -1266,18 +1352,22 @@ def confirm_import_holdings():
             
             holding_amount = holding_shares * cost_price
             
-            sql = """
+            # 1. 保存到 user_holdings 表
+            sql_holdings = """
             INSERT INTO user_holdings 
             (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
             VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
             ON DUPLICATE KEY UPDATE
                 holding_shares = holding_shares + :add_shares,
                 holding_amount = holding_amount + :add_amount,
-                notes = CONCAT(notes, '; ', :notes)
+                cost_price = (holding_amount + :add_amount) / (holding_shares + :add_shares),
+                notes = CONCAT(notes, '; ', :notes),
+                updated_at = NOW()
             """
             
             try:
-                success = db_manager.execute_sql(sql, {
+                # 保存到 user_holdings
+                success = db_manager.execute_sql(sql_holdings, {
                     'user_id': user_id,
                     'fund_code': fund_code,
                     'fund_name': fund_name,
@@ -1291,11 +1381,41 @@ def confirm_import_holdings():
                 })
                 
                 if success:
+                    # 2. 获取最新的基金净值信息（从 fund_analysis_results）
+                    sql_nav = """
+                    SELECT current_estimate, yesterday_nav 
+                    FROM fund_analysis_results 
+                    WHERE fund_code = :fund_code 
+                    ORDER BY analysis_date DESC 
+                    LIMIT 1
+                    """
+                    nav_df = db_manager.execute_query(sql_nav, {'fund_code': fund_code})
+                    
+                    # 3. 计算持仓盈亏信息
+                    if not nav_df.empty:
+                        current_nav = float(nav_df.iloc[0]['current_estimate']) if pd.notna(nav_df.iloc[0]['current_estimate']) else cost_price
+                        previous_nav = float(nav_df.iloc[0]['yesterday_nav']) if pd.notna(nav_df.iloc[0]['yesterday_nav']) else cost_price
+                        
+                        # 当前市值和昨日市值
+                        current_value = holding_shares * current_nav
+                        previous_value = holding_shares * previous_nav
+                        
+                        # 持有盈亏
+                        holding_profit = current_value - holding_amount
+                        holding_profit_rate = (holding_profit / holding_amount * 100) if holding_amount > 0 else 0
+                        
+                        # 当日盈亏
+                        today_profit = current_value - previous_value
+                        today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
+                        
+                        logger.info(f"导入基金 {fund_code}: 持仓金额={holding_amount:.2f}, 当前市值={current_value:.2f}, 持有盈亏={holding_profit:.2f} ({holding_profit_rate:.2f}%)")
+                    
                     imported.append({
                         'fund_code': fund_code,
                         'fund_name': fund_name,
                         'holding_shares': holding_shares,
-                        'cost_price': cost_price
+                        'cost_price': cost_price,
+                        'holding_amount': holding_amount
                     })
                 else:
                     failed.append({'fund_code': fund_code, 'error': '数据库插入失败'})

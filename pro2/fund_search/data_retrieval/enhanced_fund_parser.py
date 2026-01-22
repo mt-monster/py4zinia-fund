@@ -71,7 +71,7 @@ def parse_fund_info_enhanced(texts: List[str]) -> List[Dict]:
     
     def find_fund_code_by_name(fund_name):
         """根据基金名称查找代码"""
-        # 清理基金名称
+        # 首先在本地映射表中查找
         clean_name = re.sub(r'\([^)]*\)', '', fund_name)  # 移除括号内容
         clean_name = re.sub(r'[A-Z]$', '', clean_name)    # 移除末尾字母
         clean_name = clean_name.strip()
@@ -80,6 +80,18 @@ def parse_fund_info_enhanced(texts: List[str]) -> List[Dict]:
         for name_key, code in FUND_NAME_CODE_MAPPING.items():
             if name_key in clean_name or clean_name in name_key:
                 return code
+        
+        # 如果本地映射表没有找到，尝试使用akshare查找
+        try:
+            from .akshare_fund_lookup import lookup_fund_code
+            code = lookup_fund_code(fund_name)
+            if code:
+                # 将新找到的映射添加到本地映射表
+                FUND_NAME_CODE_MAPPING[clean_name] = code
+                logger.info(f"通过akshare找到基金代码: {clean_name} -> {code}")
+                return code
+        except Exception as e:
+            logger.warning(f"akshare查找失败: {e}")
         
         return None
     

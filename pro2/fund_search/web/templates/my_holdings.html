@@ -984,6 +984,26 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
         .table-wrapper {
             flex: 1;
             overflow: auto;
@@ -1191,35 +1211,8 @@
                 </div>
             </div>`;
 
-            // 确认导入模态框
-            const confirmModalHtml = `
-            <div class="confirm-modal-overlay" id="confirmModalOverlay" style="display: none;">
-                <div class="confirm-modal">
-                    <div class="confirm-modal-header">
-                        <h3><i class="bi bi-check-circle"></i> 确认导入基金持仓</h3>
-                        <button class="confirm-modal-close" onclick="closeConfirmModal()">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    <div class="confirm-modal-content">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> 
-                            请确认识别结果并填写持有份额、成本价等信息
-                        </div>
-                        <div id="confirmContent"></div>
-                    </div>
-                    <div class="confirm-modal-footer">
-                        <button class="btn btn-secondary" onclick="closeConfirmModal()">取消</button>
-                        <button class="btn btn-success" id="confirmImportBtn" onclick="confirmImport()">
-                            <i class="bi bi-download"></i> 确认导入
-                        </button>
-                    </div>
-                </div>
-            </div>`;
-
             // 添加模态框到页面
             document.body.insertAdjacentHTML('beforeend', modalHtml);
-            document.body.insertAdjacentHTML('beforeend', confirmModalHtml);
             console.log('截图导入模态框已创建');
         }
 
@@ -1261,6 +1254,8 @@
                 modalElement.style.display = 'none';
             }
             document.body.style.overflow = '';
+            // 重置模态框状态，为下次使用做准备
+            resetScreenshotModal();
         }
 
         // 重置模态框状态
@@ -1288,13 +1283,11 @@
             const screenshotInput = document.getElementById('screenshotInput');
             const uploadArea = document.getElementById('uploadArea');
             const recognizeBtn = document.getElementById('recognizeBtn');
-            const confirmImportBtn = document.getElementById('confirmImportBtn');
 
             console.log('找到的元素:', {
                 screenshotInput: !!screenshotInput,
                 uploadArea: !!uploadArea,
-                recognizeBtn: !!recognizeBtn,
-                confirmImportBtn: !!confirmImportBtn
+                recognizeBtn: !!recognizeBtn
             });
 
             if (screenshotInput) {
@@ -1324,10 +1317,6 @@
 
             if (recognizeBtn) {
                 recognizeBtn.addEventListener('click', recognizeScreenshot);
-            }
-
-            if (confirmImportBtn) {
-                confirmImportBtn.addEventListener('click', confirmImport);
             }
         }
 
@@ -1389,8 +1378,11 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    recognizedFunds = data.data;
-                    showRecognitionResult(data.data);
+                    // 保存识别到的基金数据
+                    recognizedFunds = data.data || [];
+                    // 显示增强的识别结果（包含投资组合汇总）
+                    showRecognitionResult(data);
+                    // 不再自动保存，等待用户确认
                 } else {
                     showRecognitionError(data.error, data.suggestion);
                 }
@@ -1405,39 +1397,323 @@
             });
         }
 
-        // 显示识别结果
-        function showRecognitionResult(funds) {
+        // 自动保存识别结果到数据库
+        function autoSaveToDatabase(funds) {
+            if (!funds || funds.length === 0) {
+                console.log('没有需要保存的基金数据');
+                return;
+            }
+
+            console.log('开始自动保存到数据库...', funds);
+            console.log('识别到的基金数据:', funds);
+
+            // 准备导入数据 - 从识别结果计算持有份额和成本价
+            const fundsToImport = funds.map(fund => {
+                // 从识别结果中提取数据
+                const holding_amount = fund.holding_amount || 0;
+                const profit_amount = fund.profit_amount || 0;
+                const current_value = fund.current_value || (holding_amount + profit_amount);
+                const nav_value = fund.nav_value;  // 可能为null
+                
+                let holding_shares = 0;
+                let cost_price = 0;
+                
+                // 如果有净值，使用精确计算
+                if (nav_value && nav_value > 0 && current_value > 0) {
+                    // 持有份额 = 当前市值 / 当前净值
+                    holding_shares = current_value / nav_value;
+                    // 成本价 = 持仓金额 / 持有份额
+                    if (holding_shares > 0) {
+                        cost_price = holding_amount / holding_shares;
+                    }
+                    console.log(`${fund.fund_code}: 使用净值计算 - 份额=${holding_shares.toFixed(2)}, 成本价=${cost_price.toFixed(4)}`);
+                } else {
+                    // 没有净值，使用简化方法：持有份额 = 持仓金额，成本价 = 1
+                    holding_shares = holding_amount;
+                    cost_price = 1.0;
+                    console.log(`${fund.fund_code}: 使用简化计算 - 份额=${holding_shares.toFixed(2)}, 成本价=${cost_price.toFixed(4)}`);
+                }
+                
+                return {
+                    fund_code: fund.fund_code,
+                    fund_name: fund.fund_name,
+                    holding_shares: holding_shares,
+                    cost_price: cost_price,
+                    buy_date: fund.buy_date || new Date().toISOString().split('T')[0],
+                    confidence: fund.confidence || 0
+                };
+            }).filter(fund => fund.fund_code && fund.holding_shares > 0);
+
+            console.log('准备保存的数据:', fundsToImport);
+
+            if (fundsToImport.length === 0) {
+                console.log('没有有效的基金数据可以保存（缺少基金代码或持仓金额）');
+                // 即使没有数据可以保存，也显示识别结果并关闭模态框
+                showSaveErrorNotification('识别到的数据不完整，无法保存');
+                setTimeout(() => {
+                    closeScreenshotModal();
+                }, 2000);
+                return;
+            }
+
+            // 调用导入API
+            fetch('/api/holdings/import/confirm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: 'default_user',
+                    funds: fundsToImport
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('保存API响应:', data);
+                if (data.success) {
+                    console.log(`✅ 成功保存 ${data.imported.length} 个基金到数据库`);
+                    // 显示成功提示
+                    showSaveSuccessNotification(data.imported.length);
+                    // 延迟关闭模态框和刷新列表，让用户看到成功消息
+                    setTimeout(() => {
+                        // 关闭截图导入模态框
+                        closeScreenshotModal();
+                        // 刷新持仓列表
+                        loadFunds();
+                    }, 1500);
+                } else {
+                    console.error('保存失败:', data.error);
+                    showSaveErrorNotification(data.error);
+                    // 保存失败也关闭模态框
+                    setTimeout(() => {
+                        closeScreenshotModal();
+                    }, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('保存到数据库失败:', error);
+                showSaveErrorNotification('网络错误，保存失败');
+                // 网络错误也关闭模态框
+                setTimeout(() => {
+                    closeScreenshotModal();
+                }, 3000);
+            });
+        }
+
+        // 显示保存成功通知
+        function showSaveSuccessNotification(count) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideIn 0.3s ease-out;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            notification.innerHTML = `
+                <i class="bi bi-check-circle-fill"></i> 
+                成功保存 ${count} 个基金到持仓列表
+            `;
+            document.body.appendChild(notification);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // 显示保存失败通知
+        function showSaveErrorNotification(error) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideIn 0.3s ease-out;
+                font-size: 14px;
+                font-weight: 500;
+            `;
+            notification.innerHTML = `
+                <i class="bi bi-exclamation-triangle-fill"></i> 
+                保存失败: ${error}
+            `;
+            document.body.appendChild(notification);
+
+            // 5秒后自动消失
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 5000);
+        }
+
+        // 显示识别结果（增强版 - 包含投资组合汇总）
+        function showRecognitionResult(data) {
             const resultDiv = document.getElementById('recognitionResult');
             if (!resultDiv) return;
             
             resultDiv.style.display = 'block';
 
-            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${funds.length} 个基金</div>`;
+            const funds = Array.isArray(data) ? data : (data.data || []);
+            const portfolioSummary = data.portfolio_summary || null;
 
+            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${funds.length} 个基金，请确认信息后导入</div>`;
+
+            // 投资组合汇总卡片
+            if (portfolioSummary) {
+                html += `
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; margin-bottom: 20px; color: white;">
+                    <h5 style="margin: 0 0 15px 0; font-weight: 600;"><i class="bi bi-pie-chart"></i> 📈 投资组合汇总</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">基金数量</div>
+                            <div style="font-size: 24px; font-weight: bold;">${portfolioSummary.total_funds}</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总持仓成本</div>
+                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_holding_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏金额</div>
+                            <div style="font-size: 20px; font-weight: bold; color: ${portfolioSummary.total_profit_amount >= 0 ? '#4ade80' : '#f87171'};">
+                                ${portfolioSummary.total_profit_amount >= 0 ? '+' : ''}¥${portfolioSummary.total_profit_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            </div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总当前市值</div>
+                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_current_value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
+                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏率</div>
+                            <div style="font-size: 20px; font-weight: bold; color: ${portfolioSummary.total_profit_rate >= 0 ? '#4ade80' : '#f87171'};">
+                                ${portfolioSummary.total_profit_rate >= 0 ? '+' : ''}${portfolioSummary.total_profit_rate.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+
+                // 表现对比
+                if (portfolioSummary.best_fund && portfolioSummary.worst_fund) {
+                    html += `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 15px; border-radius: 10px; color: white;">
+                            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">🏆 表现最佳</div>
+                            <div style="font-weight: 600; margin-bottom: 3px;">${portfolioSummary.best_fund.fund_name}</div>
+                            <div style="font-size: 20px; font-weight: bold;">+${portfolioSummary.best_fund.profit_rate.toFixed(2)}%</div>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 15px; border-radius: 10px; color: white;">
+                            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">📉 表现最差</div>
+                            <div style="font-weight: 600; margin-bottom: 3px;">${portfolioSummary.worst_fund.fund_name}</div>
+                            <div style="font-size: 20px; font-weight: bold;">${portfolioSummary.worst_fund.profit_rate >= 0 ? '+' : ''}${portfolioSummary.worst_fund.profit_rate.toFixed(2)}%</div>
+                        </div>
+                    </div>`;
+                }
+            }
+
+            // 详细基金列表（9列完整信息）
             if (funds.length > 0) {
-                html += '<div class="table-responsive" style="margin-top: 15px;">';
-                html += '<table class="table table-sm">';
-                html += '<thead><tr><th>基金代码</th><th>基金名称</th><th>置信度</th></tr></thead>';
+                html += '<div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">';
+                html += '<h6 style="margin: 0 0 15px 0; font-weight: 600; color: #333;"><i class="bi bi-list-ul"></i> 识别详情</h6>';
+                html += '<div style="overflow-x: auto;">';
+                html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
+                html += `<thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金代码</th>
+                        <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金名称</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">持仓金额</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">盈亏金额</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">盈亏率</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">当前市值</th>
+                        <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">置信度</th>
+                        <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">识别来源</th>
+                        <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">原始文本</th>
+                    </tr>
+                </thead>`;
                 html += '<tbody>';
 
                 funds.forEach(fund => {
-                    html += `<tr>
-                        <td><strong>${fund.fund_code || '--'}</strong></td>
-                        <td>${fund.fund_name || '--'}</td>
-                        <td>${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}</td>
+                    const profitColor = (fund.profit_amount || 0) >= 0 ? '#10b981' : '#ef4444';
+                    const profitSign = (fund.profit_amount || 0) >= 0 ? '+' : '';
+                    
+                    html += `<tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 10px 8px;"><span style="font-family: 'Courier New', monospace; color: #3b82f6; font-weight: 600;">${fund.fund_code || '--'}</span></td>
+                        <td style="padding: 10px 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${fund.fund_name || '--'}">${fund.fund_name || '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.holding_amount ? fund.holding_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_amount !== null && fund.profit_amount !== undefined ? profitSign + '¥' + fund.profit_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_rate !== null && fund.profit_rate !== undefined ? profitSign + fund.profit_rate.toFixed(2) + '%' : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.current_value ? fund.current_value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: center;"><span style="background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}</span></td>
+                        <td style="padding: 10px 8px; text-align: center;"><span style="background: #6b7280; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">${fund.source || '--'}</span></td>
+                        <td style="padding: 10px 8px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; font-size: 12px;" title="${fund.original_text || '--'}">${fund.original_text || '--'}</td>
                     </tr>`;
                 });
 
-                html += '</tbody></table></div>';
+                html += '</tbody></table></div></div>';
 
-                // 添加确认按钮
-                html += '<div class="text-center" style="margin-top: 20px;">';
-                html += '<button class="btn btn-success" onclick="openConfirmModal()">';
+                // 添加确认导入和导出按钮
+                html += '<div style="text-align: center; margin-top: 20px; display: flex; gap: 15px; justify-content: center;">';
+                html += '<button class="btn btn-success" onclick="confirmAndSave()" style="padding: 10px 30px; font-size: 14px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">';
                 html += '<i class="bi bi-check-circle"></i> 确认导入';
-                html += '</button></div>';
+                html += '</button>';
+                html += '<button class="btn btn-outline-secondary" onclick="exportRecognitionResults()" style="padding: 10px 30px; font-size: 14px;">';
+                html += '<i class="bi bi-download"></i> 导出Excel';
+                html += '</button>';
+                html += '</div>';
             }
 
             document.getElementById('resultContent').innerHTML = html;
+        }
+
+        // 导出识别结果为CSV
+        function exportRecognitionResults() {
+            if (recognizedFunds.length === 0) {
+                alert('没有可导出的数据');
+                return;
+            }
+
+            // 构建CSV内容
+            let csv = '\uFEFF'; // UTF-8 BOM
+            csv += '基金代码,基金名称,持仓金额,盈亏金额,盈亏率,当前市值,置信度,识别来源,原始文本\n';
+
+            recognizedFunds.forEach(fund => {
+                csv += `${fund.fund_code || ''},`;
+                csv += `"${(fund.fund_name || '').replace(/"/g, '""')}",`;
+                csv += `${fund.holding_amount || ''},`;
+                csv += `${fund.profit_amount || ''},`;
+                csv += `${fund.profit_rate || ''},`;
+                csv += `${fund.current_value || ''},`;
+                csv += `${fund.confidence ? (fund.confidence * 100).toFixed(1) : ''},`;
+                csv += `${fund.source || ''},`;
+                csv += `"${(fund.original_text || '').replace(/"/g, '""')}"\n`;
+            });
+
+            // 创建下载链接
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `基金识别结果_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // 显示识别错误
@@ -1457,141 +1733,10 @@
             resultContent.innerHTML = html;
         }
 
-        // 打开确认模态框
-        function openConfirmModal() {
-            if (recognizedFunds.length === 0) return;
-
-            // 关闭截图模态框
-            closeScreenshotModal();
-            
-            // 显示确认模态框
-            const confirmModal = document.getElementById('confirmModalOverlay');
-            if (confirmModal) {
-                confirmModal.style.display = 'flex';
-                document.body.style.overflow = 'hidden';
-                showConfirmContent(recognizedFunds);
-            }
-        }
-
-        // 关闭确认模态框
-        function closeConfirmModal() {
-            const modalElement = document.getElementById('confirmModalOverlay');
-            if (modalElement) {
-                modalElement.style.display = 'none';
-            }
-            document.body.style.overflow = '';
-        }
-
-        // 显示确认内容
-        function showConfirmContent(funds) {
-            const confirmContent = document.getElementById('confirmContent');
-            if (!confirmContent) return;
-            
-            let html = '<div class="row">';
-
-            funds.forEach((fund, index) => {
-                html += `
-                <div class="col-md-6 mb-3">
-                    <div class="card">
-                        <div class="card-header">
-                            <strong>${fund.fund_code || '--'}</strong> - ${fund.fund_name || '--'}
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-2">
-                                <div class="col-sm-6">
-                                    <label class="form-label">持有份额</label>
-                                    <input type="number" class="form-control" id="shares_${index}"
-                                           value="${fund.holding_shares || ''}" step="0.01" min="0">
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="form-label">成本价(元)</label>
-                                    <input type="number" class="form-control" id="price_${index}"
-                                           value="${fund.cost_price || ''}" step="0.001" min="0">
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="form-label">买入日期</label>
-                                    <input type="date" class="form-control" id="date_${index}"
-                                           value="${fund.buy_date || ''}">
-                                </div>
-                                <div class="col-sm-6">
-                                    <label class="form-label">置信度</label>
-                                    <input type="text" class="form-control" readonly
-                                           value="${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            });
-
-            html += '</div>';
-            if (confirmContent) confirmContent.innerHTML = html;
-        }
-
-        // 确认导入
-        function confirmImport() {
-            const fundsToImport = [];
-
-            recognizedFunds.forEach((fund, index) => {
-                const sharesEl = document.getElementById(`shares_${index}`);
-                const priceEl = document.getElementById(`price_${index}`);
-                const dateEl = document.getElementById(`date_${index}`);
-                
-                const shares = sharesEl ? parseFloat(sharesEl.value) || 0 : 0;
-                const price = priceEl ? parseFloat(priceEl.value) || 0 : 0;
-                const buyDate = dateEl ? dateEl.value : '';
-
-                if (shares > 0 && price > 0) {
-                    fundsToImport.push({
-                        fund_code: fund.fund_code,
-                        fund_name: fund.fund_name,
-                        holding_shares: shares,
-                        cost_price: price,
-                        buy_date: buyDate,
-                        confidence: fund.confidence
-                    });
-                }
-            });
-
-            if (fundsToImport.length === 0) {
-                alert('请至少填写一个基金的份额和成本价');
-                return;
-            }
-
-            const btn = document.getElementById('confirmImportBtn');
-            if (!btn) return;
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 导入中...';
-
-            fetch('/api/holdings/import/confirm', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    user_id: 'default_user',
-                    funds: fundsToImport
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`成功导入 ${fundsToImport.length} 个基金到持仓列表`);
-                    closeConfirmModal();
-                    loadFunds(); // 重新加载持仓数据
-                } else {
-                    alert('导入失败: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('导入失败:', error);
-                alert('导入失败，请重试');
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-download"></i> 确认导入';
-            });
+        // 确认并保存到数据库
+        function confirmAndSave() {
+            console.log('用户确认导入，开始保存到数据库...');
+            autoSaveToDatabase(recognizedFunds);
         }
 
         // 确保在DOM加载完成后创建模态框
@@ -1611,9 +1756,8 @@
         window.closeScreenshotModal = closeScreenshotModal;
         window.resetScreenshotModal = resetScreenshotModal;
         window.recognizeScreenshot = recognizeScreenshot;
-        window.openConfirmModal = openConfirmModal;
-        window.closeConfirmModal = closeConfirmModal;
-        window.confirmImport = confirmImport;
+        window.confirmAndSave = confirmAndSave;
+        window.exportRecognitionResults = exportRecognitionResults;
         
         console.log('截图导入功能已初始化');
         console.log('testScreenshotModal函数:', typeof window.testScreenshotModal);

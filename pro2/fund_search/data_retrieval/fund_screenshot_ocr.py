@@ -15,13 +15,15 @@ import io
 logger = logging.getLogger(__name__)
 
 
-def recognize_fund_screenshot(image_data: str, use_gpu: bool = False) -> List[Dict]:
+def recognize_fund_screenshot(image_data: str, use_gpu: bool = False, import_to_portfolio: bool = False, user_id: str = "default") -> List[Dict]:
     """
     识别基金截图中的基金信息
     
     参数：
     image_data: Base64编码的图片数据或图片二进制数据
     use_gpu: 是否使用GPU加速
+    import_to_portfolio: 是否导入到持仓列表
+    user_id: 用户ID（用于持仓导入）
     
     返回：
     list: 识别到的基金列表，每个元素包含 fund_code、fund_name、confidence
@@ -33,10 +35,38 @@ def recognize_fund_screenshot(image_data: str, use_gpu: bool = False) -> List[Di
     
     if ocr_engine == 'easyocr':
         logger.info("使用EasyOCR进行识别")
-        return recognize_with_easyocr(image_data, use_gpu)
+        result = recognize_with_easyocr(image_data, use_gpu)
     else:
         logger.info("使用PaddleOCR进行识别")
-        return recognize_with_paddleocr(image_data, use_gpu)
+        result = recognize_with_paddleocr(image_data, use_gpu)
+    
+    # 如果需要导入到持仓列表
+    if import_to_portfolio and result:
+        try:
+            from .portfolio_importer import PortfolioImporter
+            
+            # 重新进行OCR以获取原始文本
+            if ocr_engine == 'easyocr':
+                ocr_texts = _get_ocr_texts_easyocr(image_data, use_gpu)
+            else:
+                ocr_texts = _get_ocr_texts_paddleocr(image_data, use_gpu)
+            
+            if ocr_texts:
+                importer = PortfolioImporter()
+                holdings = importer.extract_portfolio_from_ocr(ocr_texts)
+                
+                if holdings:
+                    success = importer.import_to_database(holdings, user_id)
+                    if success:
+                        logger.info(f"成功导入 {len(holdings)} 个持仓到用户 {user_id}")
+                    else:
+                        logger.warning("持仓导入失败")
+                else:
+                    logger.warning("未能从截图中提取持仓信息")
+        except Exception as e:
+            logger.error(f"持仓导入过程中出错: {e}")
+    
+    return result
 
 
 def recognize_with_paddleocr(image_data: str, use_gpu: bool = False) -> List[Dict]:
@@ -93,13 +123,25 @@ def recognize_with_paddleocr(image_data: str, use_gpu: bool = False) -> List[Dic
         
         logger.info(f"OCR识别到 {len(texts)} 行文本")
         
-        # 解析基金信息 - 使用增强版解析器
-        from .enhanced_fund_parser import parse_fund_info_enhanced
-        funds = parse_fund_info_enhanced(texts)
+        # 使用智能解析器进行解析
+        from .smart_fund_parser import parse_fund_info_with_manual_fallback
+        parse_result = parse_fund_info_with_manual_fallback(texts)
         
-        # 如果增强版解析器没有结果，尝试原始解析器
+        funds = parse_result['funds']
+        
+        # 如果有手工导入建议，记录到日志
+        if parse_result['manual_import_needed']:
+            logger.warning(f"有 {len(parse_result['manual_items'])} 项需要手工导入")
+            logger.info(parse_result['manual_prompt'])
+        
+        # 如果智能解析器没有结果，尝试原始解析器
         if not funds:
-            funds = parse_fund_info(texts)
+            from .enhanced_fund_parser import parse_fund_info_enhanced
+            funds = parse_fund_info_enhanced(texts)
+            
+            # 如果还是没有结果，尝试基础解析器
+            if not funds:
+                funds = parse_fund_info(texts)
         
         return funds
         
@@ -163,13 +205,25 @@ def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]
         
         logger.info(f"EasyOCR识别到 {len(texts)} 行文本")
         
-        # 解析基金信息 - 使用增强版解析器
-        from .enhanced_fund_parser import parse_fund_info_enhanced
-        funds = parse_fund_info_enhanced(texts)
+        # 使用智能解析器进行解析
+        from .smart_fund_parser import parse_fund_info_with_manual_fallback
+        parse_result = parse_fund_info_with_manual_fallback(texts)
         
-        # 如果增强版解析器没有结果，尝试原始解析器
+        funds = parse_result['funds']
+        
+        # 如果有手工导入建议，记录到日志
+        if parse_result['manual_import_needed']:
+            logger.warning(f"有 {len(parse_result['manual_items'])} 项需要手工导入")
+            logger.info(parse_result['manual_prompt'])
+        
+        # 如果智能解析器没有结果，尝试原始解析器
         if not funds:
-            funds = parse_fund_info(texts)
+            from .enhanced_fund_parser import parse_fund_info_enhanced
+            funds = parse_fund_info_enhanced(texts)
+            
+            # 如果还是没有结果，尝试基础解析器
+            if not funds:
+                funds = parse_fund_info(texts)
         
         return funds
         
@@ -182,6 +236,98 @@ def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]
         logger.error(f"EasyOCR识别失败: {e}")
         # 提供手动输入提示
         logger.info("OCR识别失败，请考虑手动输入基金代码和名称")
+        return []
+
+
+def _get_ocr_texts_easyocr(image_data: str, use_gpu: bool = False) -> List[str]:
+    """获取EasyOCR识别的原始文本列表"""
+    try:
+        import easyocr
+        
+        # 处理Base64编码的图片数据
+        if isinstance(image_data, str):
+            import base64
+            if ',' in image_data:
+                image_data = image_data.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+        else:
+            image_bytes = image_data
+        
+        # 初始化 EasyOCR
+        reader = easyocr.Reader(['ch_sim', 'en'], gpu=use_gpu)
+        
+        # 将字节数据转换为图片
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # 执行 OCR 识别
+        import numpy as np
+        image_array = np.array(image)
+        result = reader.readtext(image_array)
+        
+        # 提取文本
+        texts = []
+        for detection in result:
+            text = detection[1]  # 获取识别的文本
+            confidence = detection[2]  # 获取置信度
+            
+            from .ocr_config import get_confidence_threshold
+            threshold = get_confidence_threshold()
+            
+            if confidence > threshold:
+                texts.append(text)
+        
+        return texts
+        
+    except Exception as e:
+        logger.error(f"获取EasyOCR文本失败: {e}")
+        return []
+
+
+def _get_ocr_texts_paddleocr(image_data: str, use_gpu: bool = False) -> List[str]:
+    """获取PaddleOCR识别的原始文本列表"""
+    try:
+        # 处理Base64编码的图片数据
+        if isinstance(image_data, str):
+            import base64
+            if ',' in image_data:
+                image_data = image_data.split(',')[1]
+            image_bytes = base64.b64decode(image_data)
+        else:
+            image_bytes = image_data
+        
+        # 使用 PaddleOCR 进行识别
+        from paddleocr import PaddleOCR
+        
+        # 初始化 OCR
+        ocr = PaddleOCR(use_textline_orientation=True, lang='ch')
+        
+        # 将字节数据转换为图片
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # 执行 OCR 识别
+        import numpy as np
+        image_array = np.array(image)
+        result = ocr.ocr(image_array)
+        
+        if not result or not result[0]:
+            return []
+        
+        # 提取文本
+        texts = []
+        for line in result[0]:
+            text = line[1][0]  # 获取识别的文本
+            confidence = line[1][1]  # 获取置信度
+            
+            from .ocr_config import get_confidence_threshold
+            threshold = get_confidence_threshold()
+            
+            if confidence > threshold:
+                texts.append(text)
+        
+        return texts
+        
+    except Exception as e:
+        logger.error(f"获取PaddleOCR文本失败: {e}")
         return []
 
 
@@ -336,12 +482,15 @@ def validate_recognized_fund(fund: Dict) -> Tuple[bool, str]:
         basic_info = EnhancedFundData.get_fund_basic_info(fund_code)
         
         if basic_info and basic_info.get('fund_name'):
-            # 基金存在，返回真实的基金名称
             real_name = basic_info['fund_name']
-            logger.info(f"验证成功: {fund_code} - {real_name}")
-            # 更新基金名称为真实名称
-            fund['fund_name'] = real_name
-            return True, real_name
+            # 只有当获取到的名称不是默认格式时，才更新基金名称
+            if not real_name.startswith(f'基金{fund_code}'):
+                # 更新基金名称为真实名称
+                fund['fund_name'] = real_name
+                return True, real_name
+            else:
+                # 如果获取到的是默认格式，保留原有的基金名称
+                return True, fund_name
         else:
             return False, f"基金代码 {fund_code} 不存在"
             
