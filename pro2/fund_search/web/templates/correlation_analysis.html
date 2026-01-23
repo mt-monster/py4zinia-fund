@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基金相关性分析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .analysis-section {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .analysis-section h2 {
+            color: #2c3e50;
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .analysis-section h3 {
+            color: #34495e;
+            font-size: 16px;
+            margin-bottom: 15px;
+            margin-top: 25px;
+        }
+
+        .matrix-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        .correlation-matrix {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .correlation-matrix th,
+        .correlation-matrix td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .correlation-matrix th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .correlation-matrix td {
+            font-family: monospace;
+        }
+
+        .correlation-matrix tr:first-child th:first-child {
+            background-color: transparent;
+            border: none;
+        }
+
+        .correlation-1 {
+            background-color: #e3f2fd;
+        }
+
+        .correlation-high {
+            background-color: #ffebee;
+        }
+
+        .correlation-medium {
+            background-color: #fff3e0;
+        }
+
+        .correlation-low {
+            background-color: #e8f5e8;
+        }
+
+        .explanation {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .explanation h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .explanation ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .explanation li {
+            margin-bottom: 5px;
+        }
+
+        .button-container {
+            margin-top: 30px;
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .analysis-section {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .analysis-section h2 {
+                font-size: 18px;
+            }
+
+            .correlation-matrix {
+                font-size: 12px;
+            }
+
+            .correlation-matrix th,
+            .correlation-matrix td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>基金相关性分析</h1>
+            <p>分析基金之间的相关性，帮助您分散投资风险</p>
+        </div>
+
+        <div class="analysis-section">
+            <h2>分析结果</h2>
+
+            <div id="analysis-content">
+                <div class="error-message">
+                    <p>请从基金持仓页面选择基金进行相关性分析</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <a href="/my_holdings" class="btn btn-primary">返回持仓页面</a>
+        </div>
+    </div>
+
+    <script>
+        // 从URL参数获取分析数据
+        function getAnalysisData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataParam = urlParams.get('data');
+            
+            if (dataParam) {
+                try {
+                    return JSON.parse(decodeURIComponent(dataParam));
+                } catch (error) {
+                    console.error('解析数据失败:', error);
+                    return null;
+                }
+            }
+            
+            return null;
+        }
+
+        // 渲染分析结果
+        function renderAnalysisResult(data) {
+            const contentDiv = document.getElementById('analysis-content');
+            
+            if (!data) {
+                contentDiv.innerHTML = `
+                    <div class="error-message">
+                        <p>没有分析数据，请从基金持仓页面选择基金进行相关性分析</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+
+            // 渲染相关性矩阵
+            if (data.correlation_matrix && data.fund_names) {
+                html += `
+                    <h3>相关性矩阵</h3>
+                    <div class="matrix-container">
+                        <table class="correlation-matrix">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                `;
+
+                // 表头
+                data.fund_names.forEach(fundName => {
+                    html += `<th>${fundName}</th>`;
+                });
+
+                html += `
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                // 表格内容
+                data.correlation_matrix.forEach((row, rowIndex) => {
+                    html += `<tr>
+                        <th>${data.fund_names[rowIndex]}</th>`;
+
+                    row.forEach(value => {
+                        let className = '';
+                        if (value === 1) {
+                            className = 'correlation-1';
+                        } else if (value > 0.7) {
+                            className = 'correlation-high';
+                        } else if (value > 0.3) {
+                            className = 'correlation-medium';
+                        } else {
+                            className = 'correlation-low';
+                        }
+
+                        html += `<td class="${className}">${value.toFixed(4)}</td>`;
+                    });
+
+                    html += `</tr>`;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // 渲染说明
+            html += `
+                <div class="explanation">
+                    <h3>说明</h3>
+                    <ul>
+                        <li>相关性系数范围: [-1, 1]</li>
+                        <li>接近 1: 高度正相关，两只基金走势相似</li>
+                        <li>接近 -1: 高度负相关，两只基金走势相反</li>
+                        <li>接近 0: 无相关性，两只基金走势独立</li>
+                    </ul>
+                    <p>相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。</p>
+                </div>
+            `;
+
+            contentDiv.innerHTML = html;
+        }
+
+        // 页面加载时渲染分析结果
+        window.onload = function() {
+            const data = getAnalysisData();
+            renderAnalysisResult(data);
+        };
+    </script>
+</body>
+</html>

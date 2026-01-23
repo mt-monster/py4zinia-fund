@@ -3460,6 +3460,14 @@
 
         // 显示分析结果
         function showAnalysisResult(data) {
+            // 在新窗口中打开分析结果
+            const dataParam = encodeURIComponent(JSON.stringify(data));
+            const url = `/correlation-analysis?data=${dataParam}`;
+            
+            // 打开新窗口，设置合理的大小
+            window.open(url, '_blank', 'width=1200,height=800,top=100,left=100,scrollbars=yes,resizable=yes');
+            return;
+            
             // 创建分析结果模态框
             const modal = document.createElement('div');
             modal.className = 'modal';
