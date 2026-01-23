@@ -91,6 +91,11 @@ def etf_page():
     """ETF市场页"""
     return render_template('etf_market.html')
 
+@app.route('/correlation-analysis')
+def correlation_analysis_page():
+    """基金相关性分析页面"""
+    return render_template('correlation_analysis.html')
+
 @app.route('/etf/<etf_code>')
 def etf_detail_page(etf_code):
     """ETF详情页"""
