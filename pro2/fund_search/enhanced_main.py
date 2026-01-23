@@ -640,6 +640,34 @@ class EnhancedFundAnalysisSystem:
             
             analysis_date = datetime.now().strftime('%Y-%m-%d')
             
+            # 从数据库获取持仓数据并合并到results_df
+            try:
+                # 查询user_holdings表获取持仓金额
+                holdings_sql = """
+                SELECT fund_code, holding_amount 
+                FROM user_holdings 
+                WHERE user_id = 'default_user'
+                """
+                holdings_df = self.db_manager.execute_query(holdings_sql)
+                
+                if not holdings_df.empty:
+                    # 重命名列以便合并
+                    holdings_df = holdings_df.rename(columns={'holding_amount': 'holding_amount'})
+                    # 与results_df合并
+                    results_df = results_df.merge(holdings_df, on='fund_code', how='left')
+                    logger.info(f"成功合并持仓数据，共 {len(holdings_df)} 条记录")
+                
+                # 计算累计盈亏 = 当前市值 - 持仓金额
+                if 'holding_amount' in results_df.columns and 'estimate_nav' in results_df.columns:
+                    results_df['cumulative_profit_loss'] = results_df.apply(
+                        lambda row: (row['estimate_nav'] - row['holding_amount']) if pd.notna(row['holding_amount']) and pd.notna(row['estimate_nav']) else None,
+                        axis=1
+                    )
+                    logger.info("成功计算累计盈亏")
+                
+            except Exception as e:
+                logger.warning(f"获取持仓数据失败: {str(e)}，将继续生成报告但不包含持仓信息")
+            
             # 生成综合报告
             report_data = self.notification_manager.generate_comprehensive_report(
                 results_df, strategy_summary, report_files, analysis_date
