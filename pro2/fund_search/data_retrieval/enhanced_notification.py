@@ -22,8 +22,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# 只获取logger，不配置basicConfig（由主程序配置）
 logger = logging.getLogger(__name__)
 
 
@@ -1166,7 +1165,8 @@ class EnhancedNotificationManager:
         # 选择要显示的列（与参考图片一致的顺序）
         display_columns = [
             'fund_code', 'fund_name', 'today_return', 'yesterday_return', 
-            'status_label', 'operation_suggestion', 'execution_amount'
+            'status_label', 'operation_suggestion', 'execution_amount',
+            'holding_amount', 'cumulative_profit_loss'
         ]
         
         # 确保所需的列存在
@@ -1189,6 +1189,8 @@ class EnhancedNotificationManager:
             elif col == 'operation_suggestion':
                 width_style = "min-width: 120px;"
             elif col == 'status_label':
+                width_style = "min-width: 100px;"
+            elif col in ['holding_amount', 'cumulative_profit_loss']:
                 width_style = "min-width: 100px;"
                 
             html_table += f"<th style='padding: 8px; border: 1px solid #ddd; {width_style}'>{display_name}</th>"
@@ -1256,6 +1258,29 @@ class EnhancedNotificationManager:
                 elif col in ['execute_amount', 'execution_amount']:
                     amount = str(value) if pd.notna(value) else "N/A"
                     html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{amount}</td>"
+                
+                elif col == 'holding_amount':
+                    if pd.notna(value):
+                        try:
+                            holding_val = float(value)
+                            formatted_value = f"¥{holding_val:.2f}"
+                            html_table += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: right;'>{formatted_value}</td>"
+                        except (ValueError, TypeError):
+                            html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{value}</td>"
+                    else:
+                        html_table += "<td style='padding: 8px; border: 1px solid #ddd;'>N/A</td>"
+                
+                elif col == 'cumulative_profit_loss':
+                    if pd.notna(value):
+                        try:
+                            profit_val = float(value)
+                            formatted_value = f"¥{profit_val:.2f}"
+                            color = '#e74c3c' if profit_val > 0 else '#27ae60' if profit_val < 0 else 'black'
+                            html_table += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: right; color: {color}; font-weight: 500;'>{formatted_value}</td>"
+                        except (ValueError, TypeError):
+                            html_table += f"<td style='padding: 8px; border: 1px solid #ddd;'>{value}</td>"
+                    else:
+                        html_table += "<td style='padding: 8px; border: 1px solid #ddd;'>N/A</td>"
                 
                 elif col == 'fund_name':
                      html_table += f"<td style='padding: 8px; border: 1px solid #ddd; text-align: left;'>{value if pd.notna(value) else 'N/A'}</td>"
@@ -1375,7 +1400,11 @@ class EnhancedNotificationManager:
             'buy_multiplier': '买入倍数',
             
             # 趋势分析字段
-            'trend_status': '趋势状态'
+            'trend_status': '趋势状态',
+            
+            # 持仓相关字段
+            'holding_amount': '持有金额',
+            'cumulative_profit_loss': '累计盈亏'
         }
         return column_names.get(column_name, column_name)
 

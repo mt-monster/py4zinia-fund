@@ -190,7 +190,7 @@ def get_funds():
                 if fund.get(key) is not None and pd.notna(fund[key]):
                     fund[key] = round(float(fund[key]), 2)
             
-            for key in ['sharpe_ratio', 'composite_score']:
+            for key in ['sharpe_ratio', 'sharpe_ratio_ytd', 'sharpe_ratio_1y', 'sharpe_ratio_all', 'composite_score']:
                 if fund.get(key) is not None and pd.notna(fund[key]):
                     fund[key] = round(float(fund[key]), 4)
             
@@ -1027,7 +1027,8 @@ def get_holdings():
                far.today_return, far.prev_day_return as yesterday_return,
                far.current_estimate as current_nav,
                far.yesterday_nav as previous_nav,
-               far.sharpe_ratio, far.max_drawdown, far.volatility,
+               far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
+               far.max_drawdown, far.volatility,
                far.annualized_return, far.calmar_ratio, far.sortino_ratio
         FROM user_holdings h
         LEFT JOIN fund_analysis_results far ON h.fund_code = far.fund_code
@@ -1058,6 +1059,9 @@ def get_holdings():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
             yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0
             sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+            sharpe_ratio_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else 0
+            sharpe_ratio_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else 0
+            sharpe_ratio_all = float(row['sharpe_ratio_all']) if pd.notna(row['sharpe_ratio_all']) else 0
             max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
             volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
             annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
@@ -1103,6 +1107,9 @@ def get_holdings():
                 'yesterday_return': round(yesterday_return, 2),
                 # 绩效指标
                 'sharpe_ratio': round(sharpe_ratio, 4),
+                'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4),
+                'sharpe_ratio_1y': round(sharpe_ratio_1y, 4),
+                'sharpe_ratio_all': round(sharpe_ratio_all, 4),
                 'max_drawdown': round(max_drawdown * 100, 2),
                 'volatility': round(volatility * 100, 2),
                 'annualized_return': round(annualized_return * 100, 2),
@@ -1223,6 +1230,50 @@ def update_holding(fund_code):
         logger.error(f"更新持仓失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@app.route('/api/holdings/clear', methods=['DELETE'])
+def clear_holdings():
+    """
+    清空用户持仓
+    """
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        # 删除用户的所有持仓记录
+        sql = "DELETE FROM user_holdings WHERE user_id = :user_id"
+        success = db_manager.execute_sql(sql, {'user_id': user_id})
+        
+        if success:
+            return jsonify({'success': True, 'message': '持仓已清空'})
+        else:
+            return jsonify({'success': False, 'error': '清空失败'})
+    except Exception as e:
+        logger.error(f"清空持仓失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/holdings/analyze/correlation', methods=['POST'])
+def analyze_fund_correlation():
+    """
+    分析基金相关性
+    """
+    try:
+        data = request.get_json()
+        if not data or 'fund_codes' not in data:
+            return jsonify({'success': False, 'error': '缺少基金代码'})
+        
+        fund_codes = data['fund_codes']
+        if len(fund_codes) < 2:
+            return jsonify({'success': False, 'error': '至少需要2只基金进行相关性分析'})
+        
+        # 导入相关性分析模块
+        from data_retrieval.fund_analyzer import FundAnalyzer
+        
+        analyzer = FundAnalyzer()
+        result = analyzer.analyze_correlation(fund_codes)
+        
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        logger.error(f"分析基金相关性失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/holdings/<fund_code>', methods=['DELETE'])
 def delete_holding(fund_code):

@@ -49,6 +49,30 @@
             border-radius: 4px;
         }
         .top-nav .nav-links a:hover { background: rgba(255,255,255,0.1); }
+        /* 通知样式 */
+        .notification {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        .notification.success {
+            background-color: #27ae60;
+        }
+        .notification.error {
+            background-color: #e74c3c;
+        }
+        .notification.info {
+            background-color: #3498db;
+        }
 </style>
 </head>
 <body>
@@ -1120,6 +1144,12 @@
                 <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;" title="上传截图导入持仓">
                     <i class="bi bi-camera"></i> 截图导入
                 </button>
+                <button class="btn-filter" onclick="clearFundList()" style="background: #95a5a6;" title="清空基金列表">
+                    <i class="bi bi-trash"></i> 清空
+                </button>
+                <button class="btn-filter" onclick="startAnalysis()" style="background: #3498db;" title="分析所选基金相关性">
+                    <i class="bi bi-chart-line"></i> 开始分析
+                </button>
                 <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
                     共 <span id="total-count">0</span> 只基金
                 </span>
@@ -1145,13 +1175,15 @@
                             <th class="sortable" data-column="holding_profit_rate">持有盈亏率 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="total_profit_rate">累计盈亏率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="sharpe_ratio">夏普比率 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_ytd">夏普比率(今年以来) <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_1y">夏普比率(近一年) <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_all">夏普比率(成立以来) <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="max_drawdown">最大回撤 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span></th>
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
-                        <tr><td colspan="14" class="loading">加载中...</td></tr>
+                        <tr><td colspan="17" class="loading">加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1234,12 +1266,6 @@
         function openScreenshotModal() {
             console.log('openScreenshotModal 被调用');
             
-            // 确保模态框已创建
-            if (!document.getElementById('screenshotModalOverlay')) {
-                createScreenshotModal();
-                initScreenshotModalEvents();
-            }
-            
             const modalElement = document.getElementById('screenshotModalOverlay');
             if (!modalElement) {
                 console.error('找不到 screenshotModalOverlay 元素');
@@ -1285,8 +1311,14 @@
             recognizedFunds = [];
         }
 
-        // 初始化事件监听器
+        // 初始化事件监听器（仅初始化一次）
+        let screenshotModalEventsInitialized = false;
         function initScreenshotModalEvents() {
+            if (screenshotModalEventsInitialized) {
+                console.log('截图模态框事件已初始化，跳过重复初始化');
+                return;
+            }
+            
             console.log('初始化截图模态框事件');
             const screenshotInput = document.getElementById('screenshotInput');
             const uploadArea = document.getElementById('uploadArea');
@@ -1326,6 +1358,8 @@
             if (recognizeBtn) {
                 recognizeBtn.addEventListener('click', recognizeScreenshot);
             }
+            
+            screenshotModalEventsInitialized = true;
         }
 
         // 处理文件选择
@@ -2080,6 +2114,18 @@
                         const val = fund.sharpe_ratio || 0;
                         return { value: val.toFixed(2), class: '' };
                     },
+                    'sharpe_ratio_ytd': (fund) => {
+                        const val = fund.sharpe_ratio_ytd || 0;
+                        return { value: val.toFixed(2), class: '' };
+                    },
+                    'sharpe_ratio_1y': (fund) => {
+                        const val = fund.sharpe_ratio_1y || 0;
+                        return { value: val.toFixed(2), class: '' };
+                    },
+                    'sharpe_ratio_all': (fund) => {
+                        const val = fund.sharpe_ratio_all || 0;
+                        return { value: val.toFixed(2), class: '' };
+                    },
                     'max_drawdown': (fund) => {
                         const val = fund.max_drawdown || 0;
                         return { value: this.formatPercent(val), class: 'negative' };
@@ -2112,7 +2158,7 @@
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
                     
                     // 生成单元格HTML
-                    let cellsHtml = '<td data-column="checkbox"><input type="checkbox"></td>';
+                    let cellsHtml = '<td data-column="checkbox"><input type="checkbox" class="fund-checkbox" data-fund-code="' + fund.fund_code + '"></td>';
                     
                     if (config) {
                         // 使用列配置生成单元格
@@ -3306,9 +3352,257 @@
             }
         }
 
+        function showNotification(message, type = 'info') {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            // 添加到页面
+            document.body.appendChild(notification);
+            
+            // 显示通知
+            setTimeout(() => {
+                notification.style.opacity = '1';
+            }, 10);
+            
+            // 3秒后隐藏通知
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        async function clearFundList() {
+            const tbody = document.getElementById('fund-table-body');
+            // 显示加载状态
+            tbody.innerHTML = '<tr><td colspan="17" class="loading">清空数据中...</td></tr>';
+            
+            try {
+                // 调用API清空数据库中的持仓记录
+                const response = await fetch('/api/holdings/clear', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 清空基金数据
+                    allFunds = [];
+                    // 更新总数量显示
+                    document.getElementById('total-count').textContent = '0';
+                    // 清空表格内容
+                    tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
+                    // 显示成功提示
+                    showNotification('持仓已清空', 'success');
+                } else {
+                    // 显示错误提示
+                    showNotification('清空持仓失败: ' + (result.error || '未知错误'), 'error');
+                    // 恢复表格内容
+                    await loadFunds();
+                }
+            } catch (error) {
+                console.error('清空持仓失败:', error);
+                // 显示错误提示
+                showNotification('清空持仓失败: 网络错误', 'error');
+                // 恢复表格内容
+                await loadFunds();
+            }
+        }
+
+        // 开始分析所选基金相关性
+        async function startAnalysis() {
+            // 收集选中的基金
+            const selectedFunds = [];
+            const checkboxes = document.querySelectorAll('input[type="checkbox"].fund-checkbox:checked');
+            
+            if (checkboxes.length < 2) {
+                showNotification('请至少选择2只基金进行相关性分析', 'error');
+                return;
+            }
+            
+            checkboxes.forEach(checkbox => {
+                const fundCode = checkbox.dataset.fundCode;
+                if (fundCode) {
+                    selectedFunds.push(fundCode);
+                }
+            });
+            
+            // 显示加载状态
+            showNotification('正在分析基金相关性...', 'info');
+            
+            try {
+                const response = await fetch('/api/holdings/analyze/correlation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fund_codes: selectedFunds })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    // 显示分析结果
+                    showAnalysisResult(result.data);
+                } else {
+                    showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('分析失败:', error);
+                showNotification('分析失败: 网络错误', 'error');
+            }
+        }
+
+        // 显示分析结果
+        function showAnalysisResult(data) {
+            // 创建分析结果模态框
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.style.position = 'fixed';
+            modal.style.zIndex = '1000';
+            modal.style.left = '0';
+            modal.style.top = '0';
+            modal.style.width = '100%';
+            modal.style.height = '100%';
+            modal.style.overflow = 'auto';
+            modal.style.backgroundColor = 'rgba(0,0,0,0.4)';
+            
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            modalContent.style.backgroundColor = '#fefefe';
+            modalContent.style.margin = '15% auto';
+            modalContent.style.padding = '20px';
+            modalContent.style.border = '1px solid #888';
+            modalContent.style.width = '80%';
+            modalContent.style.maxWidth = '800px';
+            modalContent.style.borderRadius = '8px';
+            
+            // 添加标题
+            const title = document.createElement('h2');
+            title.textContent = '基金相关性分析结果';
+            title.style.marginTop = '0';
+            modalContent.appendChild(title);
+            
+            // 添加相关性矩阵
+            if (data.correlation_matrix) {
+                const matrixSection = document.createElement('div');
+                matrixSection.style.marginTop = '20px';
+                
+                const matrixTitle = document.createElement('h3');
+                matrixTitle.textContent = '相关性矩阵';
+                matrixSection.appendChild(matrixTitle);
+                
+                const matrixTable = document.createElement('table');
+                matrixTable.style.width = '100%';
+                matrixTable.style.borderCollapse = 'collapse';
+                
+                // 创建表头
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                const emptyTh = document.createElement('th');
+                headerRow.appendChild(emptyTh);
+                
+                data.fund_names.forEach(fundName => {
+                    const th = document.createElement('th');
+                    th.textContent = fundName;
+                    th.style.border = '1px solid #ddd';
+                    th.style.padding = '8px';
+                    th.style.textAlign = 'center';
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                matrixTable.appendChild(thead);
+                
+                // 创建表格内容
+                const tbody = document.createElement('tbody');
+                data.correlation_matrix.forEach((row, rowIndex) => {
+                    const tr = document.createElement('tr');
+                    const fundNameTd = document.createElement('td');
+                    fundNameTd.textContent = data.fund_names[rowIndex];
+                    fundNameTd.style.border = '1px solid #ddd';
+                    fundNameTd.style.padding = '8px';
+                    fundNameTd.style.fontWeight = 'bold';
+                    tr.appendChild(fundNameTd);
+                    
+                    row.forEach(value => {
+                        const td = document.createElement('td');
+                        td.textContent = value.toFixed(4);
+                        td.style.border = '1px solid #ddd';
+                        td.style.padding = '8px';
+                        td.style.textAlign = 'center';
+                        
+                        // 根据相关性值设置背景颜色
+                        if (value === 1) {
+                            td.style.backgroundColor = '#e3f2fd';
+                        } else if (value > 0.7) {
+                            td.style.backgroundColor = '#ffebee';
+                        } else if (value > 0.3) {
+                            td.style.backgroundColor = '#fff3e0';
+                        } else {
+                            td.style.backgroundColor = '#e8f5e8';
+                        }
+                        
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                matrixTable.appendChild(tbody);
+                matrixSection.appendChild(matrixTable);
+                modalContent.appendChild(matrixSection);
+            }
+            
+            // 添加说明
+            const explanation = document.createElement('div');
+            explanation.style.marginTop = '20px';
+            explanation.style.fontSize = '14px';
+            explanation.style.color = '#666';
+            explanation.innerHTML = `
+                <h3>说明</h3>
+                <ul>
+                    <li>相关性系数范围: [-1, 1]</li>
+                    <li>接近 1: 高度正相关，两只基金走势相似</li>
+                    <li>接近 -1: 高度负相关，两只基金走势相反</li>
+                    <li>接近 0: 无相关性，两只基金走势独立</li>
+                </ul>
+                <p>相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。</p>
+            `;
+            modalContent.appendChild(explanation);
+            
+            // 添加关闭按钮
+            const closeButton = document.createElement('button');
+            closeButton.textContent = '关闭';
+            closeButton.style.marginTop = '20px';
+            closeButton.style.padding = '10px 20px';
+            closeButton.style.backgroundColor = '#3498db';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.borderRadius = '4px';
+            closeButton.style.cursor = 'pointer';
+            closeButton.onclick = function() {
+                document.body.removeChild(modal);
+            };
+            modalContent.appendChild(closeButton);
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // 点击模态框外部关闭
+            window.onclick = function(event) {
+                if (event.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+        }
+
         async function loadFunds() {
             const tbody = document.getElementById('fund-table-body');
-            tbody.innerHTML = '<tr><td colspan="14" class="loading">加载中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="17" class="loading">加载中...</td></tr>';
             
             try {
                 const search = document.getElementById('search-input').value.trim();
@@ -3356,11 +3650,11 @@
                         }
                     }, isLargeDataset ? 10 : 0);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="14" class="empty-state">暂无数据</td></tr>';
-                }
+                            tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
+                        }
             } catch (error) {
                 console.error('加载失败:', error);
-                tbody.innerHTML = '<tr><td colspan="14" class="empty-state">加载失败</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="17" class="empty-state">加载失败</td></tr>';
             }
         }
         
@@ -4749,7 +5043,9 @@
             { key: 'holding_profit_rate', name: '持有盈亏率', visible: true, fixed: false, sortable: true },
             { key: 'total_profit', name: '累计盈亏', visible: true, fixed: false, sortable: true },
             { key: 'total_profit_rate', name: '累计盈亏率', visible: true, fixed: false, sortable: true },
-            { key: 'sharpe_ratio', name: '夏普比率', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio_ytd', name: '夏普比率(今年以来)', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio_1y', name: '夏普比率(近一年)', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio_all', name: '夏普比率(成立以来)', visible: true, fixed: false, sortable: true },
             { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
             { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
         ];

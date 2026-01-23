@@ -14,8 +14,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import logging
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# 只获取logger，不配置basicConfig（由主程序配置）
 logger = logging.getLogger(__name__)
 
 

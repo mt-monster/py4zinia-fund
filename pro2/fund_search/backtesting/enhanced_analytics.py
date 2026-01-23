@@ -17,8 +17,7 @@ import warnings
 import os
 warnings.filterwarnings('ignore')
 
-# 设置日志和中文字体
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# 只获取logger，不配置basicConfig（由主程序配置）
 logger = logging.getLogger(__name__)
 
 # 设置中文字体

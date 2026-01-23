@@ -32,24 +32,21 @@ def recognize_fund_screenshot(image_data: str, use_gpu: bool = False, import_to_
     
     # 根据配置选择OCR引擎
     ocr_engine = get_ocr_engine()
+    ocr_texts = []
     
     if ocr_engine == 'easyocr':
         logger.info("使用EasyOCR进行识别")
-        result = recognize_with_easyocr(image_data, use_gpu)
+        result, ocr_texts = recognize_with_easyocr(image_data, use_gpu)
     else:
         logger.info("使用PaddleOCR进行识别")
         result = recognize_with_paddleocr(image_data, use_gpu)
+        # 保存OCR识别的文本，避免重复识别
+        ocr_texts = _get_ocr_texts_paddleocr(image_data, use_gpu)
     
     # 如果需要导入到持仓列表
     if import_to_portfolio and result:
         try:
             from .portfolio_importer import PortfolioImporter
-            
-            # 重新进行OCR以获取原始文本
-            if ocr_engine == 'easyocr':
-                ocr_texts = _get_ocr_texts_easyocr(image_data, use_gpu)
-            else:
-                ocr_texts = _get_ocr_texts_paddleocr(image_data, use_gpu)
             
             if ocr_texts:
                 importer = PortfolioImporter()
@@ -148,15 +145,17 @@ def recognize_with_paddleocr(image_data: str, use_gpu: bool = False) -> List[Dic
     except ImportError:
         logger.error("PaddleOCR 未安装，请运行: pip install paddleocr")
         # 尝试使用备用方案：easyocr
-        return recognize_with_easyocr(image_data, use_gpu)
+        funds, _ = recognize_with_easyocr(image_data, use_gpu)
+        return funds
     except Exception as e:
         logger.error(f"PaddleOCR识别失败: {e}")
         # 如果PaddleOCR失败，尝试使用EasyOCR作为备用方案
         logger.info("PaddleOCR失败，尝试使用EasyOCR作为备用方案")
-        return recognize_with_easyocr(image_data, use_gpu)
+        funds, _ = recognize_with_easyocr(image_data, use_gpu)
+        return funds
 
 
-def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]:
+def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> Tuple[List[Dict], List[str]]:
     """
     使用 EasyOCR 作为备用方案
     
@@ -165,7 +164,7 @@ def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]
     use_gpu: 是否使用GPU加速
     
     返回：
-    list: 识别到的基金列表
+    tuple: (识别到的基金列表, 识别到的文本列表)
     """
     try:
         import easyocr
@@ -225,7 +224,7 @@ def recognize_with_easyocr(image_data: str, use_gpu: bool = False) -> List[Dict]
             if not funds:
                 funds = parse_fund_info(texts)
         
-        return funds
+        return funds, texts
         
     except ImportError:
         logger.error("EasyOCR 未安装，请运行: pip install easyocr")
