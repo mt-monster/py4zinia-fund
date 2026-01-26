@@ -1273,7 +1273,8 @@ def analyze_fund_correlation():
         from data_retrieval.fund_analyzer import FundAnalyzer
         
         analyzer = FundAnalyzer()
-        result = analyzer.analyze_correlation(fund_codes)
+        # 使用 use_cache=False 确保获取最新的基金名称
+        result = analyzer.analyze_correlation(fund_codes, use_cache=False)
         
         return jsonify({'success': True, 'data': result})
     except Exception as e:

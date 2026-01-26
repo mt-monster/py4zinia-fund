@@ -218,10 +218,24 @@ class FundAnalyzer:
         str: 基金名称，如果不存在则返回None
         """
         try:
+            # 首先尝试从 fund_basic_info 表获取
             sql = "SELECT fund_name FROM fund_basic_info WHERE fund_code = :fund_code"
             result = self.db_manager.execute_query_raw(sql, {'fund_code': fund_code})
-            if result and len(result) > 0:
+            if result and len(result) > 0 and result[0][0]:
                 return result[0][0]
+            
+            # 如果 fund_basic_info 表中没有，尝试从 user_holdings 表获取
+            sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
+            result = self.db_manager.execute_query_raw(sql, {'fund_code': fund_code})
+            if result and len(result) > 0 and result[0][0]:
+                return result[0][0]
+            
+            # 如果 user_holdings 表中也没有，尝试从 fund_analysis_results 表获取
+            sql = "SELECT fund_name FROM fund_analysis_results WHERE fund_code = :fund_code ORDER BY analysis_date DESC LIMIT 1"
+            result = self.db_manager.execute_query_raw(sql, {'fund_code': fund_code})
+            if result and len(result) > 0 and result[0][0]:
+                return result[0][0]
+            
             return None
         except Exception as e:
             logger.error(f"获取基金名称失败: {e}")
