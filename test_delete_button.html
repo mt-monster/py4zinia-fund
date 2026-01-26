@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试删除按钮</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>测试删除按钮</h2>
+        <div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h6 style="margin: 0 0 15px 0; font-weight: 600; color: #333;"><i class="bi bi-list-ul"></i> 识别详情</h6>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+                            <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金代码</th>
+                            <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金名称</th>
+                            <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid #f0f0f0;">
+                            <td style="padding: 10px 8px;"><span style="font-family: 'Courier New', monospace; color: #3b82f6; font-weight: 600;">017962</span></td>
+                            <td style="padding: 10px 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">广发医药创新混合发起式A</td>
+                            <td style="padding: 10px 8px; text-align: center;">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editFund(0)" style="margin-right: 5px; display: inline-block; padding: 4px 8px; font-size: 12px;">
+                                    编辑
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(0)" style="display: inline-block; padding: 4px 8px; font-size: 12px;">
+                                    删除
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let recognizedFunds = [
+            {
+                fund_code: "017962",
+                fund_name: "广发医药创新混合发起式A",
+                holding_amount: 127.13,
+                profit_amount: -2.87,
+                profit_rate: -2.21,
+                current_value: 124.26,
+                confidence: 0.8,
+                source: "name_match",
+                original_text: "广发医药创新混合发起式C一3.21汇添富中证银行"
+            }
+        ];
+        
+        function editFund(index) {
+            alert('编辑基金: ' + recognizedFunds[index].fund_name);
+        }
+        
+        function deleteFund(index) {
+            if (confirm('确定要删除这个基金条目吗？')) {
+                recognizedFunds.splice(index, 1);
+                alert('基金已删除');
+                // 重新加载页面
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
