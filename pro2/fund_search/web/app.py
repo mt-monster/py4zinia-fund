@@ -1036,7 +1036,14 @@ def get_holdings():
                far.max_drawdown, far.volatility,
                far.annualized_return, far.calmar_ratio, far.sortino_ratio
         FROM user_holdings h
-        LEFT JOIN fund_analysis_results far ON h.fund_code = far.fund_code
+        LEFT JOIN (
+            SELECT * FROM fund_analysis_results
+            WHERE (fund_code, analysis_date) IN (
+                SELECT fund_code, MAX(analysis_date) as max_date
+                FROM fund_analysis_results
+                GROUP BY fund_code
+            )
+        ) far ON h.fund_code = far.fund_code
         WHERE h.user_id = :user_id
         """
         
