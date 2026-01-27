@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,13 +18,20 @@
             --border-color: #ecf0f1;
             --bg-light: #f8f9fa;
         }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
             font-size: 13px;
             background-color: #f5f5f5;
             color: var(--text-dark);
         }
+
         /* 顶部导航 */
         .top-nav {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
@@ -32,6 +40,7 @@
             align-items: center;
             justify-content: space-between;
         }
+
         .top-nav .brand {
             color: white;
             font-size: 18px;
@@ -40,15 +49,24 @@
             align-items: center;
             gap: 10px;
         }
-        .top-nav .nav-links { display: flex; gap: 20px; }
+
+        .top-nav .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
         .top-nav .nav-links a {
-            color: rgba(255,255,255,0.9);
+            color: rgba(255, 255, 255, 0.9);
             text-decoration: none;
             font-size: 14px;
             padding: 5px 10px;
             border-radius: 4px;
         }
-        .top-nav .nav-links a:hover { background: rgba(255,255,255,0.1); }
+
+        .top-nav .nav-links a:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
         /* 通知样式 */
         .notification {
             position: fixed;
@@ -64,24 +82,29 @@
             transition: opacity 0.3s ease;
             z-index: 1000;
         }
+
         .notification.success {
             background-color: #27ae60;
         }
+
         .notification.error {
             background-color: #e74c3c;
         }
+
         .notification.info {
             background-color: #3498db;
         }
-</style>
+    </style>
 </head>
+
 <body>
-<style>
+    <style>
         /* 主容器布局 - 更新为单列布局 */
         .main-container {
             display: flex;
             height: calc(100vh - 50px);
         }
+
         /* 表格区域 - 现在占据全宽 */
         .left-panel {
             flex: 1;
@@ -91,6 +114,7 @@
             flex-direction: column;
             background: white;
         }
+
         /* 工具栏 */
         .toolbar {
             padding: 10px 15px;
@@ -101,6 +125,7 @@
             gap: 15px;
             flex-wrap: wrap;
         }
+
         .toolbar .search-box {
             display: flex;
             align-items: center;
@@ -109,6 +134,7 @@
             border-radius: 4px;
             padding: 0 10px;
         }
+
         .toolbar .search-box input {
             border: none;
             outline: none;
@@ -116,6 +142,7 @@
             width: 180px;
             font-size: 13px;
         }
+
         .toolbar select {
             padding: 6px 10px;
             border: 1px solid #ddd;
@@ -123,12 +150,14 @@
             font-size: 13px;
             background: white;
         }
+
         .toolbar input[type="date"] {
             padding: 5px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 13px;
         }
+
         .toolbar .btn-filter {
             background: var(--primary-red);
             color: white;
@@ -138,7 +167,11 @@
             cursor: pointer;
             font-size: 13px;
         }
-        .toolbar .btn-filter:hover { background: #c0392b; }
+
+        .toolbar .btn-filter:hover {
+            background: #c0392b;
+        }
+
         .toolbar .btn-settings {
             background: transparent;
             border: 1px solid #ddd;
@@ -149,21 +182,25 @@
             color: #666;
             transition: all 0.2s;
         }
+
         .toolbar .btn-settings:hover {
             background: #f5f5f5;
             border-color: #bbb;
             color: #333;
         }
+
         /* 表格样式 */
         .table-wrapper {
             flex: 1;
             overflow: auto;
         }
+
         .fund-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
         }
+
         .fund-table th {
             background: #fafafa;
             padding: 10px 8px;
@@ -175,19 +212,31 @@
             top: 0;
             white-space: nowrap;
         }
+
         .fund-table td {
             padding: 10px 8px;
             border-bottom: 1px solid #f0f0f0;
             white-space: nowrap;
         }
-        .fund-table tr:hover { background: #fafafa; }
-        .fund-table tr.selected { background: #fff3f3; }
+
+        .fund-table tr:hover {
+            background: #fafafa;
+        }
+
+        .fund-table tr.selected {
+            background: #fff3f3;
+        }
+
         .fund-table .fund-code {
             color: var(--primary-red);
             cursor: pointer;
             font-weight: 500;
         }
-        .fund-table .fund-code:hover { text-decoration: underline; }
+
+        .fund-table .fund-code:hover {
+            text-decoration: underline;
+        }
+
         .fund-table .fund-name {
             white-space: normal;
             word-wrap: break-word;
@@ -196,35 +245,51 @@
             min-height: 50px;
             padding: 12px 8px;
         }
-        
+
         /* 展开面板样式 */
         .expansion-panel-row {
             background: transparent !important;
         }
+
         .expansion-panel-row:hover {
             background: transparent !important;
         }
+
         .expansion-panel-container {
             transition: height 0.3s ease-out;
             overflow: hidden;
         }
-        
-        .positive { color: var(--danger-red); }  /* 正值（上涨）用红色 */
-        .negative { color: var(--success-green); }  /* 负值（下跌）用绿色 */
-        .text-muted { color: var(--text-muted); }
+
+        .positive {
+            color: var(--danger-red);
+        }
+
+        /* 正值（上涨）用红色 */
+        .negative {
+            color: var(--success-green);
+        }
+
+        /* 负值（下跌）用绿色 */
+        .text-muted {
+            color: var(--text-muted);
+        }
+
         /* 排序相关样式 */
         .fund-table th.sortable {
             cursor: pointer;
             user-select: none;
             transition: background-color 0.2s;
         }
+
         .fund-table th.sortable:hover {
             background: #f0f0f0;
         }
+
         .fund-table th.sortable.sorted {
             background: #e8f4fc;
             color: var(--text-dark);
         }
+
         .sort-indicator {
             display: inline-block;
             margin-left: 4px;
@@ -232,27 +297,29 @@
             color: #aaa;
             vertical-align: middle;
         }
+
         .sort-indicator.asc::after {
             content: '▲';
             color: var(--primary-red);
         }
+
         .sort-indicator.desc::after {
             content: '▼';
             color: var(--primary-red);
         }
-</style>
-<style>
+    </style>
+    <style>
         /* 右侧详情面板样式 - 保留供后续展开功能使用 */
         /* 这些样式将在展开功能中重新使用 */
         .detail-panel {
             background: white;
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             margin: 10px;
         }
-        
+
         .detail-header {
             padding: 20px;
             border-bottom: 1px solid var(--border-color);
@@ -261,78 +328,81 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .fund-title-section .fund-title {
             font-size: 18px;
             font-weight: bold;
             color: var(--text-dark);
             margin-bottom: 5px;
         }
-        
+
         .fund-title-section .fund-code-display {
             color: var(--text-muted);
             font-size: 13px;
             font-family: monospace;
         }
-        
+
         .detail-content {
             padding: 0;
         }
-        
+
         .detail-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 0;
             min-height: 300px;
         }
-        
-        .detail-left, .detail-right {
+
+        .detail-left,
+        .detail-right {
             padding: 20px;
         }
-        
+
         .detail-right {
             border-left: 1px solid var(--border-color);
             background: #fafafa;
         }
-        
+
         /* 收益率显示 */
         .return-display {
             text-align: center;
             padding: 10px 0;
         }
-        
+
         .return-display .main-return {
             font-size: 28px;
             font-weight: bold;
             margin-bottom: 5px;
         }
-        
+
         .return-display .return-label {
             font-size: 12px;
             color: var(--text-muted);
             margin-bottom: 8px;
         }
-        
+
         .nav-info {
             display: flex;
             justify-content: center;
             gap: 15px;
             font-size: 12px;
         }
-        
+
         .nav-value {
             color: var(--text-muted);
         }
-        
+
         .nav-change {
             font-weight: 500;
         }
-        
+
         /* 性能指标区域 */
-        .metrics-section, .risk-section, .advice-section {
+        .metrics-section,
+        .risk-section,
+        .advice-section {
             margin-bottom: 25px;
         }
-        
+
         .section-title {
             font-size: 14px;
             font-weight: 600;
@@ -342,17 +412,17 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .section-title i {
             color: var(--primary-red);
         }
-        
+
         .metrics-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
-        
+
         .metric-item {
             background: white;
             padding: 12px;
@@ -360,18 +430,18 @@
             border: 1px solid #eee;
             text-align: center;
         }
-        
+
         .metric-label {
             font-size: 11px;
             color: var(--text-muted);
             margin-bottom: 5px;
         }
-        
+
         .metric-value {
             font-size: 14px;
             font-weight: 600;
         }
-        
+
         /* 投资建议区域 */
         .advice-section {
             background: #f8f9fa;
@@ -379,18 +449,18 @@
             padding: 20px;
             margin: 0 -20px 20px -20px;
         }
-        
+
         .advice-content {
             margin-top: 15px;
         }
-        
+
         .advice-main {
             display: flex;
             align-items: center;
             gap: 15px;
             margin-bottom: 15px;
         }
-        
+
         .advice-icon {
             width: 40px;
             height: 40px;
@@ -400,80 +470,91 @@
             justify-content: center;
             font-size: 20px;
         }
-        
+
         .advice-icon.strong-buy {
             background: #d4edda;
             color: #155724;
         }
-        
+
         .advice-icon.buy {
             background: #d1ecf1;
             color: #0c5460;
         }
-        
+
         .advice-icon.hold {
             background: #fff3cd;
             color: #856404;
         }
-        
+
         .advice-icon.sell {
             background: #f8d7da;
             color: #721c24;
         }
-        
+
         .advice-text {
             flex: 1;
         }
-        
+
         .advice-status {
             font-size: 16px;
             font-weight: 600;
             color: var(--text-dark);
             margin-bottom: 3px;
         }
-        
+
         .advice-suggestion {
             font-size: 13px;
             color: var(--text-muted);
         }
-        
+
         .advice-details {
             background: white;
             border-radius: 6px;
             padding: 12px;
         }
-        
+
         .advice-row {
             display: flex;
             justify-content: space-between;
             padding: 5px 0;
             border-bottom: 1px solid #eee;
         }
-        
+
         .advice-row:last-child {
             border-bottom: none;
         }
-        
+
         .advice-row .label {
             color: var(--text-muted);
             font-size: 12px;
         }
-        
+
         .advice-row .value {
             font-weight: 500;
             font-size: 12px;
         }
-        
-        .score-strong-buy { color: #155724; }
-        .score-buy { color: #0c5460; }
-        .score-hold { color: #856404; }
-        .score-sell { color: #721c24; }
-        
+
+        .score-strong-buy {
+            color: #155724;
+        }
+
+        .score-buy {
+            color: #0c5460;
+        }
+
+        .score-hold {
+            color: #856404;
+        }
+
+        .score-sell {
+            color: #721c24;
+        }
+
         /* 风险指标区域 */
         .risk-level {
             margin-bottom: 15px;
         }
-        
+
         .risk-badge {
             display: inline-block;
             padding: 4px 12px;
@@ -482,28 +563,28 @@
             font-weight: 600;
             text-transform: uppercase;
         }
-        
+
         .risk-badge.risk-low {
             background: #d4edda;
             color: #155724;
         }
-        
+
         .risk-badge.risk-medium {
             background: #fff3cd;
             color: #856404;
         }
-        
+
         .risk-badge.risk-high {
             background: #f8d7da;
             color: #721c24;
         }
-        
+
         .risk-metrics {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
-        
+
         .risk-item {
             background: white;
             padding: 10px;
@@ -511,23 +592,23 @@
             border: 1px solid #eee;
             text-align: center;
         }
-        
+
         .risk-label {
             font-size: 11px;
             color: var(--text-muted);
             margin-bottom: 4px;
         }
-        
+
         .risk-value {
             font-size: 13px;
             font-weight: 600;
         }
-        
+
         /* 走势图区域 */
         .chart-section {
             margin-top: 20px;
         }
-        
+
         .chart-section .chart-title {
             font-size: 14px;
             font-weight: 600;
@@ -537,11 +618,11 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .chart-section .chart-title i {
             color: var(--primary-red);
         }
-        
+
         .chart-container {
             background: white;
             border-radius: 8px;
@@ -550,7 +631,7 @@
             min-height: 250px;
             position: relative;
         }
-        
+
         /* 可调整大小的图表样式 */
         .resizable-chart-wrapper {
             position: relative;
@@ -560,11 +641,11 @@
             overflow: hidden;
             transition: box-shadow 0.2s ease;
         }
-        
+
         .resizable-chart-wrapper:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
-        
+
         .resize-handle {
             position: absolute;
             width: 8px;
@@ -576,26 +657,26 @@
             opacity: 0;
             transition: opacity 0.2s ease;
         }
-        
+
         .resize-handle:hover {
             background: #c0392b;
             transform: translate(-50%, -50%) scale(1.2);
         }
-        
+
         .resizable-chart-wrapper:hover .resize-handle {
             opacity: 1;
         }
-        
+
         /* 拖拽时的样式 */
         body.dragging {
             user-select: none;
             cursor: grabbing !important;
         }
-        
+
         body.dragging * {
             cursor: inherit !important;
         }
-        
+
         .chart-placeholder {
             display: flex;
             flex-direction: column;
@@ -604,13 +685,13 @@
             height: 200px;
             color: var(--text-muted);
         }
-        
+
         .chart-placeholder i {
             font-size: 32px;
             margin-bottom: 10px;
             color: #ddd;
         }
-        
+
         .chart-error {
             display: flex;
             flex-direction: column;
@@ -619,18 +700,18 @@
             height: 200px;
             color: var(--danger-red);
         }
-        
+
         .chart-error i {
             font-size: 32px;
             margin-bottom: 10px;
         }
-        
+
         .chart-controls {
             margin-top: 15px;
             display: flex;
             justify-content: center;
         }
-        
+
         /* 时间段选择 */
         .period-tabs {
             display: flex;
@@ -639,7 +720,7 @@
             padding: 4px;
             border-radius: 6px;
         }
-        
+
         .period-tabs .tab {
             padding: 6px 12px;
             border-radius: 4px;
@@ -649,57 +730,60 @@
             color: var(--text-muted);
             transition: all 0.2s ease;
         }
-        
+
         .period-tabs .tab:hover {
             background: #e9ecef;
             color: var(--text-dark);
         }
-        
+
         .period-tabs .tab.active {
             background: var(--primary-red);
             color: white;
         }
-        
+
         /* 响应式设计 */
         @media (max-width: 1200px) {
             .detail-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .detail-right {
                 border-left: none;
                 border-top: 1px solid var(--border-color);
             }
-            
+
             .detail-header {
                 flex-direction: column;
                 text-align: center;
                 gap: 15px;
             }
-            
-            .metrics-grid, .risk-metrics {
+
+            .metrics-grid,
+            .risk-metrics {
                 grid-template-columns: 1fr;
             }
         }
-        
+
         @media (max-width: 768px) {
             .detail-panel {
                 margin: 5px;
             }
-            
-            .detail-left, .detail-right {
+
+            .detail-left,
+            .detail-right {
                 padding: 15px;
             }
-            
+
             .advice-section {
                 margin: 0 -15px 15px -15px;
                 padding: 15px;
             }
-            
+
             .return-display .main-return {
                 font-size: 24px;
             }
         }
+
         /* 收益率显示 */
         .return-display {
             text-align: center;
@@ -707,41 +791,50 @@
             border-bottom: 1px solid var(--border-color);
             margin-bottom: 15px;
         }
+
         .return-display .main-return {
             font-size: 36px;
             font-weight: bold;
         }
+
         .return-display .return-label {
             font-size: 12px;
             color: var(--text-muted);
             margin-top: 5px;
         }
+
         .return-row {
             display: flex;
             justify-content: space-around;
             margin-top: 15px;
         }
+
         .return-item {
             text-align: center;
         }
+
         .return-item .value {
             font-size: 14px;
             font-weight: 500;
         }
+
         .return-item .label {
             font-size: 11px;
             color: var(--text-muted);
         }
+
         /* 走势图区域 */
         .chart-section {
             margin-bottom: 15px;
         }
+
         .chart-section .chart-title {
             font-size: 13px;
             font-weight: 500;
             margin-bottom: 10px;
             color: var(--text-dark);
         }
+
         .chart-container {
             height: 120px;
             background: #fafafa;
@@ -751,6 +844,7 @@
             justify-content: center;
             color: var(--text-muted);
         }
+
         /* 投资建议区域 */
         .advice-section {
             background: #fafafa;
@@ -758,6 +852,7 @@
             padding: 15px;
             margin-bottom: 15px;
         }
+
         .advice-section .section-title {
             font-size: 13px;
             font-weight: 500;
@@ -766,15 +861,26 @@
             align-items: center;
             gap: 5px;
         }
+
         .advice-row {
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
             border-bottom: 1px solid #eee;
         }
-        .advice-row:last-child { border-bottom: none; }
-        .advice-row .label { color: var(--text-muted); }
-        .advice-row .value { font-weight: 500; }
+
+        .advice-row:last-child {
+            border-bottom: none;
+        }
+
+        .advice-row .label {
+            color: var(--text-muted);
+        }
+
+        .advice-row .value {
+            font-weight: 500;
+        }
+
         /* 时间段选择 */
         .period-tabs {
             display: flex;
@@ -782,6 +888,7 @@
             margin-bottom: 15px;
             flex-wrap: wrap;
         }
+
         .period-tabs .tab {
             padding: 5px 12px;
             border: 1px solid #ddd;
@@ -790,23 +897,41 @@
             font-size: 12px;
             background: white;
         }
-        .period-tabs .tab:hover { background: #f5f5f5; }
+
+        .period-tabs .tab:hover {
+            background: #f5f5f5;
+        }
+
         .period-tabs .tab.active {
             background: var(--primary-red);
             color: white;
             border-color: var(--primary-red);
         }
+
         /* 交易记录 */
-        .trade-section { margin-top: 15px; }
+        .trade-section {
+            margin-top: 15px;
+        }
+
         .trade-row {
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
             font-size: 12px;
         }
+
         /* 加载状态 */
-        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
-        .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
 
         /* 截图导入样式 */
         .upload-area {
@@ -816,39 +941,47 @@
             padding: 20px;
             text-align: center;
         }
+
         .upload-area:hover {
             border-color: var(--primary-red);
             background: rgba(231, 76, 60, 0.05);
         }
+
         .upload-area.drag-over {
             background: rgba(231, 76, 60, 0.1);
             border-color: var(--primary-red);
         }
+
         .upload-placeholder {
             text-align: center;
             padding: 40px 20px;
         }
+
         .upload-placeholder i {
             font-size: 48px;
             color: #ddd;
             margin-bottom: 15px;
         }
+
         .preview-area {
             text-align: center;
             padding: 20px;
         }
+
         .preview-area img {
             max-width: 100%;
             max-height: 300px;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
+
         .recognition-result {
             margin-top: 20px;
         }
 
         /* 自定义模态框样式 */
-        .screenshot-modal-overlay, .confirm-modal-overlay {
+        .screenshot-modal-overlay,
+        .confirm-modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -861,7 +994,8 @@
             align-items: center;
         }
 
-        .screenshot-modal, .confirm-modal {
+        .screenshot-modal,
+        .confirm-modal {
             background: white;
             border-radius: 12px;
             width: 90%;
@@ -876,7 +1010,8 @@
             max-width: 1000px;
         }
 
-        .screenshot-modal-header, .confirm-modal-header {
+        .screenshot-modal-header,
+        .confirm-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -884,14 +1019,16 @@
             border-bottom: 1px solid #ecf0f1;
         }
 
-        .screenshot-modal-header h3, .confirm-modal-header h3 {
+        .screenshot-modal-header h3,
+        .confirm-modal-header h3 {
             margin: 0;
             font-size: 1.1rem;
             font-weight: 600;
             color: #333;
         }
 
-        .screenshot-modal-close, .confirm-modal-close {
+        .screenshot-modal-close,
+        .confirm-modal-close {
             background: none;
             border: none;
             font-size: 1.2rem;
@@ -900,17 +1037,20 @@
             padding: 4px;
         }
 
-        .screenshot-modal-close:hover, .confirm-modal-close:hover {
+        .screenshot-modal-close:hover,
+        .confirm-modal-close:hover {
             color: #333;
         }
 
-        .screenshot-modal-content, .confirm-modal-content {
+        .screenshot-modal-content,
+        .confirm-modal-content {
             flex: 1;
             overflow-y: auto;
             padding: 20px;
         }
 
-        .screenshot-modal-footer, .confirm-modal-footer {
+        .screenshot-modal-footer,
+        .confirm-modal-footer {
             display: flex;
             justify-content: flex-end;
             gap: 12px;
@@ -986,7 +1126,7 @@
             border: 1px solid #bee5eb;
             color: #0c5460;
         }
-        
+
         /* 性能优化：加载指示器 */
         .loading-overlay {
             position: absolute;
@@ -1002,6 +1142,7 @@
             font-size: 14px;
             color: var(--text-muted);
         }
+
         .loading-overlay .spinner {
             display: inline-block;
             width: 20px;
@@ -1012,36 +1153,48 @@
             animation: spin 1s linear infinite;
             margin-right: 10px;
         }
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
+
         @keyframes slideIn {
             from {
                 transform: translateX(400px);
                 opacity: 0;
             }
+
             to {
                 transform: translateX(0);
                 opacity: 1;
             }
         }
+
         @keyframes slideOut {
             from {
                 transform: translateX(0);
                 opacity: 1;
             }
+
             to {
                 transform: translateX(400px);
                 opacity: 0;
             }
         }
+
         .table-wrapper {
             flex: 1;
             overflow: auto;
-            position: relative; /* 为加载指示器提供定位上下文 */
+            position: relative;
+            /* 为加载指示器提供定位上下文 */
         }
-        
+
         /* 侧边栏样式 */
         .sidebar {
             position: fixed;
@@ -1053,19 +1206,21 @@
             height: calc(100vh - 50px);
             background: white;
             border-left: 1px solid var(--border-color);
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
             transform: translateX(100%);
             transition: transform 0.3s ease;
             z-index: 1000;
             overflow-y: auto;
         }
+
         .sidebar.open {
             transform: translateX(0);
         }
+
         .sidebar.resizing {
             transition: none;
         }
-        
+
         /* 侧边栏拖拽手柄 */
         .sidebar-resize-handle {
             position: absolute;
@@ -1077,9 +1232,11 @@
             background: transparent;
             z-index: 1001;
         }
+
         .sidebar-resize-handle:hover {
             background: rgba(231, 76, 60, 0.2);
         }
+
         .sidebar-resize-handle::before {
             content: '';
             position: absolute;
@@ -1093,6 +1250,7 @@
             opacity: 0;
             transition: opacity 0.2s;
         }
+
         .sidebar-resize-handle:hover::before,
         .sidebar.resizing .sidebar-resize-handle::before {
             opacity: 1;
@@ -1141,7 +1299,8 @@
                 <button class="btn-filter" onclick="loadFunds()">
                     <i class="bi bi-funnel"></i> 筛选
                 </button>
-                <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;" title="上传截图导入持仓">
+                <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;"
+                    title="上传截图导入持仓">
                     <i class="bi bi-camera"></i> 截图导入
                 </button>
                 <button class="btn-filter" onclick="clearFundList()" style="background: #95a5a6;" title="清空基金列表">
@@ -1166,24 +1325,40 @@
                             <th style="width: 30px;" data-column="checkbox"></th>
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="prev_day_return">昨日盈亏率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="holding_profit">持有盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="holding_profit_rate">持有盈亏率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="total_profit_rate">累计盈亏率 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="sharpe_ratio_ytd">夏普比率(今年以来) <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="sharpe_ratio_1y">夏普比率(近一年) <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="sharpe_ratio_all">夏普比率(成立以来) <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="max_drawdown">最大回撤 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="prev_day_return">昨日盈亏率 <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="today_profit_rate">当日盈亏率 <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_profit">持有盈亏 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="holding_profit_rate">持有盈亏率 <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="total_profit_rate">累计盈亏率 <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_ytd">夏普比率(今年以来) <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_1y">夏普比率(近一年) <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="sharpe_ratio_all">夏普比率(成立以来) <span
+                                    class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="max_drawdown">最大回撤 <span class="sort-indicator"></span>
+                            </th>
+                            <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span>
+                            </th>
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
-                        <tr><td colspan="17" class="loading">加载中...</td></tr>
+                        <tr>
+                            <td colspan="17" class="loading">加载中...</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -1193,7 +1368,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // ==================== 截图导入功能 ====================
-        
+
         // 全局变量
         let currentBase64Image = null;
         let recognizedFunds = [];
@@ -1244,7 +1419,7 @@
                     </div>
                     <div class="screenshot-modal-footer">
                         <button class="btn btn-secondary" onclick="closeScreenshotModal()">取消</button>
-                        <button class="btn btn-primary" id="recognizeBtn" disabled onclick="recognizeScreenshot()">
+                        <button class="btn btn-primary" id="recognizeBtn" disabled>
                             <i class="bi bi-search"></i> 开始识别
                         </button>
                     </div>
@@ -1265,18 +1440,18 @@
         // 打开截图导入模态框
         function openScreenshotModal() {
             console.log('openScreenshotModal 被调用');
-            
+
             const modalElement = document.getElementById('screenshotModalOverlay');
             if (!modalElement) {
                 console.error('找不到 screenshotModalOverlay 元素');
                 alert('截图导入功能初始化失败，请刷新页面重试');
                 return;
             }
-            
+
             // 显示模态框
             modalElement.style.display = 'flex';
             document.body.style.overflow = 'hidden';
-            
+
             resetScreenshotModal();
             console.log('模态框已显示');
         }
@@ -1306,7 +1481,7 @@
             if (recognitionResult) recognitionResult.style.display = 'none';
             if (recognizeBtn) recognizeBtn.disabled = true;
             if (screenshotInput) screenshotInput.value = '';
-            
+
             currentBase64Image = null;
             recognizedFunds = [];
         }
@@ -1318,7 +1493,7 @@
                 console.log('截图模态框事件已初始化，跳过重复初始化');
                 return;
             }
-            
+
             console.log('初始化截图模态框事件');
             const screenshotInput = document.getElementById('screenshotInput');
             const uploadArea = document.getElementById('uploadArea');
@@ -1358,7 +1533,7 @@
             if (recognizeBtn) {
                 recognizeBtn.addEventListener('click', recognizeScreenshot);
             }
-            
+
             screenshotModalEventsInitialized = true;
         }
 
@@ -1378,7 +1553,7 @@
             }
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 currentBase64Image = e.target.result;
                 showImagePreview(currentBase64Image);
                 document.getElementById('recognizeBtn').disabled = false;
@@ -1391,7 +1566,7 @@
             const uploadArea = document.getElementById('uploadArea');
             const previewArea = document.getElementById('previewArea');
             const imagePreview = document.getElementById('imagePreview');
-            
+
             if (uploadArea) uploadArea.style.display = 'none';
             if (previewArea) previewArea.style.display = 'block';
             if (imagePreview) imagePreview.src = base64Data;
@@ -1403,7 +1578,7 @@
 
             const btn = document.getElementById('recognizeBtn');
             if (!btn) return;
-            
+
             btn.disabled = true;
             btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 识别中...';
 
@@ -1417,26 +1592,26 @@
                     use_gpu: false
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // 保存识别到的基金数据
-                    recognizedFunds = data.data || [];
-                    // 显示增强的识别结果（包含投资组合汇总）
-                    showRecognitionResult(data);
-                    // 不再自动保存，等待用户确认
-                } else {
-                    showRecognitionError(data.error, data.suggestion);
-                }
-            })
-            .catch(error => {
-                console.error('识别失败:', error);
-                showRecognitionError('网络错误，请重试');
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-search"></i> 开始识别';
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 保存识别到的基金数据
+                        recognizedFunds = data.data || [];
+                        // 显示增强的识别结果（包含投资组合汇总）
+                        showRecognitionResult(data);
+                        // 不再自动保存，等待用户确认
+                    } else {
+                        showRecognitionError(data.error, data.suggestion);
+                    }
+                })
+                .catch(error => {
+                    console.error('识别失败:', error);
+                    showRecognitionError('网络错误，请重试');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-search"></i> 开始识别';
+                });
         }
 
         // 自动保存识别结果到数据库
@@ -1456,10 +1631,10 @@
                 const profit_amount = fund.profit_amount || 0;
                 const current_value = fund.current_value || (holding_amount + profit_amount);
                 const nav_value = fund.nav_value;  // 可能为null
-                
+
                 let holding_shares = 0;
                 let cost_price = 0;
-                
+
                 // 如果有净值，使用精确计算
                 if (nav_value && nav_value > 0 && current_value > 0) {
                     // 持有份额 = 当前市值 / 当前净值
@@ -1475,7 +1650,7 @@
                     cost_price = 1.0;
                     console.log(`${fund.fund_code}: 使用简化计算 - 份额=${holding_shares.toFixed(2)}, 成本价=${cost_price.toFixed(4)}`);
                 }
-                
+
                 return {
                     fund_code: fund.fund_code,
                     fund_name: fund.fund_name,
@@ -1509,37 +1684,37 @@
                     funds: fundsToImport
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                console.log('保存API响应:', data);
-                if (data.success) {
-                    console.log(`✅ 成功保存 ${data.imported.length} 个基金到数据库`);
-                    // 显示成功提示
-                    showSaveSuccessNotification(data.imported.length);
-                    // 延迟关闭模态框和刷新列表，让用户看到成功消息
-                    setTimeout(() => {
-                        // 关闭截图导入模态框
-                        closeScreenshotModal();
-                        // 刷新持仓列表
-                        loadFunds();
-                    }, 1500);
-                } else {
-                    console.error('保存失败:', data.error);
-                    showSaveErrorNotification(data.error);
-                    // 保存失败也关闭模态框
+                .then(response => response.json())
+                .then(data => {
+                    console.log('保存API响应:', data);
+                    if (data.success) {
+                        console.log(`✅ 成功保存 ${data.imported.length} 个基金到数据库`);
+                        // 显示成功提示
+                        showSaveSuccessNotification(data.imported.length);
+                        // 延迟关闭模态框和刷新列表，让用户看到成功消息
+                        setTimeout(() => {
+                            // 关闭截图导入模态框
+                            closeScreenshotModal();
+                            // 刷新持仓列表
+                            loadFunds();
+                        }, 1500);
+                    } else {
+                        console.error('保存失败:', data.error);
+                        showSaveErrorNotification(data.error);
+                        // 保存失败也关闭模态框
+                        setTimeout(() => {
+                            closeScreenshotModal();
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    console.error('保存到数据库失败:', error);
+                    showSaveErrorNotification('网络错误，保存失败');
+                    // 网络错误也关闭模态框
                     setTimeout(() => {
                         closeScreenshotModal();
                     }, 3000);
-                }
-            })
-            .catch(error => {
-                console.error('保存到数据库失败:', error);
-                showSaveErrorNotification('网络错误，保存失败');
-                // 网络错误也关闭模态框
-                setTimeout(() => {
-                    closeScreenshotModal();
-                }, 3000);
-            });
+                });
         }
 
         // 显示保存成功通知
@@ -1610,13 +1785,27 @@
         function showRecognitionResult(data) {
             const resultDiv = document.getElementById('recognitionResult');
             if (!resultDiv) return;
-            
+
             resultDiv.style.display = 'block';
 
             const funds = Array.isArray(data) ? data : (data.data || []);
             const portfolioSummary = data.portfolio_summary || null;
 
-            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${funds.length} 个基金，请确认信息后导入</div>`;
+            // 去重处理
+            const seenCodes = new Set();
+            const uniqueFunds = funds.filter(fund => {
+                const fundCode = fund.fund_code;
+                if (fundCode && !seenCodes.has(fundCode)) {
+                    seenCodes.add(fundCode);
+                    return true;
+                }
+                return false;
+            });
+
+            // 更新全局变量为去重后的数据
+            recognizedFunds = uniqueFunds;
+
+            let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${uniqueFunds.length} 个基金，请确认信息后导入</div>`;
 
             // 投资组合汇总卡片
             if (portfolioSummary) {
@@ -1630,17 +1819,17 @@
                         </div>
                         <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
                             <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总持仓成本</div>
-                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_holding_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_holding_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                         <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
                             <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏金额</div>
                             <div style="font-size: 20px; font-weight: bold; color: ${portfolioSummary.total_profit_amount >= 0 ? '#4ade80' : '#f87171'};">
-                                ${portfolioSummary.total_profit_amount >= 0 ? '+' : ''}¥${portfolioSummary.total_profit_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                ${portfolioSummary.total_profit_amount >= 0 ? '+' : ''}¥${portfolioSummary.total_profit_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
                         </div>
                         <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
                             <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总当前市值</div>
-                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_current_value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_current_value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                         <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
                             <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏率</div>
@@ -1670,7 +1859,7 @@
             }
 
             // 详细基金列表（9列完整信息）
-            if (funds.length > 0) {
+            if (uniqueFunds.length > 0) {
                 html += '<div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">';
                 html += '<h6 style="margin: 0 0 15px 0; font-weight: 600; color: #333;"><i class="bi bi-list-ul"></i> 识别详情</h6>';
                 html += '<div style="overflow-x: auto;">';
@@ -1691,26 +1880,26 @@
                 </thead>`;
                 html += '<tbody>';
 
-                funds.forEach(fund => {
+                uniqueFunds.forEach((fund, index) => {
                     const profitColor = (fund.profit_amount || 0) >= 0 ? '#10b981' : '#ef4444';
                     const profitSign = (fund.profit_amount || 0) >= 0 ? '+' : '';
-                    
+
                     html += `<tr style="border-bottom: 1px solid #f0f0f0;">
                         <td style="padding: 10px 8px;"><span style="font-family: 'Courier New', monospace; color: #3b82f6; font-weight: 600;">${fund.fund_code || '--'}</span></td>
                         <td style="padding: 10px 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${fund.fund_name || '--'}">${fund.fund_name || '--'}</td>
-                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.holding_amount ? fund.holding_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
-                        <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_amount !== null && fund.profit_amount !== undefined ? profitSign + '¥' + fund.profit_amount.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.holding_amount ? fund.holding_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_amount !== null && fund.profit_amount !== undefined ? profitSign + '¥' + fund.profit_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
                         <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_rate !== null && fund.profit_rate !== undefined ? profitSign + fund.profit_rate.toFixed(2) + '%' : '--'}</td>
-                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.current_value ? fund.current_value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.current_value ? fund.current_value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
                         <td style="padding: 10px 8px; text-align: center;"><span style="background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}</span></td>
                         <td style="padding: 10px 8px; text-align: center;"><span style="background: #6b7280; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">${fund.source || '--'}</span></td>
                         <td style="padding: 10px 8px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; font-size: 12px;" title="${fund.original_text || '--'}">${fund.original_text || '--'}</td>
                         <td style="padding: 10px 8px; text-align: center; min-width: 120px;">
                             <div style="display: flex; gap: 5px; justify-content: center;">
-                                <button class="btn btn-sm btn-outline-primary" onclick="editFund(${funds.indexOf(fund)})" style="padding: 4px 8px; font-size: 12px;">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editFund(${index})" style="padding: 4px 8px; font-size: 12px;">
                                     编辑
                                 </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${funds.indexOf(fund)})" style="padding: 4px 8px; font-size: 12px;">
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteFund(${index})" style="padding: 4px 8px; font-size: 12px;">
                                     删除
                                 </button>
                             </div>
@@ -1762,7 +1951,7 @@
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `基金识别结果_${new Date().toISOString().slice(0,10)}.csv`);
+            link.setAttribute('download', `基金识别结果_${new Date().toISOString().slice(0, 10)}.csv`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -1773,9 +1962,9 @@
         function showRecognitionError(error, suggestion = '') {
             const resultDiv = document.getElementById('recognitionResult');
             const resultContent = document.getElementById('resultContent');
-            
+
             if (!resultDiv || !resultContent) return;
-            
+
             resultDiv.style.display = 'block';
 
             let html = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${error}</div>`;
@@ -1850,7 +2039,7 @@
             document.body.appendChild(modalDiv);
 
             // 绑定表单提交事件
-            document.getElementById('editFundForm').addEventListener('submit', function(e) {
+            document.getElementById('editFundForm').addEventListener('submit', function (e) {
                 e.preventDefault();
                 const formData = new FormData(this);
                 const updatedFund = {
@@ -1864,10 +2053,10 @@
 
                 // 更新recognizedFunds数组
                 recognizedFunds[index] = updatedFund;
-                
+
                 // 重新显示识别结果
                 showRecognitionResult({ data: recognizedFunds });
-                
+
                 // 关闭模态框
                 closeEditModal();
             });
@@ -1886,7 +2075,7 @@
             if (confirm('确定要删除这个基金条目吗？')) {
                 // 从recognizedFunds数组中删除
                 recognizedFunds.splice(index, 1);
-                
+
                 // 重新显示识别结果
                 showRecognitionResult({ data: recognizedFunds });
             }
@@ -1903,11 +2092,11 @@
         window.recognizeScreenshot = recognizeScreenshot;
         window.confirmAndSave = confirmAndSave;
         window.exportRecognitionResults = exportRecognitionResults;
-        
+
         console.log('截图导入功能已初始化');
         console.log('testScreenshotModal函数:', typeof window.testScreenshotModal);
         console.log('openScreenshotModal函数:', typeof window.openScreenshotModal);
-        
+
         let currentPage = 1;
         const perPage = 50;
         let allFunds = [];
@@ -1919,8 +2108,8 @@
         class DataSorter {
             // 判断是否为空值
             isNullValue(value) {
-                return value === null || value === undefined || value === '' || value === '--' || 
-                       (typeof value === 'number' && isNaN(value));
+                return value === null || value === undefined || value === '' || value === '--' ||
+                    (typeof value === 'number' && isNaN(value));
             }
 
             // 处理空值，返回用于比较的值
@@ -1935,19 +2124,19 @@
             compareNumbers(a, b, order) {
                 const aVal = this.handleNullValue(a);
                 const bVal = this.handleNullValue(b);
-                
+
                 // 空值处理：升序时空值排最后，降序时空值排最前
                 if (aVal === null && bVal === null) return 0;
                 if (aVal === null) return order === 'asc' ? 1 : -1;
                 if (bVal === null) return order === 'asc' ? -1 : 1;
-                
+
                 const numA = parseFloat(aVal);
                 const numB = parseFloat(bVal);
-                
+
                 if (isNaN(numA) && isNaN(numB)) return 0;
                 if (isNaN(numA)) return order === 'asc' ? 1 : -1;
                 if (isNaN(numB)) return order === 'asc' ? -1 : 1;
-                
+
                 return order === 'asc' ? numA - numB : numB - numA;
             }
 
@@ -1955,15 +2144,15 @@
             compareStrings(a, b, order) {
                 const aVal = this.handleNullValue(a);
                 const bVal = this.handleNullValue(b);
-                
+
                 // 空值处理
                 if (aVal === null && bVal === null) return 0;
                 if (aVal === null) return order === 'asc' ? 1 : -1;
                 if (bVal === null) return order === 'asc' ? -1 : 1;
-                
+
                 const strA = String(aVal);
                 const strB = String(bVal);
-                
+
                 const result = strA.localeCompare(strB, 'zh-CN');
                 return order === 'asc' ? result : -result;
             }
@@ -1972,20 +2161,20 @@
             sortByColumn(data, columnName, order, columnType) {
                 if (!data || data.length === 0) return data;
                 if (order === 'none') return data;
-                
+
                 const sortedData = [...data];
-                
+
                 sortedData.sort((a, b) => {
                     const aValue = a[columnName];
                     const bValue = b[columnName];
-                    
+
                     if (columnType === 'number') {
                         return this.compareNumbers(aValue, bValue, order);
                     } else {
                         return this.compareStrings(aValue, bValue, order);
                     }
                 });
-                
+
                 return sortedData;
             }
         }
@@ -2082,7 +2271,7 @@
             toggleLoading(show, message = '排序中...') {
                 const tableWrapper = document.querySelector('.table-wrapper');
                 let overlay = tableWrapper.querySelector('.loading-overlay');
-                
+
                 if (show) {
                     if (!overlay) {
                         overlay = document.createElement('div');
@@ -2113,7 +2302,7 @@
                         indicator.classList.remove('asc', 'desc');
                     }
                 });
-                
+
                 // 设置当前列的指示器
                 if (order !== 'none') {
                     const th = document.querySelector(`.fund-table th[data-column="${columnName}"]`);
@@ -2143,11 +2332,11 @@
             // 性能优化：使用文档片段渲染表格
             renderTableRows(funds) {
                 const tbody = document.getElementById('fund-table-body');
-                
+
                 // 获取列配置（如果存在）
                 const config = typeof columnConfig !== 'undefined' ? columnConfig : null;
                 const visibleColCount = config ? config.filter(c => c.visible).length + 1 : 15; // +1 for checkbox
-                
+
                 if (!funds || funds.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="${visibleColCount}" class="empty-state">暂无数据</td></tr>`;
                     return;
@@ -2155,7 +2344,7 @@
 
                 // 使用文档片段提高性能
                 const fragment = document.createDocumentFragment();
-                
+
                 // 定义列数据映射
                 const columnDataMap = {
                     'fund_code': (fund) => ({ value: fund.fund_code, class: 'fund-code' }),
@@ -2238,31 +2427,31 @@
                         return { value: `<strong>${val.toFixed(4)}</strong>`, class: '' };
                     }
                 };
-                
+
                 funds.forEach((fund, index) => {
                     const tr = document.createElement('tr');
-                    
+
                     // 修改点击事件处理 - 展开侧边栏而不是跳转页面
                     tr.onclick = (event) => {
                         // 检查是否点击了复选框
                         if (event.target.type === 'checkbox') {
                             return; // 不处理复选框点击
                         }
-                        
+
                         // 展开侧边栏显示基金详情
                         showFundSidebar(fund);
-                        
+
                         // 保持原有的选中逻辑
                         selectFund(fund);
                     };
-                    
+
                     // 添加样式以指示行可点击
                     tr.style.cursor = 'pointer';
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
-                    
+
                     // 生成单元格HTML
                     let cellsHtml = '<td data-column="checkbox"><input type="checkbox" class="fund-checkbox" data-fund-code="' + fund.fund_code + '"></td>';
-                    
+
                     if (config) {
                         // 使用列配置生成单元格
                         config.forEach(col => {
@@ -2275,9 +2464,9 @@
                         });
                     } else {
                         // 默认列顺序（兼容旧代码）
-                        const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'prev_day_return', 
-                            'holding_amount', 'today_profit', 'today_profit_rate', 'holding_profit', 
-                            'holding_profit_rate', 'total_profit', 'total_profit_rate', 'sharpe_ratio', 
+                        const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'prev_day_return',
+                            'holding_amount', 'today_profit', 'today_profit_rate', 'holding_profit',
+                            'holding_profit_rate', 'total_profit', 'total_profit_rate', 'sharpe_ratio',
                             'max_drawdown', 'composite_score'];
                         defaultOrder.forEach(key => {
                             const dataFn = columnDataMap[key];
@@ -2287,21 +2476,21 @@
                             }
                         });
                     }
-                    
+
                     tr.innerHTML = cellsHtml;
                     fragment.appendChild(tr);
                 });
-                
+
                 // 一次性添加所有行，提高性能
                 tbody.innerHTML = '';
                 tbody.appendChild(fragment);
             }
-            
+
             // 更新表头显示状态（仅更新显示/隐藏，不改变顺序）
             updateHeaderVisibility(config) {
                 const headerRow = document.querySelector('.fund-table thead tr');
                 if (!headerRow) return;
-                
+
                 config.forEach(col => {
                     const th = headerRow.querySelector(`th[data-column="${col.key}"]`);
                     if (th) {
@@ -2313,11 +2502,11 @@
             // 辅助方法：格式化百分比
             formatPercent(value) {
                 if (value === null || value === undefined || isNaN(value)) return '--';
-                
+
                 // 直接使用值，因为 API 返回的数据已经是百分比值
                 // 例如：0.22 表示 0.22%，-1.11 表示 -1.11%
                 const displayValue = value;
-                
+
                 const sign = displayValue >= 0 ? '+' : '';
                 return sign + displayValue.toFixed(2) + '%';
             }
@@ -2347,20 +2536,20 @@
                     pannable: options.pannable !== false,
                     ...options
                 };
-                
+
                 this.chart = null;
                 this.resizeHandles = [];
                 this.isDragging = false;
                 this.dragStartPos = { x: 0, y: 0 };
                 this.initialSize = { width: 0, height: 0 };
-                this.currentSize = { 
-                    width: this.options.width || 400, 
-                    height: this.options.height || 250 
+                this.currentSize = {
+                    width: this.options.width || 400,
+                    height: this.options.height || 250
                 };
-                
+
                 this.init();
             }
-            
+
             // 初始化图表组件
             init() {
                 this.createChartContainer();
@@ -2369,7 +2558,7 @@
                 }
                 this.bindEvents();
             }
-            
+
             // 创建图表容器
             createChartContainer() {
                 this.chartWrapper = document.createElement('div');
@@ -2383,7 +2572,7 @@
                     background: white;
                     overflow: hidden;
                 `;
-                
+
                 this.canvas = document.createElement('canvas');
                 this.canvas.width = this.currentSize.width - 2; // 减去边框
                 this.canvas.height = this.currentSize.height - 2;
@@ -2392,11 +2581,11 @@
                     width: 100%;
                     height: 100%;
                 `;
-                
+
                 this.chartWrapper.appendChild(this.canvas);
                 this.container.appendChild(this.chartWrapper);
             }
-            
+
             // 创建调整大小手柄
             createResizeHandles() {
                 const handles = [
@@ -2409,7 +2598,7 @@
                     { position: 'e', cursor: 'e-resize', x: '100%', y: '50%' },
                     { position: 'w', cursor: 'w-resize', x: '0%', y: '50%' }
                 ];
-                
+
                 handles.forEach(handleConfig => {
                     const handle = document.createElement('div');
                     handle.className = `resize-handle resize-${handleConfig.position}`;
@@ -2428,19 +2617,19 @@
                         opacity: 0;
                         transition: opacity 0.2s ease;
                     `;
-                    
+
                     handle.dataset.position = handleConfig.position;
                     this.chartWrapper.appendChild(handle);
                     this.resizeHandles.push(handle);
                 });
-                
+
                 // 鼠标悬停时显示手柄
                 this.chartWrapper.addEventListener('mouseenter', () => {
                     this.resizeHandles.forEach(handle => {
                         handle.style.opacity = '1';
                     });
                 });
-                
+
                 this.chartWrapper.addEventListener('mouseleave', () => {
                     if (!this.isDragging) {
                         this.resizeHandles.forEach(handle => {
@@ -2449,7 +2638,7 @@
                     }
                 });
             }
-            
+
             // 绑定事件
             bindEvents() {
                 // 绑定调整大小事件
@@ -2458,54 +2647,54 @@
                         this.handleDragStart(e, handle.dataset.position);
                     });
                 });
-                
+
                 // 绑定全局鼠标事件
                 document.addEventListener('mousemove', (e) => {
                     if (this.isDragging) {
                         this.handleDragMove(e);
                     }
                 });
-                
+
                 document.addEventListener('mouseup', () => {
                     this.handleDragEnd();
                 });
-                
+
                 // 防止图表内容被选中
                 this.chartWrapper.addEventListener('selectstart', (e) => {
                     e.preventDefault();
                 });
             }
-            
+
             // 处理拖拽开始
             handleDragStart(event, position) {
                 event.preventDefault();
                 event.stopPropagation();
-                
+
                 this.isDragging = true;
                 this.dragPosition = position;
                 this.dragStartPos = { x: event.clientX, y: event.clientY };
                 this.initialSize = { ...this.currentSize };
-                
+
                 // 添加拖拽时的样式
                 document.body.style.cursor = event.target.style.cursor;
                 document.body.style.userSelect = 'none';
-                
+
                 // 保持手柄可见
                 this.resizeHandles.forEach(handle => {
                     handle.style.opacity = '1';
                 });
             }
-            
+
             // 处理拖拽中
             handleDragMove(event) {
                 if (!this.isDragging) return;
-                
+
                 const deltaX = event.clientX - this.dragStartPos.x;
                 const deltaY = event.clientY - this.dragStartPos.y;
-                
+
                 let newWidth = this.initialSize.width;
                 let newHeight = this.initialSize.height;
-                
+
                 // 根据拖拽位置计算新尺寸
                 switch (this.dragPosition) {
                     case 'se':
@@ -2537,26 +2726,26 @@
                         newWidth = this.initialSize.width - deltaX;
                         break;
                 }
-                
+
                 // 应用尺寸约束
                 newWidth = Math.max(this.options.minWidth, Math.min(this.options.maxWidth, newWidth));
                 newHeight = Math.max(this.options.minHeight, Math.min(this.options.maxHeight, newHeight));
-                
+
                 // 更新图表尺寸
                 this.resizeChart(newWidth, newHeight);
             }
-            
+
             // 处理拖拽结束
             handleDragEnd() {
                 if (!this.isDragging) return;
-                
+
                 this.isDragging = false;
                 this.dragPosition = null;
-                
+
                 // 恢复样式
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
-                
+
                 // 隐藏手柄
                 setTimeout(() => {
                     if (!this.chartWrapper.matches(':hover')) {
@@ -2565,44 +2754,44 @@
                         });
                     }
                 }, 100);
-                
+
                 // 触发尺寸变化事件
                 this.onResize();
             }
-            
+
             // 调整图表大小
             resizeChart(width, height) {
                 this.currentSize.width = width;
                 this.currentSize.height = height;
-                
+
                 // 更新容器尺寸
                 this.chartWrapper.style.width = width + 'px';
                 this.chartWrapper.style.height = height + 'px';
-                
+
                 // 更新canvas尺寸
                 this.canvas.width = width - 2;
                 this.canvas.height = height - 2;
-                
+
                 // 重新渲染图表
                 if (this.chart) {
                     this.chart.resize();
                 }
             }
-            
+
             // 初始化Chart.js图表
             initChart(data, options = {}) {
                 if (!window.Chart) {
                     console.error('Chart.js library not found');
                     return;
                 }
-                
+
                 const ctx = this.canvas.getContext('2d');
-                
+
                 // 销毁现有图表
                 if (this.chart) {
                     this.chart.destroy();
                 }
-                
+
                 const defaultOptions = {
                     type: 'line',
                     data: data,
@@ -2656,10 +2845,10 @@
                         }
                     }
                 };
-                
+
                 // 合并选项
                 const chartConfig = this.mergeDeep(defaultOptions, options);
-                
+
                 // 添加缩放和平移功能
                 if (this.options.zoomable || this.options.pannable) {
                     chartConfig.options.plugins.zoom = {
@@ -2678,13 +2867,13 @@
                         }
                     };
                 }
-                
+
                 // 创建图表
                 this.chart = new Chart(ctx, chartConfig);
-                
+
                 return this.chart;
             }
-            
+
             // 更新图表数据
             updateData(data) {
                 if (this.chart) {
@@ -2692,18 +2881,18 @@
                     this.chart.update('none'); // 无动画更新
                 }
             }
-            
+
             // 获取当前尺寸
             getSize() {
                 return { ...this.currentSize };
             }
-            
+
             // 设置尺寸
             setSize(width, height) {
                 this.resizeChart(width, height);
                 this.onResize();
             }
-            
+
             // 尺寸变化回调
             onResize() {
                 // 可以被子类重写或通过选项传入回调
@@ -2711,11 +2900,11 @@
                     this.options.onResize(this.currentSize);
                 }
             }
-            
+
             // 深度合并对象
             mergeDeep(target, source) {
                 const result = { ...target };
-                
+
                 for (const key in source) {
                     if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
                         result[key] = this.mergeDeep(result[key] || {}, source[key]);
@@ -2723,22 +2912,22 @@
                         result[key] = source[key];
                     }
                 }
-                
+
                 return result;
             }
-            
+
             // 销毁图表
             destroy() {
                 if (this.chart) {
                     this.chart.destroy();
                     this.chart = null;
                 }
-                
+
                 if (this.chartWrapper) {
                     this.chartWrapper.remove();
                     this.chartWrapper = null;
                 }
-                
+
                 this.resizeHandles = [];
                 this.canvas = null;
             }
@@ -2753,28 +2942,28 @@
                 this.chartComponent = null;
                 this.isVisible = false;
             }
-            
+
             // 创建面板DOM结构
             createElement() {
                 if (this.element) {
                     return this.element;
                 }
-                
+
                 const panelDiv = document.createElement('div');
                 panelDiv.className = 'detail-panel';
                 panelDiv.innerHTML = this.getHTML();
                 this.element = panelDiv;
-                
+
                 return this.element;
             }
-            
+
             // 获取面板HTML内容
             getHTML() {
                 const basicInfo = this.renderBasicInfo();
                 const performanceMetrics = this.renderPerformanceMetrics();
                 const investmentAdvice = this.renderInvestmentAdvice();
                 const riskIndicators = this.renderRiskIndicators();
-                
+
                 return `
                     <div class="detail-panel">
                         ${basicInfo}
@@ -2803,12 +2992,12 @@
                     </div>
                 `;
             }
-            
+
             // 渲染基本信息
             renderBasicInfo() {
                 const todayReturn = this.fundData.today_return || 0;
                 const currentNav = this.fundData.current_nav || 0;
-                
+
                 return `
                     <div class="detail-header">
                         <div class="fund-title-section">
@@ -2830,14 +3019,14 @@
                     </div>
                 `;
             }
-            
+
             // 渲染性能指标
             renderPerformanceMetrics() {
                 const annualReturn = this.fundData.annualized_return || 0;
                 const sharpeRatio = this.fundData.sharpe_ratio || 0;
                 const volatility = this.fundData.volatility || 0;
                 const winRate = this.fundData.win_rate || 0;
-                
+
                 return `
                     <div class="metrics-section">
                         <div class="section-title">
@@ -2872,14 +3061,14 @@
                     </div>
                 `;
             }
-            
+
             // 渲染投资建议
             renderInvestmentAdvice() {
                 const statusLabel = this.fundData.status_label || '--';
                 const operationSuggestion = this.fundData.operation_suggestion || '--';
                 const executionAmount = this.fundData.execution_amount || '--';
                 const compositeScore = this.fundData.composite_score || 0;
-                
+
                 // 根据综合评分确定建议等级
                 let adviceLevel = 'neutral';
                 let adviceIcon = 'bi-dash-circle';
@@ -2896,7 +3085,7 @@
                     adviceLevel = 'sell';
                     adviceIcon = 'bi-arrow-down-circle';
                 }
-                
+
                 return `
                     <div class="advice-section">
                         <div class="section-title">
@@ -2928,14 +3117,14 @@
                     </div>
                 `;
             }
-            
+
             // 渲染风险指标
             renderRiskIndicators() {
                 const maxDrawdown = this.fundData.max_drawdown || 0;
                 const volatility = this.fundData.volatility || 0;
                 const beta = this.fundData.beta || 0;
                 const var95 = this.fundData.var_95 || 0;
-                
+
                 // 风险等级评估
                 let riskLevel = 'low';
                 let riskColor = 'success';
@@ -2946,7 +3135,7 @@
                     riskLevel = 'medium';
                     riskColor = 'warning';
                 }
-                
+
                 return `
                     <div class="risk-section">
                         <div class="section-title">
@@ -2986,19 +3175,19 @@
                     </div>
                 `;
             }
-            
+
             // 初始化交互功能
             initializeInteractions(container) {
                 // 初始化图表
                 this.initializeChart(container);
-                
+
                 // 添加时间段切换功能
                 this.initializePeriodTabs(container);
-                
+
                 // 标记为可见
                 this.isVisible = true;
             }
-            
+
             // 初始化图表
             initializeChart(container) {
                 const chartContainer = container.querySelector(`#chart-${this.fundData.fund_code}`);
@@ -3007,12 +3196,12 @@
                     this.createBasicChart(chartContainer);
                 }
             }
-            
+
             // 创建基础图表
             createBasicChart(container) {
                 // 清空容器
                 container.innerHTML = '';
-                
+
                 // 创建可调整大小的图表
                 this.chartComponent = new ResizableChart(container, {
                     width: 400,
@@ -3028,7 +3217,7 @@
                         console.log('图表尺寸变化:', size);
                     }
                 });
-                
+
                 // 添加时间段控制
                 const controlsDiv = document.createElement('div');
                 controlsDiv.className = 'chart-controls';
@@ -3041,11 +3230,11 @@
                     </div>
                 `;
                 container.appendChild(controlsDiv);
-                
+
                 // 加载图表数据
                 this.loadChartData(this.fundData.fund_code, 30);
             }
-            
+
             // 初始化时间段切换
             initializePeriodTabs(container) {
                 const tabs = container.querySelectorAll('.period-tabs .tab');
@@ -3055,24 +3244,24 @@
                         tabs.forEach(t => t.classList.remove('active'));
                         // 添加当前tab的active状态
                         e.target.classList.add('active');
-                        
+
                         // 重新加载图表数据
                         const period = parseInt(e.target.getAttribute('data-period'));
                         this.loadChartData(this.fundData.fund_code, period);
                     });
                 });
             }
-            
+
             // 加载图表数据
             async loadChartData(fundCode, days = 30) {
                 try {
                     const response = await fetch(`/api/fund/${fundCode}/history?days=${days}`);
                     const result = await response.json();
-                    
+
                     if (result.success && result.data && result.data.length > 0) {
                         const labels = result.data.map(d => d.date.substring(5)); // MM-DD格式
                         const values = result.data.map(d => d.nav);
-                        
+
                         const chartData = {
                             labels: labels,
                             datasets: [{
@@ -3087,7 +3276,7 @@
                                 pointHoverRadius: 4
                             }]
                         };
-                        
+
                         // 使用ResizableChart创建图表
                         if (this.chartComponent) {
                             this.chartComponent.initChart(chartData, {
@@ -3114,7 +3303,7 @@
                     this.showChartError('数据加载失败');
                 }
             }
-            
+
             // 显示图表错误状态
             showChartError(message) {
                 if (this.chartComponent && this.chartComponent.chartWrapper) {
@@ -3126,7 +3315,7 @@
                     `;
                 }
             }
-            
+
             // 更新数据
             updateData(fundData) {
                 this.fundData = fundData;
@@ -3136,19 +3325,19 @@
                     this.initializeInteractions(this.element.parentElement);
                 }
             }
-            
+
             // 销毁面板
             destroy() {
                 if (this.chartComponent) {
                     this.chartComponent.destroy();
                     this.chartComponent = null;
                 }
-                
+
                 if (this.element) {
                     this.element.remove();
                     this.element = null;
                 }
-                
+
                 this.isVisible = false;
             }
         }
@@ -3162,14 +3351,14 @@
                 this.panels = new Map();        // 面板缓存
                 this.isAnimating = false;       // 动画状态标记
             }
-            
+
             // 处理行点击事件
             handleRowClick(fundData, rowElement) {
                 // 防止动画期间的重复点击
                 if (this.isAnimating) {
                     return;
                 }
-                
+
                 // 检查是否点击的是当前展开的行
                 if (this.expandedRow === rowElement) {
                     this.collapsePanel(rowElement);
@@ -3182,17 +3371,17 @@
                     this.expandPanel(fundData, rowElement);
                 }
             }
-            
+
             // 展开详情面板
             expandPanel(fundData, rowElement) {
                 if (this.isAnimating) return;
-                
+
                 this.isAnimating = true;
                 this.expandedRow = rowElement;
-                
+
                 // 获取或创建面板
                 const panel = this.getOrCreatePanel(fundData.fund_code, fundData);
-                
+
                 // 创建面板容器行
                 const panelRow = document.createElement('tr');
                 panelRow.className = 'expansion-panel-row';
@@ -3203,32 +3392,32 @@
                         </div>
                     </td>
                 `;
-                
+
                 // 插入到当前行后面
                 rowElement.parentNode.insertBefore(panelRow, rowElement.nextSibling);
-                
+
                 // 获取面板容器
                 const container = panelRow.querySelector('.expansion-panel-container');
-                
+
                 // 计算目标高度
                 container.style.height = 'auto';
                 const targetHeight = container.scrollHeight;
                 container.style.height = '0px';
-                
+
                 // 执行展开动画
                 requestAnimationFrame(() => {
                     container.style.transition = `height ${this.animationDuration}ms ease-out`;
                     container.style.height = targetHeight + 'px';
-                    
+
                     setTimeout(() => {
                         container.style.height = 'auto';
                         this.isAnimating = false;
-                        
+
                         // 初始化面板内的交互功能
                         panel.initializeInteractions(container);
                     }, this.animationDuration);
                 });
-                
+
                 // 更新面板状态
                 this.updatePanelState(fundData.fund_code, {
                     isExpanded: true,
@@ -3236,41 +3425,41 @@
                     lastUpdated: new Date()
                 });
             }
-            
+
             // 收起详情面板
             collapsePanel(rowElement) {
                 if (this.isAnimating) return;
-                
+
                 this.isAnimating = true;
-                
+
                 // 查找面板行
                 const panelRow = rowElement.nextSibling;
                 if (!panelRow || !panelRow.classList.contains('expansion-panel-row')) {
                     this.isAnimating = false;
                     return;
                 }
-                
+
                 const container = panelRow.querySelector('.expansion-panel-container');
                 if (!container) {
                     this.isAnimating = false;
                     return;
                 }
-                
+
                 // 执行收起动画
                 const currentHeight = container.scrollHeight;
                 container.style.height = currentHeight + 'px';
                 container.style.transition = `height ${this.animationDuration}ms ease-in`;
-                
+
                 requestAnimationFrame(() => {
                     container.style.height = '0px';
-                    
+
                     setTimeout(() => {
                         panelRow.remove();
                         this.expandedRow = null;
                         this.isAnimating = false;
                     }, this.animationDuration);
                 });
-                
+
                 // 更新面板状态
                 const fundCode = this.getFundCodeFromRow(rowElement);
                 if (fundCode) {
@@ -3280,7 +3469,7 @@
                     });
                 }
             }
-            
+
             // 切换面板状态
             togglePanel(fundData, rowElement) {
                 if (this.expandedRow === rowElement) {
@@ -3289,7 +3478,7 @@
                     this.handleRowClick(fundData, rowElement);
                 }
             }
-            
+
             // 获取或创建面板
             getOrCreatePanel(fundCode, fundData) {
                 if (!this.panels.has(fundCode)) {
@@ -3298,17 +3487,17 @@
                 }
                 return this.panels.get(fundCode);
             }
-            
+
             // 更新面板状态
             updatePanelState(fundCode, state) {
                 const currentState = this.getPanelState(fundCode) || {};
                 const newState = { ...currentState, ...state };
-                
+
                 // 这里可以添加状态持久化逻辑
                 // 例如保存到 localStorage 或发送到服务器
                 console.log('更新面板状态:', fundCode, newState);
             }
-            
+
             // 获取面板状态
             getPanelState(fundCode) {
                 // 这里可以从 localStorage 或服务器获取状态
@@ -3321,13 +3510,13 @@
                     lastUpdated: new Date()
                 };
             }
-            
+
             // 从行元素获取基金代码
             getFundCodeFromRow(rowElement) {
                 const codeCell = rowElement.querySelector('.fund-code');
                 return codeCell ? codeCell.textContent.trim() : null;
             }
-            
+
             // 清理所有面板
             clearAllPanels() {
                 this.panels.forEach(panel => panel.destroy());
@@ -3335,7 +3524,7 @@
                 this.expandedRow = null;
                 this.isAnimating = false;
             }
-            
+
             // 获取当前展开状态
             getExpansionState() {
                 return {
@@ -3351,18 +3540,18 @@
         const expansionController = new ExpansionController();
 
         // 页面加载
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initDatePicker();
             initSorting();  // 初始化排序功能
             initColumnConfig();  // 初始化列配置
             loadFunds();
-            
-            document.getElementById('search-input').addEventListener('keypress', function(e) {
+
+            document.getElementById('search-input').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') loadFunds();
             });
             document.getElementById('sort-select').addEventListener('change', loadFunds);
             document.getElementById('date-select').addEventListener('change', loadFunds);
-            
+
             // 注释：时间段切换事件监听器保留供展开功能使用
             /*
             document.querySelectorAll('.period-tabs .tab').forEach(tab => {
@@ -3373,7 +3562,7 @@
             });
             */
         });
-        
+
         // 初始化列配置
         function initColumnConfig() {
             // 从localStorage加载列配置
@@ -3393,12 +3582,12 @@
         function initSorting() {
             // 为所有可排序的表头绑定点击事件
             document.querySelectorAll('.fund-table th.sortable').forEach(th => {
-                th.addEventListener('click', function() {
+                th.addEventListener('click', function () {
                     const columnName = this.getAttribute('data-column');
                     handleSort(columnName);
                 });
             });
-            
+
             // 设置默认排序状态的UI显示
             const state = sortController.getSortState();
             uiRenderer.updateSortIndicators(state.column, state.order);
@@ -3408,17 +3597,17 @@
         function handleSort(columnName) {
             const result = sortController.handleColumnClick(columnName);
             if (!result) return;
-            
+
             // 更新UI指示器
             uiRenderer.updateSortIndicators(result.column, result.order);
-            
+
             // 性能优化：大数据量时显示加载指示器并异步排序
             const isLargeDataset = allFunds.length > 500;
-            
+
             if (isLargeDataset) {
                 uiRenderer.toggleLoading(true, '排序中...');
             }
-            
+
             // 异步执行排序操作
             setTimeout(() => {
                 try {
@@ -3460,15 +3649,15 @@
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
             notification.textContent = message;
-            
+
             // 添加到页面
             document.body.appendChild(notification);
-            
+
             // 显示通知
             setTimeout(() => {
                 notification.style.opacity = '1';
             }, 10);
-            
+
             // 3秒后隐藏通知
             setTimeout(() => {
                 notification.style.opacity = '0';
@@ -3482,7 +3671,7 @@
             const tbody = document.getElementById('fund-table-body');
             // 显示加载状态
             tbody.innerHTML = '<tr><td colspan="17" class="loading">清空数据中...</td></tr>';
-            
+
             try {
                 // 调用API清空数据库中的持仓记录
                 const response = await fetch('/api/holdings/clear', {
@@ -3491,9 +3680,9 @@
                         'Content-Type': 'application/json'
                     }
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     // 清空基金数据
                     allFunds = [];
@@ -3523,22 +3712,22 @@
             // 收集选中的基金
             const selectedFunds = [];
             const checkboxes = document.querySelectorAll('input[type="checkbox"].fund-checkbox:checked');
-            
+
             if (checkboxes.length < 2) {
                 showNotification('请至少选择2只基金进行相关性分析', 'error');
                 return;
             }
-            
+
             checkboxes.forEach(checkbox => {
                 const fundCode = checkbox.dataset.fundCode;
                 if (fundCode) {
                     selectedFunds.push(fundCode);
                 }
             });
-            
+
             // 显示加载状态
             showNotification('正在分析基金相关性...', 'info');
-            
+
             try {
                 const response = await fetch('/api/holdings/analyze/correlation', {
                     method: 'POST',
@@ -3547,7 +3736,7 @@
                     },
                     body: JSON.stringify({ fund_codes: selectedFunds })
                 });
-                
+
                 const result = await response.json();
                 if (result.success) {
                     // 显示分析结果
@@ -3566,11 +3755,11 @@
             // 在新窗口中打开分析结果
             const dataParam = encodeURIComponent(JSON.stringify(data));
             const url = `/correlation-analysis?data=${dataParam}`;
-            
+
             // 打开新窗口，设置合理的大小
             window.open(url, '_blank', 'width=1200,height=800,top=100,left=100,scrollbars=yes,resizable=yes');
             return;
-            
+
             // 创建分析结果模态框
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -3583,7 +3772,7 @@
             modal.style.height = '100%';
             modal.style.overflow = 'auto';
             modal.style.backgroundColor = 'rgba(0,0,0,0.4)';
-            
+
             const modalContent = document.createElement('div');
             modalContent.className = 'modal-content';
             modalContent.style.backgroundColor = '#fefefe';
@@ -3593,32 +3782,32 @@
             modalContent.style.width = '80%';
             modalContent.style.maxWidth = '800px';
             modalContent.style.borderRadius = '8px';
-            
+
             // 添加标题
             const title = document.createElement('h2');
             title.textContent = '基金相关性分析结果';
             title.style.marginTop = '0';
             modalContent.appendChild(title);
-            
+
             // 添加相关性矩阵
             if (data.correlation_matrix) {
                 const matrixSection = document.createElement('div');
                 matrixSection.style.marginTop = '20px';
-                
+
                 const matrixTitle = document.createElement('h3');
                 matrixTitle.textContent = '相关性矩阵';
                 matrixSection.appendChild(matrixTitle);
-                
+
                 const matrixTable = document.createElement('table');
                 matrixTable.style.width = '100%';
                 matrixTable.style.borderCollapse = 'collapse';
-                
+
                 // 创建表头
                 const thead = document.createElement('thead');
                 const headerRow = document.createElement('tr');
                 const emptyTh = document.createElement('th');
                 headerRow.appendChild(emptyTh);
-                
+
                 data.fund_names.forEach(fundName => {
                     const th = document.createElement('th');
                     th.textContent = fundName;
@@ -3629,7 +3818,7 @@
                 });
                 thead.appendChild(headerRow);
                 matrixTable.appendChild(thead);
-                
+
                 // 创建表格内容
                 const tbody = document.createElement('tbody');
                 data.correlation_matrix.forEach((row, rowIndex) => {
@@ -3640,14 +3829,14 @@
                     fundNameTd.style.padding = '8px';
                     fundNameTd.style.fontWeight = 'bold';
                     tr.appendChild(fundNameTd);
-                    
+
                     row.forEach(value => {
                         const td = document.createElement('td');
                         td.textContent = value.toFixed(4);
                         td.style.border = '1px solid #ddd';
                         td.style.padding = '8px';
                         td.style.textAlign = 'center';
-                        
+
                         // 根据相关性值设置背景颜色
                         if (value === 1) {
                             td.style.backgroundColor = '#e3f2fd';
@@ -3658,7 +3847,7 @@
                         } else {
                             td.style.backgroundColor = '#e8f5e8';
                         }
-                        
+
                         tr.appendChild(td);
                     });
                     tbody.appendChild(tr);
@@ -3667,7 +3856,7 @@
                 matrixSection.appendChild(matrixTable);
                 modalContent.appendChild(matrixSection);
             }
-            
+
             // 添加说明
             const explanation = document.createElement('div');
             explanation.style.marginTop = '20px';
@@ -3684,7 +3873,7 @@
                 <p>相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。</p>
             `;
             modalContent.appendChild(explanation);
-            
+
             // 添加关闭按钮
             const closeButton = document.createElement('button');
             closeButton.textContent = '关闭';
@@ -3695,16 +3884,16 @@
             closeButton.style.border = 'none';
             closeButton.style.borderRadius = '4px';
             closeButton.style.cursor = 'pointer';
-            closeButton.onclick = function() {
+            closeButton.onclick = function () {
                 document.body.removeChild(modal);
             };
             modalContent.appendChild(closeButton);
-            
+
             modal.appendChild(modalContent);
             document.body.appendChild(modal);
-            
+
             // 点击模态框外部关闭
-            window.onclick = function(event) {
+            window.onclick = function (event) {
                 if (event.target === modal) {
                     document.body.removeChild(modal);
                 }
@@ -3714,30 +3903,40 @@
         async function loadFunds() {
             const tbody = document.getElementById('fund-table-body');
             tbody.innerHTML = '<tr><td colspan="17" class="loading">加载中...</td></tr>';
-            
+
             try {
                 const search = document.getElementById('search-input').value.trim();
                 const sortBy = document.getElementById('sort-select').value;
-                
+
                 // 从/api/holdings获取用户持仓数据
                 let url = `/api/holdings?user_id=default_user`;
                 if (search) url += `&search=${encodeURIComponent(search)}`;
-                
+
                 const response = await fetch(url);
                 const result = await response.json();
-                
+
                 if (result.success) {
-                    allFunds = result.data;
+                    // 对基金数据进行去重处理，确保每个fund_code只出现一次
+                    const seenCodes = new Set();
+                    const uniqueFunds = result.data.filter(fund => {
+                        if (seenCodes.has(fund.fund_code)) {
+                            return false;
+                        }
+                        seenCodes.add(fund.fund_code);
+                        return true;
+                    });
+
+                    allFunds = uniqueFunds;
                     document.getElementById('total-count').textContent = allFunds.length;
-                    
+
                     // 应用当前排序状态（性能优化版本）
                     const sortState = sortController.getSortState();
                     const isLargeDataset = allFunds.length > 500;
-                    
+
                     if (isLargeDataset) {
                         uiRenderer.toggleLoading(true, '加载中...');
                     }
-                    
+
                     // 异步应用排序
                     setTimeout(() => {
                         try {
@@ -3748,7 +3947,7 @@
                             } else {
                                 uiRenderer.renderTableRows(allFunds);
                             }
-                            
+
                             // 注释：自动选择第一个基金的逻辑保留供展开功能使用
                             // if (allFunds.length > 0) selectFund(allFunds[0]);
                         } catch (error) {
@@ -3761,19 +3960,19 @@
                         }
                     }, isLargeDataset ? 10 : 0);
                 } else {
-                            tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
-                        }
+                    tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
+                }
             } catch (error) {
                 console.error('加载失败:', error);
                 tbody.innerHTML = '<tr><td colspan="17" class="empty-state">加载失败</td></tr>';
             }
         }
-        
+
         // 保留原有的 renderFundTable 函数以保持兼容性
         function renderFundTable(funds) {
             uiRenderer.renderTableRows(funds);
         }
-        
+
         function selectFund(fund) {
             selectedFund = fund;
             // 更新表格选中状态 - 修改为兼容展开面板的逻辑
@@ -3782,7 +3981,7 @@
                 if (tr.classList.contains('expansion-panel-row')) {
                     return;
                 }
-                
+
                 // 检查是否是当前选中的基金行
                 const fundCodeCell = tr.querySelector('.fund-code');
                 if (fundCodeCell && fundCodeCell.textContent.trim() === fund.fund_code) {
@@ -3791,7 +3990,7 @@
                     tr.classList.remove('selected');
                 }
             });
-            
+
             // 注释：详情面板更新逻辑保留供展开功能使用
             // updateDetailPanel(fund);
             // loadNavChart(fund.fund_code);
@@ -3804,7 +4003,7 @@
             const maxDrawdown = fund.max_drawdown || 0;  // API已转换为百分比
             const volatility = fund.volatility || 0;  // API已转换为百分比
             const winRate = fund.win_rate || 0;  // API已转换为百分比
-            
+
             // 这些DOM元素在展开功能中会重新创建
             /*
             document.getElementById('detail-fund-name').textContent = fund.fund_name || '--';
@@ -3830,7 +4029,7 @@
             document.getElementById('detail-volatility').textContent = formatPercent(volatility);
             document.getElementById('detail-winrate').textContent = formatPercent(winRate);
             */
-            
+
             // 返回格式化的数据对象供展开功能使用
             return {
                 fundName: fund.fund_name || '--',
@@ -3857,20 +4056,20 @@
             try {
                 const response = await fetch(`/api/fund/${fundCode}/history?days=30`);
                 const result = await response.json();
-                
+
                 // 如果没有提供canvas元素，则不创建图表（用于展开功能）
                 if (!canvasElement) {
                     return result; // 返回数据供展开功能使用
                 }
-                
+
                 const ctx = canvasElement.getContext('2d');
-                
+
                 if (navChart) navChart.destroy();
-                
+
                 if (result.success && result.data && result.data.length > 0) {
                     const labels = result.data.map(d => d.date.substring(5));
                     const values = result.data.map(d => d.nav);
-                    
+
                     navChart = new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -3902,7 +4101,7 @@
                         options: { responsive: true, maintainAspectRatio: false }
                     });
                 }
-                
+
                 return result;
             } catch (error) {
                 console.error('加载走势图失败:', error);
@@ -3912,15 +4111,15 @@
 
         function formatPercent(value) {
             if (value === null || value === undefined || isNaN(value)) return '--';
-            
+
             // 处理小数形式的收益率（比如0.09表示9%）
             let displayValue = value;
-            
+
             // 如果数值的绝对值小于1，说明它是小数形式的收益率，需要乘以100转换为百分比
             if (Math.abs(value) < 1) {
                 displayValue = value * 100;
             }
-            
+
             const sign = displayValue >= 0 ? '+' : '';
             return sign + displayValue.toFixed(2) + '%';
         }
@@ -3949,21 +4148,21 @@
             currentChartType = 'trend'; // 重置图表类型为业绩走势
             const sidebar = document.getElementById('fund-sidebar');
             const sidebarContent = document.getElementById('sidebar-content');
-            
+
             // 加载侧边栏内容
             sidebarContent.innerHTML = await generateSidebarContent(fund);
-            
+
             // 显示侧边栏
             sidebar.classList.add('open');
-            
+
             // 应用当前宽度
             sidebar.style.width = sidebarWidth + 'px';
-            
+
             // 初始化侧边栏内的功能 - 放在setTimeout中确保DOM已完全渲染
             setTimeout(async () => {
                 await initializeSidebarFeatures(fund);
             }, 0);
-            
+
             // 初始化拖拽调整大小功能
             initializeSidebarResize();
         }
@@ -3971,15 +4170,15 @@
         // 隐藏侧边栏
         function hideSidebar() {
             const sidebar = document.getElementById('fund-sidebar');
-            
+
             sidebar.classList.remove('open');
-            
+
             // 清理图表
             if (sidebarChart) {
                 sidebarChart.destroy();
                 sidebarChart = null;
             }
-            
+
             currentSidebarFund = null;
         }
 
@@ -3989,7 +4188,7 @@
             const yearReturn = fund.annualized_return || 0;
             const todayReturnColor = todayReturn >= 0 ? '#e74c3c' : '#27ae60';
             const yearReturnColor = yearReturn >= 0 ? '#e74c3c' : '#27ae60';
-            
+
             return `
                 <!-- 页面头部 -->
                 <div style="background: white; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #ecf0f1; position: sticky; top: 0; z-index: 100;">
@@ -4252,19 +4451,19 @@
         async function initializeSidebarFeatures(fund) {
             // 加载持仓数据
             await loadSidebarHolding(fund.fund_code);
-            
+
             // 加载图表数据
             await loadSidebarChart(fund.fund_code, '1y');
-            
+
             // 加载历史净值
             await loadSidebarNavHistory(fund.fund_code, '1y');
-            
+
             // 加载阶段涨幅
             loadSidebarStageReturns(fund);
-            
+
             // 加载基金持仓（股票持仓）
             loadSidebarFundHoldings(fund.fund_code);
-            
+
             // 绑定时间周期按钮事件
             document.querySelectorAll('.sidebar-period-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
@@ -4281,13 +4480,13 @@
                     await loadSidebarNavHistory(fund.fund_code, period);
                 });
             });
-            
+
             // 绑定图表类型切换事件（业绩走势/单位净值）
             document.querySelectorAll('.sidebar-chart-tab').forEach(tab => {
                 tab.addEventListener('click', async () => {
                     const chartType = tab.dataset.type;
                     currentChartType = chartType;
-                    
+
                     // 更新标签页样式
                     document.querySelectorAll('.sidebar-chart-tab').forEach(t => {
                         t.style.color = '#7f8c8d';
@@ -4295,13 +4494,13 @@
                     });
                     tab.style.color = '#e74c3c';
                     tab.style.borderBottom = '2px solid #e74c3c';
-                    
+
                     // 重新渲染图表
                     const period = document.querySelector('.sidebar-period-btn.active')?.dataset.period || '1y';
                     await loadSidebarChart(fund.fund_code, period);
                 });
             });
-            
+
             // 绑定标签页切换事件
             document.querySelectorAll('.sidebar-tab-nav').forEach(tab => {
                 tab.addEventListener('click', () => {
@@ -4317,7 +4516,7 @@
                     const indicator = document.createElement('span');
                     indicator.style.cssText = 'position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 24px; height: 3px; background: #e74c3c; border-radius: 2px;';
                     tab.appendChild(indicator);
-                    
+
                     document.querySelectorAll('.sidebar-tab-pane').forEach(pane => {
                         pane.style.display = 'none';
                     });
@@ -4325,7 +4524,7 @@
                 });
             });
         }
-        
+
         // 加载侧边栏持仓数据
         async function loadSidebarHolding(fundCode) {
             try {
@@ -4341,12 +4540,12 @@
                 console.error('加载持仓数据失败:', e);
             }
         }
-        
+
         // 渲染侧边栏持仓信息
         function renderSidebarHolding(holding) {
             const gridEl = document.getElementById('sidebar-holding-grid');
             const noHoldingEl = document.getElementById('sidebar-no-holding');
-            
+
             if (!holding) {
                 // 没有持仓数据，显示基金绩效指标
                 if (gridEl) gridEl.style.display = 'none';
@@ -4359,10 +4558,10 @@
                 }
                 return;
             }
-            
+
             if (gridEl) gridEl.style.display = 'block';
             if (noHoldingEl) noHoldingEl.style.display = 'none';
-            
+
             const formatValue = (val, suffix = '', colorize = false) => {
                 if (val === null || val === undefined || isNaN(val)) return '--';
                 const num = parseFloat(val);
@@ -4370,12 +4569,12 @@
                 const sign = colorize && num >= 0 ? '+' : '';
                 return `<span style="color: ${color};">${sign}${num.toFixed(2)}${suffix}</span>`;
             };
-            
+
             const setEl = (id, html) => {
                 const el = document.getElementById(id);
                 if (el) el.innerHTML = html;
             };
-            
+
             setEl('sidebar-today-profit', formatValue(holding.today_profit, '', true));
             setEl('sidebar-today-profit-rate', formatValue(holding.today_profit_rate, '%', true));
             setEl('sidebar-holding-profit', formatValue(holding.holding_profit, '', true));
@@ -4385,22 +4584,22 @@
             setEl('sidebar-holding-shares', holding.holding_shares ? holding.holding_shares.toFixed(2) : '--');
             setEl('sidebar-holding-cost', holding.cost_price && holding.holding_shares ? (holding.cost_price * holding.holding_shares).toFixed(2) : '--');
         }
-        
+
         // 渲染基金绩效指标（无持仓时显示）
         async function renderFundPerformance(fund) {
             const setEl = (id, value, isPercent = false, colorize = false) => {
                 const el = document.getElementById(id);
                 if (!el) return;
-                
+
                 if (value === null || value === undefined || isNaN(value)) {
                     el.textContent = '--';
                     el.style.color = '#333';
                     return;
                 }
-                
+
                 const num = parseFloat(value);
                 let displayValue = isPercent ? num.toFixed(2) + '%' : num.toFixed(4);
-                
+
                 if (colorize) {
                     const color = num >= 0 ? '#e74c3c' : '#27ae60';
                     const sign = num >= 0 ? '+' : '';
@@ -4409,27 +4608,27 @@
                 } else {
                     el.style.color = '#333';
                 }
-                
+
                 el.textContent = displayValue;
             };
-            
+
             // 年化收益率
             setEl('sidebar-perf-annualized', fund.annualized_return, true, true);
-            
+
             // 三个时间段的夏普比率
             setEl('sidebar-perf-sharpe-ytd', fund.sharpe_ratio_ytd, false, false);
             setEl('sidebar-perf-sharpe-1y', fund.sharpe_ratio_1y, false, false);
             setEl('sidebar-perf-sharpe-all', fund.sharpe_ratio_all, false, false);
-            
+
             // 最大回撤
             setEl('sidebar-perf-drawdown', fund.max_drawdown, true, true);
-            
+
             // 波动率
             setEl('sidebar-perf-volatility', fund.volatility, true, false);
-            
+
             // 综合评分
             setEl('sidebar-perf-score', fund.composite_score, false, false);
-            
+
             // 投资建议
             const suggestionEl = document.getElementById('sidebar-perf-suggestion');
             if (suggestionEl && fund.operation_suggestion) {
@@ -4443,21 +4642,21 @@
                     suggestionEl.style.color = '#f39c12';
                 }
             }
-            
+
             // 获取基金成立日期
             await loadFundInceptionDate(fund.fund_code);
         }
-        
+
         // 加载基金成立日期
         async function loadFundInceptionDate(fundCode) {
             const dateEl = document.getElementById('sidebar-perf-inception-date');
             if (!dateEl) return;
-            
+
             try {
                 // 尝试从API获取基金基本信息
                 const response = await fetch(`/api/fund/${fundCode}/info`);
                 const result = await response.json();
-                
+
                 if (result.success && result.data && result.data.inception_date) {
                     dateEl.textContent = result.data.inception_date;
                 } else {
@@ -4468,7 +4667,7 @@
                 dateEl.textContent = '暂无数据';
             }
         }
-        
+
         // 加载侧边栏图表
         async function loadSidebarChart(fundCode, period) {
             console.log('loadSidebarChart called:', fundCode, period);
@@ -4490,7 +4689,7 @@
                 renderSidebarChart([]);
             }
         }
-        
+
         // 渲染侧边栏图表
         function renderSidebarChart(data) {
             console.log('renderSidebarChart called with data:', data);
@@ -4500,34 +4699,34 @@
                 console.error('Canvas element not found!');
                 return;
             }
-            
+
             if (sidebarChart) {
                 console.log('Destroying existing chart');
                 sidebarChart.destroy();
             }
-            
+
             // 确保数据是数组
             const dataArray = Array.isArray(data) ? data : [];
             console.log('Data array length:', dataArray.length);
-            
-            const sortedData = [...dataArray].sort((a, b) => 
+
+            const sortedData = [...dataArray].sort((a, b) =>
                 (a.date || a.analysis_date).localeCompare(b.date || b.analysis_date)
             );
-            
+
             const labels = sortedData.map(d => (d.date || d.analysis_date || '').substring(5));
             const navData = sortedData.map(d => parseFloat(d.nav || d.current_nav || d.yesterday_nav) || null);
-            
+
             const firstNav = navData.find(n => n !== null) || 1;
-            const returnData = navData.map(nav => 
+            const returnData = navData.map(nav =>
                 nav === null ? null : ((nav - firstNav) / firstNav * 100).toFixed(2)
             );
-            
+
             // 根据图表类型选择数据和配置
             const isNavChart = currentChartType === 'nav';
             const chartData = isNavChart ? navData : returnData;
-            
+
             console.log('Chart type:', currentChartType, 'Data points:', chartData.length);
-            
+
             // 更新图例显示
             const fundReturnEl = document.getElementById('sidebar-fund-return');
             if (fundReturnEl) {
@@ -4549,7 +4748,7 @@
                     }
                 }
             }
-            
+
             console.log('Creating new Chart.js instance');
             sidebarChart = new Chart(ctx, {
                 type: 'line',
@@ -4579,7 +4778,7 @@
                             displayColors: false,
                             callbacks: {
                                 title: (ctx) => ctx[0].label,
-                                label: (ctx) => isNavChart 
+                                label: (ctx) => isNavChart
                                     ? `净值: ${ctx.parsed.y.toFixed(4)}`
                                     : `涨幅: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y}%`
                             }
@@ -4595,10 +4794,10 @@
                             display: true,
                             position: 'right',
                             grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { 
-                                callback: (v) => isNavChart ? v.toFixed(2) : v + '%', 
-                                color: '#999', 
-                                font: { size: 10 } 
+                            ticks: {
+                                callback: (v) => isNavChart ? v.toFixed(2) : v + '%',
+                                color: '#999',
+                                font: { size: 10 }
                             }
                         }
                     }
@@ -4606,14 +4805,14 @@
             });
             console.log('Chart created successfully:', sidebarChart);
         }
-        
+
         // 加载侧边栏历史净值
         async function loadSidebarNavHistory(fundCode, period) {
             const listEl = document.getElementById('sidebar-nav-history-list');
             if (!listEl) return;
-            
+
             listEl.innerHTML = '<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 8px;"></div><div>加载中...</div></div>';
-            
+
             try {
                 const res = await fetch(`/api/fund/${fundCode}/history?period=${period}`);
                 const result = await res.json();
@@ -4626,24 +4825,24 @@
                 listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
             }
         }
-        
+
         // 渲染侧边栏历史净值
         function renderSidebarNavHistory(data) {
             const listEl = document.getElementById('sidebar-nav-history-list');
             if (!listEl || !data || data.length === 0) return;
-            
-            const sortedData = [...data].sort((a, b) => 
+
+            const sortedData = [...data].sort((a, b) =>
                 (b.date || b.analysis_date).localeCompare(a.date || a.analysis_date)
             );
-            
+
             let html = '';
             let prevNav = null;
-            
+
             // 计算日涨幅
             const dataWithReturn = sortedData.map((item, index) => {
                 const nav = parseFloat(item.nav || item.current_nav || item.yesterday_nav) || null;
                 let dailyReturn = item.daily_return !== undefined ? item.daily_return : item.today_return;
-                
+
                 // 如果没有日涨幅数据，尝试从相邻数据计算
                 if (dailyReturn === undefined && nav !== null && index < sortedData.length - 1) {
                     const nextItem = sortedData[index + 1];
@@ -4652,49 +4851,49 @@
                         dailyReturn = ((nav - nextNav) / nextNav * 100);
                     }
                 }
-                
+
                 return { ...item, calculatedReturn: dailyReturn };
             });
-            
+
             dataWithReturn.forEach(item => {
                 const date = (item.date || item.analysis_date || '').substring(0, 10);
                 const nav = parseFloat(item.nav || item.current_nav || item.yesterday_nav);
                 const navStr = nav ? nav.toFixed(4) : '--';
                 const dailyReturn = item.calculatedReturn;
-                
+
                 let returnStr = '--';
                 let returnColor = '#333';
                 if (dailyReturn !== null && dailyReturn !== undefined && !isNaN(dailyReturn)) {
                     returnColor = dailyReturn >= 0 ? '#e74c3c' : '#27ae60';
                     returnStr = (dailyReturn >= 0 ? '+' : '') + dailyReturn.toFixed(2) + '%';
                 }
-                
+
                 html += `<div style="display: flex; padding: 14px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.9rem;">
                     <span style="flex: 1; text-align: left;">${date}</span>
                     <span style="flex: 1; text-align: center;">${navStr}</span>
                     <span style="flex: 1; text-align: right; color: ${returnColor};">${returnStr}</span>
                 </div>`;
             });
-            
+
             listEl.innerHTML = html;
         }
-        
+
         // 加载阶段涨幅数据
         async function loadSidebarStageReturns(fund) {
             const listEl = document.getElementById('sidebar-stage-returns-list');
             if (!listEl) return;
-            
+
             // 显示加载状态
             listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>加载中...</div>';
-            
+
             try {
                 // 调用API获取阶段涨幅数据
                 const res = await fetch(`/api/fund/${fund.fund_code}/stage-returns`);
                 const result = await res.json();
-                
+
                 if (result.success && result.data) {
                     const data = result.data;
-                    
+
                     // 阶段涨幅数据 - 基金和沪深300对比
                     const stages = [
                         { label: '近一周', fund: data.week_return, hs300: data.hs300_week_return },
@@ -4704,7 +4903,7 @@
                         { label: '近一年', fund: data.year_return, hs300: data.hs300_year_return },
                         { label: '近三年', fund: data.three_year_return, hs300: data.hs300_three_year_return }
                     ];
-                    
+
                     renderStageReturns(stages);
                 } else {
                     // 如果API失败，使用基金数据中的字段（如果有）
@@ -4723,12 +4922,12 @@
                 listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
             }
         }
-        
+
         // 渲染阶段涨幅列表
         function renderStageReturns(stages) {
             const listEl = document.getElementById('sidebar-stage-returns-list');
             if (!listEl) return;
-            
+
             const formatReturn = (val) => {
                 if (val === null || val === undefined || isNaN(val)) return { text: '--', color: '#333' };
                 const num = parseFloat(val);
@@ -4736,40 +4935,40 @@
                 const sign = num >= 0 ? '+' : '';
                 return { text: sign + num.toFixed(2) + '%', color };
             };
-            
+
             let html = '';
             stages.forEach(stage => {
                 const fundReturn = formatReturn(stage.fund);
                 const hs300Return = formatReturn(stage.hs300);
-                
+
                 html += `<div style="display: flex; padding: 14px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.9rem;">
                     <span style="flex: 1; text-align: left; color: #333;">${stage.label}</span>
                     <span style="flex: 1; text-align: center; color: ${fundReturn.color};">${fundReturn.text}</span>
                     <span style="flex: 1; text-align: right; color: ${hs300Return.color};">${hs300Return.text}</span>
                 </div>`;
             });
-            
+
             listEl.innerHTML = html;
         }
-        
+
         // 加载基金持仓（股票持仓）
         async function loadSidebarFundHoldings(fundCode) {
             const listEl = document.getElementById('sidebar-holdings-list');
             const totalRatioEl = document.getElementById('sidebar-total-ratio');
             const dateEl = document.getElementById('sidebar-holdings-date');
-            
+
             if (!listEl) return;
-            
+
             // 显示加载状态
             listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><div style="width: 24px; height: 24px; border: 2px solid #ecf0f1; border-top-color: #3498db; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>加载中...</div>';
-            
+
             try {
                 const res = await fetch(`/api/fund/${fundCode}/holdings`);
                 const result = await res.json();
-                
+
                 if (result.success && result.data && result.data.holdings && result.data.holdings.length > 0) {
                     const data = result.data;
-                    
+
                     // 更新头部信息
                     if (totalRatioEl) {
                         totalRatioEl.textContent = data.total_ratio ? data.total_ratio.toFixed(2) + '%' : '--';
@@ -4777,7 +4976,7 @@
                     if (dateEl && data.update_date) {
                         dateEl.textContent = '更新于' + data.update_date;
                     }
-                    
+
                     // 渲染持仓列表
                     renderFundHoldings(data.holdings);
                 } else {
@@ -4790,12 +4989,12 @@
                 listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #7f8c8d;"><i class="bi bi-exclamation-circle"></i><div>加载失败</div></div>';
             }
         }
-        
+
         // 渲染基金持仓列表
         function renderFundHoldings(holdings) {
             const listEl = document.getElementById('sidebar-holdings-list');
             if (!listEl || !holdings || holdings.length === 0) return;
-            
+
             const formatReturn = (val) => {
                 if (val === null || val === undefined || isNaN(val)) return { text: '--', color: '#333' };
                 const num = parseFloat(val);
@@ -4803,12 +5002,12 @@
                 const sign = num >= 0 ? '+' : '';
                 return { text: sign + num.toFixed(2) + '%', color };
             };
-            
+
             let html = '';
             holdings.forEach(item => {
                 const stockReturn = formatReturn(item.stock_return);
                 const ratio = item.ratio !== null ? item.ratio.toFixed(2) + '%' : '--';
-                
+
                 // 较上期变化显示
                 let changeHtml = '--';
                 if (item.change_direction === 'new') {
@@ -4819,7 +5018,7 @@
                     const arrow = item.ratio_change >= 0 ? '↑' : '↓';
                     changeHtml = `<span style="color: ${changeColor};">${changeSign}${item.ratio_change.toFixed(2)}%${arrow}</span>`;
                 }
-                
+
                 html += `<div style="display: flex; padding: 12px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.85rem; align-items: center;">
                     <div style="flex: 2; text-align: left;">
                         <div style="color: #333; font-weight: 500;">${item.stock_name || '--'}</div>
@@ -4830,7 +5029,7 @@
                     <span style="flex: 1; text-align: right;">${changeHtml}</span>
                 </div>`;
             });
-            
+
             listEl.innerHTML = html;
         }
 
@@ -4838,39 +5037,39 @@
         function initializeSidebarResize() {
             const resizeHandle = document.getElementById('sidebar-resize-handle');
             const sidebar = document.getElementById('fund-sidebar');
-            
+
             if (!resizeHandle) return;
-            
+
             resizeHandle.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 isResizingSidebar = true;
                 resizeStartX = e.clientX;
                 resizeStartWidth = sidebarWidth;
-                
+
                 // 添加拖拽状态类
                 sidebar.classList.add('resizing');
                 document.body.style.cursor = 'ew-resize';
                 document.body.style.userSelect = 'none';
             });
-            
+
             document.addEventListener('mousemove', (e) => {
                 if (!isResizingSidebar) return;
-                
+
                 // 计算新宽度（向左拖动增加宽度，向右拖动减少宽度）
                 const deltaX = resizeStartX - e.clientX;
                 let newWidth = resizeStartWidth + deltaX;
-                
+
                 // 限制宽度范围
                 newWidth = Math.max(300, Math.min(800, newWidth));
-                
+
                 // 应用新宽度
                 sidebarWidth = newWidth;
                 sidebar.style.width = newWidth + 'px';
             });
-            
+
             document.addEventListener('mouseup', () => {
                 if (!isResizingSidebar) return;
-                
+
                 isResizingSidebar = false;
                 sidebar.classList.remove('resizing');
                 document.body.style.cursor = '';
@@ -4898,7 +5097,8 @@
             </div>
             <div class="settings-modal-tabs">
                 <button class="settings-tab" data-tab="holdings" onclick="switchSettingsTab('holdings')">持仓管理</button>
-                <button class="settings-tab active" data-tab="columns" onclick="switchSettingsTab('columns')">表头管理</button>
+                <button class="settings-tab active" data-tab="columns"
+                    onclick="switchSettingsTab('columns')">表头管理</button>
             </div>
             <div class="settings-modal-content">
                 <!-- 持仓管理 -->
@@ -4942,7 +5142,7 @@
             justify-content: center;
             align-items: center;
         }
-        
+
         .settings-modal {
             background: white;
             border-radius: 12px;
@@ -4953,7 +5153,7 @@
             flex-direction: column;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
         }
-        
+
         .settings-modal-header {
             display: flex;
             justify-content: space-between;
@@ -4961,14 +5161,14 @@
             padding: 16px 20px;
             border-bottom: 1px solid #ecf0f1;
         }
-        
+
         .settings-modal-header h3 {
             margin: 0;
             font-size: 1.1rem;
             font-weight: 600;
             color: #333;
         }
-        
+
         .settings-modal-close {
             background: none;
             border: none;
@@ -4977,11 +5177,11 @@
             cursor: pointer;
             padding: 4px;
         }
-        
+
         .settings-modal-close:hover {
             color: #333;
         }
-        
+
         .settings-modal-tabs {
             display: flex;
             justify-content: center;
@@ -4989,7 +5189,7 @@
             gap: 8px;
             border-bottom: 1px solid #ecf0f1;
         }
-        
+
         .settings-tab {
             padding: 8px 24px;
             border: 1px solid #ecf0f1;
@@ -5000,28 +5200,28 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        
+
         .settings-tab:hover {
             border-color: #3498db;
             color: #3498db;
         }
-        
+
         .settings-tab.active {
             background: #333;
             color: white;
             border-color: #333;
         }
-        
+
         .settings-modal-content {
             flex: 1;
             overflow-y: auto;
             padding: 0;
         }
-        
+
         .settings-pane {
             padding: 0;
         }
-        
+
         .column-list-header {
             display: flex;
             padding: 12px 20px;
@@ -5032,12 +5232,12 @@
             position: sticky;
             top: 0;
         }
-        
+
         .column-list {
             max-height: 400px;
             overflow-y: auto;
         }
-        
+
         .column-item {
             display: flex;
             align-items: center;
@@ -5045,27 +5245,27 @@
             border-bottom: 1px solid #ecf0f1;
             transition: background 0.2s;
         }
-        
+
         .column-item:hover {
             background: #f8f9fa;
         }
-        
+
         .column-item.fixed {
             background: #f0f7ff;
         }
-        
+
         .column-item .column-name {
             flex: 2;
             font-size: 0.95rem;
             color: #333;
             font-weight: 500;
         }
-        
+
         .column-item .column-action {
             flex: 1;
             text-align: center;
         }
-        
+
         .column-item .action-btn {
             background: none;
             border: none;
@@ -5075,34 +5275,34 @@
             padding: 4px 8px;
             transition: color 0.2s;
         }
-        
+
         .column-item .action-btn:hover {
             color: #3498db;
         }
-        
+
         .column-item .action-btn.active {
             color: #3498db;
         }
-        
+
         .column-item .action-btn.disabled {
             color: #ecf0f1;
             cursor: not-allowed;
         }
-        
+
         .column-item .drag-handle {
             cursor: grab;
             color: #bdc3c7;
         }
-        
+
         .column-item .drag-handle:hover {
             color: #7f8c8d;
         }
-        
+
         .column-item.dragging {
             opacity: 0.5;
             background: #e8f4fc;
         }
-        
+
         .settings-modal-footer {
             display: flex;
             justify-content: flex-end;
@@ -5110,7 +5310,7 @@
             padding: 16px 20px;
             border-top: 1px solid #ecf0f1;
         }
-        
+
         .btn-reset {
             padding: 8px 20px;
             border: 1px solid #ecf0f1;
@@ -5120,11 +5320,11 @@
             color: #666;
             cursor: pointer;
         }
-        
+
         .btn-reset:hover {
             border-color: #bdc3c7;
         }
-        
+
         .btn-apply {
             padding: 8px 24px;
             border: none;
@@ -5134,7 +5334,7 @@
             color: white;
             cursor: pointer;
         }
-        
+
         .btn-apply:hover {
             background: #2980b9;
         }
@@ -5160,21 +5360,21 @@
             { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
             { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
         ];
-        
+
         let columnConfig = JSON.parse(localStorage.getItem('fundColumnConfig')) || JSON.parse(JSON.stringify(defaultColumnConfig));
         let draggedItem = null;
-        
+
         // 打开管理设置弹窗
         function openSettingsModal() {
             document.getElementById('settings-modal-overlay').style.display = 'flex';
             renderColumnList();
         }
-        
+
         // 关闭管理设置弹窗
         function closeSettingsModal() {
             document.getElementById('settings-modal-overlay').style.display = 'none';
         }
-        
+
         // 切换设置标签页
         function switchSettingsTab(tab) {
             document.querySelectorAll('.settings-tab').forEach(t => {
@@ -5185,12 +5385,12 @@
             });
             document.getElementById('settings-' + tab).style.display = 'block';
         }
-        
+
         // 渲染列配置列表
         function renderColumnList() {
             const listEl = document.getElementById('column-list');
             if (!listEl) return;
-            
+
             let html = '';
             columnConfig.forEach((col, index) => {
                 const isFixed = col.fixed;
@@ -5198,7 +5398,7 @@
                 const visibleClass = col.visible ? 'active' : '';
                 const pinnedIcon = col.pinned ? 'bi-pin-fill' : 'bi-pin';
                 const pinnedClass = col.pinned ? 'active' : '';
-                
+
                 html += `
                     <div class="column-item ${isFixed ? 'fixed' : ''}" data-index="${index}" draggable="${!isFixed}">
                         <span class="column-name">${col.name}</span>
@@ -5220,66 +5420,66 @@
                     </div>
                 `;
             });
-            
+
             listEl.innerHTML = html;
-            
+
             // 绑定拖拽事件
             initDragAndDrop();
         }
-        
+
         // 切换列显示/隐藏
         function toggleColumnVisible(index) {
             columnConfig[index].visible = !columnConfig[index].visible;
             renderColumnList();
         }
-        
+
         // 切换列置顶
         function toggleColumnPinned(index) {
             columnConfig[index].pinned = !columnConfig[index].pinned;
             renderColumnList();
         }
-        
+
         // 初始化拖拽排序
         function initDragAndDrop() {
             const items = document.querySelectorAll('.column-item[draggable="true"]');
-            
+
             items.forEach(item => {
                 item.addEventListener('dragstart', (e) => {
                     draggedItem = item;
                     item.classList.add('dragging');
                     e.dataTransfer.effectAllowed = 'move';
                 });
-                
+
                 item.addEventListener('dragend', () => {
                     item.classList.remove('dragging');
                     draggedItem = null;
                 });
-                
+
                 item.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
                 });
-                
+
                 item.addEventListener('drop', (e) => {
                     e.preventDefault();
                     if (!draggedItem || draggedItem === item) return;
-                    
+
                     const fromIndex = parseInt(draggedItem.dataset.index);
                     const toIndex = parseInt(item.dataset.index);
-                    
+
                     // 不能移动到固定列的位置
                     if (columnConfig[toIndex].fixed) return;
-                    
+
                     // 交换位置
                     const temp = columnConfig[fromIndex];
                     columnConfig.splice(fromIndex, 1);
                     columnConfig.splice(toIndex, 0, temp);
-                    
+
                     renderColumnList();
                 });
             });
         }
-        
+
         // 重置列配置
         function resetColumnSettings() {
             columnConfig = JSON.parse(JSON.stringify(defaultColumnConfig));
@@ -5287,39 +5487,39 @@
             renderColumnList();
             applyColumnSettings();
         }
-        
+
         // 应用列配置
         function applyColumnSettings() {
             localStorage.setItem('fundColumnConfig', JSON.stringify(columnConfig));
             updateTableColumns();
             closeSettingsModal();
         }
-        
+
         // 更新表格列显示（包括顺序）
         function updateTableColumns() {
             // 重新排列表头
             reorderTableHeader();
-            
+
             // 重新渲染表格数据以应用列配置
             if (typeof allFunds !== 'undefined' && allFunds.length > 0) {
                 uiRenderer.renderTableRows(allFunds);
             }
         }
-        
+
         // 重新排列表头
         function reorderTableHeader() {
             const headerRow = document.querySelector('.fund-table thead tr');
             if (!headerRow) return;
-            
+
             // 保存checkbox列的HTML（始终在最前面）
             const checkboxHtml = '<th style="width: 30px;" data-column="checkbox"></th>';
-            
+
             // 清空表头
             headerRow.innerHTML = '';
-            
+
             // 先添加checkbox列
             headerRow.innerHTML = checkboxHtml;
-            
+
             // 按照columnConfig顺序添加其他列
             columnConfig.forEach(col => {
                 const th = document.createElement('th');
@@ -5329,11 +5529,11 @@
                 th.innerHTML = `${col.name} <span class="sort-indicator"></span>`;
                 headerRow.appendChild(th);
             });
-            
+
             // 重新绑定排序事件
             initSorting();
         }
-        
+
         // 点击弹窗外部关闭
         document.getElementById('settings-modal-overlay')?.addEventListener('click', (e) => {
             if (e.target.id === 'settings-modal-overlay') {
@@ -5342,4 +5542,5 @@
         });
     </script>
 </body>
+
 </html>
