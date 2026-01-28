@@ -88,7 +88,8 @@ class UnifiedStrategyEngine:
         prev_day_return: float,
         returns_history: Optional[List[float]] = None,
         cumulative_pnl: Optional[float] = None,
-        performance_metrics: Optional[Dict] = None
+        performance_metrics: Optional[Dict] = None,
+        strategy_id: Optional[str] = None
     ) -> UnifiedStrategyResult:
         """
         综合策略分析
@@ -99,13 +100,14 @@ class UnifiedStrategyEngine:
             returns_history: 历史收益率序列（用于趋势和波动率分析）
             cumulative_pnl: 累计盈亏率（用于止损检查）
             performance_metrics: 绩效指标（可选增强分析）
+            strategy_id: 特定策略ID（可选），如果指定则只应用该策略
             
         Returns:
             UnifiedStrategyResult: 综合策略分析结果
         """
         try:
             # 1. 基础策略分析
-            base_result = self._basic_strategy_analysis(today_return, prev_day_return)
+            base_result = self._basic_strategy_analysis(today_return, prev_day_return, strategy_id)
             
             # 2. 止损检查
             stop_loss_result = self._check_stop_loss(cumulative_pnl)
@@ -142,7 +144,8 @@ class UnifiedStrategyEngine:
     def _basic_strategy_analysis(
         self, 
         today_return: float, 
-        prev_day_return: float
+        prev_day_return: float,
+        strategy_id: Optional[str] = None
     ) -> Dict:
         """
         基础策略分析
@@ -150,10 +153,69 @@ class UnifiedStrategyEngine:
         Args:
             today_return: 当日收益率（%）
             prev_day_return: 前一日收益率（%）
+            strategy_id: 特定策略ID（可选），如果指定则只应用该策略
             
         Returns:
             基础策略结果字典
         """
+        # 如果指定了特定策略ID，则只应用该策略
+        if strategy_id and strategy_id in self.strategy_rules:
+            rule = self.strategy_rules[strategy_id]
+            conditions = rule.get('conditions', [])
+            
+            for condition in conditions:
+                today_min = condition.get('today_return_min', float('-inf'))
+                today_max = condition.get('today_return_max', float('inf'))
+                prev_min = condition.get('prev_day_return_min', float('-inf'))
+                prev_max = condition.get('prev_day_return_max', float('inf'))
+                
+                # 处理 YAML 中的 .inf 值
+                if today_min == '.inf':
+                    today_min = float('inf')
+                elif today_min == '-.inf':
+                    today_min = float('-inf')
+                if today_max == '.inf':
+                    today_max = float('inf')
+                elif today_max == '-.inf':
+                    today_max = float('-inf')
+                if prev_min == '.inf':
+                    prev_min = float('inf')
+                elif prev_min == '-.inf':
+                    prev_min = float('-inf')
+                if prev_max == '.inf':
+                    prev_max = float('inf')
+                elif prev_max == '-.inf':
+                    prev_max = float('-inf')
+                
+                # 检查是否满足条件
+                if (today_min <= today_return <= today_max and 
+                    prev_min <= prev_day_return <= prev_max):
+                    
+                    action = rule.get('action', 'hold')
+                    buy_multiplier = rule.get('buy_multiplier', self.buy_multipliers.get(action, 0.0))
+                    
+                    return {
+                        'strategy_name': strategy_id,
+                        'action': action,
+                        'buy_multiplier': buy_multiplier,
+                        'redeem_amount': rule.get('redeem_amount', 0),
+                        'status_label': rule.get('label', ''),
+                        'operation_suggestion': rule.get('description', ''),
+                        'comparison_value': today_return - prev_day_return
+                    }
+            
+            # 如果指定了策略ID但条件不匹配，返回该策略的默认行为
+            return {
+                'strategy_name': strategy_id,
+                'action': 'hold',  # 默认为持有
+                'buy_multiplier': 0.0,
+                'redeem_amount': 0,
+                'status_label': f'{strategy_id} - 未满足执行条件',
+                'operation_suggestion': f'当前市场条件下，{strategy_id}策略建议保持观望',
+                'comparison_value': today_return - prev_day_return
+            }
+        
+        # 否则，按原有逻辑遍历所有策略规则
         # 遍历所有策略规则
         for strategy_name, rule in self.strategy_rules.items():
             conditions = rule.get('conditions', [])

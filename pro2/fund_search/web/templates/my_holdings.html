@@ -1322,7 +1322,9 @@
                 <table class="fund-table">
                     <thead>
                         <tr>
-                            <th style="width: 30px;" data-column="checkbox"></th>
+                            <th style="width: 30px;" data-column="checkbox">
+                                <input type="checkbox" id="select-all-checkbox" style="margin: 0 auto; display: block;">
+                            </th>
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span>
@@ -1353,11 +1355,12 @@
                             </th>
                             <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span>
                             </th>
+                            <th style="text-align: center;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
                         <tr>
-                            <td colspan="17" class="loading">加载中...</td>
+                            <td colspan="18" class="loading">加载中...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2335,7 +2338,7 @@
 
                 // 获取列配置（如果存在）
                 const config = typeof columnConfig !== 'undefined' ? columnConfig : null;
-                const visibleColCount = config ? config.filter(c => c.visible).length + 1 : 15; // +1 for checkbox
+                const visibleColCount = config ? config.filter(c => c.visible).length + 2 : 16; // +1 for checkbox, +1 for operations
 
                 if (!funds || funds.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="${visibleColCount}" class="empty-state">暂无数据</td></tr>`;
@@ -2462,6 +2465,18 @@
                                 cellsHtml += `<td data-column="${col.key}" class="${data.class}" ${display}>${data.value}</td>`;
                             }
                         });
+                        
+                        // 添加操作列
+                        cellsHtml += `
+                            <td style="text-align: center;">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        `;
                     } else {
                         // 默认列顺序（兼容旧代码）
                         const defaultOrder = ['fund_code', 'fund_name', 'today_return', 'prev_day_return',
@@ -2475,6 +2490,18 @@
                                 cellsHtml += `<td data-column="${key}" class="${data.class}">${data.value}</td>`;
                             }
                         });
+                        
+                        // 添加操作列
+                        cellsHtml += `
+                            <td style="text-align: center;">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        `;
                     }
 
                     tr.innerHTML = cellsHtml;
@@ -2484,6 +2511,31 @@
                 // 一次性添加所有行，提高性能
                 tbody.innerHTML = '';
                 tbody.appendChild(fragment);
+                
+                // 更新全选按钮状态
+                updateSelectAllStatus();
+                
+                // 重新绑定全选事件（如果之前未绑定）
+                const selectAllCheckbox = document.getElementById('select-all-checkbox');
+                if (selectAllCheckbox && !selectAllCheckbox.hasEventListener) {
+                    selectAllCheckbox.addEventListener('click', function() {
+                        const isChecked = this.checked;
+                        document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
+                            checkbox.checked = isChecked;
+                        });
+                    });
+                    selectAllCheckbox.hasEventListener = true;
+                }
+                
+                // 绑定单个复选框变化事件
+                document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
+                    if (!checkbox.hasChangeEventListener) {
+                        checkbox.addEventListener('change', function() {
+                            updateSelectAllStatus();
+                        });
+                        checkbox.hasChangeEventListener = true;
+                    }
+                });
             }
 
             // 更新表头显示状态（仅更新显示/隐藏，不改变顺序）
@@ -2520,6 +2572,55 @@
 
         // 创建 UIRenderer 实例
         const uiRenderer = new UIRenderer();
+        
+        // 全选功能初始化
+        function initSelectAll() {
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (!selectAllCheckbox) return;
+            
+            // 全选/取消全选
+            selectAllCheckbox.addEventListener('click', function() {
+                const isChecked = this.checked;
+                document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+            });
+            
+            // 单个复选框变化时更新全选状态
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('fund-checkbox')) {
+                    updateSelectAllStatus();
+                }
+            });
+        }
+        
+        // 更新全选按钮状态
+        function updateSelectAllStatus() {
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            if (!selectAllCheckbox) return;
+            
+            const checkboxes = document.querySelectorAll('.fund-checkbox');
+            if (checkboxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                return;
+            }
+            
+            const checkedBoxes = document.querySelectorAll('.fund-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (checkedBoxes.length === checkboxes.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+        
+        // 页面加载完成后初始化全选功能
+        document.addEventListener('DOMContentLoaded', initSelectAll);
 
         // ==================== ResizableChart 类 ====================
         // 负责可拖拽调整大小的图表组件
@@ -3667,10 +3768,135 @@
             }, 3000);
         }
 
+        // 编辑基金记录
+        async function editFundRecord(fundCode) {
+            // 从 allFunds 中查找对应基金
+            const fund = allFunds.find(f => f.fund_code === fundCode);
+            if (!fund) {
+                showNotification('未找到基金信息', 'error');
+                return;
+            }
+
+            // 创建编辑模态框
+            const modalDiv = document.createElement('div');
+            modalDiv.id = 'editFundModal';
+            modalDiv.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;">
+                    <div style="background: white; border-radius: 8px; padding: 20px; width: 90%; max-width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+                        <h5 style="margin: 0 0 20px 0; font-weight: 600; color: #333;">编辑基金信息</h5>
+                        <form id="editFundForm">
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">基金代码</label>
+                                <input type="text" name="fund_code" id="edit_fund_code" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; background-color: white;" maxlength="6">
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">基金名称</label>
+                                <input type="text" name="fund_name" id="edit_fund_name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: white;">
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">持有金额</label>
+                                <input type="number" name="holding_amount" id="edit_holding_amount" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background-color: white;">
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                                <button type="button" onclick="closeEditModal()" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 4px; background: white; color: #333; cursor: pointer;">取消</button>
+                                <button type="submit" style="padding: 8px 16px; border: none; border-radius: 4px; background: #3b82f6; color: white; cursor: pointer;">保存</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modalDiv);
+
+            // 设置初始值
+            document.getElementById('edit_fund_code').value = fund.fund_code || '';
+            document.getElementById('edit_fund_name').value = fund.fund_name || '';
+            document.getElementById('edit_holding_amount').value = fund.holding_amount || '';
+
+            // 保存原始的 fund_code，用于API调用
+            const originalFundCode = fund.fund_code;
+
+            // 绑定表单提交事件
+            document.getElementById('editFundForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const updatedFund = {
+                    fund_code: formData.get('fund_code'),
+                    fund_name: formData.get('fund_name'),
+                    holding_amount: parseFloat(formData.get('holding_amount')) || 0
+                };
+
+                try {
+                    // 使用原始的 fund_code 作为 URL 参数
+                    const response = await fetch(`/api/holdings/${originalFundCode}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updatedFund)
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        showNotification('基金信息更新成功，正在刷新数据...', 'success');
+                        // 关闭模态框
+                        closeEditModal();
+                        // 等待500ms让后端完成数据更新，然后重新加载基金列表
+                        setTimeout(() => {
+                            loadFunds();
+                        }, 500);
+                    } else {
+                        showNotification('更新失败: ' + (result.error || '未知错误'), 'error');
+                        closeEditModal();
+                    }
+                } catch (error) {
+                    console.error('更新基金失败:', error);
+                    showNotification('更新失败: 网络错误', 'error');
+                    closeEditModal();
+                }
+            });
+        }
+
+        // 关闭编辑模态框
+        function closeEditModal() {
+            const modal = document.getElementById('editFundModal');
+            if (modal) {
+                document.body.removeChild(modal);
+            }
+        }
+
+        // 删除基金记录
+        async function deleteFundRecord(fundCode) {
+            if (!confirm('确定要删除这个基金记录吗？')) {
+                return;
+            }
+
+            try {
+                // 调用API删除基金记录
+                const response = await fetch(`/api/holdings/\${fundCode}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showNotification('基金记录删除成功', 'success');
+                    // 重新加载基金列表
+                    loadFunds();
+                } else {
+                    showNotification('删除失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                console.error('删除基金失败:', error);
+                showNotification('删除失败: 网络错误', 'error');
+            }
+        }
+
         async function clearFundList() {
             const tbody = document.getElementById('fund-table-body');
             // 显示加载状态
-            tbody.innerHTML = '<tr><td colspan="17" class="loading">清空数据中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="18" class="loading">清空数据中...</td></tr>';
 
             try {
                 // 调用API清空数据库中的持仓记录
@@ -3689,7 +3915,7 @@
                     // 更新总数量显示
                     document.getElementById('total-count').textContent = '0';
                     // 清空表格内容
-                    tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="18" class="empty-state">暂无数据</td></tr>';
                     // 显示成功提示
                     showNotification('持仓已清空', 'success');
                 } else {
@@ -3902,17 +4128,24 @@
 
         async function loadFunds() {
             const tbody = document.getElementById('fund-table-body');
-            tbody.innerHTML = '<tr><td colspan="17" class="loading">加载中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="18" class="loading">加载中...</td></tr>';
 
             try {
                 const search = document.getElementById('search-input').value.trim();
                 const sortBy = document.getElementById('sort-select').value;
 
                 // 从/api/holdings获取用户持仓数据
-                let url = `/api/holdings?user_id=default_user`;
+                // 添加时间戳参数避免浏览器缓存
+                let url = `/api/holdings?user_id=default_user&_t=${Date.now()}`;
                 if (search) url += `&search=${encodeURIComponent(search)}`;
 
-                const response = await fetch(url);
+                const response = await fetch(url, {
+                    cache: 'no-cache',  // 禁用缓存
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
                 const result = await response.json();
 
                 if (result.success) {
@@ -3960,11 +4193,11 @@
                         }
                     }, isLargeDataset ? 10 : 0);
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="17" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="18" class="empty-state">暂无数据</td></tr>';
                 }
             } catch (error) {
                 console.error('加载失败:', error);
-                tbody.innerHTML = '<tr><td colspan="17" class="empty-state">加载失败</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="18" class="empty-state">加载失败</td></tr>';
             }
         }
 
