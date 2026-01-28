@@ -22,7 +22,7 @@ from .trend_analyzer import TrendAnalyzer, TrendType, TrendResult
 from .position_manager import PositionManager, VolatilityLevel, PositionAdjustment
 from .strategy_evaluator import StrategyEvaluator, EvaluationResult
 from .unified_strategy_engine import UnifiedStrategyEngine, UnifiedStrategyResult
-from .strategy_adapter import StrategyAdapter, create_strategy_adapter
+from .strategy_adapter import StrategyAdapter, get_strategy_adapter
 from .custom_strategy_backtest import (
     CustomStrategyBacktest, BacktestResult, TradeRecord,
     FilterEngine, SortingEngine, WeightCalculator, RiskController,

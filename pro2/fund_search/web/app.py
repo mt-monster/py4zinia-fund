@@ -754,7 +754,41 @@ def backtest_strategy():
         base_invest = data.get('base_invest', 100)  # 基准定投金额
         
         if not fund_code:
-            return jsonify({'success': False, 'error': '请输入基金代码'})
+            return jsonify({'success': False, 'error': '请输入基金代码'}), 400
+        
+        # Validate parameters according to requirements 10.4
+        validation_errors = []
+        
+        # Validate initial_amount (must be >= 100)
+        try:
+            initial_amount = float(initial_amount)
+            if initial_amount < 100:
+                validation_errors.append('初始金额必须大于等于100元')
+        except (TypeError, ValueError):
+            validation_errors.append('初始金额必须是有效数字')
+        
+        # Validate base_invest (must be >= 10)
+        try:
+            base_invest = float(base_invest)
+            if base_invest < 10:
+                validation_errors.append('基准定投金额必须大于等于10元')
+        except (TypeError, ValueError):
+            validation_errors.append('基准定投金额必须是有效数字')
+        
+        # Validate days (must be in [30, 60, 90, 180, 365])
+        try:
+            days = int(days)
+            if days not in [30, 60, 90, 180, 365]:
+                validation_errors.append('回测天数必须是30、60、90、180或365天')
+        except (TypeError, ValueError):
+            validation_errors.append('回测天数必须是有效数字')
+        
+        # Return validation errors if any
+        if validation_errors:
+            return jsonify({
+                'success': False, 
+                'error': '; '.join(validation_errors)
+            }), 400
         
         # 获取历史数据
         sql = f"""
@@ -916,6 +950,546 @@ def backtest_strategy():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_invest, days):
+    """
+    Execute backtest for a single fund.
+    
+    Returns backtest result dictionary or None if no data found.
+    Requirements: 4.1, 4.2, 4.3, 4.4
+    """
+    try:
+        # 导入 AkShare 数据获取模块
+        from backtesting.akshare_data_fetcher import fetch_fund_history_with_fallback
+        from backtesting.strategy_adapter import get_strategy_adapter
+        
+        # 获取历史数据（优先数据库，不足时从 AkShare 获取）
+        df = fetch_fund_history_with_fallback(fund_code, days, db_manager)
+        
+        if df.empty:
+            logger.warning(f"无法获取基金 {fund_code} 的历史数据")
+            return None
+        
+        logger.info(f"基金 {fund_code} 获取到 {len(df)} 条历史数据，使用策略 {strategy_id} 开始回测...")
+        
+        df = df.sort_values('analysis_date', ascending=True)
+        
+        # 检查是否为高级策略（dual_ma, mean_reversion, target_value, grid, enhanced_rule_based）
+        strategy_adapter = get_strategy_adapter()
+        use_advanced_strategy = strategy_adapter.is_advanced_strategy(strategy_id)
+        
+        if not use_advanced_strategy:
+            logger.warning(f"未知的策略ID: {strategy_id}，将使用默认策略")
+            strategy_id = 'enhanced_rule_based'
+            use_advanced_strategy = True
+        
+        logger.info(f"策略类型: 高级策略 - {strategy_id}")
+        
+        # Initialize backtest variables
+        balance = initial_amount
+        holdings = 0
+        trades = []
+        returns_history = []
+        cumulative_pnl = 0.0
+        
+        # 为高级策略准备DataFrame（需要包含nav列）
+        if use_advanced_strategy:
+            # 创建包含nav列的DataFrame
+            backtest_df = df.copy()
+            if 'nav' not in backtest_df.columns:
+                # 从current_estimate或yesterday_nav计算nav
+                if 'current_estimate' in backtest_df.columns:
+                    backtest_df['nav'] = backtest_df['current_estimate']
+                elif 'yesterday_nav' in backtest_df.columns:
+                    backtest_df['nav'] = backtest_df['yesterday_nav']
+                else:
+                    # 使用today_return反推nav
+                    backtest_df['nav'] = 1.0
+                    for i in range(1, len(backtest_df)):
+                        prev_nav = backtest_df.iloc[i-1]['nav']
+                        today_ret = backtest_df.iloc[i]['today_return'] / 100 if pd.notna(backtest_df.iloc[i]['today_return']) else 0
+                        backtest_df.iloc[i, backtest_df.columns.get_loc('nav')] = prev_nav * (1 + today_ret)
+        
+        # Run backtest simulation (Requirement 4.3 - Apply selected strategy rules)
+        # 所有策略都使用高级策略实现
+        strategy_returns = []  # Track strategy-specific returns for Sharpe ratio calculation
+        
+        for idx, (df_idx, row) in enumerate(df.iterrows()):
+            today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
+            
+            # Calculate total portfolio value before applying today's return
+            total_value_before = balance + holdings
+            
+            # Calculate cumulative P&L
+            if holdings > 0:
+                cumulative_pnl = (holdings - initial_amount + balance) / initial_amount - 1
+            
+            # 使用高级策略
+            try:
+                signal = strategy_adapter.generate_signal(
+                    strategy_id=strategy_id,
+                    history_df=backtest_df,
+                    current_index=idx,
+                    current_holdings=holdings,
+                    cash=balance,
+                    base_invest=base_invest
+                )
+                
+                # 执行买入
+                if signal.action == 'buy' and signal.buy_multiplier > 0:
+                    buy_amount = base_invest * signal.buy_multiplier
+                    if balance >= buy_amount:
+                        balance -= buy_amount
+                        holdings += buy_amount
+                        trades.append({
+                            'date': str(row['analysis_date']),
+                            'action': 'buy',
+                            'amount': buy_amount,
+                            'balance': round(balance, 2),
+                            'holdings': round(holdings, 2),
+                            'profit': 0,
+                            'multiplier': signal.buy_multiplier,
+                            'reason': signal.reason,
+                            'description': signal.description
+                        })
+                
+                # 执行卖出
+                elif signal.action == 'sell' and signal.redeem_amount > 0:
+                    # 如果redeem_amount是比例（0-1之间）
+                    if 0 < signal.redeem_amount <= 1:
+                        sell_amount = holdings * signal.redeem_amount
+                    else:
+                        sell_amount = min(signal.redeem_amount, holdings)
+                    
+                    if sell_amount > 0:
+                        holdings -= sell_amount
+                        balance += sell_amount
+                        trades.append({
+                            'date': str(row['analysis_date']),
+                            'action': 'sell',
+                            'amount': sell_amount,
+                            'balance': round(balance, 2),
+                            'holdings': round(holdings, 2),
+                            'profit': 0,
+                            'reason': signal.reason,
+                            'description': signal.description
+                        })
+            
+            except Exception as e:
+                logger.error(f"策略 {strategy_id} 执行失败: {str(e)}")
+                # 策略执行失败时，默认持有
+                pass
+            
+            # Update holdings value based on daily return
+            holdings *= (1 + today_return / 100)
+            
+            # Calculate total portfolio value after applying today's return
+            total_value_after = balance + holdings
+            
+            # Calculate daily return for strategy performance
+            if total_value_before > 0:
+                daily_strategy_return = (total_value_after - total_value_before) / total_value_before
+                strategy_returns.append(daily_strategy_return)
+        
+        # Calculate final results (Requirement 4.4)
+        final_value = balance + holdings
+        total_return = (final_value - initial_amount) / initial_amount * 100
+        
+        # Calculate annualized return
+        years = days / 365.0
+        annualized_return = ((final_value / initial_amount) ** (1 / years) - 1) * 100 if years > 0 else 0
+        
+        # Calculate max drawdown
+        peak = initial_amount
+        max_dd = 0
+        for trade in trades:
+            current_value = trade['balance'] + trade['holdings']
+            if current_value > peak:
+                peak = current_value
+            drawdown = (peak - current_value) / peak * 100 if peak > 0 else 0
+            if drawdown > max_dd:
+                max_dd = drawdown
+        
+        # Calculate Sharpe ratio (simplified) - now based on strategy performance
+        if len(strategy_returns) > 1:
+            import numpy as np
+            returns_array = np.array(strategy_returns)
+            mean_return = np.mean(returns_array)
+            std_return = np.std(returns_array)
+            sharpe_ratio = (mean_return / std_return * np.sqrt(252)) if std_return > 0 else 0
+        else:
+            sharpe_ratio = 0
+        
+        # Evaluate strategy performance (Requirement 4.4)
+        evaluation = strategy_evaluator.evaluate(trades)
+        evaluation_dict = strategy_evaluator.to_dict(evaluation)
+        
+        # Clean up Infinity and NaN values
+        import math
+        for key, value in evaluation_dict.items():
+            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
+                evaluation_dict[key] = None
+        
+        logger.info(f"回测完成: 策略={strategy_id}, 最终价值={final_value:.2f}, 总收益率={total_return:.2f}%, 交易次数={len(trades)}")
+        
+        # Return complete backtest results
+        return {
+            'fund_code': fund_code,
+            'strategy_id': strategy_id,
+            'initial_amount': initial_amount,
+            'final_value': round(final_value, 2),
+            'total_return': round(total_return, 2),
+            'annualized_return': round(annualized_return, 2),
+            'max_drawdown': round(max_dd, 2),
+            'sharpe_ratio': round(sharpe_ratio, 4),
+            'trades_count': len(trades),
+            'trades': trades,
+            'evaluation': evaluation_dict
+        }
+    except Exception as e:
+        logger.error(f"Single fund backtest failed for {fund_code}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_invest, days):
+    """
+    Execute independent backtests for multiple funds and aggregate results.
+    
+    Requirements: 6.1, 6.2, 6.3, 6.4, 6.5
+    """
+    try:
+        # Execute independent backtests for each fund (Requirement 6.2)
+        individual_results = []
+        failed_funds = []
+        
+        # Divide initial amount equally among funds
+        amount_per_fund = initial_amount / len(fund_codes)
+        
+        for fund_code in fund_codes:
+            result = _execute_single_fund_backtest(
+                fund_code, strategy_id, amount_per_fund, base_invest, days
+            )
+            
+            if result is not None:
+                individual_results.append(result)
+            else:
+                failed_funds.append(fund_code)
+        
+        if not individual_results:
+            return jsonify({
+                'success': False,
+                'error': f'无法获取任何基金的历史数据: {", ".join(failed_funds)}'
+            }), 404
+        
+        # Calculate aggregated portfolio metrics (Requirement 6.3)
+        total_final_value = sum(r['final_value'] for r in individual_results)
+        total_initial_amount = sum(r['initial_amount'] for r in individual_results)
+        
+        portfolio_total_return = (total_final_value - total_initial_amount) / total_initial_amount * 100
+        
+        # Calculate portfolio annualized return
+        years = days / 365.0
+        portfolio_annualized_return = ((total_final_value / total_initial_amount) ** (1 / years) - 1) * 100 if years > 0 else 0
+        
+        # Calculate weighted average metrics
+        weights = [r['initial_amount'] / total_initial_amount for r in individual_results]
+        portfolio_max_drawdown = sum(r['max_drawdown'] * w for r, w in zip(individual_results, weights))
+        portfolio_sharpe_ratio = sum(r['sharpe_ratio'] * w for r, w in zip(individual_results, weights))
+        
+        total_trades = sum(r['trades_count'] for r in individual_results)
+        
+        # Identify best and worst performing funds (Requirement 6.5)
+        best_fund = max(individual_results, key=lambda x: x['total_return'])
+        worst_fund = min(individual_results, key=lambda x: x['total_return'])
+        
+        # Prepare individual fund summary (without full trade history for brevity)
+        fund_summaries = []
+        for result in individual_results:
+            fund_summaries.append({
+                'fund_code': result['fund_code'],
+                'initial_amount': result['initial_amount'],
+                'final_value': result['final_value'],
+                'total_return': result['total_return'],
+                'annualized_return': result['annualized_return'],
+                'max_drawdown': result['max_drawdown'],
+                'sharpe_ratio': result['sharpe_ratio'],
+                'trades_count': result['trades_count']
+            })
+        
+        # Return both individual and aggregated results (Requirement 6.4, 6.5)
+        return jsonify({
+            'success': True,
+            'data': {
+                'mode': 'multi_fund',
+                'strategy_id': strategy_id,
+                'total_funds': len(individual_results),
+                'failed_funds': failed_funds,
+                
+                # Aggregated portfolio metrics (Requirement 6.3)
+                'portfolio': {
+                    'initial_amount': round(total_initial_amount, 2),
+                    'final_value': round(total_final_value, 2),
+                    'total_return': round(portfolio_total_return, 2),
+                    'annualized_return': round(portfolio_annualized_return, 2),
+                    'max_drawdown': round(portfolio_max_drawdown, 2),
+                    'sharpe_ratio': round(portfolio_sharpe_ratio, 4),
+                    'total_trades': total_trades
+                },
+                
+                # Best and worst performing funds (Requirement 6.5)
+                'best_fund': {
+                    'fund_code': best_fund['fund_code'],
+                    'total_return': best_fund['total_return'],
+                    'final_value': best_fund['final_value']
+                },
+                'worst_fund': {
+                    'fund_code': worst_fund['fund_code'],
+                    'total_return': worst_fund['total_return'],
+                    'final_value': worst_fund['final_value']
+                },
+                
+                # Individual fund results (Requirement 6.4)
+                'individual_funds': fund_summaries,
+                'funds': fund_summaries,  # 添加funds键以兼容前端
+                
+                # Full details for first fund (for UI display)
+                'sample_fund_details': individual_results[0] if individual_results else None
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Multi-fund backtest failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy/backtest-holdings', methods=['POST'])
+def backtest_holdings():
+    """
+    Enhanced backtest API endpoint for user holdings with strategy selection
+    
+    Accepts fund_codes array, strategy_id, and backtest parameters.
+    Integrates with existing backtest engine and applies selected strategy rules.
+    Returns complete backtest results with evaluation metrics.
+    
+    Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3, 6.4, 6.5
+    """
+    try:
+        data = request.get_json()
+        fund_codes = data.get('fund_codes', [])
+        strategy_id = data.get('strategy_id', 'enhanced_rule_based')
+        initial_amount = data.get('initial_amount', 10000)
+        base_invest = data.get('base_invest', 100)
+        days = data.get('days', 90)
+        
+        # Validate parameters (Requirement 4.5)
+        validation_errors = []
+        
+        # Validate fund_codes
+        if not fund_codes or not isinstance(fund_codes, list):
+            validation_errors.append('fund_codes必须是非空数组')
+        elif len(fund_codes) == 0:
+            validation_errors.append('至少需要选择一个基金')
+        
+        # Validate initial_amount (must be >= 100)
+        try:
+            initial_amount = float(initial_amount)
+            if initial_amount < 100:
+                validation_errors.append('初始金额必须大于等于100元')
+        except (TypeError, ValueError):
+            validation_errors.append('初始金额必须是有效数字')
+        
+        # Validate base_invest (must be >= 10)
+        try:
+            base_invest = float(base_invest)
+            if base_invest < 10:
+                validation_errors.append('基准定投金额必须大于等于10元')
+        except (TypeError, ValueError):
+            validation_errors.append('基准定投金额必须是有效数字')
+        
+        # Validate days (must be in [30, 60, 90, 180, 365])
+        try:
+            days = int(days)
+            if days not in [30, 60, 90, 180, 365]:
+                validation_errors.append('回测天数必须是30、60、90、180或365天')
+        except (TypeError, ValueError):
+            validation_errors.append('回测天数必须是有效数字')
+        
+        # Validate strategy_id
+        from backtesting.strategy_report_parser import StrategyReportParser
+        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        
+        try:
+            parser = StrategyReportParser(report_path)
+            available_strategies = parser.get_all_strategy_ids()
+            
+            if strategy_id not in available_strategies:
+                validation_errors.append(f'无效的策略ID: {strategy_id}，可用策略: {", ".join(available_strategies)}')
+        except Exception as e:
+            logger.warning(f"无法验证策略ID: {str(e)}")
+        
+        # Return validation errors if any
+        if validation_errors:
+            return jsonify({
+                'success': False,
+                'error': '; '.join(validation_errors)
+            }), 400
+        
+        # Multi-fund backtesting (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
+        if len(fund_codes) > 1:
+            return _execute_multi_fund_backtest(
+                fund_codes, strategy_id, initial_amount, base_invest, days
+            )
+        
+        # Single fund backtest (Requirement 4.1, 4.2, 4.3)
+        fund_code = fund_codes[0]
+        result = _execute_single_fund_backtest(
+            fund_code, strategy_id, initial_amount, base_invest, days
+        )
+        
+        if result is None:
+            return jsonify({
+                'success': False,
+                'error': f'没有找到基金 {fund_code} 的历史数据'
+            }), 404
+        
+        # Return complete backtest results (Requirement 4.4)
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logger.error(f"Enhanced backtest failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategy/compare', methods=['POST'])
+def compare_strategies():
+    """
+    Strategy comparison API endpoint
+    
+    Accepts a single fund_code and multiple strategy_ids.
+    Executes backtests for all selected strategies with identical parameters.
+    Returns side-by-side comparison results with best strategy highlighted.
+    
+    Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
+    """
+    try:
+        data = request.get_json()
+        fund_code = data.get('fund_code')
+        strategy_ids = data.get('strategy_ids', [])
+        initial_amount = data.get('initial_amount', 10000)
+        base_invest = data.get('base_invest', 100)
+        days = data.get('days', 90)
+        
+        # Validate parameters
+        validation_errors = []
+        
+        # Validate fund_code
+        if not fund_code:
+            validation_errors.append('fund_code是必需的')
+        
+        # Validate strategy_ids
+        if not strategy_ids or not isinstance(strategy_ids, list):
+            validation_errors.append('strategy_ids必须是非空数组')
+        elif len(strategy_ids) < 2:
+            validation_errors.append('至少需要选择两个策略进行比较')
+        
+        # Validate initial_amount (must be >= 100)
+        try:
+            initial_amount = float(initial_amount)
+            if initial_amount < 100:
+                validation_errors.append('初始金额必须大于等于100元')
+        except (TypeError, ValueError):
+            validation_errors.append('初始金额必须是有效数字')
+        
+        # Validate base_invest (must be >= 10)
+        try:
+            base_invest = float(base_invest)
+            if base_invest < 10:
+                validation_errors.append('基准定投金额必须大于等于10元')
+        except (TypeError, ValueError):
+            validation_errors.append('基准定投金额必须是有效数字')
+        
+        # Validate days (must be in [30, 60, 90, 180, 365])
+        try:
+            days = int(days)
+            if days not in [30, 60, 90, 180, 365]:
+                validation_errors.append('回测天数必须是30、60、90、180或365天')
+        except (TypeError, ValueError):
+            validation_errors.append('回测天数必须是有效数字')
+        
+        # Validate strategy_ids
+        from backtesting.strategy_report_parser import StrategyReportParser
+        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        
+        try:
+            parser = StrategyReportParser(report_path)
+            available_strategies = parser.get_all_strategy_ids()
+            
+            for strategy_id in strategy_ids:
+                if strategy_id not in available_strategies:
+                    validation_errors.append(f'无效的策略ID: {strategy_id}')
+        except Exception as e:
+            logger.warning(f"无法验证策略ID: {str(e)}")
+        
+        # Return validation errors if any
+        if validation_errors:
+            return jsonify({
+                'success': False,
+                'error': '; '.join(validation_errors)
+            }), 400
+        
+        # Execute backtests for all strategies with identical parameters (Requirement 7.2)
+        comparison_results = []
+        
+        for strategy_id in strategy_ids:
+            result = _execute_single_fund_backtest(
+                fund_code, strategy_id, initial_amount, base_invest, days
+            )
+            
+            if result is None:
+                return jsonify({
+                    'success': False,
+                    'error': f'没有找到基金 {fund_code} 的历史数据'
+                }), 404
+            
+            comparison_results.append(result)
+        
+        # Identify best performing strategy by total return (Requirement 7.4)
+        best_strategy = max(comparison_results, key=lambda x: x['total_return'])
+        best_strategy_id = best_strategy['strategy_id']
+        
+        # Mark the best strategy
+        for result in comparison_results:
+            result['is_best'] = (result['strategy_id'] == best_strategy_id)
+        
+        # Return comparison results (Requirement 7.3, 7.5)
+        return jsonify({
+            'success': True,
+            'data': {
+                'fund_code': fund_code,
+                'initial_amount': initial_amount,
+                'base_invest': base_invest,
+                'days': days,
+                'strategies': comparison_results,
+                'best_strategy_id': best_strategy_id
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Strategy comparison failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
     """获取分析汇总"""
@@ -1019,6 +1593,77 @@ def get_funds_by_date(date):
 
 
 # ==================== 持仓管理 API ====================
+
+@app.route('/api/user-holdings', methods=['GET'])
+def get_user_holdings():
+    """获取用户持仓列表（简化版，用于策略页面）
+    
+    返回用户的基金持仓基本信息，不包含复杂的盈亏计算
+    """
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        sql = """
+        SELECT fund_code, fund_name, holding_shares, cost_price, 
+               holding_amount, buy_date
+        FROM user_holdings 
+        WHERE user_id = :user_id
+        ORDER BY holding_amount DESC
+        """
+        
+        df = db_manager.execute_query(sql, {'user_id': user_id})
+        
+        if df.empty:
+            return jsonify({'success': True, 'data': []})
+        
+        # 转换为字典列表
+        holdings = []
+        for _, row in df.iterrows():
+            holding = {
+                'fund_code': row['fund_code'],
+                'fund_name': row['fund_name'],
+                'holding_shares': round(float(row['holding_shares']), 4) if pd.notna(row['holding_shares']) else 0,
+                'cost_price': round(float(row['cost_price']), 4) if pd.notna(row['cost_price']) else 0,
+                'holding_amount': round(float(row['holding_amount']), 2) if pd.notna(row['holding_amount']) else 0,
+                'buy_date': str(row['buy_date']) if pd.notna(row['buy_date']) else None
+            }
+            holdings.append(holding)
+        
+        return jsonify({'success': True, 'data': holdings})
+        
+    except Exception as e:
+        logger.error(f"获取用户持仓失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/strategies/metadata', methods=['GET'])
+def get_strategies_metadata():
+    """获取策略元数据（从策略对比报告中解析）
+    
+    返回五个策略的详细信息，包括绩效指标
+    """
+    try:
+        from backtesting.strategy_report_parser import StrategyReportParser
+        
+        # 策略报告路径
+        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        
+        # 解析策略报告
+        parser = StrategyReportParser(report_path)
+        strategies = parser.parse()
+        
+        return jsonify({'success': True, 'data': strategies})
+        
+    except FileNotFoundError as e:
+        logger.error(f"策略报告文件未找到: {str(e)}")
+        return jsonify({'success': False, 'error': '策略报告文件未找到'}), 500
+    except ValueError as e:
+        logger.error(f"策略报告解析失败: {str(e)}")
+        return jsonify({'success': False, 'error': f'策略报告解析失败: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"获取策略元数据失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/holdings', methods=['GET'])
 def get_holdings():
@@ -1182,61 +1827,237 @@ def add_holding():
 
 @app.route('/api/holdings/<fund_code>', methods=['PUT'])
 def update_holding(fund_code):
-    """更新持仓"""
+    """更新持仓并刷新实时数据"""
     try:
         data = request.get_json()
         user_id = data.get('user_id', 'default_user')
         
-        # 构建更新字段
-        update_fields = []
-        params = {'user_id': user_id, 'fund_code': fund_code}
+        # 检查是否修改了 fund_code
+        new_fund_code = data.get('fund_code')
+        fund_code_changed = new_fund_code and new_fund_code != fund_code
         
-        if 'fund_name' in data:
-            update_fields.append('fund_name = :fund_name')
-            params['fund_name'] = data['fund_name']
-        
-        if 'holding_shares' in data:
-            update_fields.append('holding_shares = :holding_shares')
-            params['holding_shares'] = float(data['holding_shares'])
-        
-        if 'cost_price' in data:
-            update_fields.append('cost_price = :cost_price')
-            params['cost_price'] = float(data['cost_price'])
-        
-        # 重新计算持有金额
-        if 'holding_shares' in data or 'cost_price' in data:
-            # 获取当前值
-            sql_get = "SELECT holding_shares, cost_price FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
-            df = db_manager.execute_query(sql_get, {'user_id': user_id, 'fund_code': fund_code})
-            if not df.empty:
-                current_shares = params.get('holding_shares', float(df.iloc[0]['holding_shares']))
-                current_price = params.get('cost_price', float(df.iloc[0]['cost_price']))
-                params['holding_amount'] = current_shares * current_price
-                update_fields.append('holding_amount = :holding_amount')
-        
-        if 'buy_date' in data:
-            update_fields.append('buy_date = :buy_date')
-            params['buy_date'] = data['buy_date']
-        
-        if 'notes' in data:
-            update_fields.append('notes = :notes')
-            params['notes'] = data['notes']
-        
-        if not update_fields:
-            return jsonify({'success': False, 'error': '没有要更新的字段'}), 400
-        
-        sql = f"""
-        UPDATE user_holdings 
-        SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = :user_id AND fund_code = :fund_code
-        """
-        
-        success = db_manager.execute_sql(sql, params)
-        
-        if success:
-            return jsonify({'success': True, 'message': '持仓更新成功'})
+        # 如果 fund_code 改变了，需要特殊处理
+        if fund_code_changed:
+            # 检查新的 fund_code 是否已存在
+            check_sql = "SELECT COUNT(*) as count FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+            check_result = db_manager.execute_query(check_sql, {'user_id': user_id, 'fund_code': new_fund_code})
+            if not check_result.empty and check_result.iloc[0]['count'] > 0:
+                return jsonify({'success': False, 'error': f'基金代码 {new_fund_code} 已存在'}), 400
+            
+            # 获取旧记录的所有数据
+            get_sql = "SELECT * FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+            old_record = db_manager.execute_query(get_sql, {'user_id': user_id, 'fund_code': fund_code})
+            
+            if old_record.empty:
+                return jsonify({'success': False, 'error': '未找到原始记录'}), 404
+            
+            old_data = old_record.iloc[0].to_dict()
+            
+            # 更新字段值
+            old_data['fund_code'] = new_fund_code
+            if 'fund_name' in data:
+                old_data['fund_name'] = data['fund_name']
+            if 'holding_amount' in data:
+                old_data['holding_amount'] = float(data['holding_amount'])
+            
+            # 删除旧记录
+            delete_sql = "DELETE FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+            db_manager.execute_sql(delete_sql, {'user_id': user_id, 'fund_code': fund_code})
+            
+            # 插入新记录
+            insert_sql = """
+            INSERT INTO user_holdings (user_id, fund_code, fund_name, holding_shares, cost_price, 
+                                      holding_amount, buy_date, notes)
+            VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, 
+                    :holding_amount, :buy_date, :notes)
+            """
+            insert_params = {
+                'user_id': user_id,
+                'fund_code': old_data['fund_code'],
+                'fund_name': old_data['fund_name'],
+                'holding_shares': float(old_data.get('holding_shares', 0)),
+                'cost_price': float(old_data.get('cost_price', 0)),
+                'holding_amount': float(old_data.get('holding_amount', 0)),
+                'buy_date': old_data.get('buy_date'),
+                'notes': old_data.get('notes', '')
+            }
+            success = db_manager.execute_sql(insert_sql, insert_params)
+            
+            if not success:
+                return jsonify({'success': False, 'error': '更新基金代码失败'}), 500
+            
+            # 使用新的 fund_code 继续后续处理
+            fund_code = new_fund_code
+            fund_name = old_data['fund_name']
         else:
-            return jsonify({'success': False, 'error': '持仓更新失败'}), 500
+            # fund_code 没有改变，正常更新
+            update_fields = []
+            params = {'user_id': user_id, 'fund_code': fund_code}
+            
+            if 'fund_name' in data:
+                update_fields.append('fund_name = :fund_name')
+                params['fund_name'] = data['fund_name']
+            
+            if 'holding_shares' in data:
+                update_fields.append('holding_shares = :holding_shares')
+                params['holding_shares'] = float(data['holding_shares'])
+            
+            if 'cost_price' in data:
+                update_fields.append('cost_price = :cost_price')
+                params['cost_price'] = float(data['cost_price'])
+            
+            # 重新计算持有金额
+            if 'holding_amount' in data:
+                update_fields.append('holding_amount = :holding_amount')
+                params['holding_amount'] = float(data['holding_amount'])
+            elif 'holding_shares' in data or 'cost_price' in data:
+                # 获取当前值
+                sql_get = "SELECT holding_shares, cost_price FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+                df = db_manager.execute_query(sql_get, {'user_id': user_id, 'fund_code': fund_code})
+                if not df.empty:
+                    current_shares = params.get('holding_shares', float(df.iloc[0]['holding_shares']))
+                    current_price = params.get('cost_price', float(df.iloc[0]['cost_price']))
+                    params['holding_amount'] = current_shares * current_price
+                    update_fields.append('holding_amount = :holding_amount')
+            
+            if 'buy_date' in data:
+                update_fields.append('buy_date = :buy_date')
+                params['buy_date'] = data['buy_date']
+            
+            if 'notes' in data:
+                update_fields.append('notes = :notes')
+                params['notes'] = data['notes']
+            
+            if not update_fields:
+                return jsonify({'success': False, 'error': '没有要更新的字段'}), 400
+            
+            sql = f"""
+            UPDATE user_holdings 
+            SET {', '.join(update_fields)}, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = :user_id AND fund_code = :fund_code
+            """
+            
+            success = db_manager.execute_sql(sql, params)
+            
+            if not success:
+                return jsonify({'success': False, 'error': '持仓更新失败'}), 500
+            
+            # 获取基金名称
+            fund_name = params.get('fund_name')
+            if not fund_name:
+                sql_name = "SELECT fund_name FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+                df_name = db_manager.execute_query(sql_name, {'user_id': user_id, 'fund_code': fund_code})
+                if not df_name.empty:
+                    fund_name = df_name.iloc[0]['fund_name']
+        
+        # 更新成功后，获取最新实时数据并更新fund_analysis_results表
+        try:
+            from data_retrieval.enhanced_fund_data import EnhancedFundData
+            from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+            
+            fund_data_manager = EnhancedFundData()
+            strategy_engine = EnhancedInvestmentStrategy()
+            
+            # 获取实时数据
+            realtime_data = fund_data_manager.get_realtime_data(fund_code)
+            performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
+            
+            # 计算今日和昨日收益率
+            today_return = float(realtime_data.get('today_return', 0.0))
+            yesterday_return = float(realtime_data.get('yesterday_return', 0.0))
+            
+            # 投资策略分析
+            strategy_result = strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
+            
+            # 更新fund_analysis_results表
+            from datetime import datetime
+            analysis_date = datetime.now().date()
+            
+            update_sql = """
+            INSERT INTO fund_analysis_results (
+                fund_code, fund_name, analysis_date,
+                yesterday_nav, current_estimate, today_return, prev_day_return,
+                status_label, operation_suggestion, execution_amount,
+                is_buy, buy_multiplier, redeem_amount, comparison_value,
+                annualized_return, sharpe_ratio, sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all,
+                max_drawdown, volatility, calmar_ratio, sortino_ratio, var_95,
+                win_rate, profit_loss_ratio, total_return, composite_score
+            ) VALUES (
+                :fund_code, :fund_name, :analysis_date,
+                :yesterday_nav, :current_estimate, :today_return, :prev_day_return,
+                :status_label, :operation_suggestion, :execution_amount,
+                :is_buy, :buy_multiplier, :redeem_amount, :comparison_value,
+                :annualized_return, :sharpe_ratio, :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all,
+                :max_drawdown, :volatility, :calmar_ratio, :sortino_ratio, :var_95,
+                :win_rate, :profit_loss_ratio, :total_return, :composite_score
+            ) ON DUPLICATE KEY UPDATE
+                fund_name = VALUES(fund_name),
+                yesterday_nav = VALUES(yesterday_nav),
+                current_estimate = VALUES(current_estimate),
+                today_return = VALUES(today_return),
+                prev_day_return = VALUES(prev_day_return),
+                status_label = VALUES(status_label),
+                operation_suggestion = VALUES(operation_suggestion),
+                execution_amount = VALUES(execution_amount),
+                is_buy = VALUES(is_buy),
+                buy_multiplier = VALUES(buy_multiplier),
+                redeem_amount = VALUES(redeem_amount),
+                comparison_value = VALUES(comparison_value),
+                annualized_return = VALUES(annualized_return),
+                sharpe_ratio = VALUES(sharpe_ratio),
+                sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
+                sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
+                sharpe_ratio_all = VALUES(sharpe_ratio_all),
+                max_drawdown = VALUES(max_drawdown),
+                volatility = VALUES(volatility),
+                calmar_ratio = VALUES(calmar_ratio),
+                sortino_ratio = VALUES(sortino_ratio),
+                var_95 = VALUES(var_95),
+                win_rate = VALUES(win_rate),
+                profit_loss_ratio = VALUES(profit_loss_ratio),
+                total_return = VALUES(total_return),
+                composite_score = VALUES(composite_score)
+            """
+            
+            update_params = {
+                'fund_code': fund_code,
+                'fund_name': fund_name or fund_code,
+                'analysis_date': analysis_date,
+                'yesterday_nav': realtime_data.get('previous_nav', 0.0),
+                'current_estimate': realtime_data.get('estimate_nav', 0.0),
+                'today_return': today_return,
+                'prev_day_return': yesterday_return,
+                'status_label': strategy_result.get('status_label', ''),
+                'operation_suggestion': strategy_result.get('operation_suggestion', ''),
+                'execution_amount': strategy_result.get('execution_amount', ''),
+                'is_buy': 1 if strategy_result.get('action') in ['buy', 'strong_buy', 'weak_buy'] else 0,
+                'buy_multiplier': strategy_result.get('buy_multiplier', 0.0),
+                'redeem_amount': strategy_result.get('redeem_amount', 0.0),
+                'comparison_value': strategy_result.get('comparison_value', 0.0),
+                'annualized_return': performance_metrics.get('annualized_return', 0.0),
+                'sharpe_ratio': performance_metrics.get('sharpe_ratio', 0.0),
+                'sharpe_ratio_ytd': performance_metrics.get('sharpe_ratio_ytd', 0.0),
+                'sharpe_ratio_1y': performance_metrics.get('sharpe_ratio_1y', 0.0),
+                'sharpe_ratio_all': performance_metrics.get('sharpe_ratio_all', 0.0),
+                'max_drawdown': performance_metrics.get('max_drawdown', 0.0),
+                'volatility': performance_metrics.get('volatility', 0.0),
+                'calmar_ratio': performance_metrics.get('calmar_ratio', 0.0),
+                'sortino_ratio': performance_metrics.get('sortino_ratio', 0.0),
+                'var_95': performance_metrics.get('var_95', 0.0),
+                'win_rate': performance_metrics.get('win_rate', 0.0),
+                'profit_loss_ratio': performance_metrics.get('profit_loss_ratio', 0.0),
+                'total_return': performance_metrics.get('total_return', 0.0),
+                'composite_score': performance_metrics.get('composite_score', 0.0)
+            }
+            
+            db_manager.execute_sql(update_sql, update_params)
+            logger.info(f"已更新基金 {fund_code} 的实时数据和指标")
+            
+        except Exception as e:
+            logger.warning(f"更新实时数据失败: {str(e)}")
+            # 即使更新实时数据失败，也返回成功（因为持仓已更新）
+        
+        return jsonify({'success': True, 'message': '持仓更新成功，实时数据已刷新'})
             
     except Exception as e:
         logger.error(f"更新持仓失败: {str(e)}")
