@@ -516,6 +516,16 @@
             </div>
         </div>
 
+        <!-- 综合分析区域 -->
+        <div id="comprehensive-analysis-section" class="analysis-section" style="display: none;">
+            <h2>综合分析结果</h2>
+            <div id="comprehensive-content">
+                <div class="loading-spinner">
+                    <i class="bi bi-arrow-repeat"></i> 加载中...
+                </div>
+            </div>
+        </div>
+
         <!-- 基金详细分析区域 -->
         <div id="fund-details-section" class="fund-detail-section" style="display: none;">
             <!-- 动态生成的基金详细分析卡片将插入这里 -->
@@ -710,9 +720,10 @@
             const data = getAnalysisData();
             renderAnalysisResult(data);
             
-            // 如果有基金代码，加载详细分析
+            // 如果有基金代码，加载详细分析和综合分析
             if (data && data.fund_codes && data.fund_codes.length > 0) {
                 loadFundDetails(data.fund_codes, data.fund_names);
+                loadComprehensiveAnalysis(data.fund_codes);
             }
         };
 
@@ -944,6 +955,158 @@
                 document.querySelector(`#holdings-table-${fundCode} tbody`).innerHTML = 
                     '<tr><td colspan="5" class="empty-data">加载失败</td></tr>';
             }
+        }
+
+        // 加载综合分析数据
+        async function loadComprehensiveAnalysis(fundCodes) {
+            try {
+                const response = await fetch('/api/holdings/analyze/comprehensive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fund_codes: fundCodes })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    renderComprehensiveAnalysis(result.data);
+                } else {
+                    document.getElementById('comprehensive-content').innerHTML = `
+                        <div class="error-message">
+                            <p>综合分析失败: ${result.error || '未知错误'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载综合分析失败:', error);
+                document.getElementById('comprehensive-content').innerHTML = `
+                    <div class="error-message">
+                        <p>加载综合分析失败: 网络错误</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 渲染综合分析结果
+        function renderComprehensiveAnalysis(data) {
+            const section = document.getElementById('comprehensive-analysis-section');
+            const contentDiv = document.getElementById('comprehensive-content');
+            
+            section.style.display = 'block';
+            
+            if (!data) {
+                contentDiv.innerHTML = `
+                    <div class="error-message">
+                        <p>没有综合分析数据</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+
+            // 资产配置
+            if (data.asset_allocation) {
+                html += `<div style="margin-top: 20px;">
+                    <h3>资产配置</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">资产类型</th>
+                                <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">占比</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                Object.entries(data.asset_allocation).forEach(([type, ratio]) => {
+                    html += `<tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;">${type}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${ratio}%</td>
+                    </tr>`;
+                });
+
+                html += `</tbody>
+                    </table>
+                </div>`;
+            }
+
+            // 行业分布
+            if (data.industry_distribution) {
+                html += `<div style="margin-top: 30px;">
+                    <h3>行业分布</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr>
+                                <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">行业</th>
+                                <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">占比</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                Object.entries(data.industry_distribution).forEach(([industry, ratio]) => {
+                    html += `<tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;">${industry}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${ratio}%</td>
+                    </tr>`;
+                });
+
+                html += `</tbody>
+                    </table>
+                </div>`;
+            }
+
+            // 重仓股
+            if (data.top_stocks) {
+                html += `<div style="margin-top: 30px;">
+                    <h3>重仓股 TOP10</h3>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                            <thead>
+                                <tr>
+                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">股票名称</th>
+                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">代码</th>
+                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">持仓占比</th>
+                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">市值(万)</th>
+                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">涨跌幅</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                data.top_stocks.forEach(stock => {
+                    const returnClass = stock.stock_return > 0 ? 'positive-change' : stock.stock_return < 0 ? 'negative-change' : '';
+                    const returnSign = stock.stock_return > 0 ? '+' : '';
+                    html += `<tr>
+                        <td style="border: 1px solid #ddd; padding: 10px;">${stock.stock_name}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; font-family: monospace;">${stock.stock_code}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${stock.proportion}%</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${stock.market_value || '--'}</td>
+                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;" class="${returnClass}">
+                            ${stock.stock_return ? returnSign + stock.stock_return + '%' : '--'}
+                        </td>
+                    </tr>`;
+                });
+
+                html += `</tbody>
+                        </table>
+                    </div>
+                </div>`;
+            }
+
+            // 分析摘要
+            if (data.summary) {
+                html += `<div style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+                    <h3>分析摘要</h3>
+                    <div style="line-height: 1.5;">
+                        <p><strong>总股票占比：</strong>${data.summary.total_stock_proportion}%</p>
+                        <p><strong>行业集中度（前3）：</strong>${data.summary.top_industry_concentration}%</p>
+                        <p><strong>重仓股集中度（前5）：</strong>${data.summary.top_stock_concentration}%</p>
+                        <p><strong>分析日期：</strong>${data.summary.analysis_date}</p>
+                    </div>
+                </div>`;
+            }
+
+            contentDiv.innerHTML = html;
         }
     </script>
 </body>
