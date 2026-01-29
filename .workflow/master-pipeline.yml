@@ -66,18 +66,16 @@ stages:
           - echo ""
           - echo "Test reports available:"
           - ls -la tests/reports/ 2>/dev/null || echo "No test reports found"
+          # 确保文件存在，避免制品上传失败
+          - touch tests/reports/.gitkeep
+          - touch htmlcov/.gitkeep
+          - touch coverage.xml
         artifacts:
           - name: TEST_REPORTS
             path:
               - pro2/tests/reports/
               - pro2/htmlcov/
               - pro2/coverage.xml
-
-      - step: publish@general_artifacts
-        name: publish_test_reports
-        displayName: 上传测试报告
-        dependArtifact: TEST_REPORTS
-        artifactName: test-reports
 
   # 阶段2: 代码风格检查
   - name: lint
