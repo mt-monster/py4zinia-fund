@@ -25,6 +25,7 @@ from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
 from data_retrieval.enhanced_fund_data import EnhancedFundData
 from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
+from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -2334,17 +2335,20 @@ def analyze_comprehensive():
         
         combined_holdings = pd.concat(all_holdings, ignore_index=True)
         
-        # Calculate asset allocation
-        asset_allocation = calculate_asset_allocation(combined_holdings, total_asset)
+        # Get fund count for weighted average calculation
+        fund_codes_count = len(fund_codes)
         
-        # Calculate industry distribution
-        industry_distribution = calculate_industry_distribution(combined_holdings, total_asset)
+        # Calculate asset allocation (with weighted average for multiple funds)
+        asset_allocation = calculate_asset_allocation(combined_holdings, total_asset, fund_codes_count)
         
-        # Calculate top stocks
-        top_stocks = calculate_top_stocks(combined_holdings, total_asset)
+        # Calculate industry distribution (with weighted average for multiple funds)
+        industry_distribution = calculate_industry_distribution(combined_holdings, total_asset, fund_codes_count)
+        
+        # Calculate top stocks (with weighted average for multiple funds)
+        top_stocks = calculate_top_stocks(combined_holdings, total_asset, fund_codes_count)
         
         # Generate analysis summary
-        summary = generate_analysis_summary(asset_allocation, industry_distribution, top_stocks)
+        summary = generate_analysis_summary(asset_allocation, industry_distribution, top_stocks, fund_codes_count)
         
         return jsonify({
             'success': True,
@@ -2419,9 +2423,14 @@ def get_fund_holdings_data(fund_code):
         traceback.print_exc()
         return None
 
-def calculate_asset_allocation(holdings_df, total_asset):
+def calculate_asset_allocation(holdings_df, total_asset, fund_codes_count=1):
     """
     Calculate asset allocation based on holdings data
+    
+    Args:
+        holdings_df: 持仓数据DataFrame
+        total_asset: 总资产（用于市值计算）
+        fund_codes_count: 基金数量（用于加权平均）
     """
     try:
         # Group by asset type
@@ -2429,22 +2438,32 @@ def calculate_asset_allocation(holdings_df, total_asset):
             asset_groups = holdings_df.groupby('asset_type')['proportion'].sum()
         else:
             # Default to stock allocation if no asset type column
+            # 当多个基金时，需要计算加权平均而不是简单相加
             stock_proportion = holdings_df['proportion'].sum()
-            asset_groups = pd.Series({'股票': stock_proportion, '债券': 0, '现金': 0, '其他': 0})
+            # 按基金数量加权平均，确保总比例不超过100%
+            weighted_stock_proportion = stock_proportion / max(fund_codes_count, 1)
+            asset_groups = pd.Series({'股票': weighted_stock_proportion, '债券': 0, '现金': 0, '其他': 0})
         
         # Convert to dictionary with percentage format
         asset_allocation = {}
         for asset_type, proportion in asset_groups.items():
-            asset_allocation[str(asset_type)] = round(float(proportion), 2)
+            # 对多基金情况进行加权平均
+            adjusted_proportion = proportion / max(fund_codes_count, 1)
+            asset_allocation[str(asset_type)] = round(float(adjusted_proportion), 2)
         
         return asset_allocation
     except Exception as e:
         logger.error(f"计算资产配置失败: {e}")
         return {}
 
-def calculate_industry_distribution(holdings_df, total_asset):
+def calculate_industry_distribution(holdings_df, total_asset, fund_codes_count=1):
     """
     Calculate industry distribution based on holdings data
+    
+    Args:
+        holdings_df: 持仓数据DataFrame
+        total_asset: 总资产（用于市值计算）
+        fund_codes_count: 基金数量（用于加权平均）
     """
     try:
         # Group by industry
@@ -2460,18 +2479,25 @@ def calculate_industry_distribution(holdings_df, total_asset):
         industry_groups = industry_groups.sort_values(ascending=False)
         
         # Convert to dictionary with percentage format
+        # 对多基金情况进行加权平均
         industry_distribution = {}
         for industry, proportion in industry_groups.items():
-            industry_distribution[str(industry)] = round(float(proportion), 2)
+            adjusted_proportion = proportion / max(fund_codes_count, 1)
+            industry_distribution[str(industry)] = round(float(adjusted_proportion), 2)
         
         return industry_distribution
     except Exception as e:
         logger.error(f"计算行业分布失败: {e}")
         return {}
 
-def calculate_top_stocks(holdings_df, total_asset):
+def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
     """
     Calculate top stocks based on holdings data
+    
+    Args:
+        holdings_df: 持仓数据DataFrame
+        total_asset: 总资产（用于市值计算）
+        fund_codes_count: 基金数量（用于加权平均）
     """
     try:
         # Group by stock code and name, sum the proportions
@@ -2481,13 +2507,16 @@ def calculate_top_stocks(holdings_df, total_asset):
         sorted_holdings = grouped.sort_values('proportion', ascending=False).head(10)
         
         # Convert to list of dictionaries
+        # 对多基金情况进行加权平均
         top_stocks = []
         for _, row in sorted_holdings.iterrows():
+            raw_proportion = float(row.get('proportion', 0))
+            adjusted_proportion = raw_proportion / max(fund_codes_count, 1)
             stock_info = {
                 'stock_name': str(row.get('stock_name', row.get('name', ''))),
                 'stock_code': str(row.get('stock_code', row.get('code', ''))),
-                'proportion': round(float(row.get('proportion', 0)), 2),
-                'market_value': round(float(row.get('proportion', 0)) * total_asset / 100, 2)
+                'proportion': round(adjusted_proportion, 2),
+                'market_value': round(adjusted_proportion * total_asset / 100, 2)
             }
             top_stocks.append(stock_info)
         
@@ -2498,31 +2527,39 @@ def calculate_top_stocks(holdings_df, total_asset):
         traceback.print_exc()
         return []
 
-def generate_analysis_summary(asset_allocation, industry_distribution, top_stocks):
+def generate_analysis_summary(asset_allocation, industry_distribution, top_stocks, fund_codes_count=1):
     """
     Generate analysis summary based on calculated data
+    
+    Args:
+        asset_allocation: 资产配置字典
+        industry_distribution: 行业分布字典
+        top_stocks: 重仓股列表
+        fund_codes_count: 基金数量（用于说明数据已加权平均）
     """
     try:
         summary = {
             'total_stock_proportion': 0,
             'top_industry_concentration': 0,
             'top_stock_concentration': 0,
-            'analysis_date': datetime.now().strftime('%Y-%m-%d')
+            'analysis_date': datetime.now().strftime('%Y-%m-%d'),
+            'fund_count': fund_codes_count,
+            'calculation_method': 'weighted_average' if fund_codes_count > 1 else 'simple'
         }
         
-        # Calculate total stock proportion
+        # Calculate total stock proportion (already weighted)
         if asset_allocation:
             summary['total_stock_proportion'] = asset_allocation.get('股票', 0)
         
-        # Calculate top industry concentration (top 3 industries)
+        # Calculate top industry concentration (top 3 industries) - already weighted
         if industry_distribution:
-            top_industries = list(industry_distribution.values())[:3]
-            summary['top_industry_concentration'] = sum(top_industries)
+            top_industries = sorted(industry_distribution.values(), reverse=True)[:3]
+            summary['top_industry_concentration'] = round(sum(top_industries), 2)
         
-        # Calculate top stock concentration (top 5 stocks)
+        # Calculate top stock concentration (top 5 stocks) - already weighted
         if top_stocks:
             top_5_stocks = top_stocks[:5]
-            summary['top_stock_concentration'] = sum(stock['proportion'] for stock in top_5_stocks)
+            summary['top_stock_concentration'] = round(sum(stock['proportion'] for stock in top_5_stocks), 2)
         
         return summary
     except Exception as e:
@@ -4059,10 +4096,107 @@ def get_fund_bond_allocation(fund_code):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/fund/<fund_code>/heavyweight-stocks', methods=['GET'])
+def get_fund_heavyweight_stocks(fund_code):
+    """
+    获取基金重仓股数据（实时）
+    
+    Args:
+        fund_code: 基金代码
+        
+    Query Parameters:
+        date: 报告期日期（可选，格式：YYYYMMDD）
+        refresh: 是否强制刷新缓存（可选，true/false）
+        
+    Returns:
+        JSON: {
+            success: bool,
+            data: [
+                {
+                    name: str,          # 股票名称
+                    code: str,          # 股票代码
+                    holding_ratio: str, # 持仓占比
+                    market_value: str,  # 市值（万）
+                    change_percent: str # 涨跌幅
+                }
+            ],
+            source: str,        # 数据来源
+            timestamp: str,     # 数据时间戳
+            error: str          # 错误信息（如果失败）
+        }
+    """
+    try:
+        # 获取查询参数
+        date = request.args.get('date', None)
+        refresh = request.args.get('refresh', 'false').lower() == 'true'
+        
+        logger.info(f"获取基金 {fund_code} 的重仓股数据，日期: {date}, 刷新: {refresh}")
+        
+        # 如果强制刷新，清除缓存
+        if refresh:
+            fetcher = get_fetcher()
+            fetcher.clear_cache(fund_code)
+        
+        # 获取重仓股数据
+        result = fetch_heavyweight_stocks(fund_code, date=date, use_cache=not refresh)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': result['data'],
+                'source': result['source'],
+                'timestamp': result['timestamp']
+            })
+        else:
+            logger.error(f"获取重仓股数据失败: {result.get('error', '未知错误')}")
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '获取数据失败'),
+                'data': [],
+                'timestamp': result.get('timestamp', datetime.now().isoformat())
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"获取基金重仓股数据失败: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'服务器错误: {str(e)}',
+            'data': [],
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+@app.route('/api/fund/<fund_code>/heavyweight-stocks/cache', methods=['DELETE'])
+def clear_heavyweight_stocks_cache(fund_code):
+    """
+    清除基金重仓股数据缓存
+    
+    Args:
+        fund_code: 基金代码
+        
+    Returns:
+        JSON: {success: bool, message: str}
+    """
+    try:
+        fetcher = get_fetcher()
+        fetcher.clear_cache(fund_code)
+        
+        return jsonify({
+            'success': True,
+            'message': f'基金 {fund_code} 的重仓股数据缓存已清除'
+        })
+    except Exception as e:
+        logger.error(f"清除缓存失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     init_components()
     app.run(host='0.0.0.0', port=5000, debug=True)
 else:
-    # 当作为模块导入时，自动初始化组件
+    # 褰撲綔涓烘ā鍧楀鍏ユ椂锛岃嚜鍔ㄥ垵濮嬪寲缁勪欢
     init_components()
 

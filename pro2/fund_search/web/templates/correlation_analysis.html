@@ -6,6 +6,8 @@
     <title>基金相关性分析</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/heavyweight-stocks.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-data-tables.css') }}">
     <style>
         * {
             margin: 0;
@@ -738,7 +740,7 @@
 
                 const result = await response.json();
                 if (result.success) {
-                    renderComprehensiveAnalysis(result.data);
+                    renderComprehensiveAnalysis(result.data, fundCodes);
                 } else {
                     document.getElementById('comprehensive-content').innerHTML = `
                         <div class="error-message">
@@ -757,11 +759,14 @@
         }
 
         // 渲染综合分析结果
-        function renderComprehensiveAnalysis(data) {
+        function renderComprehensiveAnalysis(data, fundCodes) {
             const section = document.getElementById('comprehensive-analysis-section');
             const contentDiv = document.getElementById('comprehensive-content');
             
             section.style.display = 'block';
+            
+            // 保存基金代码列表供后续使用
+            data.fund_codes = fundCodes;
             
             if (!data) {
                 contentDiv.innerHTML = `
@@ -774,92 +779,14 @@
 
             let html = '';
 
-            // 资产配置
-            if (data.asset_allocation) {
-                html += `<div style="margin-top: 20px;">
-                    <h3>资产配置</h3>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                        <thead>
-                            <tr>
-                                <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">资产类型</th>
-                                <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">占比</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+            // 资产配置 - 使用统一实时数据表格组件
+            html += `<div id="asset-allocation-container" style="margin-top: 20px;"></div>`;
 
-                Object.entries(data.asset_allocation).forEach(([type, ratio]) => {
-                    html += `<tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;">${type}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${ratio}%</td>
-                    </tr>`;
-                });
+            // 行业分布 - 使用统一实时数据表格组件
+            html += `<div id="industry-distribution-container" style="margin-top: 30px;"></div>`;
 
-                html += `</tbody>
-                    </table>
-                </div>`;
-            }
-
-            // 行业分布
-            if (data.industry_distribution) {
-                html += `<div style="margin-top: 30px;">
-                    <h3>行业分布</h3>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                        <thead>
-                            <tr>
-                                <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">行业</th>
-                                <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">占比</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-                Object.entries(data.industry_distribution).forEach(([industry, ratio]) => {
-                    html += `<tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;">${industry}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${ratio}%</td>
-                    </tr>`;
-                });
-
-                html += `</tbody>
-                    </table>
-                </div>`;
-            }
-
-            // 重仓股
-            if (data.top_stocks) {
-                html += `<div style="margin-top: 30px;">
-                    <h3>重仓股 TOP10</h3>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                            <thead>
-                                <tr>
-                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">股票名称</th>
-                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: left; background-color: #f8f9fa;">代码</th>
-                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">持仓占比</th>
-                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">市值(万)</th>
-                                    <th style="border: 1px solid #ddd; padding: 10px; text-align: right; background-color: #f8f9fa;">涨跌幅</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-
-                data.top_stocks.forEach(stock => {
-                    const returnClass = stock.stock_return > 0 ? 'positive-change' : stock.stock_return < 0 ? 'negative-change' : '';
-                    const returnSign = stock.stock_return > 0 ? '+' : '';
-                    html += `<tr>
-                        <td style="border: 1px solid #ddd; padding: 10px;">${stock.stock_name}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; font-family: monospace;">${stock.stock_code}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${stock.proportion}%</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;">${stock.market_value || '--'}</td>
-                        <td style="border: 1px solid #ddd; padding: 10px; text-align: right;" class="${returnClass}">
-                            ${stock.stock_return ? returnSign + stock.stock_return + '%' : '--'}
-                        </td>
-                    </tr>`;
-                });
-
-                html += `</tbody>
-                        </table>
-                    </div>
-                </div>`;
-            }
+            // 重仓股 - 使用统一实时数据表格组件
+            html += `<div id="heavyweight-stocks-container" style="margin-top: 30px;"></div>`;
 
             // 分析摘要
             if (data.summary) {
@@ -875,7 +802,80 @@
             }
 
             contentDiv.innerHTML = html;
+            
+            // 初始化资产配置表格
+            if (data.asset_allocation) {
+                new RealtimeDataTable('asset-allocation-container', {
+                    title: '资产配置',
+                    dataType: 'asset',
+                    fundCodes: data.fund_codes,
+                    cacheDuration: 5 * 60 * 1000,
+                    autoRefresh: false
+                });
+                // 手动设置数据并渲染
+                setTimeout(() => {
+                    const table = window['asset-allocation-container_table'];
+                    if (table) {
+                        table.state.data = data.asset_allocation;
+                        table.state.lastUpdated = new Date();
+                        table.state.source = 'analysis';
+                        table.render();
+                    }
+                }, 100);
+            }
+            
+            // 初始化行业分布表格
+            if (data.industry_distribution) {
+                new RealtimeDataTable('industry-distribution-container', {
+                    title: '行业分布',
+                    dataType: 'industry',
+                    fundCodes: data.fund_codes,
+                    cacheDuration: 5 * 60 * 1000,
+                    autoRefresh: false
+                });
+                // 手动设置数据并渲染
+                setTimeout(() => {
+                    const table = window['industry-distribution-container_table'];
+                    if (table) {
+                        table.state.data = data.industry_distribution;
+                        table.state.lastUpdated = new Date();
+                        table.state.source = 'analysis';
+                        table.render();
+                    }
+                }, 100);
+            }
+            
+            // 初始化重仓股实时数据组件（使用第一个选中的基金）
+            if (data.fund_codes && data.fund_codes.length > 0) {
+                const primaryFundCode = data.fund_codes[0];
+                new RealtimeDataTable('heavyweight-stocks-container', {
+                    title: '重仓股 TOP10',
+                    dataType: 'heavyweight',
+                    fundCodes: data.fund_codes,
+                    columns: [
+                        { title: '排名', field: 'index', class: 'text-center', style: 'width: 60px;', formatter: (v, row) => v + 1 },
+                        { title: '股票名称', field: 'name', class: 'stock-name' },
+                        { title: '股票代码', field: 'code', class: 'stock-code text-center' },
+                        { title: '持仓占比', field: 'holding_ratio', class: 'text-right', formatter: (v) => `${v}%` },
+                        { title: '持仓市值', field: 'market_value', class: 'text-right', formatter: (v) => `${v}万` },
+                        { title: '较上期变化', field: 'change_percent', class: 'text-right', formatter: (v) => {
+                            if (v === '--' || v === undefined || v === null) return '<span class="neutral">--</span>';
+                            const change = parseFloat(v);
+                            if (isNaN(change)) return '<span class="neutral">--</span>';
+                            const className = change > 0 ? 'positive' : change < 0 ? 'negative' : 'neutral';
+                            const sign = change > 0 ? '+' : '';
+                            return `<span class="${className}">${sign}${v}%</span>`;
+                        }}
+                    ],
+                    fetchUrl: `/api/fund/${primaryFundCode}/heavyweight-stocks`,
+                    cacheDuration: 5 * 60 * 1000,
+                    autoRefresh: true,
+                    refreshInterval: 5 * 60 * 1000
+                });
+            }
         }
     </script>
+    <script src="{{ url_for('static', filename='js/heavyweight-stocks.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/realtime-data-tables.js') }}"></script>
 </body>
 </html>

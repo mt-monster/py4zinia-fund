@@ -1,0 +1,412 @@
+/**
+ * 实时数据表格样式
+ * 统一处理资产配置、行业分布、重仓股等表格的样式
+ */
+
+/* 容器样式 */
+.realtime-table-container {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-top: 30px;
+    overflow: hidden;
+    border: 1px solid #e8e8e8;
+}
+
+.realtime-table-container[data-type="asset"] {
+    border-left: 4px solid #52c41a;
+}
+
+.realtime-table-container[data-type="industry"] {
+    border-left: 4px solid #1890ff;
+}
+
+.realtime-table-container[data-type="heavyweight"] {
+    border-left: 4px solid #722ed1;
+}
+
+/* 头部样式 */
+.realtime-table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.realtime-table-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #262626;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.title-icon {
+    font-size: 20px;
+}
+
+.realtime-table-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.last-updated {
+    font-size: 12px;
+    color: #8c8c8c;
+    background: #f5f5f5;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.refresh-btn {
+    background: #ffffff;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.refresh-btn:hover {
+    background: #f0f7ff;
+    border-color: #1890ff;
+    color: #1890ff;
+    transform: rotate(180deg);
+}
+
+.refresh-btn:active {
+    transform: rotate(360deg) scale(0.95);
+}
+
+/* 内容区域 */
+.realtime-table-content {
+    padding: 0;
+}
+
+/* 表格样式 */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.realtime-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.realtime-data-table thead {
+    background: #fafafa;
+}
+
+.realtime-data-table th {
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: #262626;
+    border-bottom: 2px solid #e8e8e8;
+    white-space: nowrap;
+}
+
+/* 可排序表头样式 */
+.realtime-data-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.realtime-data-table th.sortable:hover {
+    background-color: #e6f7ff;
+}
+
+.realtime-data-table th.sortable:active {
+    background-color: #bae7ff;
+}
+
+/* 排序图标样式 */
+.sort-icon {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 12px;
+    color: #bfbfbf;
+    transition: color 0.2s ease;
+}
+
+.realtime-data-table th.sortable:hover .sort-icon {
+    color: #1890ff;
+}
+
+.sort-icon.active {
+    color: #1890ff;
+    font-weight: bold;
+}
+
+.realtime-data-table th.text-center {
+    text-align: center;
+}
+
+.realtime-data-table th.text-right {
+    text-align: right;
+}
+
+.realtime-data-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    color: #595959;
+}
+
+.realtime-data-table tbody tr:hover {
+    background: #f6ffed;
+    transition: background 0.2s ease;
+}
+
+.realtime-data-table tbody tr.even {
+    background: #fafafa;
+}
+
+.realtime-data-table tbody tr.even:hover {
+    background: #f6ffed;
+}
+
+/* 百分比条样式 */
+.percentage-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.percentage-value {
+    font-weight: 600;
+    color: #262626;
+}
+
+.percentage-bar {
+    width: 100px;
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.percentage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #52c41a 0%, #73d13d 100%);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+/* 状态样式 */
+.loading-state,
+.error-state,
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f0f0f0;
+    border-top-color: #1890ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-state p {
+    color: #8c8c8c;
+    font-size: 14px;
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.error-state p {
+    color: #ff4d4f;
+    margin-bottom: 16px;
+}
+
+.retry-btn {
+    background: #ff4d4f;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    background: #ff7875;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 77, 79, 0.3);
+}
+
+.empty-state p {
+    color: #bfbfbf;
+    font-size: 14px;
+}
+
+/* 涨跌幅样式 */
+.positive {
+    color: #f5222d;
+    font-weight: 500;
+}
+
+.negative {
+    color: #52c41a;
+    font-weight: 500;
+}
+
+.neutral {
+    color: #8c8c8c;
+}
+
+/* 股票名称和代码样式 */
+.stock-name {
+    font-weight: 500;
+    color: #262626;
+}
+
+.stock-code {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 13px;
+    color: #8c8c8c;
+    background: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* 文本对齐 */
+.text-center {
+    text-align: center !important;
+}
+
+.text-right {
+    text-align: right !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .realtime-table-container {
+        margin-top: 20px;
+        border-radius: 8px;
+    }
+    
+    .realtime-table-header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .realtime-table-title {
+        font-size: 16px;
+    }
+    
+    .realtime-table-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .realtime-data-table {
+        font-size: 13px;
+    }
+    
+    .realtime-data-table th,
+    .realtime-data-table td {
+        padding: 10px 12px;
+    }
+    
+    .percentage-bar {
+        width: 60px;
+    }
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .realtime-table-container {
+        background: #1f1f1f;
+        border-color: #434343;
+    }
+    
+    .realtime-table-header {
+        background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+        border-bottom-color: #434343;
+    }
+    
+    .realtime-table-title {
+        color: #e8e8e8;
+    }
+    
+    .last-updated {
+        background: #2a2a2a;
+        color: #a6a6a6;
+    }
+    
+    .refresh-btn {
+        background: #2a2a2a;
+        border-color: #434343;
+        color: #a6a6a6;
+    }
+    
+    .refresh-btn:hover {
+        background: #1f1f1f;
+        border-color: #1890ff;
+        color: #1890ff;
+    }
+    
+    .realtime-data-table thead {
+        background: #2a2a2a;
+    }
+    
+    .realtime-data-table th {
+        color: #e8e8e8;
+        border-bottom-color: #434343;
+    }
+    
+    .realtime-data-table td {
+        color: #a6a6a6;
+        border-bottom-color: #2a2a2a;
+    }
+    
+    .realtime-data-table tbody tr:hover,
+    .realtime-data-table tbody tr.even:hover {
+        background: #2a3a2a;
+    }
+    
+    .realtime-data-table tbody tr.even {
+        background: #262626;
+    }
+    
+    .percentage-bar {
+        background: #434343;
+    }
+    
+    .stock-code {
+        background: #2a2a2a;
+        color: #a6a6a6;
+    }
+}

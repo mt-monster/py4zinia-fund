@@ -184,7 +184,7 @@ class FundAnalyzer:
                 merged_df = pd.merge(merged_df, df_renamed, on='date', how='outer')
         
         # 填充缺失值（使用前向填充和后向填充）
-        merged_df = merged_df.fillna(method='ffill').fillna(method='bfill')
+        merged_df = merged_df.ffill().bfill()
         
         # 再次检查是否有足够的数据
         if len(merged_df) < min_data_points:
