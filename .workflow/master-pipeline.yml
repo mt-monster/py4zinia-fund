@@ -95,9 +95,9 @@ stages:
           - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Lint check completed"
         allowFailure: true
 
-  # 阶段3: 构建
+  # 阶段3: 构建并发布
   - name: build
-    displayName: 构建应用
+    displayName: 构建与发布
     strategy: naturally
     trigger: auto
     steps:
@@ -122,20 +122,14 @@ stages:
           - mkdir -p build_output
           - echo "Build completed at $(date)" > build_output/build_info.txt
           - cp -r pro2 build_output/ 2>/dev/null || echo "No pro2 directory to copy"
+          - echo "Build artifacts prepared"
         artifacts:
-          - name: BUILD_OUTPUT
+          - name: BUILD_ARTIFACT
             path:
               - build_output/
 
-  # 阶段4: 发布
-  - name: release
-    displayName: 发布
-    strategy: naturally
-    trigger: auto
-    steps:
-      - step: publish@release_artifacts
-        name: publish_release_artifacts
-        displayName: 发布
-        dependArtifact: BUILD_OUTPUT
-        version: 1.0.0.0
-        autoIncrement: true
+      - step: publish@general_artifacts
+        name: publish_artifacts
+        displayName: 上传构建制品
+        dependArtifact: BUILD_ARTIFACT
+        artifactName: build-package
