@@ -1199,12 +1199,245 @@ class EnhancedDatabaseManager:
             
             logger.info(f"基金 {analysis_data.get('fund_code', '')} 分析结果已保存到fund_analysis_results表")
             return True
-            
+
         except Exception as e:
             logger.error(f"插入基金分析结果数据失败: {str(e)}")
             return False
 
+    # ==================== 测试支持方法 ====================
 
+    @property
+    def Session(self):
+        """获取会话工厂（用于测试）"""
+        from sqlalchemy.orm import sessionmaker
+        return sessionmaker(bind=self.engine)
+
+    def get_table_list(self) -> List[str]:
+        """获取数据库表列表"""
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(self.engine)
+            return inspector.get_table_names()
+        except Exception as e:
+            logger.error(f"获取表列表失败: {str(e)}")
+            return []
+
+    def insert_fund_data(self, fund_data: Dict) -> bool:
+        """插入基金数据（测试用）"""
+        try:
+            # 为测试数据提供默认值
+            complete_data = {
+                'fund_code': fund_data.get('fund_code', ''),
+                'fund_name': fund_data.get('fund_name', ''),
+                'fund_type': fund_data.get('fund_type', '未知类型'),
+                'fund_company': fund_data.get('fund_company', ''),
+                'fund_manager': fund_data.get('fund_manager', ''),
+                'establish_date': fund_data.get('establish_date'),
+                'management_fee': fund_data.get('management_fee', 0.0),
+                'custody_fee': fund_data.get('custody_fee', 0.0),
+            }
+            return self.insert_fund_basic_info(complete_data)
+        except Exception as e:
+            logger.error(f"插入基金数据失败: {str(e)}")
+            return False
+
+    def get_fund_list(self) -> pd.DataFrame:
+        """获取基金列表"""
+        try:
+            sql = "SELECT * FROM fund_basic_info ORDER BY fund_code"
+            return pd.read_sql(sql, self.engine)
+        except Exception as e:
+            logger.error(f"获取基金列表失败: {str(e)}")
+            return pd.DataFrame()
+
+    def get_fund_detail(self, fund_code: str) -> Optional[Dict]:
+        """获取基金详情"""
+        try:
+            sql = "SELECT * FROM fund_basic_info WHERE fund_code = %(fund_code)s"
+            df = pd.read_sql(sql, self.engine, params={'fund_code': fund_code})
+            if not df.empty:
+                return df.iloc[0].to_dict()
+            return None
+        except Exception as e:
+            logger.error(f"获取基金详情失败: {str(e)}")
+            return None
+
+    def update_fund_data(self, fund_code: str, update_data: Dict) -> bool:
+        """更新基金数据"""
+        try:
+            set_clause = ', '.join([f"{k} = :{k}" for k in update_data.keys()])
+            sql = f"UPDATE fund_basic_info SET {set_clause} WHERE fund_code = :fund_code"
+            params = {**update_data, 'fund_code': fund_code}
+            self.execute_sql(sql, params)
+            return True
+        except Exception as e:
+            logger.error(f"更新基金数据失败: {str(e)}")
+            return False
+
+    def delete_fund_data(self, fund_code: str) -> bool:
+        """删除基金数据"""
+        try:
+            sql = "DELETE FROM fund_basic_info WHERE fund_code = %(fund_code)s"
+            self.execute_sql(sql, {'fund_code': fund_code})
+            return True
+        except Exception as e:
+            logger.error(f"删除基金数据失败: {str(e)}")
+            return False
+
+    def insert_holding(self, holding_data: Dict) -> bool:
+        """插入持仓数据"""
+        try:
+            sql = """
+            INSERT INTO user_holdings (
+                fund_code, fund_name, holding_amount, holding_shares, nav, created_at
+            ) VALUES (
+                :fund_code, :fund_name, :holding_amount, :holding_shares, :nav, :created_at
+            ) ON DUPLICATE KEY UPDATE
+                fund_name = VALUES(fund_name),
+                holding_amount = VALUES(holding_amount),
+                holding_shares = VALUES(holding_shares),
+                nav = VALUES(nav),
+                updated_at = CURRENT_TIMESTAMP
+            """
+            self.execute_sql(sql, holding_data)
+            return True
+        except Exception as e:
+            logger.error(f"插入持仓数据失败: {str(e)}")
+            return False
+
+    def get_user_holdings(self) -> List[Dict]:
+        """获取用户持仓列表"""
+        try:
+            sql = "SELECT * FROM user_holdings ORDER BY created_at DESC"
+            df = pd.read_sql(sql, self.engine)
+            return df.to_dict('records')
+        except Exception as e:
+            logger.error(f"获取用户持仓失败: {str(e)}")
+            return []
+
+    def update_holding(self, fund_code: str, update_data: Dict) -> bool:
+        """更新持仓数据"""
+        try:
+            set_clause = ', '.join([f"{k} = :{k}" for k in update_data.keys()])
+            sql = f"UPDATE user_holdings SET {set_clause} WHERE fund_code = :fund_code"
+            params = {**update_data, 'fund_code': fund_code}
+            self.execute_sql(sql, params)
+            return True
+        except Exception as e:
+            logger.error(f"更新持仓数据失败: {str(e)}")
+            return False
+
+    def delete_holding(self, fund_code: str) -> bool:
+        """删除持仓数据"""
+        try:
+            sql = "DELETE FROM user_holdings WHERE fund_code = %(fund_code)s"
+            self.execute_sql(sql, {'fund_code': fund_code})
+            return True
+        except Exception as e:
+            logger.error(f"删除持仓数据失败: {str(e)}")
+            return False
+
+    def clear_all_holdings(self) -> bool:
+        """清空所有持仓"""
+        try:
+            sql = "TRUNCATE TABLE user_holdings"
+            self.execute_sql(sql)
+            return True
+        except Exception as e:
+            logger.error(f"清空持仓失败: {str(e)}")
+            return False
+
+    def save_user_strategy(self, strategy_data: Dict) -> int:
+        """保存用户策略，返回策略ID"""
+        try:
+            import json
+            sql = """
+            INSERT INTO user_strategies (
+                user_id, name, description, config, created_at, updated_at
+            ) VALUES (
+                :user_id, :name, :description, :config, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """
+            params = {
+                'user_id': strategy_data.get('user_id', 'default_user'),
+                'name': strategy_data.get('name', ''),
+                'description': strategy_data.get('description', ''),
+                'config': json.dumps(strategy_data.get('rules', []))
+            }
+            with self.engine.connect() as conn:
+                result = conn.execute(text(sql), params)
+                conn.commit()
+                return result.lastrowid
+        except Exception as e:
+            logger.error(f"保存用户策略失败: {str(e)}")
+            return -1
+
+    def get_user_strategies(self) -> List[Dict]:
+        """获取用户策略列表"""
+        try:
+            import json
+            sql = "SELECT * FROM user_strategies ORDER BY updated_at DESC"
+            df = pd.read_sql(sql, self.engine)
+            strategies = []
+            for _, row in df.iterrows():
+                strategy = row.to_dict()
+                if isinstance(strategy.get('config'), str):
+                    strategy['config'] = json.loads(strategy['config'])
+                strategies.append(strategy)
+            return strategies
+        except Exception as e:
+            logger.error(f"获取用户策略失败: {str(e)}")
+            return []
+
+    def get_user_strategy_by_id(self, strategy_id: int) -> Optional[Dict]:
+        """根据ID获取用户策略"""
+        try:
+            import json
+            sql = "SELECT * FROM user_strategies WHERE id = %(strategy_id)s"
+            df = pd.read_sql(sql, self.engine, params={'strategy_id': strategy_id})
+            if not df.empty:
+                strategy = df.iloc[0].to_dict()
+                if isinstance(strategy.get('config'), str):
+                    strategy['config'] = json.loads(strategy['config'])
+                return strategy
+            return None
+        except Exception as e:
+            logger.error(f"获取用户策略失败: {str(e)}")
+            return None
+
+    def update_user_strategy(self, strategy_id: int, update_data: Dict) -> bool:
+        """更新用户策略"""
+        try:
+            import json
+            fields = []
+            params = {'strategy_id': strategy_id}
+            if 'name' in update_data:
+                fields.append("name = :name")
+                params['name'] = update_data['name']
+            if 'description' in update_data:
+                fields.append("description = :description")
+                params['description'] = update_data['description']
+            if 'rules' in update_data:
+                fields.append("config = :config")
+                params['config'] = json.dumps(update_data['rules'])
+            if fields:
+                fields.append("updated_at = CURRENT_TIMESTAMP")
+                sql = f"UPDATE user_strategies SET {', '.join(fields)} WHERE id = :strategy_id"
+                self.execute_sql(sql, params)
+            return True
+        except Exception as e:
+            logger.error(f"更新用户策略失败: {str(e)}")
+            return False
+
+    def delete_user_strategy(self, strategy_id: int) -> bool:
+        """删除用户策略"""
+        try:
+            sql = "DELETE FROM user_strategies WHERE id = %(strategy_id)s"
+            self.execute_sql(sql, {'strategy_id': strategy_id})
+            return True
+        except Exception as e:
+            logger.error(f"删除用户策略失败: {str(e)}")
+            return False
 
     def close_connection(self):
         """关闭数据库连接"""
@@ -1214,6 +1447,61 @@ class EnhancedDatabaseManager:
                 logger.info("数据库连接已关闭")
         except Exception as e:
             logger.error(f"关闭数据库连接失败: {str(e)}")
+
+
+# 模块级函数，供测试使用
+def build_connection_string(db_config: dict, include_db: bool = True) -> str:
+    """
+    构建数据库连接字符串
+    
+    参数:
+        db_config: 数据库配置字典
+        include_db: 是否包含数据库名
+        
+    返回:
+        连接字符串
+    """
+    charset = db_config.get('charset', 'utf8mb4')
+    
+    if include_db:
+        return (
+            f"mysql+pymysql://{db_config['user']}:{db_config['password']}"
+            f"@{db_config['host']}:{db_config['port']}/{db_config['database']}"
+            f"?charset={charset}"
+        )
+    else:
+        return (
+            f"mysql+pymysql://{db_config['user']}:{db_config['password']}"
+            f"@{db_config['host']}:{db_config['port']}"
+            f"?charset={charset}"
+        )
+
+
+def sanitize_fund_code(fund_code: str) -> str:
+    """
+    清理和标准化基金代码
+    
+    参数:
+        fund_code: 原始基金代码字符串
+        
+    返回:
+        标准化的6位基金代码
+    """
+    if not fund_code:
+        return ''
+    
+    # 移除空白字符
+    code = fund_code.strip()
+    
+    # 移除可能的后缀（如 .OF）
+    if '.' in code:
+        code = code.split('.')[0]
+    
+    # 确保是6位数字
+    if len(code) == 6 and code.isdigit():
+        return code
+    
+    return code
 
 
 if __name__ == "__main__":

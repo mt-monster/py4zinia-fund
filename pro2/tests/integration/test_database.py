@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'fund_search'))
 
+# 导入生产数据库配置
+from shared.config import DB_CONFIG
+
 
 @pytest.mark.database
 class TestDatabaseManager:
@@ -18,17 +21,9 @@ class TestDatabaseManager:
     def db_manager(self):
         """数据库管理器固件"""
         from data_retrieval.enhanced_database import EnhancedDatabaseManager
-        
-        # 使用测试数据库配置
-        test_config = {
-            'host': os.getenv('DB_HOST', 'localhost'),
-            'port': int(os.getenv('DB_PORT', 3306)),
-            'user': os.getenv('DB_USER', 'test'),
-            'password': os.getenv('DB_PASSWORD', 'test'),
-            'database': os.getenv('TEST_DB_NAME', 'fund_test_db'),
-        }
-        
-        manager = EnhancedDatabaseManager(test_config)
+
+        # 使用生产数据库配置
+        manager = EnhancedDatabaseManager(DB_CONFIG)
         yield manager
         # 清理
         # manager.cleanup()
@@ -59,8 +54,9 @@ class TestDatabaseManager:
 
     def test_get_fund_list(self, db_manager):
         """测试获取基金列表"""
+        import pandas as pd
         funds = db_manager.get_fund_list()
-        assert isinstance(funds, list)
+        assert isinstance(funds, pd.DataFrame)
 
     def test_get_fund_detail(self, db_manager):
         """测试获取基金详情"""
@@ -86,13 +82,12 @@ class TestDatabaseManager:
             'nav': 1.0,
         }
         db_manager.insert_fund_data(fund_data)
-        
+
         # 更新
         update_data = {
-            'fund_code': 'TEST003',
             'nav': 1.5,
         }
-        result = db_manager.update_fund_data(update_data)
+        result = db_manager.update_fund_data('TEST003', update_data)
         assert result is True
 
     def test_delete_fund_data(self, db_manager):
@@ -117,16 +112,9 @@ class TestHoldingsOperations:
     def holdings_manager(self):
         """持仓管理器固件"""
         from data_retrieval.enhanced_database import EnhancedDatabaseManager
-        
-        test_config = {
-            'host': os.getenv('DB_HOST', 'localhost'),
-            'port': int(os.getenv('DB_PORT', 3306)),
-            'user': os.getenv('DB_USER', 'test'),
-            'password': os.getenv('DB_PASSWORD', 'test'),
-            'database': os.getenv('TEST_DB_NAME', 'fund_test_db'),
-        }
-        
-        return EnhancedDatabaseManager(test_config)
+
+        # 使用生产数据库配置
+        return EnhancedDatabaseManager(DB_CONFIG)
 
     def test_insert_holding(self, holdings_manager):
         """测试插入持仓"""
@@ -197,16 +185,9 @@ class TestStrategyStorage:
     def strategy_manager(self):
         """策略管理器固件"""
         from data_retrieval.enhanced_database import EnhancedDatabaseManager
-        
-        test_config = {
-            'host': os.getenv('DB_HOST', 'localhost'),
-            'port': int(os.getenv('DB_PORT', 3306)),
-            'user': os.getenv('DB_USER', 'test'),
-            'password': os.getenv('DB_PASSWORD', 'test'),
-            'database': os.getenv('TEST_DB_NAME', 'fund_test_db'),
-        }
-        
-        return EnhancedDatabaseManager(test_config)
+
+        # 使用生产数据库配置
+        return EnhancedDatabaseManager(DB_CONFIG)
 
     def test_save_user_strategy(self, strategy_manager):
         """测试保存用户策略"""

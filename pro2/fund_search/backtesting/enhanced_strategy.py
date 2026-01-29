@@ -1178,6 +1178,110 @@ class EnhancedInvestmentStrategy:
             }
 
 
+# 策略类，用于测试
+class MomentumStrategy:
+    """动量策略"""
+    
+    def __init__(self, lookback_period: int = 20):
+        self.lookback_period = lookback_period
+    
+    def generate_signals(self, data: pd.DataFrame) -> list:
+        """生成交易信号"""
+        signals = []
+        for i in range(len(data)):
+            if i < self.lookback_period:
+                signals.append(0)
+            else:
+                # 简单动量计算
+                current = data['nav'].iloc[i]
+                past = data['nav'].iloc[i - self.lookback_period]
+                momentum = (current - past) / past if past > 0 else 0
+                
+                if momentum > 0.05:
+                    signals.append(1)  # 买入
+                elif momentum < -0.05:
+                    signals.append(-1)  # 卖出
+                else:
+                    signals.append(0)  # 持有
+        return signals
+
+
+class MeanReversionStrategy:
+    """均值回归策略"""
+    
+    def __init__(self, window: int = 20, threshold: float = 0.02):
+        self.window = window
+        self.threshold = threshold
+    
+    def generate_signals(self, data: pd.DataFrame) -> list:
+        """生成交易信号"""
+        signals = []
+        for i in range(len(data)):
+            if i < self.window:
+                signals.append(0)
+            else:
+                window_data = data['nav'].iloc[i-self.window:i]
+                mean = window_data.mean()
+                current = data['nav'].iloc[i]
+                deviation = (current - mean) / mean if mean > 0 else 0
+                
+                if deviation < -self.threshold:
+                    signals.append(1)  # 买入（低于均值）
+                elif deviation > self.threshold:
+                    signals.append(-1)  # 卖出（高于均值）
+                else:
+                    signals.append(0)
+        return signals
+
+
+def calculate_performance_metrics(returns: np.ndarray) -> dict:
+    """
+    计算策略性能指标
+    
+    参数:
+        returns: 收益率数组
+        
+    返回:
+        性能指标字典
+    """
+    if len(returns) == 0:
+        return {
+            'total_return': 0.0,
+            'annualized_return': 0.0,
+            'volatility': 0.0,
+            'sharpe_ratio': 0.0,
+            'max_drawdown': 0.0
+        }
+    
+    # 总收益率
+    total_return = np.prod(1 + returns) - 1
+    
+    # 年化收益率（假设252个交易日）
+    n = len(returns)
+    annualized_return = (1 + total_return) ** (252 / n) - 1 if n > 0 else 0
+    
+    # 波动率
+    volatility = np.std(returns) * np.sqrt(252)
+    
+    # 夏普比率（假设无风险利率2%）
+    risk_free_rate = 0.02
+    sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility > 0 else 0
+    
+    # 最大回撤
+    cumulative = np.cumprod(1 + returns)
+    running_max = np.maximum.accumulate(cumulative)
+    drawdown = (cumulative - running_max) / running_max
+    max_drawdown = np.min(drawdown)
+    
+    return {
+        'total_return': total_return,
+        'annualized_return': annualized_return,
+        'volatility': volatility,
+        'sharpe_ratio': sharpe_ratio,
+        'max_drawdown': max_drawdown
+    }
+
+
 if __name__ == "__main__":
     import sys
     import os

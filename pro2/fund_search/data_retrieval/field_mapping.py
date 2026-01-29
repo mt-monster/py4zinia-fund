@@ -185,3 +185,69 @@ def format_value(field_name: str, value: any) -> str:
 
 # 导入pandas以支持值格式化
 import pandas as pd
+
+
+def standardize_field_names(raw_data: dict) -> dict:
+    """
+    标准化字段名称（中文转英文）
+    
+    参数:
+        raw_data: 原始数据字典（可能包含中文字段名）
+        
+    返回:
+        标准化后的数据字典（英文字段名）
+    """
+    # 中文到英文的字段映射
+    chinese_to_english = {
+        '基金代码': 'fund_code',
+        '基金名称': 'fund_name',
+        '基金类型': 'fund_type',
+        '单位净值': 'nav',
+        '累计净值': 'accumulated_nav',
+        '日增长率': 'daily_return',
+        '持仓金额': 'holding_amount',
+        '持仓份额': 'holding_shares',
+        '日期': 'date',
+    }
+    
+    standardized = {}
+    for key, value in raw_data.items():
+        # 尝试将中文字段名转换为英文
+        english_key = chinese_to_english.get(key, key)
+        standardized[english_key] = value
+    
+    return standardized
+
+
+def calculate_derived_fields(data: dict) -> dict:
+    """
+    计算派生字段
+    
+    参数:
+        data: 基础数据字典
+        
+    返回:
+        包含派生字段的完整数据字典
+    """
+    result = data.copy()
+    
+    # 计算日收益率（如果有当前净值和昨日净值）
+    if 'nav' in data and 'prev_nav' in data:
+        try:
+            nav = float(data['nav'])
+            prev_nav = float(data['prev_nav'])
+            if prev_nav > 0:
+                result['daily_return'] = (nav - prev_nav) / prev_nav
+        except (ValueError, TypeError):
+            pass
+    
+    # 计算持仓价值（如果有持仓金额或持仓份额和净值）
+    if 'holding_amount' in data:
+        result['holding_value'] = float(data['holding_amount'])
+    elif 'holding_shares' in data and 'nav' in data:
+        try:
+            result['holding_value'] = float(data['holding_shares']) * float(data['nav'])
+        except (ValueError, TypeError):
+            pass
+    
+    return result

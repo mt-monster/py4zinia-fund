@@ -11,6 +11,7 @@ Strategy Data Models and Validation Logic
 import re
 import json
 import logging
+from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any, Optional, Union, Tuple
 from enum import Enum
@@ -116,6 +117,10 @@ class StrategyConfig:
     # 基本信息
     name: str = ''
     description: str = ''
+    strategy_type: str = 'momentum'  # 策略类型: momentum, mean_reversion, etc.
+    
+    # 策略参数
+    parameters: Dict[str, Any] = field(default_factory=dict)
     
     # 筛选条件
     filter_conditions: List[FilterCondition] = field(default_factory=list)
@@ -146,6 +151,8 @@ class StrategyConfig:
         return {
             'name': self.name,
             'description': self.description,
+            'strategy_type': self.strategy_type,
+            'parameters': self.parameters,
             'filter_conditions': [fc.to_dict() for fc in self.filter_conditions],
             'filter_logic': self.filter_logic,
             'sort_field': self.sort_field,
@@ -163,7 +170,7 @@ class StrategyConfig:
             'trailing_stop': self.trailing_stop,
             'volatility_adjustment': self.volatility_adjustment
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'StrategyConfig':
         """从字典创建实例"""
@@ -173,10 +180,12 @@ class StrategyConfig:
                 filter_conditions.append(FilterCondition.from_dict(fc_data))
             elif isinstance(fc_data, FilterCondition):
                 filter_conditions.append(fc_data)
-        
+
         return cls(
             name=data.get('name', ''),
             description=data.get('description', ''),
+            strategy_type=data.get('strategy_type', 'momentum'),
+            parameters=data.get('parameters', {}),
             filter_conditions=filter_conditions,
             filter_logic=data.get('filter_logic', 'AND'),
             sort_field=data.get('sort_field', 'composite_score'),
@@ -205,6 +214,43 @@ class StrategyConfig:
         data = json.loads(json_str)
         return cls.from_dict(data)
 
+
+@dataclass
+class BacktestResult:
+    """
+    回测结果数据类
+    
+    Attributes:
+        strategy_name: 策略名称
+        start_date: 回测开始日期
+        end_date: 回测结束日期
+        total_return: 总收益率
+        annualized_return: 年化收益率
+        max_drawdown: 最大回撤
+        sharpe_ratio: 夏普比率
+        trades: 交易记录列表
+    """
+    strategy_name: str
+    start_date: datetime
+    end_date: datetime
+    total_return: float
+    annualized_return: float
+    max_drawdown: float
+    sharpe_ratio: float
+    trades: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'strategy_name': self.strategy_name,
+            'start_date': self.start_date.isoformat() if hasattr(self.start_date, 'isoformat') else str(self.start_date),
+            'end_date': self.end_date.isoformat() if hasattr(self.end_date, 'isoformat') else str(self.end_date),
+            'total_return': self.total_return,
+            'annualized_return': self.annualized_return,
+            'max_drawdown': self.max_drawdown,
+            'sharpe_ratio': self.sharpe_ratio,
+            'trades': self.trades
+        }
 
 
 class ValidationError:

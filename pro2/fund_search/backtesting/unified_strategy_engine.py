@@ -544,6 +544,95 @@ class UnifiedStrategyEngine:
         return success
 
 
+# 模块级函数和类，供测试使用
+class StrategyRegistry:
+    """策略注册表"""
+    
+    def __init__(self):
+        self._strategies = {}
+    
+    def register(self, name: str):
+        """注册策略装饰器"""
+        def decorator(cls):
+            self._strategies[name] = cls
+            return cls
+        return decorator
+    
+    def get(self, name: str):
+        """获取策略类"""
+        return self._strategies.get(name)
+    
+    def __contains__(self, name: str) -> bool:
+        return name in self._strategies
+    
+    def list_strategies(self) -> List[str]:
+        """列出所有已注册的策略"""
+        return list(self._strategies.keys())
+
+
+class ExecutionContext:
+    """策略执行上下文"""
+    
+    def __init__(self, initial_capital: float, start_date, end_date):
+        self.initial_capital = initial_capital
+        self.current_capital = initial_capital
+        self.start_date = start_date
+        self.end_date = end_date
+        self.positions = {}
+        self.trades = []
+    
+    def update_capital(self, amount: float):
+        """更新资金"""
+        self.current_capital += amount
+    
+    def add_position(self, fund_code: str, shares: float, price: float):
+        """添加持仓"""
+        self.positions[fund_code] = {
+            'shares': shares,
+            'price': price,
+            'value': shares * price
+        }
+    
+    def get_position(self, fund_code: str) -> Optional[Dict]:
+        """获取持仓信息"""
+        return self.positions.get(fund_code)
+
+
+def calculate_portfolio_allocation(signals: Dict[str, float], total_capital: float) -> Dict[str, float]:
+    """
+    计算投资组合配置
+    
+    参数:
+        signals: 基金代码到信号强度的映射（正数表示买入，负数表示卖出）
+        total_capital: 总资金
+        
+    返回:
+        基金代码到配置金额的映射
+    """
+    if not signals or total_capital <= 0:
+        return {}
+    
+    # 只考虑买入信号
+    buy_signals = {k: v for k, v in signals.items() if v > 0}
+    
+    if not buy_signals:
+        return {}
+    
+    # 计算信号总和
+    total_signal = sum(buy_signals.values())
+    
+    if total_signal == 0:
+        return {}
+    
+    # 按信号强度分配资金
+    allocation = {}
+    for fund_code, signal in buy_signals.items():
+        weight = signal / total_signal
+        allocation[fund_code] = total_capital * weight
+    
+    return allocation
+
+
 if __name__ == "__main__":
     # 测试代码
     logging.basicConfig(level=logging.DEBUG)

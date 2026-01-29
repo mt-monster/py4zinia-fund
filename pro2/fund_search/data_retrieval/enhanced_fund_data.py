@@ -910,6 +910,60 @@ class EnhancedFundData:
             return EnhancedFundData._get_default_metrics()
 
 
+# 模块级函数，供测试使用
+def parse_date_string(date_str: str) -> Optional[datetime]:
+    """
+    解析日期字符串为datetime对象
+    
+    参数:
+        date_str: 日期字符串（支持多种格式）
+        
+    返回:
+        datetime对象，解析失败返回None
+    """
+    if not date_str:
+        return None
+    
+    date_formats = [
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%Y%m%d',
+        '%d-%m-%Y',
+        '%d/%m/%Y',
+    ]
+    
+    for fmt in date_formats:
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            continue
+    
+    return None
+
+
+def get_trading_days(start_date: datetime, end_date: datetime) -> List[datetime]:
+    """
+    获取指定日期范围内的交易日（排除周末）
+    
+    参数:
+        start_date: 开始日期
+        end_date: 结束日期
+        
+    返回:
+        交易日列表
+    """
+    trading_days = []
+    current = start_date
+    
+    while current <= end_date:
+        # 排除周末（周一=0，周日=6）
+        if current.weekday() < 5:
+            trading_days.append(current)
+        current += timedelta(days=1)
+    
+    return trading_days
+
+
 if __name__ == "__main__":
     # 测试代码
     test_codes = ['025833', '012061']
