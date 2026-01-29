@@ -183,6 +183,103 @@
             margin: 20px 0;
         }
 
+        /* Top Correlated Pairs Styles */
+        .top-correlations {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .top-correlations h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .pairs-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pair-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .pair-rank {
+            width: 30px;
+            font-weight: bold;
+            color: #666;
+            text-align: center;
+        }
+
+        .pair-funds {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pair-funds div {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pair-funds div:nth-child(2) {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .pair-correlation {
+            width: 200px;
+        }
+
+        .correlation-value {
+            font-family: monospace;
+            font-weight: bold;
+            text-align: right;
+            margin-bottom: 5px;
+        }
+
+        .correlation-bar-container {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .correlation-bar {
+            height: 100%;
+            background-color: #3498db;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .pair-item.correlation-high .correlation-bar {
+            background-color: #e74c3c;
+        }
+
+        .pair-item.correlation-medium .correlation-bar {
+            background-color: #f39c12;
+        }
+
+        .pair-item.correlation-low .correlation-bar {
+            background-color: #27ae60;
+        }
+
+        .no-pairs {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -200,6 +297,26 @@
                 font-size: 18px;
             }
 
+            .pair-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .pair-rank {
+                align-self: center;
+            }
+
+            .pair-funds {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .pair-correlation {
+                width: 100%;
+            }
+        }
+
             .correlation-matrix {
                 font-size: 12px;
             }
@@ -208,7 +325,7 @@
             .correlation-matrix td {
                 padding: 8px;
             }
-        }
+        
     </style>
 </head>
 <body>
@@ -251,6 +368,44 @@
             return null;
         }
 
+        // 提取顶部相关的基金组合
+        function getTopCorrelatedPairs(matrix, fundNames, topN = 5) {
+            if (!matrix || !fundNames || matrix.length < 2) {
+                return [];
+            }
+
+            const pairs = [];
+
+            // 遍历相关性矩阵，只考虑上三角（避免重复）
+            for (let i = 0; i < matrix.length; i++) {
+                for (let j = i + 1; j < matrix[i].length; j++) {
+                    const correlation = matrix[i][j];
+                    pairs.push({
+                        fund1: fundNames[i],
+                        fund2: fundNames[j],
+                        correlation: correlation
+                    });
+                }
+            }
+
+            // 按相关性降序排序
+            pairs.sort((a, b) => b.correlation - a.correlation);
+
+            // 返回前topN个
+            return pairs.slice(0, topN);
+        }
+
+        // 获取相关性强度类别
+        function getCorrelationClass(correlation) {
+            if (correlation > 0.7) {
+                return 'correlation-high';
+            } else if (correlation > 0.3) {
+                return 'correlation-medium';
+            } else {
+                return 'correlation-low';
+            }
+        }
+
         // 渲染分析结果
         function renderAnalysisResult(data) {
             const contentDiv = document.getElementById('analysis-content');
@@ -265,6 +420,45 @@
             }
 
             let html = '';
+
+            // 渲染顶部相关性组合
+            if (data.correlation_matrix && data.fund_names && data.fund_names.length >= 2) {
+                const topPairs = getTopCorrelatedPairs(data.correlation_matrix, data.fund_names);
+                
+                html += `<div class="top-correlations">
+                    <h3>相关性最高的基金组合</h3>
+                    <div class="pairs-list">`;
+                
+                if (topPairs.length > 0) {
+                    topPairs.forEach((pair, index) => {
+                        const correlationClass = getCorrelationClass(pair.correlation);
+                        const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
+                        
+                        html += `
+                            <div class="pair-item ${correlationClass}">
+                                <div class="pair-rank">${index + 1}</div>
+                                <div class="pair-funds">
+                                    <div>${pair.fund1}</div>
+                                    <div>↔</div>
+                                    <div>${pair.fund2}</div>
+                                </div>
+                                <div class="pair-correlation">
+                                    <div class="correlation-value">${pair.correlation.toFixed(4)}</div>
+                                    <div class="correlation-bar-container">
+                                        <div class="correlation-bar" style="width: ${barWidth}"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<div class="no-pairs">
+                        <p>无法提取相关基金组合</p>
+                    </div>`;
+                }
+                
+                html += `</div></div>`;
+            }
 
             // 渲染相关性矩阵
             if (data.correlation_matrix && data.fund_names) {
