@@ -315,6 +315,99 @@ def import_portfolio_from_screenshot(ocr_texts: List[str], user_id: str = "defau
         'holdings': holdings
     }
 
+
+# 模块级函数，供测试使用
+def parse_excel_file(file_path: str) -> List[Dict]:
+    """
+    解析Excel文件中的持仓数据
+    
+    参数:
+        file_path: Excel文件路径
+        
+    返回:
+        持仓数据列表
+    """
+    import pandas as pd
+    
+    try:
+        df = pd.read_excel(file_path)
+        holdings = []
+        
+        # 字段映射（支持中英文）
+        column_mapping = {
+            '基金代码': 'fund_code',
+            '基金名称': 'fund_name',
+            '持仓金额': 'holding_amount',
+            '持仓份额': 'holding_shares',
+            '单位净值': 'nav',
+        }
+        
+        for _, row in df.iterrows():
+            holding = {}
+            for col, key in column_mapping.items():
+                if col in row:
+                    value = row[col]
+                    # 将基金代码转换为字符串，并确保格式正确
+                    if key == 'fund_code' and value is not None:
+                        value = str(value).strip()
+                        # 如果是纯数字，确保是6位格式
+                        if value.isdigit():
+                            value = value.zfill(6)
+                    holding[key] = value
+            if holding:
+                holdings.append(holding)
+        
+        return holdings
+    except Exception as e:
+        logger.error(f"解析Excel文件失败: {str(e)}")
+        return []
+
+
+def validate_holding_data(data: Dict) -> tuple:
+    """
+    验证持仓数据有效性
+    
+    参数:
+        data: 持仓数据字典
+        
+    返回:
+        (是否有效, 错误信息列表)
+    """
+    errors = []
+    
+    # 检查必需字段
+    if not data.get('fund_code'):
+        errors.append("缺少基金代码")
+    
+    # 验证基金代码格式
+    fund_code = data.get('fund_code', '')
+    if fund_code and (len(fund_code) != 6 or not fund_code.isdigit()):
+        errors.append(f"基金代码格式无效: {fund_code}")
+    
+    # 验证持仓金额
+    holding_amount = data.get('holding_amount')
+    if holding_amount is not None:
+        try:
+            amount = float(holding_amount)
+            if amount < 0:
+                errors.append("持仓金额不能为负数")
+        except (ValueError, TypeError):
+            errors.append("持仓金额必须是数值")
+    
+    # 验证持仓份额
+    holding_shares = data.get('holding_shares')
+    if holding_shares is not None:
+        try:
+            shares = float(holding_shares)
+            if shares < 0:
+                errors.append("持仓份额不能为负数")
+        except (ValueError, TypeError):
+            errors.append("持仓份额必须是数值")
+    
+    is_valid = len(errors) == 0
+    return is_valid, errors
+
+
 if __name__ == "__main__":
     # 测试代码
     test_texts = [

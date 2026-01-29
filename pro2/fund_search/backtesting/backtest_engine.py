@@ -864,6 +864,98 @@ class FundBacktest:
         """
         self.visualize_backtest(result_df)
 
+
+# 模块级函数，供测试使用
+def calculate_cumulative_returns(returns: np.ndarray) -> np.ndarray:
+    """
+    计算累计收益率
+    
+    参数:
+        returns: 日收益率数组
+        
+    返回:
+        累计收益率数组
+    """
+    if len(returns) == 0:
+        return np.array([])
+    
+    # 计算累计收益
+    cumulative = np.cumprod(1 + returns) - 1
+    return cumulative
+
+
+def calculate_max_drawdown(prices: np.ndarray) -> tuple:
+    """
+    计算最大回撤
+    
+    参数:
+        prices: 价格序列
+        
+    返回:
+        (最大回撤值, 开始索引, 结束索引)
+    """
+    if len(prices) == 0:
+        return 0.0, 0, 0
+    
+    # 计算累计最大值
+    running_max = np.maximum.accumulate(prices)
+    
+    # 计算回撤
+    drawdown = (prices - running_max) / running_max
+    
+    # 找到最大回撤
+    max_dd_idx = np.argmin(drawdown)
+    max_dd = drawdown[max_dd_idx]
+    
+    # 找到回撤开始点（最高点）
+    start_idx = np.argmax(prices[:max_dd_idx + 1]) if max_dd_idx > 0 else 0
+    
+    return max_dd, start_idx, max_dd_idx
+
+
+def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.02) -> float:
+    """
+    计算夏普比率
+    
+    参数:
+        returns: 收益率数组
+        risk_free_rate: 无风险利率（年化）
+        
+    返回:
+        夏普比率
+    """
+    if len(returns) == 0:
+        return 0.0
+    
+    # 年化收益率
+    annual_return = np.mean(returns) * 252
+    
+    # 年化波动率
+    annual_volatility = np.std(returns) * np.sqrt(252)
+    
+    if annual_volatility == 0:
+        return 0.0
+    
+    sharpe = (annual_return - risk_free_rate) / annual_volatility
+    return sharpe
+
+
+def calculate_volatility(returns: np.ndarray) -> float:
+    """
+    计算波动率（年化）
+    
+    参数:
+        returns: 收益率数组
+        
+    返回:
+        年化波动率
+    """
+    if len(returns) == 0:
+        return 0.0
+    
+    return np.std(returns) * np.sqrt(252)
+
+
 # 示例用法
 if __name__ == "__main__":
     """示例：演示FundBacktest类的使用"""

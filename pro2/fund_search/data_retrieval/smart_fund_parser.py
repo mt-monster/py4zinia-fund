@@ -847,6 +847,77 @@ def parse_fund_info_with_manual_fallback(texts: List[str]) -> Dict:
     
     return result
 
+# 模块级函数，供测试使用
+def parse_fund_code(code_str: str) -> Optional[str]:
+    """
+    解析基金代码
+    
+    参数:
+        code_str: 可能包含基金代码的字符串
+        
+    返回:
+        标准化的6位基金代码，如果无效则返回None
+    """
+    if not code_str:
+        return None
+    
+    # 清理字符串
+    code_str = code_str.strip()
+    
+    # 移除可能的后缀
+    if '.' in code_str:
+        code_str = code_str.split('.')[0]
+    
+    # 检查是否为6位数字
+    if len(code_str) == 6 and code_str.isdigit():
+        return code_str
+    
+    # 尝试匹配"基金XXXXXX"格式
+    fund_pattern = re.compile(r'基金(\d{6})')
+    match = fund_pattern.search(code_str)
+    if match:
+        return match.group(1)
+    
+    return None
+
+
+def validate_fund_data(data: Dict) -> tuple:
+    """
+    验证基金数据完整性
+    
+    参数:
+        data: 基金数据字典
+        
+    返回:
+        (是否有效, 错误信息列表)
+    """
+    errors = []
+    
+    # 检查必需字段
+    required_fields = ['fund_code', 'fund_name']
+    for field in required_fields:
+        if field not in data or not data[field]:
+            errors.append(f"缺少必需字段: {field}")
+    
+    # 验证基金代码格式
+    if 'fund_code' in data and data['fund_code']:
+        code = data['fund_code']
+        if len(code) != 6 or not code.isdigit():
+            errors.append(f"基金代码格式无效: {code}")
+    
+    # 验证数值字段
+    numeric_fields = ['nav', 'daily_return', 'holding_amount']
+    for field in numeric_fields:
+        if field in data and data[field] is not None:
+            try:
+                float(data[field])
+            except (ValueError, TypeError):
+                errors.append(f"字段 {field} 必须是数值类型")
+    
+    is_valid = len(errors) == 0
+    return is_valid, errors
+
+
 if __name__ == "__main__":
     # 测试代码
     test_texts = [

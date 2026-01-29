@@ -2,6 +2,7 @@
 数据检索模块单元测试
 """
 
+import os
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
