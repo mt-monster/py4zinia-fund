@@ -5,8 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>投资账本 - 基金分析系统</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         :root {
             --primary-red: #e74c3c;
@@ -23,6 +21,97 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+        }
+
+        /* 表单样式 */
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .mb-3 {
+            margin-bottom: 16px;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-outline-secondary {
+            background-color: white;
+            color: #666;
+            border-color: #ddd;
+        }
+
+        .btn-outline-secondary:hover {
+            background-color: #f5f5f5;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        /* 筛选标签样式 */
+        .filter-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+
+        /* 模态框底部按钮容器 */
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 16px 20px;
+            border-top: 1px solid #ecf0f1;
         }
 
         body {
@@ -99,100 +188,30 @@
 
 <body>
     <style>
-        /* 主容器布局 - 更新为单列布局 */
+        /* 主容器布局 - 单列布局 */
         .main-container {
-            display: flex;
-            height: calc(100vh - 50px);
+            width: 100%;
+            min-height: calc(100vh - 50px);
         }
 
-        /* 表格区域 - 现在占据全宽 */
+        /* 表格区域 - 占据全宽 */
         .left-panel {
-            flex: 1;
             width: 100%;
+            min-height: 100%;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             background: white;
         }
 
-        /* 工具栏 */
-        .toolbar {
-            padding: 10px 15px;
-            background: var(--bg-light);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
 
-        .toolbar .search-box {
-            display: flex;
-            align-items: center;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 0 10px;
-        }
-
-        .toolbar .search-box input {
-            border: none;
-            outline: none;
-            padding: 6px 8px;
-            width: 180px;
-            font-size: 13px;
-        }
-
-        .toolbar select {
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            background: white;
-        }
-
-        .toolbar input[type="date"] {
-            padding: 5px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-
-        .toolbar .btn-filter {
-            background: var(--primary-red);
-            color: white;
-            border: none;
-            padding: 6px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .toolbar .btn-filter:hover {
-            background: #c0392b;
-        }
-
-        .toolbar .btn-settings {
-            background: transparent;
-            border: 1px solid #ddd;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #666;
-            transition: all 0.2s;
-        }
-
-        .toolbar .btn-settings:hover {
-            background: #f5f5f5;
-            border-color: #bbb;
-            color: #333;
-        }
 
         /* 表格样式 */
         .table-wrapper {
             flex: 1;
-            overflow: auto;
+            overflow-x: auto;
+            overflow-y: auto;
+            position: relative;
         }
 
         .fund-table {
@@ -211,6 +230,13 @@
             position: sticky;
             top: 0;
             white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 确保复选框列与工具栏对齐 */
+        .fund-table th[data-column="checkbox"] {
+            text-align: center;
         }
 
         .fund-table td {
@@ -608,6 +634,11 @@
             border-bottom: 1px solid var(--border-color);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .toolbar .search-box {
@@ -1320,11 +1351,11 @@
             }
         }
 
-        .table-wrapper {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-            /* 为加载指示器提供定位上下文 */
+        /* 确保表格与工具栏宽度一致 */
+        .fund-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
         }
 
         /* 侧边栏样式 */
@@ -1465,34 +1496,25 @@
             </div>
             
             <!-- 筛选模态框 -->
-            <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="filterModalLabel">基金筛选</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
+            <div id="filterModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 1000;">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 800px; background-color: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);">
+                    <div style="padding: 16px; border-bottom: 1px solid #ecf0f1; display: flex; justify-content: space-between; align-items: center;">
+                        <h5 style="margin: 0; font-size: 1.1rem; font-weight: 600;">基金筛选</h5>
+                        <button type="button" onclick="closeFilterModal()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #7f8c8d;">&times;</button>
+                    </div>
+                    <div style="padding: 20px;">
                             <!-- 筛选条件标签页 -->
-                            <ul class="nav nav-tabs" id="filterTabs" role="tablist">
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab" aria-controls="basic" aria-selected="true">基本信息</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab" aria-controls="performance" aria-selected="false">业绩指标</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="risk-tab" data-bs-toggle="tab" data-bs-target="#risk" type="button" role="tab" aria-controls="risk" aria-selected="false">风险指标</button>
-                                </li>
-                                <li class="nav-item" role="presentation">
-                                    <button class="nav-link" id="type-tab" data-bs-toggle="tab" data-bs-target="#type" type="button" role="tab" aria-controls="type" aria-selected="false">基金类型</button>
-                                </li>
-                            </ul>
+                            <div style="display: flex; border-bottom: 1px solid #ecf0f1; margin-bottom: 20px;">
+                                <button class="tab-button active" onclick="switchFilterTab('basic')" style="padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; border-bottom: 2px solid #3498db; margin-right: 10px;">基本信息</button>
+                                <button class="tab-button" onclick="switchFilterTab('performance')" style="padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-right: 10px;">业绩指标</button>
+                                <button class="tab-button" onclick="switchFilterTab('risk')" style="padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-right: 10px;">风险指标</button>
+                                <button class="tab-button" onclick="switchFilterTab('type')" style="padding: 10px 20px; border: none; background: none; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent;">基金类型</button>
+                            </div>
                             
                             <!-- 筛选条件内容 -->
-                            <div class="tab-content" id="filterTabsContent">
+                            <div id="filterTabsContent">
                                 <!-- 基本信息 -->
-                                <div class="tab-pane fade show active" id="basic" role="tabpanel" aria-labelledby="basic-tab">
+                                <div id="basic" style="display: block;">
                                     <div class="filter-section">
                                         <div class="mb-3">
                                             <label class="form-label">基金代码</label>
@@ -1517,7 +1539,7 @@
                                 </div>
                                 
                                 <!-- 业绩指标 -->
-                                <div class="tab-pane fade" id="performance" role="tabpanel" aria-labelledby="performance-tab">
+                                <div id="performance" style="display: none;">
                                     <div class="filter-section">
                                         <div class="mb-3">
                                             <label class="form-label">今日收益范围 (%)</label>
@@ -1556,7 +1578,7 @@
                                 </div>
                                 
                                 <!-- 风险指标 -->
-                                <div class="tab-pane fade" id="risk" role="tabpanel" aria-labelledby="risk-tab">
+                                <div id="risk" style="display: none;">
                                     <div class="filter-section">
                                         <div class="mb-3">
                                             <label class="form-label">最大回撤范围 (%)</label>
@@ -1584,7 +1606,7 @@
                                 </div>
                                 
                                 <!-- 基金类型 -->
-                                <div class="tab-pane fade" id="type" role="tabpanel" aria-labelledby="type-tab">
+                                <div id="type" style="display: none;">
                                     <div class="filter-section">
                                         <div class="mb-3">
                                             <label class="form-label">基金类型</label>
@@ -1675,8 +1697,7 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         // ==================== 截图导入功能 ====================
 
@@ -2416,6 +2437,8 @@
             'total_profit': { type: 'number', sortable: true, label: '累计盈亏' },
             'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏率' },
             'sharpe_ratio': { type: 'number', sortable: true, label: '夏普比率' },
+            'sharpe_ratio_ytd': { type: 'number', sortable: true, label: '夏普比率(今年以来)' },
+            'sharpe_ratio_1y': { type: 'number', sortable: true, label: '夏普比率(近一年)' },
             'max_drawdown': { type: 'number', sortable: true, label: '最大回撤' },
             'composite_score': { type: 'number', sortable: true, label: '综合评分' }
         };
@@ -2435,6 +2458,8 @@
             { key: 'total_profit', name: '累计盈亏', visible: true, fixed: false, sortable: true },
             { key: 'total_profit_rate', name: '累计盈亏率', visible: true, fixed: false, sortable: true },
             { key: 'sharpe_ratio', name: '夏普比率', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio_ytd', name: '夏普比率(今年以来)', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio_1y', name: '夏普比率(近一年)', visible: true, fixed: false, sortable: true },
             { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
             { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
         ];
@@ -4270,14 +4295,6 @@
 
         // 显示分析结果
         function showAnalysisResult(data) {
-            // 在新窗口中打开分析结果
-            const dataParam = encodeURIComponent(JSON.stringify(data));
-            const url = `/correlation-analysis?data=${dataParam}`;
-
-            // 打开新窗口，设置合理的大小
-            window.open(url, '_blank', 'width=1200,height=800,top=100,left=100,scrollbars=yes,resizable=yes');
-            return;
-
             // 创建分析结果模态框
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -4294,11 +4311,13 @@
             const modalContent = document.createElement('div');
             modalContent.className = 'modal-content';
             modalContent.style.backgroundColor = '#fefefe';
-            modalContent.style.margin = '15% auto';
+            modalContent.style.margin = '5% auto';
             modalContent.style.padding = '20px';
             modalContent.style.border = '1px solid #888';
-            modalContent.style.width = '80%';
-            modalContent.style.maxWidth = '800px';
+            modalContent.style.width = '90%';
+            modalContent.style.maxWidth = '1200px';
+            modalContent.style.maxHeight = '80vh';
+            modalContent.style.overflow = 'auto';
             modalContent.style.borderRadius = '8px';
 
             // 添加标题
@@ -4308,7 +4327,7 @@
             modalContent.appendChild(title);
 
             // 添加相关性矩阵
-            if (data.correlation_matrix) {
+            if (data.correlation_matrix && data.fund_names) {
                 const matrixSection = document.createElement('div');
                 matrixSection.style.marginTop = '20px';
 
@@ -4319,6 +4338,7 @@
                 const matrixTable = document.createElement('table');
                 matrixTable.style.width = '100%';
                 matrixTable.style.borderCollapse = 'collapse';
+                matrixTable.style.fontSize = '14px';
 
                 // 创建表头
                 const thead = document.createElement('thead');
@@ -4330,10 +4350,14 @@
                     const th = document.createElement('th');
                     th.textContent = fundName;
                     th.style.border = '1px solid #ddd';
-                    th.style.padding = '8px';
+                    th.style.padding = '10px';
                     th.style.textAlign = 'center';
+                    th.style.backgroundColor = '#f8f9fa';
+                    th.style.fontWeight = 'bold';
+                    th.style.whiteSpace = 'nowrap';
                     headerRow.appendChild(th);
                 });
+
                 thead.appendChild(headerRow);
                 matrixTable.appendChild(thead);
 
@@ -4341,19 +4365,25 @@
                 const tbody = document.createElement('tbody');
                 data.correlation_matrix.forEach((row, rowIndex) => {
                     const tr = document.createElement('tr');
-                    const fundNameTd = document.createElement('td');
-                    fundNameTd.textContent = data.fund_names[rowIndex];
-                    fundNameTd.style.border = '1px solid #ddd';
-                    fundNameTd.style.padding = '8px';
-                    fundNameTd.style.fontWeight = 'bold';
-                    tr.appendChild(fundNameTd);
+                    
+                    // 添加基金名称列
+                    const fundNameTh = document.createElement('th');
+                    fundNameTh.textContent = data.fund_names[rowIndex];
+                    fundNameTh.style.border = '1px solid #ddd';
+                    fundNameTh.style.padding = '10px';
+                    fundNameTh.style.textAlign = 'center';
+                    fundNameTh.style.backgroundColor = '#f8f9fa';
+                    fundNameTh.style.fontWeight = 'bold';
+                    tr.appendChild(fundNameTh);
 
+                    // 添加相关性系数列
                     row.forEach(value => {
                         const td = document.createElement('td');
                         td.textContent = value.toFixed(4);
                         td.style.border = '1px solid #ddd';
-                        td.style.padding = '8px';
+                        td.style.padding = '10px';
                         td.style.textAlign = 'center';
+                        td.style.fontFamily = 'monospace';
 
                         // 根据相关性值设置背景颜色
                         if (value === 1) {
@@ -4368,8 +4398,10 @@
 
                         tr.appendChild(td);
                     });
+
                     tbody.appendChild(tr);
                 });
+
                 matrixTable.appendChild(tbody);
                 matrixSection.appendChild(matrixTable);
                 modalContent.appendChild(matrixSection);
@@ -4377,35 +4409,101 @@
 
             // 添加说明
             const explanation = document.createElement('div');
-            explanation.style.marginTop = '20px';
+            explanation.style.marginTop = '30px';
+            explanation.style.padding = '20px';
+            explanation.style.backgroundColor = '#f8f9fa';
+            explanation.style.borderRadius = '8px';
             explanation.style.fontSize = '14px';
-            explanation.style.color = '#666';
-            explanation.innerHTML = `
-                <h3>说明</h3>
-                <ul>
-                    <li>相关性系数范围: [-1, 1]</li>
-                    <li>接近 1: 高度正相关，两只基金走势相似</li>
-                    <li>接近 -1: 高度负相关，两只基金走势相反</li>
-                    <li>接近 0: 无相关性，两只基金走势独立</li>
-                </ul>
-                <p>相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。</p>
-            `;
+
+            const explanationTitle = document.createElement('h3');
+            explanationTitle.textContent = '说明';
+            explanationTitle.style.color = '#2c3e50';
+            explanationTitle.style.marginBottom = '15px';
+            explanation.appendChild(explanationTitle);
+
+            const explanationList = document.createElement('ul');
+            explanationList.style.marginLeft = '20px';
+            explanationList.style.marginBottom = '15px';
+
+            const listItems = [
+                '相关性系数范围: [-1, 1]',
+                '接近 1: 高度正相关，两只基金走势相似',
+                '接近 -1: 高度负相关，两只基金走势相反',
+                '接近 0: 无相关性，两只基金走势独立'
+            ];
+
+            listItems.forEach(itemText => {
+                const li = document.createElement('li');
+                li.textContent = itemText;
+                li.style.marginBottom = '5px';
+                explanationList.appendChild(li);
+            });
+
+            explanation.appendChild(explanationList);
+
+            const explanationPara = document.createElement('p');
+            explanationPara.textContent = '相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。';
+            explanation.appendChild(explanationPara);
+
             modalContent.appendChild(explanation);
 
-            // 添加关闭按钮
-            const closeButton = document.createElement('button');
-            closeButton.textContent = '关闭';
-            closeButton.style.marginTop = '20px';
-            closeButton.style.padding = '10px 20px';
-            closeButton.style.backgroundColor = '#3498db';
-            closeButton.style.color = 'white';
-            closeButton.style.border = 'none';
-            closeButton.style.borderRadius = '4px';
-            closeButton.style.cursor = 'pointer';
-            closeButton.onclick = function () {
+            // 添加按钮容器
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.marginTop = '30px';
+            buttonContainer.style.display = 'flex';
+            buttonContainer.style.justifyContent = 'flex-start';
+
+            // 添加返回持仓按钮
+            const backButton = document.createElement('button');
+            backButton.textContent = '返回持仓';
+            backButton.className = 'btn btn-primary';
+            backButton.style.padding = '10px 20px';
+            backButton.style.borderRadius = '4px';
+            backButton.style.border = 'none';
+            backButton.style.backgroundColor = '#3498db';
+            backButton.style.color = 'white';
+            backButton.style.fontSize = '14px';
+            backButton.style.fontWeight = '500';
+            backButton.style.cursor = 'pointer';
+            backButton.style.transition = 'background-color 0.3s ease';
+
+            backButton.addEventListener('mouseover', function() {
+                backButton.style.backgroundColor = '#2980b9';
+            });
+
+            backButton.addEventListener('mouseout', function() {
+                backButton.style.backgroundColor = '#3498db';
+            });
+
+            backButton.addEventListener('click', function() {
+                // 关闭对话框
                 document.body.removeChild(modal);
-            };
-            modalContent.appendChild(closeButton);
+            });
+
+            buttonContainer.appendChild(backButton);
+            modalContent.appendChild(buttonContainer);
+
+            // 添加关闭按钮到模态框
+            const closeButton = document.createElement('span');
+            closeButton.textContent = '×';
+            closeButton.style.color = '#aaa';
+            closeButton.style.float = 'right';
+            closeButton.style.fontSize = '28px';
+            closeButton.style.fontWeight = 'bold';
+            closeButton.style.cursor = 'pointer';
+
+            closeButton.addEventListener('click', function() {
+                document.body.removeChild(modal);
+            });
+
+            title.appendChild(closeButton);
+
+            // 点击模态框外部关闭
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
 
             modal.appendChild(modalContent);
             document.body.appendChild(modal);
@@ -4423,8 +4521,39 @@
 
         // 打开筛选模态框
         function openFilterModal() {
-            const filterModal = new bootstrap.Modal(document.getElementById('filterModal'));
-            filterModal.show();
+            const filterModal = document.getElementById('filterModal');
+            filterModal.style.display = 'block';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+        }
+
+        // 关闭筛选模态框
+        function closeFilterModal() {
+            const filterModal = document.getElementById('filterModal');
+            filterModal.style.display = 'none';
+            document.body.style.overflow = ''; // 恢复背景滚动
+        }
+
+        // 切换筛选标签页
+        function switchFilterTab(tabId) {
+            // 隐藏所有标签页内容
+            document.getElementById('basic').style.display = 'none';
+            document.getElementById('performance').style.display = 'none';
+            document.getElementById('risk').style.display = 'none';
+            document.getElementById('type').style.display = 'none';
+            
+            // 显示选中的标签页内容
+            document.getElementById(tabId).style.display = 'block';
+            
+            // 更新标签按钮的激活状态
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.classList.remove('active');
+                button.style.borderBottom = '2px solid transparent';
+            });
+            
+            // 激活当前标签按钮
+            event.target.classList.add('active');
+            event.target.style.borderBottom = '2px solid #3498db';
         }
 
         // 重置筛选条件
@@ -4498,10 +4627,7 @@
             applyFilterLogic();
 
             // 关闭模态框
-            const filterModal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
-            if (filterModal) {
-                filterModal.hide();
-            }
+            closeFilterModal();
 
             // 显示筛选结果提示
             showFilterResults();
