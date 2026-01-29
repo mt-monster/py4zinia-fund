@@ -2,66 +2,72 @@
 # 参考文档: https://gitee.com/help/articles/4113
 
 stages:
+  - install
   - test
   - build
 
 variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   PIP_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple"
-  WORK_DIR: "pro2"
 
-# 缓存配置
-cache:
-  paths:
-    - .cache/pip
+# 安装依赖
+install:
+  stage: install
+  image: python:3.9-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
+  script:
+    - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install -r requirements.txt -i $PIP_INDEX_URL
+    - python main.py
+  cache:
+    paths:
+      - /root/.cache/pip
 
-# 单元测试任务
+# 单元测试
 unit_test:
   stage: test
   image: python:3.9-slim
+  dependencies:
+    - install
   before_script:
-    # 安装系统依赖
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
-    # 升级 pip 并设置国内镜像
     - pip install --upgrade pip -i $PIP_INDEX_URL
-    # 安装 numpy 先（pandas 依赖）
-    - pip install numpy==1.24.3 -i $PIP_INDEX_URL
-    # 安装其他依赖
     - pip install -r requirements.txt -i $PIP_INDEX_URL
-    - cd $WORK_DIR
   script:
-    # 运行单元测试（跳过数据库测试）
-    - python -m pytest tests/unit -v --html=tests/reports/unit_test_report.html --self-contained-html -k "not database" || true
+    - cd pro2
+    - python -m pytest tests/unit -v --html=tests/reports/unit_test_report.html --self-contained-html -k "not database" || echo "Tests completed with some failures"
   artifacts:
     when: always
     paths:
       - pro2/tests/reports/
     expire_in: 1 week
 
-# 代码质量检查
+# 代码风格检查
 lint:
   stage: test
   image: python:3.9-slim
+  dependencies:
+    - install
   before_script:
-    - pip install flake8 pylint -i $PIP_INDEX_URL
-    - cd $WORK_DIR
+    - pip install flake8 -i $PIP_INDEX_URL
   script:
+    - cd pro2
     - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || true
   allow_failure: true
 
-# 构建任务
+# 构建
 build:
   stage: build
   image: python:3.9-slim
+  dependencies:
+    - install
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
-    - pip install numpy==1.24.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
-    - cd $WORK_DIR
   script:
     - echo "Build successful!"
-    - echo "Application is ready for deployment"
+    - python main.py
   only:
     - master
     - develop
