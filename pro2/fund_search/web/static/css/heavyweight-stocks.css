@@ -1,0 +1,252 @@
+/**
+ * 重仓股展示组件样式
+ */
+
+.heavyweight-stocks-container {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-top: 30px;
+}
+
+.stocks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.stocks-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.stocks-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.last-updated {
+    font-size: 12px;
+    color: #999;
+}
+
+.refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #666;
+    transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+    background: #e8e8e8;
+    border-color: #ccc;
+}
+
+.refresh-btn:active {
+    transform: scale(0.98);
+}
+
+.refresh-icon {
+    font-size: 14px;
+    display: inline-block;
+    transition: transform 0.3s;
+}
+
+.refresh-btn.loading .refresh-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 加载状态 */
+.stocks-loading {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 15px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.stocks-loading p {
+    color: #666;
+    font-size: 14px;
+    margin: 0;
+}
+
+/* 错误状态 */
+.stocks-error {
+    text-align: center;
+    padding: 40px 20px;
+    background: #fff5f5;
+    border-radius: 6px;
+    border: 1px solid #fed7d7;
+}
+
+.error-icon {
+    font-size: 40px;
+    margin-bottom: 15px;
+}
+
+.error-message {
+    color: #e53e3e;
+    font-size: 14px;
+    margin-bottom: 20px;
+    word-break: break-word;
+}
+
+.retry-btn {
+    padding: 8px 20px;
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.retry-btn:hover {
+    background: #c53030;
+}
+
+/* 表格样式 */
+.stocks-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.stocks-table thead {
+    background: #f8f9fa;
+}
+
+.stocks-table th,
+.stocks-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+
+.stocks-table th {
+    font-weight: 600;
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+.stocks-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.stocks-table tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.stocks-table tbody tr:nth-child(even):hover {
+    background: #f0f0f0;
+}
+
+/* 涨跌幅样式 */
+.positive-change {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+.negative-change {
+    color: #27ae60;
+    font-weight: 500;
+}
+
+/* 数据来源 */
+.data-source {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    font-size: 12px;
+    color: #999;
+    text-align: right;
+}
+
+.source-name {
+    color: #666;
+    font-weight: 500;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .heavyweight-stocks-container {
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .stocks-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .stocks-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .stocks-table {
+        font-size: 12px;
+    }
+    
+    .stocks-table th,
+    .stocks-table td {
+        padding: 8px;
+    }
+}
+
+/* 骨架屏动画 */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* 空数据状态 */
+.no-data {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+}
+
+.no-data-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
