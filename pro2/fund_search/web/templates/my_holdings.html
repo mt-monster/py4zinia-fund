@@ -598,6 +598,119 @@
             cursor: help;
         }
 
+        /* 新工具栏样式 */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            flex-wrap: wrap;
+        }
+
+        .toolbar .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .toolbar .quick-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .toolbar .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-left: auto;
+        }
+
+        .toolbar .btn-filter {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar .btn-filter:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .toolbar select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            background: white;
+        }
+
+        /* 筛选结果提示样式 */
+        .filter-results {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .filter-tags {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        /* 筛选模态框样式 */
+        .filter-section {
+            margin-top: 16px;
+        }
+
+        .filter-section .form-label {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .filter-section .row {
+            gap: 8px;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+
+            .toolbar .search-box {
+                min-width: auto;
+            }
+
+            .toolbar .quick-actions {
+                justify-content: center;
+            }
+
+            .toolbar .toolbar-right {
+                margin-left: 0;
+                justify-content: center;
+            }
+        }
+
         .risk-metrics {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1304,9 +1417,16 @@
             <div class="toolbar">
                 <div class="search-box">
                     <i class="bi bi-search" style="color: #aaa;"></i>
-                    <input type="text" id="search-input" placeholder="搜索基金代码/名称">
+                    <input type="text" id="search-input" placeholder="搜索基金代码/名称" onkeyup="if(event.key === 'Enter') loadFunds()">
                 </div>
-                <select id="sort-select">
+                
+                <!-- 高级筛选按钮 -->
+                <button class="btn-filter" onclick="openFilterModal()" style="background: #3498db;">
+                    <i class="bi bi-funnel"></i> 高级筛选
+                </button>
+                
+                <!-- 排序选择 -->
+                <select id="sort-select" onchange="loadFunds()">
                     <option value="composite_score">综合评分</option>
                     <option value="today_return">今日收益</option>
                     <option value="prev_day_return">昨日收益</option>
@@ -1314,30 +1434,195 @@
                     <option value="sharpe_ratio">夏普比率</option>
                     <option value="max_drawdown">最大回撤</option>
                 </select>
-                <input type="date" id="date-select">
-                <button class="btn-filter" onclick="loadFunds()">
-                    <i class="bi bi-funnel"></i> 筛选
-                </button>
-                <button class="btn-filter" onclick="filterOdiifunds()" style="background: #8e44ad;"
-                    title="筛选ODII基金">
-                    <i class="bi bi-globe"></i> 筛选ODII
-                </button>
-                <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;"
-                    title="上传截图导入持仓">
-                    <i class="bi bi-camera"></i> 截图导入
-                </button>
-                <button class="btn-filter" onclick="clearFundList()" style="background: #95a5a6;" title="清空基金列表">
-                    <i class="bi bi-trash"></i> 清空
-                </button>
-                <button class="btn-filter" onclick="startAnalysis()" style="background: #3498db;" title="分析所选基金相关性">
-                    <i class="bi bi-chart-line"></i> 开始分析
-                </button>
-                <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">
-                    共 <span id="total-count">0</span> 只基金
-                </span>
-                <button class="btn-settings" onclick="openSettingsModal()" title="表头管理">
-                    <i class="bi bi-gear"></i>
-                </button>
+                
+                <!-- 快速操作按钮 -->
+                <div class="quick-actions">
+                    <button class="btn-filter" onclick="filterOdiifunds()" style="background: #8e44ad;"
+                        title="筛选ODII基金">
+                        <i class="bi bi-globe"></i> ODII
+                    </button>
+                    <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;"
+                        title="上传截图导入持仓">
+                        <i class="bi bi-camera"></i> 导入
+                    </button>
+                    <button class="btn-filter" onclick="clearFundList()" style="background: #95a5a6;" title="清空基金列表">
+                        <i class="bi bi-trash"></i> 清空
+                    </button>
+                    <button class="btn-filter" onclick="startAnalysis()" style="background: #e67e22;" title="分析所选基金相关性">
+                        <i class="bi bi-chart-line"></i> 分析
+                    </button>
+                </div>
+                
+                <!-- 基金数量和设置 -->
+                <div class="toolbar-right">
+                    <span class="fund-count" style="color: var(--text-muted); font-size: 12px;">
+                        共 <span id="total-count">0</span> 只基金
+                    </span>
+                    <button class="btn-settings" onclick="openSettingsModal()" title="表头管理">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 筛选模态框 -->
+            <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="filterModalLabel">基金筛选</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- 筛选条件标签页 -->
+                            <ul class="nav nav-tabs" id="filterTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab" aria-controls="basic" aria-selected="true">基本信息</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab" aria-controls="performance" aria-selected="false">业绩指标</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="risk-tab" data-bs-toggle="tab" data-bs-target="#risk" type="button" role="tab" aria-controls="risk" aria-selected="false">风险指标</button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="type-tab" data-bs-toggle="tab" data-bs-target="#type" type="button" role="tab" aria-controls="type" aria-selected="false">基金类型</button>
+                                </li>
+                            </ul>
+                            
+                            <!-- 筛选条件内容 -->
+                            <div class="tab-content" id="filterTabsContent">
+                                <!-- 基本信息 -->
+                                <div class="tab-pane fade show active" id="basic" role="tabpanel" aria-labelledby="basic-tab">
+                                    <div class="filter-section">
+                                        <div class="mb-3">
+                                            <label class="form-label">基金代码</label>
+                                            <input type="text" class="form-control" id="filter-fund-code" placeholder="输入基金代码">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">基金名称</label>
+                                            <input type="text" class="form-control" id="filter-fund-name" placeholder="输入基金名称">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">购买日期范围</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="date" class="form-control" id="filter-buy-date-start">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="date" class="form-control" id="filter-buy-date-end">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 业绩指标 -->
+                                <div class="tab-pane fade" id="performance" role="tabpanel" aria-labelledby="performance-tab">
+                                    <div class="filter-section">
+                                        <div class="mb-3">
+                                            <label class="form-label">今日收益范围 (%)</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-today-return-min" placeholder="最小值">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-today-return-max" placeholder="最大值">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">年化收益范围 (%)</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-annual-return-min" placeholder="最小值">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-annual-return-max" placeholder="最大值">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">持有金额范围 (元)</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="number" step="1" class="form-control" id="filter-holding-amount-min" placeholder="最小值">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="number" step="1" class="form-control" id="filter-holding-amount-max" placeholder="最大值">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 风险指标 -->
+                                <div class="tab-pane fade" id="risk" role="tabpanel" aria-labelledby="risk-tab">
+                                    <div class="filter-section">
+                                        <div class="mb-3">
+                                            <label class="form-label">最大回撤范围 (%)</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-max-drawdown-min" placeholder="最小值">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-max-drawdown-max" placeholder="最大值">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">夏普比率范围</label>
+                                            <div class="row">
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-sharpe-ratio-min" placeholder="最小值">
+                                                </div>
+                                                <div class="col">
+                                                    <input type="number" step="0.01" class="form-control" id="filter-sharpe-ratio-max" placeholder="最大值">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 基金类型 -->
+                                <div class="tab-pane fade" id="type" role="tabpanel" aria-labelledby="type-tab">
+                                    <div class="filter-section">
+                                        <div class="mb-3">
+                                            <label class="form-label">基金类型</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filter-type-odii">
+                                                <label class="form-check-label" for="filter-type-odii">ODII/海外基金</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filter-type-etf">
+                                                <label class="form-check-label" for="filter-type-etf">ETF基金</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filter-type-index">
+                                                <label class="form-check-label" for="filter-type-index">指数基金</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="filter-type-active">
+                                                <label class="form-check-label" for="filter-type-active">主动基金</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="resetFilters()">重置</button>
+                            <button type="button" class="btn btn-primary" onclick="applyFilters()">应用筛选</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 筛选结果提示 -->
+            <div class="filter-results" id="filterResults" style="display: none;">
+                <div class="filter-tags">
+                    <span class="filter-tag">已应用筛选条件</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearFilters()">清除筛选</button>
+                </div>
             </div>
 
             <!-- 表格 -->
@@ -4177,15 +4462,237 @@
             };
         }
 
-        // 筛选ODII基金
-        function filterOdiifunds() {
-            // 检查基金是否为ODII或海外基金
-            function isOdiifund(fund) {
-                const fundName = fund.fund_name || fund.fundName || '';
-                const odiiKeywords = ['QDII', 'ODII', '海外', '全球', '国际', '美股', '港股', '欧洲', '亚太', '新兴市场'];
-                return odiiKeywords.some(keyword => fundName.includes(keyword));
+        // 全局筛选条件变量
+        let currentFilters = {};
+
+        // 打开筛选模态框
+        function openFilterModal() {
+            const filterModal = new bootstrap.Modal(document.getElementById('filterModal'));
+            filterModal.show();
+        }
+
+        // 重置筛选条件
+        function resetFilters() {
+            // 重置基本信息筛选条件
+            document.getElementById('filter-fund-code').value = '';
+            document.getElementById('filter-fund-name').value = '';
+            document.getElementById('filter-buy-date-start').value = '';
+            document.getElementById('filter-buy-date-end').value = '';
+
+            // 重置业绩指标筛选条件
+            document.getElementById('filter-today-return-min').value = '';
+            document.getElementById('filter-today-return-max').value = '';
+            document.getElementById('filter-annual-return-min').value = '';
+            document.getElementById('filter-annual-return-max').value = '';
+            document.getElementById('filter-holding-amount-min').value = '';
+            document.getElementById('filter-holding-amount-max').value = '';
+
+            // 重置风险指标筛选条件
+            document.getElementById('filter-max-drawdown-min').value = '';
+            document.getElementById('filter-max-drawdown-max').value = '';
+            document.getElementById('filter-sharpe-ratio-min').value = '';
+            document.getElementById('filter-sharpe-ratio-max').value = '';
+
+            // 重置基金类型筛选条件
+            document.getElementById('filter-type-odii').checked = false;
+            document.getElementById('filter-type-etf').checked = false;
+            document.getElementById('filter-type-index').checked = false;
+            document.getElementById('filter-type-active').checked = false;
+
+            // 清空当前筛选条件
+            currentFilters = {};
+        }
+
+        // 应用筛选条件
+        function applyFilters() {
+            // 收集筛选条件
+            const filters = {
+                basic: {
+                    fundCode: document.getElementById('filter-fund-code').value.trim(),
+                    fundName: document.getElementById('filter-fund-name').value.trim(),
+                    buyDateStart: document.getElementById('filter-buy-date-start').value,
+                    buyDateEnd: document.getElementById('filter-buy-date-end').value
+                },
+                performance: {
+                    todayReturnMin: parseFloat(document.getElementById('filter-today-return-min').value) || null,
+                    todayReturnMax: parseFloat(document.getElementById('filter-today-return-max').value) || null,
+                    annualReturnMin: parseFloat(document.getElementById('filter-annual-return-min').value) || null,
+                    annualReturnMax: parseFloat(document.getElementById('filter-annual-return-max').value) || null,
+                    holdingAmountMin: parseFloat(document.getElementById('filter-holding-amount-min').value) || null,
+                    holdingAmountMax: parseFloat(document.getElementById('filter-holding-amount-max').value) || null
+                },
+                risk: {
+                    maxDrawdownMin: parseFloat(document.getElementById('filter-max-drawdown-min').value) || null,
+                    maxDrawdownMax: parseFloat(document.getElementById('filter-max-drawdown-max').value) || null,
+                    sharpeRatioMin: parseFloat(document.getElementById('filter-sharpe-ratio-min').value) || null,
+                    sharpeRatioMax: parseFloat(document.getElementById('filter-sharpe-ratio-max').value) || null
+                },
+                type: {
+                    odii: document.getElementById('filter-type-odii').checked,
+                    etf: document.getElementById('filter-type-etf').checked,
+                    index: document.getElementById('filter-type-index').checked,
+                    active: document.getElementById('filter-type-active').checked
+                }
+            };
+
+            // 保存当前筛选条件
+            currentFilters = filters;
+
+            // 应用筛选
+            applyFilterLogic();
+
+            // 关闭模态框
+            const filterModal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
+            if (filterModal) {
+                filterModal.hide();
             }
 
+            // 显示筛选结果提示
+            showFilterResults();
+        }
+
+        // 应用筛选逻辑
+        function applyFilterLogic() {
+            let filteredFunds = [...allFunds];
+
+            // 应用基本信息筛选
+            if (currentFilters.basic) {
+                const basic = currentFilters.basic;
+                if (basic.fundCode) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.fund_code.includes(basic.fundCode)
+                    );
+                }
+                if (basic.fundName) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.fund_name.includes(basic.fundName)
+                    );
+                }
+                if (basic.buyDateStart) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.buy_date >= basic.buyDateStart
+                    );
+                }
+                if (basic.buyDateEnd) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.buy_date <= basic.buyDateEnd
+                    );
+                }
+            }
+
+            // 应用业绩指标筛选
+            if (currentFilters.performance) {
+                const perf = currentFilters.performance;
+                if (perf.todayReturnMin !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.today_return >= perf.todayReturnMin
+                    );
+                }
+                if (perf.todayReturnMax !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.today_return <= perf.todayReturnMax
+                    );
+                }
+                if (perf.annualReturnMin !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.annualized_return >= perf.annualReturnMin
+                    );
+                }
+                if (perf.annualReturnMax !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.annualized_return <= perf.annualReturnMax
+                    );
+                }
+                if (perf.holdingAmountMin !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.holding_amount >= perf.holdingAmountMin
+                    );
+                }
+                if (perf.holdingAmountMax !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.holding_amount <= perf.holdingAmountMax
+                    );
+                }
+            }
+
+            // 应用风险指标筛选
+            if (currentFilters.risk) {
+                const risk = currentFilters.risk;
+                if (risk.maxDrawdownMin !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.max_drawdown >= risk.maxDrawdownMin
+                    );
+                }
+                if (risk.maxDrawdownMax !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.max_drawdown <= risk.maxDrawdownMax
+                    );
+                }
+                if (risk.sharpeRatioMin !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.sharpe_ratio >= risk.sharpeRatioMin
+                    );
+                }
+                if (risk.sharpeRatioMax !== null) {
+                    filteredFunds = filteredFunds.filter(fund => 
+                        fund.sharpe_ratio <= risk.sharpeRatioMax
+                    );
+                }
+            }
+
+            // 应用基金类型筛选
+            if (currentFilters.type) {
+                const type = currentFilters.type;
+                if (type.odii) {
+                    filteredFunds = filteredFunds.filter(isOdiifund);
+                }
+                // 其他类型筛选可以在这里添加
+            }
+
+            // 显示筛选结果
+            uiRenderer.renderTableRows(filteredFunds);
+
+            // 更新显示的基金数量
+            document.getElementById('total-count').textContent = `${filteredFunds.length} (已筛选)`;
+
+            // 显示通知
+            showNotification(`已筛选出 ${filteredFunds.length} 只基金`, 'info');
+        }
+
+        // 显示筛选结果提示
+        function showFilterResults() {
+            const filterResults = document.getElementById('filterResults');
+            filterResults.style.display = 'block';
+        }
+
+        // 清除筛选条件
+        function clearFilters() {
+            // 清空当前筛选条件
+            currentFilters = {};
+
+            // 重新加载所有基金
+            uiRenderer.renderTableRows(allFunds);
+
+            // 更新显示的基金数量
+            document.getElementById('total-count').textContent = allFunds.length;
+
+            // 隐藏筛选结果提示
+            const filterResults = document.getElementById('filterResults');
+            filterResults.style.display = 'none';
+
+            // 显示通知
+            showNotification('已清除所有筛选条件', 'info');
+        }
+
+        // 检查基金是否为ODII或海外基金
+        function isOdiifund(fund) {
+            const fundName = fund.fund_name || fund.fundName || '';
+            const odiiKeywords = ['QDII', 'ODII', '海外', '全球', '国际', '美股', '港股', '欧洲', '亚太', '新兴市场'];
+            return odiiKeywords.some(keyword => fundName.includes(keyword));
+        }
+
+        // 筛选ODII基金
+        function filterOdiifunds() {
             // 筛选ODII基金
             const odiifunds = allFunds.filter(isOdiifund);
 
