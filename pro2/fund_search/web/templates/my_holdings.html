@@ -2092,7 +2092,7 @@
             }, 5000);
         }
 
-        // 显示识别结果（增强版 - 包含投资组合汇总）
+        // 显示识别结果（精简版 - 仅保留核心基金信息）
         function showRecognitionResult(data) {
             const resultDiv = document.getElementById('recognitionResult');
             if (!resultDiv) return;
@@ -2100,7 +2100,6 @@
             resultDiv.style.display = 'block';
 
             const funds = Array.isArray(data) ? data : (data.data || []);
-            const portfolioSummary = data.portfolio_summary || null;
 
             // 去重处理
             const seenCodes = new Set();
@@ -2118,74 +2117,20 @@
 
             let html = `<div class="alert alert-success"><i class="bi bi-check-circle"></i> 成功识别 ${uniqueFunds.length} 个基金，请确认信息后导入</div>`;
 
-            // 投资组合汇总卡片
-            if (portfolioSummary) {
-                html += `
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 20px; margin-bottom: 20px; color: white;">
-                    <h5 style="margin: 0 0 15px 0; font-weight: 600;"><i class="bi bi-pie-chart"></i> 📈 投资组合汇总</h5>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
-                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">基金数量</div>
-                            <div style="font-size: 24px; font-weight: bold;">${portfolioSummary.total_funds}</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
-                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总持仓成本</div>
-                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_holding_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
-                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏金额</div>
-                            <div style="font-size: 20px; font-weight: bold; color: ${portfolioSummary.total_profit_amount >= 0 ? '#4ade80' : '#f87171'};">
-                                ${portfolioSummary.total_profit_amount >= 0 ? '+' : ''}¥${portfolioSummary.total_profit_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
-                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总当前市值</div>
-                            <div style="font-size: 20px; font-weight: bold;">¥${portfolioSummary.total_current_value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.15); padding: 12px; border-radius: 8px; backdrop-filter: blur(10px);">
-                            <div style="font-size: 11px; opacity: 0.9; margin-bottom: 5px;">总盈亏率</div>
-                            <div style="font-size: 20px; font-weight: bold; color: ${portfolioSummary.total_profit_rate >= 0 ? '#4ade80' : '#f87171'};">
-                                ${portfolioSummary.total_profit_rate >= 0 ? '+' : ''}${portfolioSummary.total_profit_rate.toFixed(2)}%
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-
-                // 表现对比
-                if (portfolioSummary.best_fund && portfolioSummary.worst_fund) {
-                    html += `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 15px; border-radius: 10px; color: white;">
-                            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">🏆 表现最佳</div>
-                            <div style="font-weight: 600; margin-bottom: 3px;">${portfolioSummary.best_fund.fund_name}</div>
-                            <div style="font-size: 20px; font-weight: bold;">+${portfolioSummary.best_fund.profit_rate.toFixed(2)}%</div>
-                        </div>
-                        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 15px; border-radius: 10px; color: white;">
-                            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">📉 表现最差</div>
-                            <div style="font-weight: 600; margin-bottom: 3px;">${portfolioSummary.worst_fund.fund_name}</div>
-                            <div style="font-size: 20px; font-weight: bold;">${portfolioSummary.worst_fund.profit_rate >= 0 ? '+' : ''}${portfolioSummary.worst_fund.profit_rate.toFixed(2)}%</div>
-                        </div>
-                    </div>`;
-                }
-            }
-
-            // 详细基金列表（9列完整信息）
+            // 核心基金列表（仅保留关键数据字段）
             if (uniqueFunds.length > 0) {
                 html += '<div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">';
-                html += '<h6 style="margin: 0 0 15px 0; font-weight: 600; color: #333;"><i class="bi bi-list-ul"></i> 识别详情</h6>';
+                html += '<h6 style="margin: 0 0 15px 0; font-weight: 600; color: #333;"><i class="bi bi-list-ul"></i> 基金列表</h6>';
                 html += '<div style="overflow-x: auto;">';
                 html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
                 html += `<thead>
                     <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
                         <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金代码</th>
                         <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">基金名称</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">当前净值</th>
+                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">涨跌幅</th>
                         <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">持仓金额</th>
-                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">盈亏金额</th>
-                        <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">盈亏率</th>
                         <th style="padding: 10px 8px; text-align: right; font-weight: 600; color: #666;">当前市值</th>
-                        <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">置信度</th>
-                        <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">识别来源</th>
-                        <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #666;">原始文本</th>
                         <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #666;">操作</th>
                     </tr>
                 </thead>`;
@@ -2198,14 +2143,11 @@
                     html += `<tr style="border-bottom: 1px solid #f0f0f0;">
                         <td style="padding: 10px 8px;"><span style="font-family: 'Courier New', monospace; color: #3b82f6; font-weight: 600;">${fund.fund_code || '--'}</span></td>
                         <td style="padding: 10px 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${fund.fund_name || '--'}">${fund.fund_name || '--'}</td>
-                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.holding_amount ? fund.holding_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
-                        <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_amount !== null && fund.profit_amount !== undefined ? profitSign + '¥' + fund.profit_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">${fund.nav_value ? fund.nav_value.toFixed(4) : '--'}</td>
                         <td style="padding: 10px 8px; text-align: right; font-weight: 600; color: ${profitColor};">${fund.profit_rate !== null && fund.profit_rate !== undefined ? profitSign + fund.profit_rate.toFixed(2) + '%' : '--'}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.holding_amount ? fund.holding_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
                         <td style="padding: 10px 8px; text-align: right; font-weight: 500;">¥${fund.current_value ? fund.current_value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--'}</td>
-                        <td style="padding: 10px 8px; text-align: center;"><span style="background: #3b82f6; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">${fund.confidence ? (fund.confidence * 100).toFixed(1) + '%' : '--'}</span></td>
-                        <td style="padding: 10px 8px; text-align: center;"><span style="background: #6b7280; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px;">${fund.source || '--'}</span></td>
-                        <td style="padding: 10px 8px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6b7280; font-size: 12px;" title="${fund.original_text || '--'}">${fund.original_text || '--'}</td>
-                        <td style="padding: 10px 8px; text-align: center; min-width: 120px;">
+                        <td style="padding: 10px 8px; text-align: center; min-width: 80px;">
                             <div style="display: flex; gap: 5px; justify-content: center;">
                                 <button class="btn btn-sm btn-outline-primary" onclick="editFund(${index})" style="padding: 4px 8px; font-size: 12px;">
                                     编辑
@@ -2220,13 +2162,10 @@
 
                 html += '</tbody></table></div></div>';
 
-                // 添加确认导入和导出按钮
-                html += '<div style="text-align: center; margin-top: 20px; display: flex; gap: 15px; justify-content: center;">';
+                // 添加确认导入按钮
+                html += '<div style="text-align: center; margin-top: 20px;">';
                 html += '<button class="btn btn-success" onclick="confirmAndSave()" style="padding: 10px 30px; font-size: 14px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">';
                 html += '<i class="bi bi-check-circle"></i> 确认导入';
-                html += '</button>';
-                html += '<button class="btn btn-outline-secondary" onclick="exportRecognitionResults()" style="padding: 10px 30px; font-size: 14px;">';
-                html += '<i class="bi bi-download"></i> 导出Excel';
                 html += '</button>';
                 html += '</div>';
             }
@@ -2234,40 +2173,7 @@
             document.getElementById('resultContent').innerHTML = html;
         }
 
-        // 导出识别结果为CSV
-        function exportRecognitionResults() {
-            if (recognizedFunds.length === 0) {
-                alert('没有可导出的数据');
-                return;
-            }
 
-            // 构建CSV内容
-            let csv = '\uFEFF'; // UTF-8 BOM
-            csv += '基金代码,基金名称,持仓金额,盈亏金额,盈亏率,当前市值,置信度,识别来源,原始文本\n';
-
-            recognizedFunds.forEach(fund => {
-                csv += `${fund.fund_code || ''},`;
-                csv += `"${(fund.fund_name || '').replace(/"/g, '""')}",`;
-                csv += `${fund.holding_amount || ''},`;
-                csv += `${fund.profit_amount || ''},`;
-                csv += `${fund.profit_rate || ''},`;
-                csv += `${fund.current_value || ''},`;
-                csv += `${fund.confidence ? (fund.confidence * 100).toFixed(1) : ''},`;
-                csv += `${fund.source || ''},`;
-                csv += `"${(fund.original_text || '').replace(/"/g, '""')}"\n`;
-            });
-
-            // 创建下载链接
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `基金识别结果_${new Date().toISOString().slice(0, 10)}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
 
         // 显示识别错误
         function showRecognitionError(error, suggestion = '') {
@@ -2402,7 +2308,7 @@
         window.closeEditModal = closeEditModal;
         window.recognizeScreenshot = recognizeScreenshot;
         window.confirmAndSave = confirmAndSave;
-        window.exportRecognitionResults = exportRecognitionResults;
+
 
         console.log('截图导入功能已初始化');
         console.log('testScreenshotModal函数:', typeof window.testScreenshotModal);
@@ -2493,6 +2399,8 @@
         // 创建 DataSorter 实例
         const dataSorter = new DataSorter();
 
+
+
         // ==================== 列配置 ====================
         const COLUMN_CONFIG = {
             'checkbox': { type: 'none', sortable: false, label: '' },
@@ -2511,6 +2419,28 @@
             'max_drawdown': { type: 'number', sortable: true, label: '最大回撤' },
             'composite_score': { type: 'number', sortable: true, label: '综合评分' }
         };
+
+        // 默认列配置
+        const defaultColumnConfig = [
+            { key: 'checkbox', name: '选择', visible: true, fixed: true, sortable: false },
+            { key: 'fund_code', name: '基金代码', visible: true, fixed: false, sortable: true },
+            { key: 'fund_name', name: '基金名称', visible: true, fixed: false, sortable: true },
+            { key: 'today_return', name: '日涨跌幅', visible: true, fixed: false, sortable: true },
+            { key: 'prev_day_return', name: '昨日盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'holding_amount', name: '持有金额', visible: true, fixed: false, sortable: true },
+            { key: 'today_profit', name: '当日盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'today_profit_rate', name: '当日盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'holding_profit', name: '持有盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'holding_profit_rate', name: '持有盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'total_profit', name: '累计盈亏', visible: true, fixed: false, sortable: true },
+            { key: 'total_profit_rate', name: '累计盈亏率', visible: true, fixed: false, sortable: true },
+            { key: 'sharpe_ratio', name: '夏普比率', visible: true, fixed: false, sortable: true },
+            { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
+            { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
+        ];
+
+        // 初始化列配置
+        let columnConfig = JSON.parse(localStorage.getItem('fundColumnConfig')) || JSON.parse(JSON.stringify(defaultColumnConfig));
 
         // ==================== SortController 类 ====================
         // 负责管理排序状态和处理用户交互
@@ -3978,16 +3908,38 @@
 
         // 页面加载
         document.addEventListener('DOMContentLoaded', function () {
-            initDatePicker();
-            initSorting();  // 初始化排序功能
-            initColumnConfig();  // 初始化列配置
-            loadFunds();
+            console.log('[DOMContentLoaded] 页面加载完成，开始初始化...');
+            try {
+                console.log('[DOMContentLoaded] 初始化日期选择器...');
+                initDatePicker();
+                console.log('[DOMContentLoaded] 初始化排序功能...');
+                initSorting();  // 初始化排序功能
+                console.log('[DOMContentLoaded] 初始化列配置...');
+                initColumnConfig();  // 初始化列配置
+                console.log('[DOMContentLoaded] 加载基金数据...');
+                loadFunds();
+                console.log('[DOMContentLoaded] 初始化完成');
+            } catch (error) {
+                console.error('[DOMContentLoaded] 初始化失败:', error);
+            }
 
-            document.getElementById('search-input').addEventListener('keypress', function (e) {
-                if (e.key === 'Enter') loadFunds();
-            });
-            document.getElementById('sort-select').addEventListener('change', loadFunds);
-            document.getElementById('date-select').addEventListener('change', loadFunds);
+            // 检查元素是否存在，再添加事件监听器
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') loadFunds();
+                });
+            }
+
+            const sortSelect = document.getElementById('sort-select');
+            if (sortSelect) {
+                sortSelect.addEventListener('change', loadFunds);
+            }
+
+            const dateSelect = document.getElementById('date-select');
+            if (dateSelect) {
+                dateSelect.addEventListener('change', loadFunds);
+            }
 
             // 注释：时间段切换事件监听器保留供展开功能使用
             /*
@@ -4707,7 +4659,12 @@
         }
 
         async function loadFunds() {
+            console.log('[loadFunds] 开始加载持仓数据...');
             const tbody = document.getElementById('fund-table-body');
+            if (!tbody) {
+                console.error('[loadFunds] 错误: 找不到 fund-table-body 元素');
+                return;
+            }
             tbody.innerHTML = '<tr><td colspan="18" class="loading">加载中...</td></tr>';
 
             try {
@@ -4719,6 +4676,7 @@
                 let url = `/api/holdings?user_id=default_user&_t=${Date.now()}`;
                 if (search) url += `&search=${encodeURIComponent(search)}`;
 
+                console.log('[loadFunds] 请求URL:', url);
                 const response = await fetch(url, {
                     cache: 'no-cache',  // 禁用缓存
                     headers: {
@@ -4726,9 +4684,12 @@
                         'Pragma': 'no-cache'
                     }
                 });
+                console.log('[loadFunds] 响应状态:', response.status);
                 const result = await response.json();
+                console.log('[loadFunds] 响应数据:', result);
 
                 if (result.success) {
+                    console.log('[loadFunds] 成功获取数据，基金数量:', result.data.length);
                     // 对基金数据进行去重处理，确保每个fund_code只出现一次
                     const seenCodes = new Set();
                     const uniqueFunds = result.data.filter(fund => {
@@ -4739,6 +4700,7 @@
                         return true;
                     });
 
+                    console.log('[loadFunds] 去重后基金数量:', uniqueFunds.length);
                     allFunds = uniqueFunds;
                     document.getElementById('total-count').textContent = allFunds.length;
 
@@ -4746,6 +4708,7 @@
                     const sortState = sortController.getSortState();
                     const isLargeDataset = allFunds.length > 500;
 
+                    console.log('[loadFunds] 排序状态:', sortState);
                     if (isLargeDataset) {
                         uiRenderer.toggleLoading(true, '加载中...');
                     }
@@ -4753,6 +4716,7 @@
                     // 异步应用排序
                     setTimeout(() => {
                         try {
+                            console.log('[loadFunds] 开始渲染表格...');
                             if (sortState.order !== 'none') {
                                 const columnType = sortController.getColumnType(sortState.column);
                                 const sortedFunds = dataSorter.sortByColumn(allFunds, sortState.column, sortState.order, columnType);
@@ -4760,11 +4724,12 @@
                             } else {
                                 uiRenderer.renderTableRows(allFunds);
                             }
+                            console.log('[loadFunds] 表格渲染完成');
 
                             // 注释：自动选择第一个基金的逻辑保留供展开功能使用
                             // if (allFunds.length > 0) selectFund(allFunds[0]);
                         } catch (error) {
-                            console.error('应用排序失败:', error);
+                            console.error('[loadFunds] 应用排序失败:', error);
                             uiRenderer.renderTableRows(allFunds);
                         } finally {
                             if (isLargeDataset) {
@@ -4773,10 +4738,11 @@
                         }
                     }, isLargeDataset ? 10 : 0);
                 } else {
+                    console.error('[loadFunds] API返回失败:', result);
                     tbody.innerHTML = '<tr><td colspan="18" class="empty-state">暂无数据</td></tr>';
                 }
             } catch (error) {
-                console.error('加载失败:', error);
+                console.error('[loadFunds] 加载失败:', error);
                 tbody.innerHTML = '<tr><td colspan="18" class="empty-state">加载失败</td></tr>';
             }
         }
@@ -6154,27 +6120,8 @@
     </style>
 
     <script>
-        // 列配置
-        const defaultColumnConfig = [
-            { key: 'fund_code', name: '代码', visible: true, fixed: true, sortable: true },
-            { key: 'fund_name', name: '名称', visible: true, fixed: true, sortable: true },
-            { key: 'today_return', name: '日涨跌幅', visible: true, fixed: false, sortable: true },
-            { key: 'prev_day_return', name: '昨日盈亏率', visible: true, fixed: false, sortable: true },
-            { key: 'holding_amount', name: '持有金额', visible: true, fixed: false, sortable: true },
-            { key: 'today_profit', name: '当日盈亏', visible: true, fixed: false, sortable: true },
-            { key: 'today_profit_rate', name: '当日盈亏率', visible: true, fixed: false, sortable: true },
-            { key: 'holding_profit', name: '持有盈亏', visible: true, fixed: false, sortable: true },
-            { key: 'holding_profit_rate', name: '持有盈亏率', visible: true, fixed: false, sortable: true },
-            { key: 'total_profit', name: '累计盈亏', visible: true, fixed: false, sortable: true },
-            { key: 'total_profit_rate', name: '累计盈亏率', visible: true, fixed: false, sortable: true },
-            { key: 'sharpe_ratio_ytd', name: '夏普比率(今年以来)', visible: true, fixed: false, sortable: true },
-            { key: 'sharpe_ratio_1y', name: '夏普比率(近一年)', visible: true, fixed: false, sortable: true },
-            { key: 'sharpe_ratio_all', name: '夏普比率(成立以来)', visible: true, fixed: false, sortable: true },
-            { key: 'max_drawdown', name: '最大回撤', visible: true, fixed: false, sortable: true },
-            { key: 'composite_score', name: '综合评分', visible: true, fixed: false, sortable: true }
-        ];
+        // 列配置 (已在文件顶部定义)
 
-        let columnConfig = JSON.parse(localStorage.getItem('fundColumnConfig')) || JSON.parse(JSON.stringify(defaultColumnConfig));
         let draggedItem = null;
 
         // 打开管理设置弹窗
