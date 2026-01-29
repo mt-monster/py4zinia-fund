@@ -350,15 +350,45 @@ body {
 }
 
 .btn-filter {
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    border: 1px solid var(--border-color);
+    background: #e9ecef;
+    color: #495057;
+    border: 1px solid #ced4da;
+    transition: all var(--transition-fast);
 }
 
 .btn-filter:hover {
-    background: var(--info-light);
-    color: var(--info);
-    border-color: var(--info);
+    background: #dee2e6;
+    color: #212529;
+    border-color: #adb5bd;
+}
+
+/* 主要按钮 - 统一使用红色 */
+.btn-filter.btn-primary {
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
+}
+
+.btn-filter.btn-primary:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* 次要按钮 - 统一使用灰色 */
+.btn-filter.btn-secondary {
+    background: #e9ecef;
+    color: #495057;
+    border-color: #ced4da;
+}
+
+.btn-filter.btn-secondary:hover {
+    background: #dee2e6;
+    color: #212529;
+    border-color: #adb5bd;
+    transform: translateY(-1px);
 }
 
 .toolbar select {
@@ -385,7 +415,7 @@ body {
     gap: var(--space-3);
 }
 
-/* 表头管理设置按钮 */
+/* 表头管理设置按钮 - 统一为红色 */
 .btn-settings {
     display: inline-flex;
     align-items: center;
@@ -394,9 +424,9 @@ body {
     padding: 8px 16px;
     height: 36px;
     border-radius: var(--border-radius-md);
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-    color: var(--text-secondary);
+    border: 1px solid #dc2626;
+    background: #dc2626;
+    color: white;
     cursor: pointer;
     transition: all var(--transition-fast);
     position: relative;
@@ -406,9 +436,11 @@ body {
 }
 
 .btn-settings:hover {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    color: var(--primary);
+    background: #b91c1c;
+    border-color: #b91c1c;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 .btn-settings:hover i {
@@ -416,7 +448,8 @@ body {
 }
 
 .btn-settings:active {
-    transform: scale(0.95);
+    transform: translateY(0) scale(0.95);
+    box-shadow: none;
 }
 
 .btn-settings:active i {
