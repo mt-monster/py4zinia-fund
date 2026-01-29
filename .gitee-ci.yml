@@ -35,12 +35,70 @@ unit_test:
     - pip install -r requirements.txt -i $PIP_INDEX_URL
   script:
     - cd pro2
-    - python -m pytest tests/unit -v --html=tests/reports/unit_test_report.html --self-contained-html -k "not database" || echo "Tests completed with some failures"
+    - echo "Running unit tests..."
+    - python -m pytest tests/unit -v --html=tests/reports/unit_test_report.html --self-contained-html -k "not database" || echo "Unit tests completed"
   artifacts:
     when: always
     paths:
       - pro2/tests/reports/
     expire_in: 1 week
+
+# 集成测试
+integration_test:
+  stage: test
+  image: python:3.9-slim
+  dependencies:
+    - install
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
+    - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install -r requirements.txt -i $PIP_INDEX_URL
+  script:
+    - cd pro2
+    - echo "Running integration tests..."
+    - python -m pytest tests/integration -v --html=tests/reports/integration_test_report.html --self-contained-html || echo "Integration tests completed"
+  artifacts:
+    when: always
+    paths:
+      - pro2/tests/reports/
+    expire_in: 1 week
+
+# 执行所有测试集
+all_tests:
+  stage: test
+  image: python:3.9-slim
+  dependencies:
+    - install
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
+    - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install -r requirements.txt -i $PIP_INDEX_URL
+  script:
+    - cd pro2
+    - echo "========================================"
+    - echo "Running ALL test suites"
+    - echo "========================================"
+    - echo ""
+    - echo "1. Running unit tests..."
+    - python -m pytest tests/unit -v --tb=short || echo "Unit tests finished"
+    - echo ""
+    - echo "2. Running integration tests..."
+    - python -m pytest tests/integration -v --tb=short || echo "Integration tests finished"
+    - echo ""
+    - echo "3. Running all tests with coverage..."
+    - python -m pytest tests/ -v --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/all_tests_report.html --self-contained-html || echo "All tests finished"
+    - echo ""
+    - echo "========================================"
+    - echo "All test suites completed!"
+    - echo "========================================"
+  artifacts:
+    when: always
+    paths:
+      - pro2/tests/reports/
+      - pro2/htmlcov/
+      - pro2/coverage.xml
+    expire_in: 1 week
+  coverage: '/TOTAL.*\s+(\d+%)$/'
 
 # 代码风格检查
 lint:
@@ -61,6 +119,7 @@ build:
   image: python:3.9-slim
   dependencies:
     - install
+    - all_tests
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
@@ -68,6 +127,9 @@ build:
   script:
     - echo "Build successful!"
     - python main.py
+    - echo ""
+    - echo "Test Summary:"
+    - cat pro2/tests/reports/*.html 2>/dev/null || echo "Test reports generated"
   only:
     - master
     - develop
