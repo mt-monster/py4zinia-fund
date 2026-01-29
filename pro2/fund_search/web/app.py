@@ -2719,18 +2719,28 @@ def import_holding_screenshot():
     """
     通过截图识别导入持仓
     接收Base64格式的图片，识别其中的基金信息
+    支持选择OCR引擎：baidu、easyocr、paddleocr
     """
     try:
         data = request.get_json()
         if not data or 'image' not in data:
             return jsonify({'success': False, 'error': '未提供图片数据'}), 400
-        
+
         image_data = data['image']
-        use_gpu = data.get('use_gpu', True)
-        
-        logger.info("开始识别基金截图...")
-        
-        recognized_funds = recognize_fund_screenshot(image_data, use_gpu=use_gpu)
+        use_gpu = data.get('use_gpu', False)
+        ocr_engine = data.get('ocr_engine', 'baidu')  # 默认使用百度OCR
+
+        logger.info(f"开始识别基金截图，使用引擎: {ocr_engine}")
+
+        # 验证OCR引擎参数
+        if ocr_engine not in ['baidu', 'easyocr', 'paddleocr']:
+            ocr_engine = 'baidu'
+
+        recognized_funds = recognize_fund_screenshot(
+            image_data,
+            use_gpu=use_gpu,
+            ocr_engine=ocr_engine
+        )
         
         if not recognized_funds:
             return jsonify({
@@ -3042,22 +3052,39 @@ def confirm_import_holdings():
 
 @app.route('/api/holdings/import/ocr-status', methods=['GET'])
 def get_ocr_status():
-    """检查OCR功能状态"""
+    """检查OCR功能状态，返回可用引擎列表"""
     try:
-        ocr_available = False
-        try:
-            import easyocr
-            ocr_available = True
-        except ImportError:
-            pass
-        
+        from data_retrieval.ocr_config import get_available_engines
+
+        engines = get_available_engines()
+
         return jsonify({
             'success': True,
             'data': {
-                'ocr_available': ocr_available,
-                'gpu_available': True,
+                'engines': engines,
+                'default_engine': 'baidu',
                 'supported_formats': ['png', 'jpg', 'jpeg'],
                 'max_file_size': '10MB'
+            }
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/holdings/import/ocr-engines', methods=['GET'])
+def get_ocr_engines():
+    """获取可用的OCR引擎列表"""
+    try:
+        from data_retrieval.ocr_config import get_available_engines, get_ocr_engine
+
+        engines = get_available_engines()
+        current_engine = get_ocr_engine()
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'engines': engines,
+                'current_engine': current_engine
             }
         })
     except Exception as e:

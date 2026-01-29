@@ -15,26 +15,48 @@ import io
 logger = logging.getLogger(__name__)
 
 
-def recognize_fund_screenshot(image_data: str, use_gpu: bool = False, import_to_portfolio: bool = False, user_id: str = "default") -> List[Dict]:
+def recognize_fund_screenshot(image_data: str, use_gpu: bool = False, import_to_portfolio: bool = False, user_id: str = "default", ocr_engine: str = None) -> List[Dict]:
     """
     识别基金截图中的基金信息
-    
+
     参数：
     image_data: Base64编码的图片数据或图片二进制数据
     use_gpu: 是否使用GPU加速
     import_to_portfolio: 是否导入到持仓列表
     user_id: 用户ID（用于持仓导入）
-    
+    ocr_engine: 指定OCR引擎 ('baidu', 'easyocr', 'paddleocr')，None则使用配置
+
     返回：
     list: 识别到的基金列表，每个元素包含 fund_code、fund_name、confidence
     """
-    from .ocr_config import get_ocr_engine
-    
+    from .ocr_config import get_ocr_engine, validate_engine_config
+
     # 根据配置选择OCR引擎
-    ocr_engine = get_ocr_engine()
+    if ocr_engine is None:
+        ocr_engine = get_ocr_engine()
+
+    # 验证引擎配置
+    is_valid, error_msg = validate_engine_config(ocr_engine)
+    if not is_valid:
+        logger.error(f"OCR引擎 {ocr_engine} 配置无效: {error_msg}")
+        # 尝试使用其他可用引擎
+        for fallback_engine in ['baidu', 'easyocr', 'paddleocr']:
+            if fallback_engine != ocr_engine:
+                is_valid, _ = validate_engine_config(fallback_engine)
+                if is_valid:
+                    logger.info(f"切换到备用引擎: {fallback_engine}")
+                    ocr_engine = fallback_engine
+                    break
+        else:
+            logger.error("没有可用的OCR引擎")
+            return []
+
     ocr_texts = []
-    
-    if ocr_engine == 'easyocr':
+
+    if ocr_engine == 'baidu':
+        logger.info("使用百度OCR进行识别")
+        result, ocr_texts = recognize_with_baidu(image_data)
+    elif ocr_engine == 'easyocr':
         logger.info("使用EasyOCR进行识别")
         result, ocr_texts = recognize_with_easyocr(image_data, use_gpu)
     else:
@@ -282,6 +304,33 @@ def _get_ocr_texts_easyocr(image_data: str, use_gpu: bool = False) -> List[str]:
         return []
 
 
+def recognize_with_baidu(image_data: str, use_accurate: bool = True) -> Tuple[List[Dict], List[str]]:
+    """
+    使用百度OCR识别基金截图
+
+    参数：
+    image_data: Base64编码的图片数据或图片二进制数据
+    use_accurate: 是否使用高精度识别
+
+    返回：
+    (识别到的基金列表, 识别到的文本列表)
+    """
+    try:
+        from .baidu_ocr import BaiduOCR
+
+        ocr = BaiduOCR(use_accurate=use_accurate)
+        funds = ocr.recognize_fund_screenshot(image_data)
+
+        # 获取原始文本
+        texts, _ = ocr.recognize(image_data)
+
+        return funds, texts
+
+    except Exception as e:
+        logger.error(f"百度OCR识别失败: {e}")
+        return [], []
+
+
 def _get_ocr_texts_paddleocr(image_data: str, use_gpu: bool = False) -> List[str]:
     """获取PaddleOCR识别的原始文本列表"""
     try:
@@ -293,24 +342,24 @@ def _get_ocr_texts_paddleocr(image_data: str, use_gpu: bool = False) -> List[str
             image_bytes = base64.b64decode(image_data)
         else:
             image_bytes = image_data
-        
+
         # 使用 PaddleOCR 进行识别
         from paddleocr import PaddleOCR
-        
+
         # 初始化 OCR
         ocr = PaddleOCR(use_textline_orientation=True, lang='ch')
-        
+
         # 将字节数据转换为图片
         image = Image.open(io.BytesIO(image_bytes))
-        
+
         # 执行 OCR 识别
         import numpy as np
         image_array = np.array(image)
         result = ocr.ocr(image_array)
-        
+
         if not result or not result[0]:
             return []
-        
+
         # 提取文本
         texts = []
         for line in result[0]:
