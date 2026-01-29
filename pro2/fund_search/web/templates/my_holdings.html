@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>投资账本 - 基金分析系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --primary-red: #e74c3c;
@@ -257,9 +258,20 @@
             color: var(--primary-red);
             cursor: pointer;
             font-weight: 500;
+            text-decoration: none;
         }
 
         .fund-table .fund-code:hover {
+            text-decoration: underline;
+        }
+
+        .fund-table .fund-code-link {
+            color: var(--primary-red);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .fund-table .fund-code-link:hover {
             text-decoration: underline;
         }
 
@@ -2613,7 +2625,10 @@
 
                 // 定义列数据映射
                 const columnDataMap = {
-                    'fund_code': (fund) => ({ value: fund.fund_code, class: 'fund-code' }),
+                    'fund_code': (fund) => ({ 
+                        value: `<a href="/fund-analysis/${fund.fund_code}" class="fund-code-link" onclick="event.stopPropagation();" target="_blank">${fund.fund_code}</a>`, 
+                        class: '' 
+                    }),
                     'fund_name': (fund) => ({ value: fund.fund_name || '--', class: 'fund-name' }),
                     'today_return': (fund) => {
                         const val = fund.today_return || 0;
@@ -4282,8 +4297,12 @@
 
                 const result = await response.json();
                 if (result.success) {
-                    // 显示分析结果
-                    showAnalysisResult(result.data);
+                    // 添加基金代码到数据中
+                    result.data.fund_codes = selectedFunds;
+                    
+                    // 跳转到相关性分析页面，传递数据
+                    const dataParam = encodeURIComponent(JSON.stringify(result.data));
+                    window.location.href = `/correlation-analysis?data=${dataParam}`;
                 } else {
                     showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
                 }
@@ -4293,8 +4312,13 @@
             }
         }
 
-        // 显示分析结果
-        function showAnalysisResult(data) {
+        // 注释：showAnalysisResult函数已废弃，现在直接跳转到相关性分析页面
+
+        // 删除基金记录
+        async function deleteFundRecord(fundCode) {
+            if (!confirm('确定要删除这个基金记录吗？')) {
+                return;
+            }
             // 创建分析结果模态框
             const modal = document.createElement('div');
             modal.className = 'modal';

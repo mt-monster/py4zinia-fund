@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>基金相关性分析</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -280,6 +282,165 @@
             color: #666;
         }
 
+        /* 基金详细分析样式 */
+        .fund-detail-section {
+            margin-top: 40px;
+        }
+
+        .fund-detail-card {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .fund-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .fund-detail-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .fund-detail-code {
+            font-size: 14px;
+            color: #7f8c8d;
+            font-family: monospace;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .analysis-module {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .module-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .module-title i {
+            color: #3498db;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+            margin-bottom: 15px;
+        }
+
+        .data-list-compact {
+            list-style: none;
+            padding: 0;
+        }
+
+        .data-list-compact li {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+
+        .data-list-compact li:last-child {
+            border-bottom: none;
+        }
+
+        .data-list-compact .label {
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .data-list-compact .value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .holdings-table-compact {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .holdings-table-compact th {
+            background-color: #e9ecef;
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .holdings-table-compact td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .holdings-table-compact tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .positive-change {
+            color: #e74c3c;
+        }
+
+        .negative-change {
+            color: #27ae60;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+
+        .loading-spinner i {
+            font-size: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-data {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 13px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -315,6 +476,16 @@
             .pair-correlation {
                 width: 100%;
             }
+
+            .analysis-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .fund-detail-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
         }
 
             .correlation-matrix {
@@ -343,6 +514,11 @@
                     <p>请从基金持仓页面选择基金进行相关性分析</p>
                 </div>
             </div>
+        </div>
+
+        <!-- 基金详细分析区域 -->
+        <div id="fund-details-section" class="fund-detail-section" style="display: none;">
+            <!-- 动态生成的基金详细分析卡片将插入这里 -->
         </div>
 
         <div class="button-container">
@@ -533,7 +709,242 @@
         window.onload = function() {
             const data = getAnalysisData();
             renderAnalysisResult(data);
+            
+            // 如果有基金代码，加载详细分析
+            if (data && data.fund_codes && data.fund_codes.length > 0) {
+                loadFundDetails(data.fund_codes, data.fund_names);
+            }
         };
+
+        // 加载基金详细分析
+        async function loadFundDetails(fundCodes, fundNames) {
+            const detailsSection = document.getElementById('fund-details-section');
+            detailsSection.style.display = 'block';
+            
+            for (let i = 0; i < fundCodes.length; i++) {
+                const fundCode = fundCodes[i];
+                const fundName = fundNames[i];
+                
+                // 创建基金详细分析卡片
+                const cardHtml = `
+                    <div class="fund-detail-card" id="fund-detail-${fundCode}">
+                        <div class="fund-detail-header">
+                            <div>
+                                <div class="fund-detail-title">${fundName}</div>
+                                <div class="fund-detail-code">${fundCode}</div>
+                            </div>
+                        </div>
+                        <div class="analysis-grid">
+                            <!-- 资产配置 -->
+                            <div class="analysis-module">
+                                <div class="module-title">
+                                    <i class="bi bi-pie-chart"></i>
+                                    资产配置
+                                </div>
+                                <div class="chart-wrapper">
+                                    <canvas id="asset-chart-${fundCode}"></canvas>
+                                </div>
+                                <ul class="data-list-compact" id="asset-list-${fundCode}">
+                                    <li class="loading-spinner"><i class="bi bi-arrow-repeat"></i> 加载中...</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- 行业分布 -->
+                            <div class="analysis-module">
+                                <div class="module-title">
+                                    <i class="bi bi-diagram-3"></i>
+                                    行业分布 TOP5
+                                </div>
+                                <div class="chart-wrapper">
+                                    <canvas id="industry-chart-${fundCode}"></canvas>
+                                </div>
+                                <ul class="data-list-compact" id="industry-list-${fundCode}">
+                                    <li class="loading-spinner"><i class="bi bi-arrow-repeat"></i> 加载中...</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- 重仓股 -->
+                            <div class="analysis-module" style="grid-column: span 2;">
+                                <div class="module-title">
+                                    <i class="bi bi-star"></i>
+                                    重仓股 TOP10
+                                </div>
+                                <div style="overflow-x: auto;">
+                                    <table class="holdings-table-compact" id="holdings-table-${fundCode}">
+                                        <thead>
+                                            <tr>
+                                                <th>股票名称</th>
+                                                <th>代码</th>
+                                                <th>持仓占比</th>
+                                                <th>市值(万)</th>
+                                                <th>涨跌幅</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colspan="5" class="loading-spinner">
+                                                    <i class="bi bi-arrow-repeat"></i> 加载中...
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                detailsSection.insertAdjacentHTML('beforeend', cardHtml);
+                
+                // 加载该基金的详细数据
+                await loadFundAssetAllocation(fundCode);
+                await loadFundIndustryAllocation(fundCode);
+                await loadFundHoldings(fundCode);
+            }
+        }
+
+        // 加载资产配置
+        async function loadFundAssetAllocation(fundCode) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/asset-allocation`);
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const data = result.data;
+                    const colors = ['#3498db', '#e74c3c', '#f39c12', '#95a5a6'];
+                    
+                    // 创建饼图
+                    const ctx = document.getElementById(`asset-chart-${fundCode}`).getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['股票', '债券', '现金', '其他'],
+                            datasets: [{
+                                data: [data.stock_ratio, data.bond_ratio, data.cash_ratio, data.other_ratio],
+                                backgroundColor: colors,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            }
+                        }
+                    });
+                    
+                    // 更新列表
+                    const listHtml = `
+                        <li>
+                            <span class="label"><span class="color-dot" style="background: #3498db;"></span> 股票</span>
+                            <span class="value">${data.stock_ratio}%</span>
+                        </li>
+                        <li>
+                            <span class="label"><span class="color-dot" style="background: #e74c3c;"></span> 债券</span>
+                            <span class="value">${data.bond_ratio}%</span>
+                        </li>
+                        <li>
+                            <span class="label"><span class="color-dot" style="background: #f39c12;"></span> 现金</span>
+                            <span class="value">${data.cash_ratio}%</span>
+                        </li>
+                        <li>
+                            <span class="label"><span class="color-dot" style="background: #95a5a6;"></span> 其他</span>
+                            <span class="value">${data.other_ratio}%</span>
+                        </li>
+                    `;
+                    document.getElementById(`asset-list-${fundCode}`).innerHTML = listHtml;
+                }
+            } catch (error) {
+                console.error(`加载基金 ${fundCode} 资产配置失败:`, error);
+                document.getElementById(`asset-list-${fundCode}`).innerHTML = '<li class="empty-data">加载失败</li>';
+            }
+        }
+
+        // 加载行业配置
+        async function loadFundIndustryAllocation(fundCode) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/industry-allocation`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    const industries = result.data.slice(0, 5);
+                    const colors = ['#3498db', '#e74c3c', '#f39c12', '#27ae60', '#9b59b6'];
+                    
+                    // 创建饼图
+                    const ctx = document.getElementById(`industry-chart-${fundCode}`).getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: industries.map(i => i.name),
+                            datasets: [{
+                                data: industries.map(i => i.ratio),
+                                backgroundColor: colors,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            }
+                        }
+                    });
+                    
+                    // 更新列表
+                    const listHtml = industries.map((industry, index) => `
+                        <li>
+                            <span class="label"><span class="color-dot" style="background: ${colors[index]};"></span> ${industry.name}</span>
+                            <span class="value">${industry.ratio}%</span>
+                        </li>
+                    `).join('');
+                    document.getElementById(`industry-list-${fundCode}`).innerHTML = listHtml;
+                } else {
+                    document.getElementById(`industry-list-${fundCode}`).innerHTML = '<li class="empty-data">暂无数据</li>';
+                }
+            } catch (error) {
+                console.error(`加载基金 ${fundCode} 行业配置失败:`, error);
+                document.getElementById(`industry-list-${fundCode}`).innerHTML = '<li class="empty-data">加载失败</li>';
+            }
+        }
+
+        // 加载重仓股
+        async function loadFundHoldings(fundCode) {
+            try {
+                const response = await fetch(`/api/fund/${fundCode}/holdings`);
+                const result = await response.json();
+                
+                if (result.success && result.data && result.data.holdings && result.data.holdings.length > 0) {
+                    const holdings = result.data.holdings;
+                    
+                    const tableHtml = holdings.map(holding => {
+                        const returnClass = holding.stock_return >= 0 ? 'positive-change' : 'negative-change';
+                        const returnSign = holding.stock_return >= 0 ? '+' : '';
+                        return `
+                            <tr>
+                                <td>${holding.stock_name}</td>
+                                <td style="font-family: monospace; font-size: 11px;">${holding.stock_code}</td>
+                                <td>${holding.ratio}%</td>
+                                <td>${holding.market_value || '--'}</td>
+                                <td class="${returnClass}">
+                                    ${holding.stock_return !== null ? returnSign + holding.stock_return + '%' : '--'}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                    
+                    document.querySelector(`#holdings-table-${fundCode} tbody`).innerHTML = tableHtml;
+                } else {
+                    document.querySelector(`#holdings-table-${fundCode} tbody`).innerHTML = 
+                        '<tr><td colspan="5" class="empty-data">暂无数据</td></tr>';
+                }
+            } catch (error) {
+                console.error(`加载基金 ${fundCode} 重仓股失败:`, error);
+                document.querySelector(`#holdings-table-${fundCode} tbody`).innerHTML = 
+                    '<tr><td colspan="5" class="empty-data">加载失败</td></tr>';
+            }
+        }
     </script>
 </body>
 </html>
