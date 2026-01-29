@@ -1751,6 +1751,32 @@
                             </div>
                         </div>
                         
+                        <!-- OCR引擎选择 -->
+                        <div class="ocr-engine-select" style="margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">
+                                <i class="bi bi-cpu"></i> 选择识别引擎
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px 12px; background: white; border: 2px solid #e9ecef; border-radius: 6px; transition: all 0.2s;">
+                                    <input type="radio" name="ocr-engine" value="baidu" checked style="margin-right: 8px;">
+                                    <span>
+                                        <strong>百度OCR</strong>
+                                        <small style="display: block; color: #666; font-size: 12px;">高精度识别，需要网络</small>
+                                    </span>
+                                </label>
+                                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px 12px; background: white; border: 2px solid #e9ecef; border-radius: 6px; transition: all 0.2s;">
+                                    <input type="radio" name="ocr-engine" value="easyocr" style="margin-right: 8px;">
+                                    <span>
+                                        <strong>EasyOCR</strong>
+                                        <small style="display: block; color: #666; font-size: 12px;">本地识别，无需网络</small>
+                                    </span>
+                                </label>
+                            </div>
+                            <div id="ocr-engine-status" style="margin-top: 8px; font-size: 12px; color: #28a745;">
+                                <i class="bi bi-check-circle"></i> 百度OCR已就绪
+                            </div>
+                        </div>
+
                         <!-- 识别结果区域 -->
                         <div class="recognition-result" id="recognitionResult" style="display: none;">
                             <div id="resultContent"></div>
@@ -1873,6 +1899,21 @@
                 recognizeBtn.addEventListener('click', recognizeScreenshot);
             }
 
+            // OCR引擎选择事件
+            const ocrEngineRadios = document.querySelectorAll('input[name="ocr-engine"]');
+            ocrEngineRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const engine = this.value;
+                    const statusDiv = document.getElementById('ocr-engine-status');
+                    if (statusDiv) {
+                        const engineName = engine === 'baidu' ? '百度OCR' : 'EasyOCR';
+                        statusDiv.innerHTML = `<i class="bi bi-check-circle"></i> ${engineName}已选中`;
+                        statusDiv.style.color = '#28a745';
+                    }
+                    console.log(`已选择OCR引擎: ${engine}`);
+                });
+            });
+
             screenshotModalEventsInitialized = true;
         }
 
@@ -1918,6 +1959,10 @@
             const btn = document.getElementById('recognizeBtn');
             if (!btn) return;
 
+            // 获取选中的OCR引擎
+            const selectedEngine = document.querySelector('input[name="ocr-engine"]:checked');
+            const ocrEngine = selectedEngine ? selectedEngine.value : 'baidu';
+
             btn.disabled = true;
             btn.innerHTML = '<i class="bi bi-hourglass-split"></i> 识别中...';
 
@@ -1928,7 +1973,8 @@
                 },
                 body: JSON.stringify({
                     image: currentBase64Image,
-                    use_gpu: false
+                    use_gpu: false,
+                    ocr_engine: ocrEngine
                 })
             })
                 .then(response => response.json())
