@@ -1,6 +1,5 @@
 # Gitee Go CI/CD 配置文件
 # 使用 Gitee Go 流水线语法
-# 注意：Gitee Python 镜像没有 apt-get，且缺少 SQLite3 支持
 
 version: '1.0'
 name: master-pipeline
@@ -31,12 +30,17 @@ stages:
           - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           # 先安装 numpy 和 pandas（避免编译）
           - pip3 install numpy==1.24.3 pandas==2.0.3
+          # 安装 SQLite3 支持（通过 pip）
+          - pip3 install pysqlite3-binary || pip3 install db-sqlite3 || echo "SQLite3 installation skipped"
           # 安装项目依赖（包含 pytest）
           - pip3 install -r requirements.txt
+          # 安装 pytest-cov
+          - pip3 install pytest-cov
           # 进入项目目录
           - cd pro2
           # 创建必要的目录
           - mkdir -p tests/reports
+          - mkdir -p htmlcov
           - echo "========================================"
           - echo "Running UNIT TESTS"
           - echo "========================================"
@@ -50,22 +54,29 @@ stages:
           - python -m pytest tests/integration -v --tb=short --ignore=tests/integration/test_api.py --html=tests/reports/integration_test_report.html --self-contained-html 2>&1 | tee tests/reports/integration_test_log.txt || echo "Integration tests completed"
           - echo ""
           - echo "========================================"
-          - echo "Running ALL TESTS"
+          - echo "Running ALL TESTS with Coverage"
           - echo "========================================"
-          # 运行所有测试（跳过有问题的）- 禁用覆盖率因为缺少 SQLite3
-          - python -m pytest tests/ -v --tb=short --ignore=tests/unit/test_data_retrieval.py --ignore=tests/unit/test_backtesting.py --ignore=tests/integration/test_api.py --html=tests/reports/all_tests_report.html --self-contained-html 2>&1 | tee tests/reports/all_tests_log.txt || echo "All tests completed"
+          # 运行所有测试（跳过有问题的）并生成覆盖率报告
+          - python -m pytest tests/ -v --tb=short --ignore=tests/unit/test_data_retrieval.py --ignore=tests/unit/test_backtesting.py --ignore=tests/integration/test_api.py --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/all_tests_report.html --self-contained-html 2>&1 | tee tests/reports/all_tests_log.txt || echo "All tests completed"
           - echo ""
           - echo "Test Summary:"
           - python -m pytest tests/ --co -q 2>/dev/null | tail -5 || echo "Could not generate summary"
+          - echo ""
+          - echo "Coverage report generated in htmlcov/"
+          - ls -la htmlcov/ 2>/dev/null || echo "No coverage report generated"
           - echo ""
           - echo "Test reports available:"
           - ls -la tests/reports/ 2>/dev/null || echo "No test reports found"
           # 确保文件存在，避免制品上传失败
           - touch tests/reports/.gitkeep
+          - touch htmlcov/.gitkeep
+          - test -f coverage.xml || touch coverage.xml
         artifacts:
           - name: TEST_REPORTS
             path:
               - pro2/tests/reports/
+              - pro2/htmlcov/
+              - pro2/coverage.xml
 
   # 阶段2: 代码风格检查
   - name: lint
@@ -84,9 +95,9 @@ stages:
           - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Lint check completed"
         allowFailure: true
 
-  # 阶段3: 构建
+  # 阶段3: 构建并发布
   - name: build
-    displayName: 构建应用
+    displayName: 构建与发布
     strategy: naturally
     trigger: auto
     steps:
@@ -99,6 +110,7 @@ stages:
           - python3 -m pip install --upgrade pip
           - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           - pip3 install numpy==1.24.3 pandas==2.0.3
+          - pip3 install pysqlite3-binary || pip3 install db-sqlite3 || echo "SQLite3 installation skipped"
           - pip3 install -r requirements.txt
           - echo "========================================"
           - echo "BUILD SUCCESSFUL"
@@ -110,20 +122,14 @@ stages:
           - mkdir -p build_output
           - echo "Build completed at $(date)" > build_output/build_info.txt
           - cp -r pro2 build_output/ 2>/dev/null || echo "No pro2 directory to copy"
+          - echo "Build artifacts prepared"
         artifacts:
-          - name: BUILD_OUTPUT
+          - name: BUILD_ARTIFACT
             path:
               - build_output/
 
-  # 阶段4: 发布
-  - name: release
-    displayName: 发布
-    strategy: naturally
-    trigger: auto
-    steps:
-      - step: publish@release_artifacts
-        name: publish_release_artifacts
-        displayName: 发布
-        dependArtifact: BUILD_OUTPUT
-        version: 1.0.0.0
-        autoIncrement: true
+      - step: publish@general_artifacts
+        name: publish_artifacts
+        displayName: 上传构建制品
+        dependArtifact: BUILD_ARTIFACT
+        artifactName: build-package
