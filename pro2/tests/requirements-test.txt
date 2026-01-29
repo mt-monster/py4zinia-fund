@@ -1,0 +1,36 @@
+# 测试依赖
+# 运行测试所需的额外依赖
+
+# 测试框架
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-html>=3.2.0
+pytest-mock>=3.11.0
+pytest-xdist>=3.3.0
+
+# 代码质量
+flake8>=6.1.0
+pylint>=2.17.0
+black>=23.7.0
+isort>=5.12.0
+mypy>=1.5.0
+
+# 覆盖率
+coverage>=7.3.0
+
+# 模拟
+responses>=0.23.0
+factory-boy>=3.3.0
+
+# 性能测试
+pytest-benchmark>=4.0.0
+
+# 安全测试
+bandit>=1.7.0
+safety>=2.3.0
+
+# 文档测试
+pytest-doctestplus>=1.0.0
+
+# 异步测试
+pytest-asyncio>=0.21.0
