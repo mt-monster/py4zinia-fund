@@ -17,14 +17,19 @@ install:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
   script:
     - pip install --upgrade pip -i $PIP_INDEX_URL
+    # 先安装 numpy，避免 pandas 编译
+    - pip install numpy==1.24.3 -i $PIP_INDEX_URL
+    # 再安装其他依赖
+    - pip install pandas==2.0.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
+    - echo "Dependencies installed successfully"
     - python main.py
   cache:
     paths:
       - /root/.cache/pip
 
 # 单元测试
-unit_test:
+run_unit_tests:
   stage: test
   image: python:3.9-slim
   dependencies:
@@ -32,11 +37,15 @@ unit_test:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install numpy==1.24.3 pandas==2.0.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
   script:
     - cd pro2
-    - echo "Running unit tests..."
-    - python -m pytest tests/unit -v --html=tests/reports/unit_test_report.html --self-contained-html -k "not database" || echo "Unit tests completed"
+    - echo "========================================"
+    - echo "Running UNIT TESTS"
+    - echo "========================================"
+    - python -m pytest tests/unit -v --tb=short --html=tests/reports/unit_test_report.html --self-contained-html 2>&1 | tee tests/reports/unit_test_log.txt
+    - echo "Unit tests exit code: $?"
   artifacts:
     when: always
     paths:
@@ -44,7 +53,7 @@ unit_test:
     expire_in: 1 week
 
 # 集成测试
-integration_test:
+run_integration_tests:
   stage: test
   image: python:3.9-slim
   dependencies:
@@ -52,19 +61,23 @@ integration_test:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install numpy==1.24.3 pandas==2.0.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
   script:
     - cd pro2
-    - echo "Running integration tests..."
-    - python -m pytest tests/integration -v --html=tests/reports/integration_test_report.html --self-contained-html || echo "Integration tests completed"
+    - echo "========================================"
+    - echo "Running INTEGRATION TESTS"
+    - echo "========================================"
+    - python -m pytest tests/integration -v --tb=short --html=tests/reports/integration_test_report.html --self-contained-html 2>&1 | tee tests/reports/integration_test_log.txt
+    - echo "Integration tests exit code: $?"
   artifacts:
     when: always
     paths:
       - pro2/tests/reports/
     expire_in: 1 week
 
-# 执行所有测试集
-all_tests:
+# 执行所有测试
+run_all_tests:
   stage: test
   image: python:3.9-slim
   dependencies:
@@ -72,25 +85,19 @@ all_tests:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install numpy==1.24.3 pandas==2.0.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
+    - pip install pytest-cov -i $PIP_INDEX_URL
   script:
     - cd pro2
     - echo "========================================"
-    - echo "Running ALL test suites"
+    - echo "Running ALL TESTS"
     - echo "========================================"
+    - python -m pytest tests/ -v --tb=short --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/all_tests_report.html --self-contained-html 2>&1 | tee tests/reports/all_tests_log.txt
+    - echo "All tests exit code: $?"
     - echo ""
-    - echo "1. Running unit tests..."
-    - python -m pytest tests/unit -v --tb=short || echo "Unit tests finished"
-    - echo ""
-    - echo "2. Running integration tests..."
-    - python -m pytest tests/integration -v --tb=short || echo "Integration tests finished"
-    - echo ""
-    - echo "3. Running all tests with coverage..."
-    - python -m pytest tests/ -v --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/all_tests_report.html --self-contained-html || echo "All tests finished"
-    - echo ""
-    - echo "========================================"
-    - echo "All test suites completed!"
-    - echo "========================================"
+    - echo "Test Summary:"
+    - python -m pytest tests/ --co -q 2>/dev/null | tail -5
   artifacts:
     when: always
     paths:
@@ -110,6 +117,7 @@ lint:
     - pip install flake8 -i $PIP_INDEX_URL
   script:
     - cd pro2
+    - echo "Running lint check..."
     - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || true
   allow_failure: true
 
@@ -119,17 +127,22 @@ build:
   image: python:3.9-slim
   dependencies:
     - install
-    - all_tests
+    - run_unit_tests
+    - run_integration_tests
+    - run_all_tests
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends gcc g++ make libgomp1
     - pip install --upgrade pip -i $PIP_INDEX_URL
+    - pip install numpy==1.24.3 pandas==2.0.3 -i $PIP_INDEX_URL
     - pip install -r requirements.txt -i $PIP_INDEX_URL
   script:
-    - echo "Build successful!"
+    - echo "========================================"
+    - echo "BUILD SUCCESSFUL"
+    - echo "========================================"
     - python main.py
     - echo ""
-    - echo "Test Summary:"
-    - cat pro2/tests/reports/*.html 2>/dev/null || echo "Test reports generated"
+    - echo "Test reports available in:"
+    - ls -la pro2/tests/reports/ 2>/dev/null || echo "No reports found"
   only:
     - master
     - develop
