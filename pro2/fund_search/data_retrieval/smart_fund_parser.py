@@ -21,22 +21,26 @@ class SmartFundParser:
     
     def parse_fund_info_smart(self, texts: List[str]) -> Tuple[List[Dict], List[str]]:
         """
-        智能解析基金信息
-        
+        智能解析基金信息（优化版）
+
         参数：
         texts: OCR识别的文本列表
-        
+
         返回：
         tuple: (成功识别的基金列表, 需要手工导入的文本列表)
         """
         funds = []
         manual_import_needed = []
-        
+
         # 记录所有OCR识别的文本，用于调试
         logger.info(f"OCR识别到的所有文本 ({len(texts)} 项): {texts}")
-        
-        # 预处理：尝试重组被分割的基金名称
-        texts = self._reconstruct_fund_names(texts)
+
+        # 步骤1：预处理过滤UI元素
+        texts = self._preprocess_texts(texts)
+        logger.info(f"过滤后的文本 ({len(texts)} 项): {texts}")
+
+        # 步骤2：尝试重组被分割的基金名称（简化版）
+        texts = self._reconstruct_fund_names_v2(texts)
         logger.info(f"重组后的文本 ({len(texts)} 项): {texts}")
         
         # 基金代码的正则表达式（6位数字）
@@ -482,27 +486,27 @@ class SmartFundParser:
                 return False
         
         return True
-    
+
     def _is_likely_non_fund_number(self, number: str) -> bool:
         """判断6位数字是否可能不是基金代码"""
         if len(number) != 6 or not number.isdigit():
             return True
-        
+
         # 排除明显不是基金代码的数字模式
         num = int(number)
-        
+
         # 排除过小的数字（通常基金代码不会太小）
         if num < 1000:
             return True
-        
+
         # 排除常见的金额模式（如100000, 200000等整数万元）
         if num % 10000 == 0 and num <= 999999:
             return True
-        
+
         # 排除日期相关的数字（如202401, 202312等）
         if number.startswith('20') and 2020 <= num // 100 <= 2030:
             return True
-        
+
         # 排除时间相关的数字（如120000表示12:00:00）
         if number.startswith('1') or number.startswith('2'):
             hour = int(number[:2])
@@ -510,11 +514,107 @@ class SmartFundParser:
             second = int(number[4:6])
             if 0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59:
                 return True
-        
+
         return False
-    
+
+    def _preprocess_texts(self, texts: List[str]) -> List[str]:
+        """预处理：过滤UI元素和无关文本"""
+        filtered = []
+
+        for text in texts:
+            text = text.strip()
+            if not text:
+                continue
+
+            # 过滤UI元素
+            if self._is_ui_element(text):
+                logger.debug(f"过滤UI元素: {text}")
+                continue
+
+            # 过滤时间格式
+            if re.match(r'^\d{1,2}:\d{2}$', text):
+                logger.debug(f"过滤时间: {text}")
+                continue
+
+            # 过滤信号/网络图标
+            if text in ['5G', '4G', 'WiFi', 'LTE', '<', '>']:
+                logger.debug(f"过滤信号图标: {text}")
+                continue
+
+            filtered.append(text)
+
+        return filtered
+
+    def _is_ui_element(self, text: str) -> bool:
+        """判断是否是UI元素而非基金数据"""
+        ui_patterns = [
+            r'^\d+%$',                    # 百分比如 78%
+            r'^全部\(\d+\)$',              # 全部(50)
+            r'^股票型\(\d+\)',             # 股票型(8)
+            r'^债券型\(\d+\)',             # 债券型(0)
+            r'^混\d+基金',                 # 混1基金
+            r'^交易[：:]',                  # 交易提示
+            r'^合计',                      # 合计
+            r'^\d+笔',                     # 1笔买入
+            r'^买入中$',                   # 买入中
+            r'^[￥$]',                     # 货币符号
+            r'^基金$', r'^自选$', r'^持仓$', r'^全球投资$', r'^基金圈$',  # 底部导航
+            r'^理财师$', r'^我的持有$', r'^持有收益排序$',  # 界面元素
+            r'^金额[/／]昨日收益',          # 表头
+            r'^持仓收益[/／]率$',           # 表头
+        ]
+
+        return any(re.match(p, text) for p in ui_patterns)
+
+    def _reconstruct_fund_names_v2(self, texts: List[str]) -> List[str]:
+        """简化版：重组被OCR分割的基金名称"""
+        reconstructed = []
+        skip_count = 0
+
+        for i, text in enumerate(texts):
+            if skip_count > 0:
+                skip_count -= 1
+                continue
+
+            text = text.strip()
+
+            # 只处理可能是基金名称开头的文本
+            if not self._is_fund_name_start(text):
+                reconstructed.append(text)
+                continue
+
+            # 最多向后看2个文本，避免过度组合
+            combined = text
+            for j in range(i + 1, min(i + 3, len(texts))):
+                next_text = texts[j].strip()
+
+                # 严格判断：只有明显是名称延续才合并
+                if self._is_strict_fund_name_continuation(next_text, combined):
+                    combined += next_text
+                    skip_count += 1
+                else:
+                    break
+
+            reconstructed.append(combined)
+
+        return reconstructed
+
+    def _is_strict_fund_name_continuation(self, text: str, current_name: str) -> bool:
+        """严格判断是否是基金名称的延续"""
+        # 排除明显不是名称的文本
+        if len(text) <= 2:  # 太短的片段
+            return False
+        if re.match(r'^[\d\.\+\-]', text):  # 数字开头
+            return False
+        if any(c in text for c in ['%', '￥', '$', '元']):  # 包含金额符号
+            return False
+        if text in ['基金', '股票', '债券', '混合', '指数', '理财']:  # 常见独立词汇
+            return False
+
+        return True
+
     def _reconstruct_fund_names(self, texts: List[str]) -> List[str]:
-        """尝试重组被OCR分割的基金名称，同时保留持仓信息"""
+        """尝试重组被OCR分割的基金名称，同时保留持仓信息（旧版，保留兼容）"""
         reconstructed = []
         i = 0
         
