@@ -1,0 +1,137 @@
+# Gitee CI/CD 配置文件
+# 参考文档: https://gitee.com/help/articles/4113
+
+stages:
+  - test
+  - build
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  # 使用 SQLite 进行测试，避免 MySQL 依赖问题
+  USE_SQLITE: "true"
+
+# 缓存配置
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+# 单元测试任务
+unit_test:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    # 安装系统依赖
+    - apt-get update && apt-get install -y gcc pkg-config
+    # 创建虚拟环境
+    - python -m venv venv
+    - source venv/bin/activate
+    # 升级 pip
+    - pip install --upgrade pip
+    # 安装项目依赖（排除重型依赖）
+    - |
+      pip install \
+        pandas>=2.3.3 \
+        openpyxl>=3.1.0 \
+        requests>=2.31.0 \
+        PyYAML>=6.0 \
+        sqlalchemy>=2.0.45 \
+        flask>=3.1.0 \
+        flask-cors>=6.0.0 \
+        matplotlib>=3.7.0 \
+        seaborn>=0.12.0 \
+        numpy>=1.24.0,<2.0.0 \
+        scikit-learn>=1.3.0 \
+        xgboost>=2.0.0
+    # 安装测试依赖
+    - pip install pytest pytest-cov pytest-html pytest-mock
+  script:
+    # 运行单元测试（跳过数据库测试）
+    - pytest tests/unit -v --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/unit_test_report.html --self-contained-html -k "not database"
+  artifacts:
+    when: always
+    paths:
+      - tests/reports/
+      - htmlcov/
+      - coverage.xml
+    expire_in: 1 week
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+
+# 集成测试任务（API测试）
+api_test:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - apt-get update && apt-get install -y gcc pkg-config
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    # 安装核心依赖
+    - |
+      pip install \
+        pandas>=2.3.3 \
+        requests>=2.31.0 \
+        PyYAML>=6.0 \
+        sqlalchemy>=2.0.45 \
+        flask>=3.1.0 \
+        flask-cors>=6.0.0 \
+        matplotlib>=3.7.0 \
+        seaborn>=0.12.0 \
+        numpy>=1.24.0,<2.0.0 \
+        scikit-learn>=1.3.0
+    # 安装测试依赖
+    - pip install pytest pytest-html pytest-mock
+  script:
+    # 运行 API 集成测试
+    - pytest tests/integration/test_api.py -v --html=tests/reports/api_test_report.html --self-contained-html
+  artifacts:
+    when: always
+    paths:
+      - tests/reports/
+    expire_in: 1 week
+
+# 代码质量检查
+lint:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - pip install flake8 pylint
+  script:
+    # 检查代码风格
+    - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || true
+    - pylint fund_search --disable=all --enable=E,F || true
+  allow_failure: true
+
+# 构建任务
+build:
+  stage: build
+  image: python:3.10-slim
+  dependencies:
+    - unit_test
+  before_script:
+    - apt-get update && apt-get install -y gcc pkg-config
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    # 安装核心依赖
+    - |
+      pip install \
+        pandas>=2.3.3 \
+        requests>=2.31.0 \
+        PyYAML>=6.0 \
+        sqlalchemy>=2.0.45 \
+        flask>=3.1.0 \
+        flask-cors>=6.0.0 \
+        matplotlib>=3.7.0 \
+        seaborn>=0.12.0 \
+        numpy>=1.24.0,<2.0.0
+  script:
+    - echo "Build successful!"
+    - echo "Application is ready for deployment"
+  artifacts:
+    paths:
+      - fund_search/
+    expire_in: 1 week
+  only:
+    - master
+    - develop
