@@ -1018,24 +1018,7 @@ def backtest_strategy():
             annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
             calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
             sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
-            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
-            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
-            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
-            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
-            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
-            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
-            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
-            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
-            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
-            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
-            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
-            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
-            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
-            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
-            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
-            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
-            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
-            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
+            composite_score = float(row['composite_score']) if pd.notna(row['composite_score']) else 0
             prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0
             
             # 更新历史收益率
@@ -1876,7 +1859,8 @@ def get_holdings():
                far.yesterday_nav as previous_nav,
                far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
                far.max_drawdown, far.volatility,
-               far.annualized_return, far.calmar_ratio, far.sortino_ratio
+               far.annualized_return, far.calmar_ratio, far.sortino_ratio,
+               far.composite_score
         FROM user_holdings h
         LEFT JOIN (
             SELECT * FROM fund_analysis_results
@@ -1921,6 +1905,7 @@ def get_holdings():
             annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
             calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
             sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
+            composite_score = float(row['composite_score']) if pd.notna(row['composite_score']) else 0
             
             # 当前市值
             current_value = holding_shares * current_nav
@@ -1968,7 +1953,8 @@ def get_holdings():
                 'volatility': round(volatility * 100, 2),
                 'annualized_return': round(annualized_return * 100, 2),
                 'calmar_ratio': round(calmar_ratio, 4),
-                'sortino_ratio': round(sortino_ratio, 4)
+                'sortino_ratio': round(sortino_ratio, 4),
+                'composite_score': round(composite_score, 4)
             }
             holdings.append(holding)
         
