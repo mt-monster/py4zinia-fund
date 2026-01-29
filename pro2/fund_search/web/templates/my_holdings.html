@@ -1472,23 +1472,9 @@
                 <button class="btn-filter btn-primary" onclick="openFilterModal()">
                     <i class="bi bi-funnel"></i> 高级筛选
                 </button>
-                
-                <!-- 排序选择 -->
-                <select id="sort-select" onchange="loadFunds()">
-                    <option value="composite_score">综合评分</option>
-                    <option value="today_return">今日收益</option>
-                    <option value="prev_day_return">昨日收益</option>
-                    <option value="annualized_return">年化收益</option>
-                    <option value="sharpe_ratio">夏普比率</option>
-                    <option value="max_drawdown">最大回撤</option>
-                </select>
-                
+
                 <!-- 快速操作按钮 -->
                 <div class="quick-actions">
-                    <button class="btn-filter btn-primary" onclick="filterOdiifunds()"
-                        title="筛选ODII基金">
-                        <i class="bi bi-globe"></i> ODII
-                    </button>
                     <button class="btn-filter btn-primary" onclick="testScreenshotModal()"
                         title="上传截图导入持仓">
                         <i class="bi bi-camera"></i> 导入
@@ -1496,8 +1482,8 @@
                     <button class="btn-filter btn-primary" onclick="clearFundList()" title="清空基金列表">
                         <i class="bi bi-trash"></i> 清空
                     </button>
-                    <button class="btn-filter btn-primary" onclick="startAnalysis()" title="分析所选基金相关性">
-                        <i class="bi bi-chart-line"></i> 相关性
+                    <button class="btn-filter btn-primary" id="analysis-btn" onclick="startAnalysis()" title="分析所选基金相关性">
+                        <i class="bi bi-chart-line"></i> <span class="btn-text">综合分析</span>
                     </button>
 
                 </div>
@@ -3990,11 +3976,6 @@
                 });
             }
 
-            const sortSelect = document.getElementById('sort-select');
-            if (sortSelect) {
-                sortSelect.addEventListener('change', loadFunds);
-            }
-
             const dateSelect = document.getElementById('date-select');
             if (dateSelect) {
                 dateSelect.addEventListener('change', loadFunds);
@@ -4284,6 +4265,13 @@
 
         // 开始分析所选基金相关性
         async function startAnalysis() {
+            const analysisBtn = document.getElementById('analysis-btn');
+            
+            // 如果按钮正在加载中，防止重复提交
+            if (analysisBtn && analysisBtn.disabled) {
+                return;
+            }
+            
             // 收集选中的基金
             const selectedFunds = [];
             const checkboxes = document.querySelectorAll('input[type="checkbox"].fund-checkbox:checked');
@@ -4300,8 +4288,11 @@
                 }
             });
 
+            // 设置按钮为加载状态
+            setAnalysisButtonLoading(true);
+
             // 显示加载状态
-            showNotification('正在分析基金相关性...', 'info');
+            showNotification('正在分析基金相关性，请稍候...', 'info');
 
             try {
                 const response = await fetch('/api/holdings/analyze/correlation', {
@@ -4322,10 +4313,39 @@
                     window.location.href = `/correlation-analysis?data=${dataParam}`;
                 } else {
                     showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
+                    setAnalysisButtonLoading(false);
                 }
             } catch (error) {
                 console.error('分析失败:', error);
                 showNotification('分析失败: 网络错误', 'error');
+                setAnalysisButtonLoading(false);
+            }
+        }
+        
+        // 设置分析按钮加载状态
+        function setAnalysisButtonLoading(isLoading) {
+            const analysisBtn = document.getElementById('analysis-btn');
+            if (!analysisBtn) return;
+            
+            const btnText = analysisBtn.querySelector('.btn-text');
+            const btnIcon = analysisBtn.querySelector('i');
+            
+            if (isLoading) {
+                // 禁用按钮，显示加载状态
+                analysisBtn.disabled = true;
+                analysisBtn.classList.add('btn-loading');
+                if (btnText) btnText.textContent = '分析中...';
+                if (btnIcon) {
+                    btnIcon.className = 'bi bi-arrow-repeat spin';
+                }
+            } else {
+                // 恢复按钮状态
+                analysisBtn.disabled = false;
+                analysisBtn.classList.remove('btn-loading');
+                if (btnText) btnText.textContent = '综合分析';
+                if (btnIcon) {
+                    btnIcon.className = 'bi bi-chart-line';
+                }
             }
         }
 
@@ -4842,10 +4862,12 @@
             }
 
             // 应用基金类型筛选
+            let filterTypeLabel = '';
             if (currentFilters.type) {
                 const type = currentFilters.type;
                 if (type.odii) {
                     filteredFunds = filteredFunds.filter(isOdiifund);
+                    filterTypeLabel = 'QDII';
                 }
                 // 其他类型筛选可以在这里添加
             }
@@ -4854,10 +4876,12 @@
             uiRenderer.renderTableRows(filteredFunds);
 
             // 更新显示的基金数量
-            document.getElementById('total-count').textContent = `${filteredFunds.length} (已筛选)`;
+            const countLabel = filterTypeLabel ? `${filteredFunds.length} (${filterTypeLabel})` : `${filteredFunds.length} (已筛选)`;
+            document.getElementById('total-count').textContent = countLabel;
 
             // 显示通知
-            showNotification(`已筛选出 ${filteredFunds.length} 只基金`, 'info');
+            const notifyMsg = filterTypeLabel ? `已筛选出 ${filteredFunds.length} 只${filterTypeLabel}基金` : `已筛选出 ${filteredFunds.length} 只基金`;
+            showNotification(notifyMsg, 'info');
         }
 
         // 显示筛选结果提示
@@ -4892,21 +4916,6 @@
             return odiiKeywords.some(keyword => fundName.includes(keyword));
         }
 
-        // 筛选ODII基金
-        function filterOdiifunds() {
-            // 筛选ODII基金
-            const odiifunds = allFunds.filter(isOdiifund);
-
-            // 显示筛选结果
-            uiRenderer.renderTableRows(odiifunds);
-
-            // 更新显示的基金数量
-            document.getElementById('total-count').textContent = `${odiifunds.length} (筛选ODII)`;
-
-            // 显示通知
-            showNotification(`已筛选出 ${odiifunds.length} 只ODII基金`, 'info');
-        }
-
         async function loadFunds() {
             console.log('[loadFunds] 开始加载持仓数据...');
             const tbody = document.getElementById('fund-table-body');
@@ -4918,7 +4927,6 @@
 
             try {
                 const search = document.getElementById('search-input').value.trim();
-                const sortBy = document.getElementById('sort-select').value;
 
                 // 从/api/holdings获取用户持仓数据
                 // 添加时间戳参数避免浏览器缓存
@@ -6610,6 +6618,9 @@
             // 保存checkbox列的HTML（始终在最前面）
             const checkboxHtml = '<th style="width: 30px;" data-column="checkbox"><input type="checkbox" id="select-all-checkbox" style="margin: 0 auto; display: block;"></th>';
 
+            // 保存操作列的HTML（始终在最后面）
+            const operationsHtml = '<th data-column="operations" style="text-align: center;">操作</th>';
+
             // 清空表头
             headerRow.innerHTML = '';
 
@@ -6626,6 +6637,9 @@
                 th.innerHTML = `${col.name} <span class="sort-indicator"></span>`;
                 headerRow.appendChild(th);
             });
+
+            // 最后添加操作列
+            headerRow.insertAdjacentHTML('beforeend', operationsHtml);
 
             // 重新绑定排序事件
             initSorting();

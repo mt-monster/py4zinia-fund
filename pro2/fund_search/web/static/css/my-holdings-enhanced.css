@@ -391,6 +391,26 @@ body {
     transform: translateY(-1px);
 }
 
+/* 按钮加载状态 */
+.btn-filter.btn-loading {
+    opacity: 0.8;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.btn-filter.btn-loading .spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+.btn-filter:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 .toolbar select {
     padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border-color);
