@@ -1469,7 +1469,7 @@
                 </div>
                 
                 <!-- 高级筛选按钮 -->
-                <button class="btn-filter" onclick="openFilterModal()" style="background: #3498db;">
+                <button class="btn-filter btn-primary" onclick="openFilterModal()">
                     <i class="bi bi-funnel"></i> 高级筛选
                 </button>
                 
@@ -1485,18 +1485,18 @@
                 
                 <!-- 快速操作按钮 -->
                 <div class="quick-actions">
-                    <button class="btn-filter" onclick="filterOdiifunds()" style="background: #8e44ad;"
+                    <button class="btn-filter btn-primary" onclick="filterOdiifunds()"
                         title="筛选ODII基金">
                         <i class="bi bi-globe"></i> ODII
                     </button>
-                    <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;"
+                    <button class="btn-filter btn-primary" onclick="testScreenshotModal()"
                         title="上传截图导入持仓">
                         <i class="bi bi-camera"></i> 导入
                     </button>
-                    <button class="btn-filter" onclick="clearFundList()" style="background: #95a5a6;" title="清空基金列表">
+                    <button class="btn-filter btn-primary" onclick="clearFundList()" title="清空基金列表">
                         <i class="bi bi-trash"></i> 清空
                     </button>
-                    <button class="btn-filter" onclick="startAnalysis()" style="background: #e67e22;" title="分析所选基金相关性">
+                    <button class="btn-filter btn-primary" onclick="startAnalysis()" title="分析所选基金相关性">
                         <i class="bi bi-chart-line"></i> 相关性
                     </button>
 
@@ -4324,14 +4324,12 @@
                     showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
                 }
             } catch (error) {
-                    console.error('分析失败:', error);
-                    showNotification('分析失败: 网络错误', 'error');
-                }
+                console.error('分析失败:', error);
+                showNotification('分析失败: 网络错误', 'error');
             }
+        }
 
-
-
-            // 注释：showAnalysisResult函数已废弃，现在直接跳转到相关性分析页面
+        // 注释：showAnalysisResult函数已废弃，现在直接跳转到相关性分析页面
 
         // 删除基金记录
         async function deleteFundRecord(fundCode) {
@@ -6382,10 +6380,27 @@
             font-size: 0.9rem;
             color: white;
             cursor: pointer;
+            transition: all 0.3s ease;
         }
 
         .btn-apply:hover {
             background: #2980b9;
+        }
+
+        .btn-apply-highlight {
+            background: #e74c3c !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+            }
         }
     </style>
 
@@ -6466,10 +6481,58 @@
             renderColumnList();
         }
 
-        // 切换列置顶
+        // 切换列置顶 - 确保只有一个列可以置顶
         function toggleColumnPinned(index) {
-            columnConfig[index].pinned = !columnConfig[index].pinned;
+            const col = columnConfig[index];
+            const wasPinned = col.pinned;
+            
+            // 如果点击的是已置顶的列，不做任何操作（保持置顶状态）
+            if (wasPinned) {
+                return;
+            }
+            
+            // 先取消所有其他列的置顶状态
+            columnConfig.forEach((c, i) => {
+                if (c.pinned && i !== index) {
+                    c.pinned = false;
+                    // 恢复到默认位置
+                    const defaultIndex = defaultColumnConfig.findIndex(dc => dc.key === c.key);
+                    if (defaultIndex !== -1) {
+                        columnConfig.splice(i, 1);
+                        columnConfig.splice(defaultIndex, 0, c);
+                    }
+                }
+            });
+            
+            // 重新获取当前列的索引（因为数组可能已经改变）
+            const newIndex = columnConfig.findIndex(c => c.key === col.key);
+            if (newIndex === -1) return;
+            
+            // 设置当前列为置顶
+            col.pinned = true;
+            // 从当前位置移除
+            columnConfig.splice(newIndex, 1);
+            // 插入到checkbox列之后（索引0是checkbox）
+            columnConfig.splice(1, 0, col);
+            
             renderColumnList();
+            // 不自动应用，引导用户点击"应用设置"按钮
+            showApplySettingsHint();
+        }
+        
+        // 显示应用设置提示
+        function showApplySettingsHint() {
+            const applyBtn = document.querySelector('.btn-apply');
+            if (applyBtn) {
+                applyBtn.classList.add('btn-apply-highlight');
+                applyBtn.textContent = '应用设置 (有未保存的更改)';
+                
+                // 3秒后移除高亮
+                setTimeout(() => {
+                    applyBtn.classList.remove('btn-apply-highlight');
+                    applyBtn.textContent = '应用设置';
+                }, 3000);
+            }
         }
 
         // 初始化拖拽排序
@@ -6553,8 +6616,9 @@
             // 先添加checkbox列
             headerRow.innerHTML = checkboxHtml;
 
-            // 按照columnConfig顺序添加其他列
+            // 按照columnConfig顺序添加其他列（跳过checkbox列，因为它已经添加了）
             columnConfig.forEach(col => {
+                if (col.key === 'checkbox') return; // 跳过checkbox列，避免重复
                 const th = document.createElement('th');
                 th.className = 'sortable';
                 th.setAttribute('data-column', col.key);
