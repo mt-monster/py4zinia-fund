@@ -4388,6 +4388,11 @@
                         // 根据相关性值设置背景颜色
                         if (value === 1) {
                             td.style.backgroundColor = '#e3f2fd';
+                            td.style.fontWeight = 'bold';
+                        } else if (value > 0.8) {
+                            td.style.backgroundColor = '#ffcdd2';
+                            td.style.fontWeight = 'bold';
+                            td.style.border = '2px solid #ef5350';
                         } else if (value > 0.7) {
                             td.style.backgroundColor = '#ffebee';
                         } else if (value > 0.3) {
@@ -4413,37 +4418,110 @@
             explanation.style.padding = '20px';
             explanation.style.backgroundColor = '#f8f9fa';
             explanation.style.borderRadius = '8px';
-            explanation.style.fontSize = '14px';
+            explanation.style.fontSize = '12px';
+            explanation.style.lineHeight = '1.5';
 
             const explanationTitle = document.createElement('h3');
             explanationTitle.textContent = '说明';
             explanationTitle.style.color = '#2c3e50';
-            explanationTitle.style.marginBottom = '15px';
+            explanationTitle.style.marginBottom = '12px';
+            explanationTitle.style.fontSize = '14px';
             explanation.appendChild(explanationTitle);
 
-            const explanationList = document.createElement('ul');
-            explanationList.style.marginLeft = '20px';
-            explanationList.style.marginBottom = '15px';
+            const explanationContent = document.createElement('div');
+            explanationContent.style.display = 'grid';
+            explanationContent.style.gridTemplateColumns = '1fr 1fr';
+            explanationContent.style.gap = '15px';
 
-            const listItems = [
-                '相关性系数范围: [-1, 1]',
-                '接近 1: 高度正相关，两只基金走势相似',
-                '接近 -1: 高度负相关，两只基金走势相反',
-                '接近 0: 无相关性，两只基金走势独立'
+            // 左侧：相关性范围说明
+            const rangeSection = document.createElement('div');
+            rangeSection.style.backgroundColor = 'white';
+            rangeSection.style.padding = '15px';
+            rangeSection.style.borderRadius = '6px';
+            rangeSection.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+            const rangeTitle = document.createElement('h4');
+            rangeTitle.textContent = '相关性系数范围';
+            rangeTitle.style.color = '#34495e';
+            rangeTitle.style.marginBottom = '10px';
+            rangeTitle.style.fontSize = '13px';
+            rangeSection.appendChild(rangeTitle);
+
+            const rangeList = document.createElement('ul');
+            rangeList.style.marginLeft = '15px';
+            rangeList.style.marginBottom = '0';
+
+            const rangeItems = [
+                '[-1, -0.2]: 负相关，风险对冲最佳',
+                '[-0.2, 0.2]: 无相关性，风险分散最佳',
+                '[0.2, 0.5]: 弱正相关，风险分散一般',
+                '[0.5, 0.7]: 中等正相关，可适度分散',
+                '[0.7, 0.8]: 强正相关，建议谨慎持有',
+                '[0.8, 1.0]: 高度正相关，不建议同时持有'
             ];
 
-            listItems.forEach(itemText => {
+            rangeItems.forEach(itemText => {
                 const li = document.createElement('li');
                 li.textContent = itemText;
-                li.style.marginBottom = '5px';
-                explanationList.appendChild(li);
+                li.style.marginBottom = '4px';
+                rangeList.appendChild(li);
             });
 
-            explanation.appendChild(explanationList);
+            rangeSection.appendChild(rangeList);
 
-            const explanationPara = document.createElement('p');
-            explanationPara.textContent = '相关性分析有助于分散投资风险，建议选择相关性较低的基金组合。';
-            explanation.appendChild(explanationPara);
+            // 右侧：投资建议
+            const adviceSection = document.createElement('div');
+            adviceSection.style.backgroundColor = 'white';
+            adviceSection.style.padding = '15px';
+            adviceSection.style.borderRadius = '6px';
+            adviceSection.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+            const adviceTitle = document.createElement('h4');
+            adviceTitle.textContent = '投资建议';
+            adviceTitle.style.color = '#34495e';
+            adviceTitle.style.marginBottom = '10px';
+            adviceTitle.style.fontSize = '13px';
+            adviceSection.appendChild(adviceTitle);
+
+            const adviceList = document.createElement('ul');
+            adviceList.style.marginLeft = '15px';
+            adviceList.style.marginBottom = '0';
+
+            const adviceItems = [
+                '选择相关性较低的基金组合',
+                '定期更新相关性分析（每月或每季度）',
+                '结合其他指标综合评估基金',
+                '注意：相关性会随时间变化'
+            ];
+
+            adviceItems.forEach(itemText => {
+                const li = document.createElement('li');
+                li.textContent = itemText;
+                li.style.marginBottom = '4px';
+                adviceList.appendChild(li);
+            });
+
+            adviceSection.appendChild(adviceList);
+
+            explanationContent.appendChild(rangeSection);
+            explanationContent.appendChild(adviceSection);
+            explanation.appendChild(explanationContent);
+
+            // 添加高亮提示
+            const highlightTip = document.createElement('div');
+            highlightTip.style.marginTop = '15px';
+            highlightTip.style.padding = '12px';
+            highlightTip.style.backgroundColor = '#fff3e0';
+            highlightTip.style.borderLeft = '4px solid #ff9800';
+            highlightTip.style.borderRadius = '4px';
+            highlightTip.style.fontSize = '11px';
+
+            const highlightText = document.createElement('p');
+            highlightText.textContent = '高亮提示：相关性系数大于0.8的单元格已用深红色背景和粗体边框突出显示，表示这些基金组合风险集中，不建议同时持有。';
+            highlightText.style.marginBottom = '0';
+            highlightTip.appendChild(highlightText);
+
+            explanation.appendChild(highlightTip);
 
             modalContent.appendChild(explanation);
 
