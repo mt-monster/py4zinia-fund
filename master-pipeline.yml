@@ -14,13 +14,12 @@ triggers:
         - main
 
 stages:
-  # 编译阶段 - 安装依赖并运行测试
-  - name: compile
-    displayName: 编译与测试
+  # 阶段1: 安装依赖
+  - name: install
+    displayName: 安装依赖
     strategy: naturally
     trigger: auto
     steps:
-      # 步骤1: 安装依赖
       - step: build@python
         name: install_dependencies
         displayName: 安装依赖
@@ -36,12 +35,16 @@ stages:
             path:
               - ./
 
-      # 步骤2: 运行单元测试
+  # 阶段2: 单元测试
+  - name: unit_test
+    displayName: 单元测试
+    strategy: naturally
+    trigger: auto
+    steps:
       - step: build@python
         name: run_unit_tests
-        displayName: 单元测试
+        displayName: 运行单元测试
         pythonVersion: '3.9'
-        dependsOn: install_dependencies
         commands:
           - cd pro2
           - echo "========================================"
@@ -53,12 +56,16 @@ stages:
             path:
               - pro2/tests/reports/
 
-      # 步骤3: 运行集成测试
+  # 阶段3: 集成测试
+  - name: integration_test
+    displayName: 集成测试
+    strategy: naturally
+    trigger: auto
+    steps:
       - step: build@python
         name: run_integration_tests
-        displayName: 集成测试
+        displayName: 运行集成测试
         pythonVersion: '3.9'
-        dependsOn: install_dependencies
         commands:
           - cd pro2
           - echo "========================================"
@@ -70,15 +77,16 @@ stages:
             path:
               - pro2/tests/reports/
 
-      # 步骤4: 运行所有测试并生成覆盖率报告
+  # 阶段4: 全量测试与覆盖率
+  - name: full_test
+    displayName: 全量测试
+    strategy: naturally
+    trigger: auto
+    steps:
       - step: build@python
         name: run_all_tests
-        displayName: 全量测试与覆盖率
+        displayName: 运行全量测试
         pythonVersion: '3.9'
-        dependsOn: 
-          - install_dependencies
-          - run_unit_tests
-          - run_integration_tests
         commands:
           - pip3 install pytest-cov
           - cd pro2
@@ -98,12 +106,22 @@ stages:
               - pro2/htmlcov/
               - pro2/coverage.xml
 
-      # 步骤5: 代码风格检查
+      - step: publish@general_artifacts
+        name: publish_test_reports
+        displayName: 上传测试报告
+        dependArtifact: ALL_TEST_REPORTS
+        artifactName: test-reports
+
+  # 阶段5: 代码风格检查
+  - name: lint
+    displayName: 代码检查
+    strategy: naturally
+    trigger: auto
+    steps:
       - step: build@python
         name: lint_check
         displayName: 代码风格检查
         pythonVersion: '3.9'
-        dependsOn: install_dependencies
         commands:
           - pip3 install flake8
           - cd pro2
@@ -111,13 +129,16 @@ stages:
           - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Lint check completed"
         allowFailure: true
 
-      # 步骤6: 构建应用
+  # 阶段6: 构建
+  - name: build
+    displayName: 构建应用
+    strategy: naturally
+    trigger: auto
+    steps:
       - step: build@python
         name: build_application
         displayName: Python 构建
         pythonVersion: '3.9'
-        dependsOn: 
-          - run_all_tests
         commands:
           - echo "========================================"
           - echo "BUILD SUCCESSFUL"
@@ -129,27 +150,17 @@ stages:
           - echo "Test reports available:"
           - ls -la pro2/tests/reports/ 2>/dev/null || echo "No test reports found"
         artifacts:
-          - name: BUILD_ARTIFACT
+          - name: BUILD_OUTPUT
             path:
               - ./
 
-      # 步骤7: 上传测试报告制品
-      - step: publish@general_artifacts
-        name: publish_test_reports
-        displayName: 上传测试报告
-        dependArtifact: ALL_TEST_REPORTS
-        artifactName: test-reports
-        dependsOn: run_all_tests
-
-      # 步骤8: 上传构建制品
       - step: publish@general_artifacts
         name: publish_general_artifacts
         displayName: 上传构建制品
-        dependArtifact: BUILD_ARTIFACT
+        dependArtifact: BUILD_OUTPUT
         artifactName: output
-        dependsOn: build_application
 
-  # 发布阶段
+  # 阶段7: 发布
   - name: release
     displayName: 发布
     strategy: naturally
