@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>投资账本 - 基金分析系统</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my-holdings-enhanced.css') }}">
     <style>
         :root {
             --primary-red: #e74c3c;
@@ -192,13 +193,16 @@
         /* 主容器布局 - 单列布局 */
         .main-container {
             width: 100%;
-            min-height: calc(100vh - 50px);
+            height: calc(100vh - 50px);
+            display: flex;
+            flex-direction: column;
         }
 
         /* 表格区域 - 占据全宽 */
         .left-panel {
             width: 100%;
-            min-height: 100%;
+            flex: 1;
+            min-height: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -210,6 +214,7 @@
         /* 表格样式 */
         .table-wrapper {
             flex: 1;
+            min-height: 0;
             overflow-x: auto;
             overflow-y: auto;
             position: relative;
@@ -1504,6 +1509,7 @@
                     </span>
                     <button class="btn-settings" onclick="openSettingsModal()" title="表头管理">
                         <i class="bi bi-gear"></i>
+                        <span>表头管理</span>
                     </button>
                 </div>
             </div>
@@ -1661,8 +1667,9 @@
             </div>
 
             <!-- 表格 -->
-            <div class="table-wrapper">
-                <table class="fund-table">
+            <div class="table-container">
+                <div class="table-wrapper">
+                    <table class="fund-table">
                     <thead>
                         <tr>
                             <th style="width: 30px;" data-column="checkbox">
@@ -1701,12 +1708,13 @@
                             <th style="text-align: center;">操作</th>
                         </tr>
                     </thead>
-                    <tbody id="fund-table-body">
-                        <tr>
-                            <td colspan="18" class="loading">加载中...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                        <tbody id="fund-table-body">
+                            <tr>
+                                <td colspan="18" class="loading">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -2769,13 +2777,17 @@
                         
                         // 添加操作列
                         cellsHtml += `
-                            <td style="text-align: center;">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                            <td data-column="operations">
+                                <div class="action-group">
+                                    <button class="action-btn edit" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
+                                        <i class="bi bi-pencil"></i>
+                                        <span>编辑</span>
+                                    </button>
+                                    <button class="action-btn delete" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
+                                        <i class="bi bi-trash"></i>
+                                        <span>删除</span>
+                                    </button>
+                                </div>
                             </td>
                         `;
                     } else {
@@ -2800,13 +2812,17 @@
                         
                         // 添加操作列
                         cellsHtml += `
-                            <td style="text-align: center;">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                            <td data-column="operations">
+                                <div class="action-group">
+                                    <button class="action-btn edit" onclick="event.stopPropagation(); editFundRecord('${fund.fund_code}');" title="编辑">
+                                        <i class="bi bi-pencil"></i>
+                                        <span>编辑</span>
+                                    </button>
+                                    <button class="action-btn delete" onclick="event.stopPropagation(); deleteFundRecord('${fund.fund_code}');" title="删除">
+                                        <i class="bi bi-trash"></i>
+                                        <span>删除</span>
+                                    </button>
+                                </div>
                             </td>
                         `;
                     }
@@ -6286,8 +6302,17 @@
             font-size: 1.1rem;
             color: #bdc3c7;
             cursor: pointer;
-            padding: 4px 8px;
-            transition: color 0.2s;
+            padding: 6px 12px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 4px;
+        }
+
+        .column-item .action-btn .btn-text {
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
         .column-item .action-btn:hover {
@@ -6306,6 +6331,16 @@
         .column-item .drag-handle {
             cursor: grab;
             color: #bdc3c7;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 1.1rem;
+        }
+
+        .column-item .drag-handle .btn-text {
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
         .column-item .drag-handle:hover {
@@ -6400,16 +6435,19 @@
                         <span class="column-action">
                             ${isFixed ? '' : `<button class="action-btn ${visibleClass}" onclick="toggleColumnVisible(${index})" title="显示/隐藏">
                                 <i class="bi ${visibleIcon}"></i>
+                                <span class="btn-text">${col.visible ? '显示' : '隐藏'}</span>
                             </button>`}
                         </span>
                         <span class="column-action">
                             ${isFixed ? '' : `<button class="action-btn ${pinnedClass}" onclick="toggleColumnPinned(${index})" title="置顶">
                                 <i class="bi ${pinnedIcon}"></i>
+                                <span class="btn-text">${col.pinned ? '已置顶' : '置顶'}</span>
                             </button>`}
                         </span>
                         <span class="column-action">
                             ${isFixed ? '' : `<span class="drag-handle" title="拖拽排序">
                                 <i class="bi bi-list"></i>
+                                <span class="btn-text">拖拽</span>
                             </span>`}
                         </span>
                     </div>
