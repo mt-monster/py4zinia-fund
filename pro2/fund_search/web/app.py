@@ -2388,40 +2388,198 @@ def delete_holding(fund_code):
 
 def get_fund_holdings_data(fund_code):
     """
-    Get fund holdings data (using mock data for testing)
+    获取基金持仓数据
+    优先使用akshare，失败时依次尝试备用数据源
+    
+    Args:
+        fund_code: 基金代码
+        
+    Returns:
+        DataFrame: 持仓数据，包含以下列：
+            - stock_name: 股票名称
+            - stock_code: 股票代码
+            - proportion: 持仓占比
+            - industry: 所属行业
+            - change_percent: 涨跌幅
+            - fund_code: 基金代码
     """
+    logger.info(f"开始获取基金 {fund_code} 的持仓数据")
+    
+    # 依次尝试不同的数据源
+    data_sources = [
+        _get_holdings_from_akshare,
+        _get_holdings_from_eastmoney,
+        _get_holdings_from_sina
+    ]
+    
+    for source_func in data_sources:
+        try:
+            logger.info(f"尝试从 {source_func.__name__} 获取数据...")
+            holdings_df = source_func(fund_code)
+            
+            if holdings_df is not None and not holdings_df.empty:
+                logger.info(f"成功从 {source_func.__name__} 获取 {len(holdings_df)} 条持仓数据")
+                logger.info(f"持仓数据列: {list(holdings_df.columns)}")
+                return holdings_df
+                
+        except Exception as e:
+            logger.warning(f"从 {source_func.__name__} 获取数据失败: {e}")
+            continue
+    
+    logger.error(f"所有数据源均无法获取基金 {fund_code} 的持仓数据")
+    return None
+
+
+def _get_holdings_from_akshare(fund_code):
+    """从akshare获取基金持仓数据"""
     try:
-        logger.info(f"开始获取基金持仓数据 {fund_code}")
+        import akshare as ak
         
-        # Create mock holdings data since akshare functions are not available
-        import pandas as pd
+        # 获取基金持仓数据
+        df = ak.fund_portfolio_hold_em(symbol=fund_code, date=None)
         
-        # Mock data for testing
-        mock_data = {
-            'stock_name': ['贵州茅台', '宁德时代', '招商银行', '中国平安', '腾讯控股'],
-            'stock_code': ['600519', '300750', '600036', '601318', '0700'],
-            'proportion': [8.5, 6.2, 5.8, 4.5, 3.9],
-            'industry': ['食品饮料', '新能源', '银行', '保险', '互联网'],
-            'fund_code': [fund_code] * 5
-        }
-        
-        holdings_df = pd.DataFrame(mock_data)
-        
-        logger.info(f"获取基金持仓数据成功 {fund_code}, 数据行数: {len(holdings_df)}")
-        
-        if holdings_df.empty:
-            logger.warning(f"基金持仓数据为空 {fund_code}")
+        if df is None or df.empty:
+            logger.warning(f"akshare返回空数据: {fund_code}")
             return None
         
-        # Log data structure
-        logger.info(f"持仓数据列: {list(holdings_df.columns)}")
+        # 标准化列名
+        column_mapping = {
+            '股票名称': 'stock_name',
+            '股票代码': 'stock_code',
+            '占净值比例': 'proportion',
+            '持仓市值': 'market_value',
+            '涨跌幅': 'change_percent'
+        }
         
-        return holdings_df
+        # 重命名列
+        for old_col, new_col in column_mapping.items():
+            if old_col in df.columns:
+                df[new_col] = df[old_col]
+        
+        # 添加基金代码
+        df['fund_code'] = fund_code
+        
+        # 尝试获取行业信息
+        df['industry'] = df['stock_name'].apply(_get_industry_by_stock_name)
+        
+        # 只保留需要的列
+        required_cols = ['stock_name', 'stock_code', 'proportion', 'industry', 'change_percent', 'fund_code']
+        available_cols = [col for col in required_cols if col in df.columns]
+        df = df[available_cols].copy()
+        
+        return df.head(10)  # 只取前10大重仓股
+        
     except Exception as e:
-        logger.error(f"获取基金持仓数据失败 {fund_code}: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"akshare获取数据失败: {e}")
+        raise
+
+
+def _get_holdings_from_eastmoney(fund_code):
+    """从天天基金网获取基金持仓数据"""
+    try:
+        import requests
+        import json
+        
+        # 天天基金网API
+        url = f"http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={fund_code}&topline=10"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.encoding = 'utf-8'
+        
+        # 解析返回的JSONP数据
+        text = response.text
+        if 'var' in text:
+            json_str = text[text.find('{'):text.rfind('}')+1]
+            data = json.loads(json_str)
+            
+            if 'data' in data and len(data['data']) > 0:
+                holdings = []
+                for item in data['data'][:10]:
+                    holdings.append({
+                        'stock_name': item.get('GPM', ''),
+                        'stock_code': item.get('GPJC', ''),
+                        'proportion': float(item.get('JZBL', 0)),
+                        'industry': _get_industry_by_stock_name(item.get('GPM', '')),
+                        'change_percent': item.get('ZDF', '--'),
+                        'fund_code': fund_code
+                    })
+                
+                return pd.DataFrame(holdings)
+        
+        logger.warning(f"天天基金网返回数据格式异常: {fund_code}")
         return None
+        
+    except Exception as e:
+        logger.error(f"天天基金网获取数据失败: {e}")
+        raise
+
+
+def _get_holdings_from_sina(fund_code):
+    """从新浪财经获取基金持仓数据"""
+    try:
+        import requests
+        
+        # 新浪财经API
+        url = f"https://stock.finance.sina.com.cn/fundInfo/api/openapi.php/CaihuiFundInfoService.getFundPortDetail?symbol={fund_code}"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        data = response.json()
+        
+        if 'result' in data and 'data' in data['result']:
+            holdings_data = data['result']['data']
+            
+            if holdings_data and len(holdings_data) > 0:
+                holdings = []
+                for item in holdings_data[:10]:
+                    holdings.append({
+                        'stock_name': item.get('name', ''),
+                        'stock_code': item.get('code', ''),
+                        'proportion': float(item.get('ratio', 0)),
+                        'industry': _get_industry_by_stock_name(item.get('name', '')),
+                        'change_percent': item.get('change', '--'),
+                        'fund_code': fund_code
+                    })
+                
+                return pd.DataFrame(holdings)
+        
+        logger.warning(f"新浪财经返回数据格式异常: {fund_code}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"新浪财经获取数据失败: {e}")
+        raise
+
+
+def _get_industry_by_stock_name(stock_name):
+    """根据股票名称推断所属行业（简化版）"""
+    industry_mapping = {
+        '茅台': '食品饮料', '五粮液': '食品饮料', '食品': '食品饮料', '饮料': '食品饮料',
+        '宁德': '新能源', '隆基': '新能源', '阳光电源': '新能源', '新能源': '新能源',
+        '银行': '银行', '招商': '银行', '平安银行': '银行', '工商银行': '银行',
+        '保险': '保险', '中国平安': '保险', '人寿': '保险', '太保': '保险',
+        '腾讯': '互联网', '阿里': '互联网', '美团': '互联网', '字节': '互联网',
+        '医药': '医药生物', '药明': '医药生物', '恒瑞': '医药生物', '康龙': '医药生物',
+        '白酒': '食品饮料', '啤酒': '食品饮料', '红酒': '食品饮料',
+        '证券': '非银金融', '中信': '非银金融', '建投': '非银金融', '中金': '非银金融',
+        '汽车': '汽车', '比亚迪': '汽车', '长城': '汽车', '上汽': '汽车',
+        '电子': '电子', '立讯': '电子', '歌尔': '电子', '半导体': '电子',
+        '化工': '化工', '万华': '化工', '石化': '化工',
+        '机械': '机械设备', '三一': '机械设备', '中联': '机械设备'
+    }
+    
+    for keyword, industry in industry_mapping.items():
+        if keyword in stock_name:
+            return industry
+    
+    return '其他'
 
 def calculate_asset_allocation(holdings_df, total_asset, fund_codes_count=1):
     """
@@ -2516,7 +2674,8 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
                 'stock_name': str(row.get('stock_name', row.get('name', ''))),
                 'stock_code': str(row.get('stock_code', row.get('code', ''))),
                 'proportion': round(adjusted_proportion, 2),
-                'market_value': round(adjusted_proportion * total_asset / 100, 2)
+                'market_value': round(adjusted_proportion * total_asset / 100, 2),
+                'change_percent': row.get('change_percent', row.get('涨跌幅', '--'))
             }
             top_stocks.append(stock_info)
         
