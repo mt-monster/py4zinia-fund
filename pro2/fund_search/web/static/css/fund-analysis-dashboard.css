@@ -1,0 +1,344 @@
+/**
+ * 基金综合分析仪表盘样式
+ * 参考京东金融盈亏分析设计风格
+ */
+
+/* 仪表盘容器 */
+.fund-dashboard {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.fund-dashboard-section {
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.fund-dashboard-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+/* 区块标题 */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title::before {
+    content: '';
+    width: 4px;
+    height: 18px;
+    background: #ff6b6b;
+    border-radius: 2px;
+}
+
+.section-title.asset::before { background: #ff6b6b; }
+.section-title.industry::before { background: #4ecdc4; }
+.section-title.stocks::before { background: #45b7d1; }
+
+.section-more {
+    font-size: 14px;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.section-more::after {
+    content: '›';
+    font-size: 18px;
+}
+
+/* 图表布局 */
+.chart-container {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-bottom: 20px;
+}
+
+.chart-wrapper {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chart-wrapper canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.chart-center-text {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    pointer-events: none;
+}
+
+.chart-center-number {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.chart-center-label {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+/* 图例列表 */
+.legend-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+}
+
+.legend-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legend-name {
+    font-size: 14px;
+    color: #333;
+}
+
+.legend-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-align: right;
+}
+
+.legend-value {
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.legend-percent {
+    font-size: 14px;
+    color: #666;
+    min-width: 50px;
+}
+
+/* 颜色系统 */
+.color-red { background: #ff6b6b; }
+.color-cyan { background: #4ecdc4; }
+.color-blue { background: #45b7d1; }
+.color-orange { background: #f9a825; }
+.color-purple { background: #9b59b6; }
+.color-green { background: #2ecc71; }
+.color-pink { background: #ff7979; }
+.color-teal { background: #1abc9c; }
+
+/* 重仓股列表 */
+.stocks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.stock-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 12px;
+    transition: background 0.2s ease;
+}
+
+.stock-item:hover {
+    background: #f0f0f0;
+}
+
+.stock-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stock-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.stock-code {
+    font-size: 12px;
+    color: #999;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.stock-metrics {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.stock-ratio {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    min-width: 60px;
+    text-align: right;
+}
+
+.stock-change {
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 80px;
+    text-align: right;
+}
+
+.stock-change.positive {
+    color: #ff4d4f;
+}
+
+.stock-change.negative {
+    color: #52c41a;
+}
+
+.stock-fund-count {
+    font-size: 13px;
+    color: #1890ff;
+    min-width: 40px;
+    text-align: right;
+}
+
+/* 分析摘要卡片 */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.summary-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 20px;
+    color: white;
+}
+
+.summary-card:nth-child(2) {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.summary-card:nth-child(3) {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.summary-card:nth-child(4) {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.summary-label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.summary-value {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .fund-dashboard {
+        padding: 16px;
+        border-radius: 12px;
+    }
+    
+    .chart-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .chart-wrapper {
+        width: 120px;
+        height: 120px;
+    }
+    
+    .chart-center-number {
+        font-size: 24px;
+    }
+    
+    .legend-list {
+        width: 100%;
+    }
+    
+    .stock-metrics {
+        gap: 12px;
+    }
+    
+    .stock-change {
+        min-width: 60px;
+    }
+    
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .stock-item {
+        padding: 12px;
+    }
+    
+    .stock-metrics {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+}
