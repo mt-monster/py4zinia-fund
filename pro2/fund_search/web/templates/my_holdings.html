@@ -579,6 +579,25 @@
             color: #721c24;
         }
 
+        /* ODII标签样式 */
+        .odii-tag {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background-color: #3498db;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .odii-tag:hover {
+            background-color: #2980b9;
+            transform: scale(1.05);
+            cursor: help;
+        }
+
         .risk-metrics {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -1298,6 +1317,10 @@
                 <input type="date" id="date-select">
                 <button class="btn-filter" onclick="loadFunds()">
                     <i class="bi bi-funnel"></i> 筛选
+                </button>
+                <button class="btn-filter" onclick="filterOdiifunds()" style="background: #8e44ad;"
+                    title="筛选ODII基金">
+                    <i class="bi bi-globe"></i> 筛选ODII
                 </button>
                 <button class="btn-filter" onclick="testScreenshotModal()" style="background: #27ae60;"
                     title="上传截图导入持仓">
@@ -2452,6 +2475,22 @@
                     tr.style.cursor = 'pointer';
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
 
+                    // 检查基金是否为ODII或海外基金
+                    function isOdiifund(fund) {
+                        // 基于基金名称判断是否为ODII或海外基金
+                        const fundName = fund.fund_name || fund.fundName || '';
+                        const odiiKeywords = ['QDII', 'ODII', '海外', '全球', '国际', '美股', '港股', '欧洲', '亚太', '新兴市场'];
+                        return odiiKeywords.some(keyword => fundName.includes(keyword));
+                    }
+
+                    // 生成ODII基金标签
+                    function generateOdiitag(fund) {
+                        if (isOdiifund(fund)) {
+                            return `<span class="badge bg-info odii-tag" title="QDII或海外基金">ODII</span>`;
+                        }
+                        return '';
+                    }
+
                     // 生成单元格HTML
                     let cellsHtml = '<td data-column="checkbox"><input type="checkbox" class="fund-checkbox" data-fund-code="' + fund.fund_code + '"></td>';
 
@@ -2462,7 +2501,13 @@
                             const dataFn = columnDataMap[col.key];
                             if (dataFn) {
                                 const data = dataFn(fund);
-                                cellsHtml += `<td data-column="${col.key}" class="${data.class}" ${display}>${data.value}</td>`;
+                                // 为基金代码列添加ODII标签
+                                if (col.key === 'fund_code') {
+                                    const odiiTag = generateOdiitag(fund);
+                                    cellsHtml += `<td data-column="${col.key}" class="${data.class}" ${display}>${data.value} ${odiiTag}</td>`;
+                                } else {
+                                    cellsHtml += `<td data-column="${col.key}" class="${data.class}" ${display}>${data.value}</td>`;
+                                }
                             }
                         });
                         
@@ -2487,7 +2532,13 @@
                             const dataFn = columnDataMap[key];
                             if (dataFn) {
                                 const data = dataFn(fund);
-                                cellsHtml += `<td data-column="${key}" class="${data.class}">${data.value}</td>`;
+                                // 为基金代码列添加ODII标签
+                                if (key === 'fund_code') {
+                                    const odiiTag = generateOdiitag(fund);
+                                    cellsHtml += `<td data-column="${key}" class="${data.class}">${data.value} ${odiiTag}</td>`;
+                                } else {
+                                    cellsHtml += `<td data-column="${key}" class="${data.class}">${data.value}</td>`;
+                                }
                             }
                         });
                         
@@ -4124,6 +4175,28 @@
                     document.body.removeChild(modal);
                 }
             };
+        }
+
+        // 筛选ODII基金
+        function filterOdiifunds() {
+            // 检查基金是否为ODII或海外基金
+            function isOdiifund(fund) {
+                const fundName = fund.fund_name || fund.fundName || '';
+                const odiiKeywords = ['QDII', 'ODII', '海外', '全球', '国际', '美股', '港股', '欧洲', '亚太', '新兴市场'];
+                return odiiKeywords.some(keyword => fundName.includes(keyword));
+            }
+
+            // 筛选ODII基金
+            const odiifunds = allFunds.filter(isOdiifund);
+
+            // 显示筛选结果
+            uiRenderer.renderTableRows(odiifunds);
+
+            // 更新显示的基金数量
+            document.getElementById('total-count').textContent = `${odiifunds.length} (筛选ODII)`;
+
+            // 显示通知
+            showNotification(`已筛选出 ${odiifunds.length} 只ODII基金`, 'info');
         }
 
         async function loadFunds() {
