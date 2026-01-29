@@ -1497,33 +1497,43 @@
                         </div>
                     </div>
 
-                    <h6 class="mb-3"><i class="bi bi-bar-chart me-2"></i>策略评估指标</h6>
-                    <div class="evaluation-grid mb-3">
-                        <div class="eval-item">
-                            <div class="eval-value">${((evaluation.hit_rate || 0) * 100).toFixed(1)}%</div>
-                            <div class="eval-label">命中率</div>
-                        </div>
-                        <div class="eval-item">
-                            <div class="eval-value">${(evaluation.profit_factor || 0).toFixed(2)}</div>
-                            <div class="eval-label">盈亏比</div>
-                        </div>
-                        <div class="eval-item">
-                            <div class="eval-value">${evaluation.max_consecutive_losses || 0}</div>
-                            <div class="eval-label">最大连亏</div>
-                        </div>
-                        <div class="eval-item">
-                            <div class="eval-value">${evaluation.max_consecutive_wins || 0}</div>
-                            <div class="eval-label">最大连赢</div>
-                        </div>
-                        <div class="eval-item">
-                            <div class="eval-value">¥${(evaluation.avg_profit_per_trade || 0).toFixed(2)}</div>
-                            <div class="eval-label">平均每笔收益</div>
-                        </div>
-                        <div class="eval-item">
-                            <div class="eval-value">¥${(evaluation.expectancy || 0).toFixed(2)}</div>
-                            <div class="eval-label">期望值</div>
-                        </div>
-                    </div>
+                    ${(() => {
+                        // 生成策略评估指标的HTML，只包含有数据的指标项
+                        const evalMetrics = [
+                            { key: 'hit_rate', label: '命中率', format: (value) => `${(value * 100).toFixed(1)}%` },
+                            { key: 'profit_factor', label: '盈亏比', format: (value) => value.toFixed(2) },
+                            { key: 'max_consecutive_losses', label: '最大连亏', format: (value) => value },
+                            { key: 'max_consecutive_wins', label: '最大连赢', format: (value) => value },
+                            { key: 'avg_profit_per_trade', label: '平均每笔收益', format: (value) => `¥${value.toFixed(2)}` },
+                            { key: 'expectancy', label: '期望值', format: (value) => `¥${value.toFixed(2)}` }
+                        ];
+
+                        // 过滤出有有效值的指标项
+                        const validEvalItems = evalMetrics.filter(item => 
+                            evaluation[item.key] !== undefined && 
+                            evaluation[item.key] !== null && 
+                            !isNaN(evaluation[item.key])
+                        );
+
+                        if (validEvalItems.length === 0) {
+                            return '';
+                        }
+
+                        // 生成评估指标的HTML
+                        const evalHtml = validEvalItems.map(item => `
+                            <div class="eval-item">
+                                <div class="eval-value">${item.format(evaluation[item.key])}</div>
+                                <div class="eval-label">${item.label}</div>
+                            </div>
+                        `).join('');
+
+                        return `
+                            <h6 class="mb-3"><i class="bi bi-bar-chart me-2"></i>策略评估指标</h6>
+                            <div class="evaluation-grid mb-3">
+                                ${evalHtml}
+                            </div>
+                        `;
+                    })()}
                 `;
             }
 
@@ -1645,11 +1655,24 @@
          * Clear loading state and restore button
          */
         function clearLoadingState() {
+            // Restore backtest button
             const btn = document.querySelector('.btn-success');
             if (btn && btn.dataset.originalText) {
                 btn.innerHTML = btn.dataset.originalText;
                 btn.disabled = false;
                 delete btn.dataset.originalText;
+            }
+            
+            // Clear loading indicator from results area if it's still there
+            const resultsContent = document.getElementById('backtest-result-content');
+            if (resultsContent) {
+                const loadingAlert = resultsContent.querySelector('.alert.alert-info');
+                const spinner = resultsContent.querySelector('.spinner-border');
+                
+                // Only clear if we find a loading spinner
+                if (loadingAlert && spinner) {
+                    resultsContent.innerHTML = '';
+                }
             }
         }
         
@@ -1927,6 +1950,18 @@
             } else {
                 // Fallback to scrolling to results div if section not found
                 resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // 更新基金名称
+            updateFundNames();
+        }
+        
+        // 辅助函数：切换基金详情的显示/隐藏
+        function toggleFundDetails(button) {
+            const detailsDiv = button.nextElementSibling;
+            if (detailsDiv && detailsDiv.classList.contains('fund-details')) {
+                detailsDiv.classList.toggle('d-none');
+                button.textContent = detailsDiv.classList.contains('d-none') ? '详情' : '收起';
             }
         }
 
@@ -2468,6 +2503,57 @@
             }
         }
         
+        // 基金名称缓存
+        const fundNameCache = {};
+        
+        // 根据基金代码获取基金名称
+        async function getFundNameByCode(fundCode) {
+            // 先检查缓存
+            if (fundNameCache[fundCode]) {
+                return fundNameCache[fundCode];
+            }
+            
+            try {
+                // 调用API获取基金详情
+                const response = await fetch(`/api/fund/${fundCode}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        const fundName = data.data.fund_name || `基金${fundCode}`;
+                        // 存入缓存
+                        fundNameCache[fundCode] = fundName;
+                        return fundName;
+                    }
+                }
+            } catch (error) {
+                console.error(`获取基金名称失败: ${fundCode}`, error);
+            }
+            
+            return `基金${fundCode}`;
+        }
+        
+        // 异步更新基金名称
+        async function updateFundNames() {
+            const fundCodeCells = document.querySelectorAll('.comparison-table tbody td:first-child');
+            const fundNameCells = document.querySelectorAll('.comparison-table tbody td:nth-child(2)');
+            
+            for (let i = 0; i < fundCodeCells.length; i++) {
+                const codeCell = fundCodeCells[i];
+                const nameCell = fundNameCells[i];
+                
+                if (codeCell && nameCell) {
+                    const strongElement = codeCell.querySelector('strong');
+                    if (strongElement) {
+                        const fundCode = strongElement.textContent.trim();
+                        if (fundCode) {
+                            const fundName = await getFundNameByCode(fundCode);
+                            nameCell.textContent = fundName;
+                        }
+                    }
+                }
+            }
+        }
+        
         /**
          * Display multi-fund backtest results
          * @param {Object} data - Multi-fund backtest result data
@@ -2482,6 +2568,44 @@
             if (!funds || funds.length === 0) {
                 showErrorMessage('回测结果中没有基金数据', 'backtest');
                 return;
+            }
+            
+            // 辅助函数：格式化基金对象为可读字符串
+            function formatFundObject(fund) {
+                if (!fund || typeof fund !== 'object') {
+                    return fund;
+                }
+                
+                // 提取关键属性
+                const fundCode = fund.fund_code || fund.code || '';
+                const fundName = fund.name || fund.fund_name || '';
+                const totalReturn = fund.total_return !== undefined ? fund.total_return : '';
+                const returnSign = totalReturn >= 0 ? '+' : '';
+                const returnClass = totalReturn >= 0 ? 'metric-positive' : 'metric-negative';
+                
+                // 构建基本信息
+                let basicInfo = `<strong>${fundCode}</strong>`;
+                if (fundName) {
+                    basicInfo += ` <small class="text-muted">${fundName}</small>`;
+                }
+                if (totalReturn !== '') {
+                    basicInfo += ` <span class="${returnClass}">: ${returnSign}${totalReturn.toFixed(2)}%</span>`;
+                }
+                
+                // 创建可展开的详情
+                const details = JSON.stringify(fund, null, 2);
+                
+                return `
+                    <div class="fund-object">
+                        <span class="fund-basic">${basicInfo}</span>
+                        <button class="fund-details-btn btn btn-sm btn-outline-secondary ms-2" onclick="toggleFundDetails(this)">
+                            详情
+                        </button>
+                        <div class="fund-details mt-2 p-2 bg-light rounded d-none">
+                            <pre class="mb-0">${details}</pre>
+                        </div>
+                    </div>
+                `;
             }
             
             // Build portfolio summary
@@ -2528,6 +2652,7 @@
                         <thead>
                             <tr>
                                 <th>基金代码</th>
+                                <th>基金名称</th>
                                 <th>初始金额</th>
                                 <th>最终价值</th>
                                 <th>总收益率</th>
@@ -2539,11 +2664,17 @@
                         </thead>
                         <tbody>
                             ${funds.map(fund => {
-                                const isBest = fund.fund_code === bestFund;
-                                const isWorst = fund.fund_code === worstFund;
+                                // 修复：使用基金代码进行比较
+                                const bestFundCode = typeof bestFund === 'object' ? bestFund.fund_code || bestFund.code : bestFund;
+                                const worstFundCode = typeof worstFund === 'object' ? worstFund.fund_code || worstFund.code : worstFund;
+                                const isBest = fund.fund_code === bestFundCode;
+                                const isWorst = fund.fund_code === worstFundCode;
                                 const returnClass = fund.total_return >= 0 ? 'metric-positive' : 'metric-negative';
                                 const returnSign = fund.total_return >= 0 ? '+' : '';
                                 const rowClass = isBest ? 'best-strategy' : '';
+                                
+                                // 获取基金名称
+                                const fundName = fund.name || fund.fund_name || '';
                                 
                                 return `
                                     <tr class="${rowClass}">
@@ -2552,6 +2683,7 @@
                                             ${isBest ? '<span class="best-badge">最佳</span>' : ''}
                                             ${isWorst ? '<span class="badge bg-secondary">最差</span>' : ''}
                                         </td>
+                                        <td>${fundName || '-'}</td>
                                         <td>¥${fund.initial_amount.toLocaleString()}</td>
                                         <td>¥${(fund.final_value || fund.total_value || 0).toLocaleString()}</td>
                                         <td class="${returnClass}">${returnSign}${fund.total_return.toFixed(2)}%</td>
@@ -2568,8 +2700,8 @@
                 
                 <div class="alert alert-info mb-0">
                     <i class="bi bi-info-circle me-2"></i>
-                    <strong>表现最佳:</strong> ${bestFund} | 
-                    <strong>表现最差:</strong> ${worstFund}
+                    <strong>表现最佳:</strong> ${formatFundObject(bestFund)} | 
+                    <strong>表现最差:</strong> ${formatFundObject(worstFund)}
                 </div>
             `;
             

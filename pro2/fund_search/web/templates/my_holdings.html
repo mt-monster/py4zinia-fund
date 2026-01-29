@@ -3872,7 +3872,7 @@
 
             try {
                 // 调用API删除基金记录
-                const response = await fetch(`/api/holdings/\${fundCode}`, {
+                const response = await fetch(`/api/holdings/${fundCode}`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json'
