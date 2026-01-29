@@ -2781,17 +2781,8 @@
                 // 更新全选按钮状态
                 updateSelectAllStatus();
                 
-                // 重新绑定全选事件（如果之前未绑定）
-                const selectAllCheckbox = document.getElementById('select-all-checkbox');
-                if (selectAllCheckbox && !selectAllCheckbox.hasEventListener) {
-                    selectAllCheckbox.addEventListener('click', function() {
-                        const isChecked = this.checked;
-                        document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
-                            checkbox.checked = isChecked;
-                        });
-                    });
-                    selectAllCheckbox.hasEventListener = true;
-                }
+                // 重新初始化全选功能，确保事件绑定正确
+                initSelectAll();
                 
                 // 绑定单个复选框变化事件
                 document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
@@ -2844,20 +2835,31 @@
             const selectAllCheckbox = document.getElementById('select-all-checkbox');
             if (!selectAllCheckbox) return;
             
-            // 全选/取消全选
-            selectAllCheckbox.addEventListener('click', function() {
+            // 定义全选点击事件处理函数
+            function handleSelectAllClick() {
                 const isChecked = this.checked;
                 document.querySelectorAll('.fund-checkbox').forEach(checkbox => {
                     checkbox.checked = isChecked;
                 });
-            });
+                // 确保全选状态一致
+                updateSelectAllStatus();
+            }
             
-            // 单个复选框变化时更新全选状态
-            document.addEventListener('change', function(e) {
-                if (e.target.classList.contains('fund-checkbox')) {
-                    updateSelectAllStatus();
-                }
-            });
+            // 移除之前的事件监听器，避免重复绑定
+            // 注意：由于函数是在内部定义的，这里实际上无法移除之前的监听器
+            // 但我们可以通过hasEventListener标志来确保只绑定一次
+            if (!selectAllCheckbox.hasEventListener) {
+                // 绑定全选点击事件
+                selectAllCheckbox.addEventListener('click', handleSelectAllClick);
+                selectAllCheckbox.hasEventListener = true;
+                
+                // 单个复选框变化时更新全选状态
+                document.addEventListener('change', function(e) {
+                    if (e.target.classList.contains('fund-checkbox')) {
+                        updateSelectAllStatus();
+                    }
+                });
+            }
         }
         
         // 更新全选按钮状态
@@ -4024,9 +4026,11 @@
                 const result = await response.json();
                 if (result.success && result.data && result.data.length > 0) {
                     const dateInput = document.getElementById('date-select');
-                    dateInput.value = result.data[0];
-                    dateInput.min = result.data[result.data.length - 1];
-                    dateInput.max = result.data[0];
+                    if (dateInput) {
+                        dateInput.value = result.data[0];
+                        dateInput.min = result.data[result.data.length - 1];
+                        dateInput.max = result.data[0];
+                    }
                 }
             } catch (error) {
                 console.error('初始化日期失败:', error);
