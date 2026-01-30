@@ -106,7 +106,15 @@ def etf_detail_page(etf_code):
 @app.route('/my_holdings')
 def my_holdings():
     """我的持仓页"""
-    return render_template('my_holdings.html')
+    # 通过 query 参数 ?v=2 使用重构版模板
+    use_refactored = request.args.get('v') == '2'
+    template = 'my_holdings_refactored.html' if use_refactored else 'my_holdings.html'
+    return render_template(template)
+
+@app.route('/my-holdings-new')
+def my_holdings_new():
+    """我的持仓页 - 重构版"""
+    return render_template('my_holdings_refactored.html')
 
 @app.route('/test-holding-recognition')
 def test_holding_recognition():
@@ -1920,6 +1928,11 @@ def get_holdings():
             today_profit = current_value - previous_value
             today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
             
+            # 昨日盈亏 - 基于昨日市值和基金昨日涨跌幅计算
+            # yesterday_return 是基金的prev_day_return（日涨跌幅）
+            yesterday_profit = previous_value * (yesterday_return / 100) if yesterday_return else 0
+            yesterday_profit_rate = yesterday_return if yesterday_return else 0
+            
             # 累计盈亏（与持有盈亏相同）
             total_profit = holding_profit
             total_profit_rate = holding_profit_rate
@@ -1944,6 +1957,8 @@ def get_holdings():
                 'total_profit_rate': round(total_profit_rate, 2),
                 'today_return': round(today_return, 2),
                 'yesterday_return': round(yesterday_return, 2),
+                'yesterday_profit': round(yesterday_profit, 2),
+                'yesterday_profit_rate': round(yesterday_profit_rate, 2),
                 # 绩效指标
                 'sharpe_ratio': round(sharpe_ratio, 4),
                 'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4),
@@ -2350,6 +2365,28 @@ def analyze_comprehensive():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/analysis', methods=['POST'])
+def start_analysis():
+    """开始分析 - 重构版API"""
+    try:
+        data = request.get_json()
+        funds = data.get('funds', [])
+        
+        if len(funds) < 2:
+            return jsonify({'success': False, 'error': '请至少选择2只基金'}), 400
+        
+        if len(funds) > 20:
+            return jsonify({'success': False, 'error': '最多支持20只基金同时分析'}), 400
+        
+        # 调用现有的综合分析逻辑
+        return analyze_comprehensive()
+        
+    except Exception as e:
+        logger.error(f"开始分析失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/holdings/<fund_code>', methods=['DELETE'])
 def delete_holding(fund_code):
