@@ -115,11 +115,13 @@ stages:
           - echo "========================================"
           - echo "BUILDING APPLICATION"
           - echo "========================================"
-          # 创建构建产物目录
-          - mkdir -p build_output
-          - echo "Build completed at $(date)" > build_output/build_info.txt
-          - cp -r pro2 build_output/ 2>/dev/null || echo "No pro2 directory to copy"
+          # 创建构建产物目录（在项目根目录）
+          - mkdir -p ${WORK_DIR}/build_output
+          - echo "Build completed at $(date)" > ${WORK_DIR}/build_output/build_info.txt
+          - cp -r pro2 ${WORK_DIR}/build_output/ 2>/dev/null || echo "No pro2 directory to copy"
+          - cp requirements.txt ${WORK_DIR}/build_output/ 2>/dev/null || echo "No requirements.txt to copy"
           - echo "Build artifacts prepared"
+          - ls -la ${WORK_DIR}/build_output/
         artifacts:
           - name: BUILD_ARTIFACT
             path:
