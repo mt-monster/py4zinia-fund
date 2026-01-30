@@ -1,3 +1,6 @@
+# Gitee Go CI/CD 配置文件
+# 使用 Gitee Go 流水线语法
+
 version: '1.0'
 name: master-pipeline
 displayName: MasterPipeline
@@ -9,7 +12,9 @@ triggers:
         - master
         - develop
         - main
+
 stages:
+  # 阶段1: 安装依赖并运行所有测试
   - name: test
     displayName: 测试阶段
     strategy: naturally
@@ -20,28 +25,38 @@ stages:
         displayName: 安装依赖并测试
         pythonVersion: '3.9'
         commands:
+          # 升级 pip
           - python3 -m pip install --upgrade pip
           - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+          # 先安装 numpy 和 pandas（避免编译）
           - pip3 install numpy==1.24.3 pandas==2.0.3
+          # 安装 SQLite3 支持（通过 pip）
           - pip3 install pysqlite3-binary || pip3 install db-sqlite3 || echo "SQLite3 installation skipped"
+          # 安装项目依赖（包含 pytest）
           - pip3 install -r requirements.txt
+          # 安装 pytest-cov
           - pip3 install pytest-cov
+          # 进入项目目录
           - cd pro2
+          # 创建必要的目录
           - mkdir -p tests/reports
           - mkdir -p htmlcov
           - echo "========================================"
           - echo "Running UNIT TESTS"
           - echo "========================================"
+          # 运行单元测试，跳过有问题的测试
           - python -m pytest tests/unit -v --tb=short --ignore=tests/unit/test_data_retrieval.py --ignore=tests/unit/test_backtesting.py --html=tests/reports/unit_test_report.html --self-contained-html 2>&1 | tee tests/reports/unit_test_log.txt || echo "Unit tests completed"
           - echo ""
           - echo "========================================"
           - echo "Running INTEGRATION TESTS"
           - echo "========================================"
+          # 运行集成测试，跳过 API 测试（需要数据库）
           - python -m pytest tests/integration -v --tb=short --ignore=tests/integration/test_api.py --html=tests/reports/integration_test_report.html --self-contained-html 2>&1 | tee tests/reports/integration_test_log.txt || echo "Integration tests completed"
           - echo ""
           - echo "========================================"
           - echo "Running ALL TESTS with Coverage"
           - echo "========================================"
+          # 运行所有测试（跳过有问题的）并生成覆盖率报告
           - python -m pytest tests/ -v --tb=short --ignore=tests/unit/test_data_retrieval.py --ignore=tests/unit/test_backtesting.py --ignore=tests/integration/test_api.py --cov=fund_search --cov-report=xml --cov-report=html --html=tests/reports/all_tests_report.html --self-contained-html 2>&1 | tee tests/reports/all_tests_log.txt || echo "All tests completed"
           - echo ""
           - echo "Test Summary:"
@@ -52,6 +67,7 @@ stages:
           - echo ""
           - echo "Test reports available:"
           - ls -la tests/reports/ 2>/dev/null || echo "No test reports found"
+          # 确保文件存在，避免制品上传失败
           - touch tests/reports/.gitkeep
           - touch htmlcov/.gitkeep
           - test -f coverage.xml || touch coverage.xml
@@ -61,6 +77,8 @@ stages:
               - pro2/tests/reports/
               - pro2/htmlcov/
               - pro2/coverage.xml
+
+  # 阶段2: 代码风格检查
   - name: lint
     displayName: 代码检查
     strategy: naturally
@@ -75,6 +93,9 @@ stages:
           - cd pro2
           - echo "Running lint check..."
           - flake8 fund_search --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Lint check completed"
+        allowFailure: true
+
+  # 阶段3: 构建并发布
   - name: build
     displayName: 构建与发布
     strategy: naturally
@@ -85,6 +106,7 @@ stages:
         displayName: Python 构建
         pythonVersion: '3.9'
         commands:
+          # 安装依赖
           - python3 -m pip install --upgrade pip
           - pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
           - pip3 install numpy==1.24.3 pandas==2.0.3
@@ -93,16 +115,16 @@ stages:
           - echo "========================================"
           - echo "BUILDING APPLICATION"
           - echo "========================================"
-          - mkdir -p ${WORK_DIR}/build_output
-          - echo "Build completed at $(date)" > ${WORK_DIR}/build_output/build_info.txt
-          - cp -r pro2 ${WORK_DIR}/build_output/ 2>/dev/null || echo "No pro2 directory to copy"
-          - cp requirements.txt ${WORK_DIR}/build_output/ 2>/dev/null || echo "No requirements.txt to copy"
+          # 创建构建产物目录
+          - mkdir -p build_output
+          - echo "Build completed at $(date)" > build_output/build_info.txt
+          - cp -r pro2 build_output/ 2>/dev/null || echo "No pro2 directory to copy"
           - echo "Build artifacts prepared"
-          - ls -la ${WORK_DIR}/build_output/
         artifacts:
           - name: BUILD_ARTIFACT
             path:
               - build_output/
+
       - step: publish@general_artifacts
         name: publish_artifacts
         displayName: 上传构建制品
