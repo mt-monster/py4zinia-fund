@@ -163,19 +163,11 @@ body {
 }
 
 /* ============================================
-   主容器布局
+   主容器布局 - left-panel 直接占据全屏
    ============================================ */
-.main-container {
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: var(--space-6);
-    height: calc(100vh - 60px);
-    display: flex;
-    flex-direction: column;
-}
-
 .left-panel {
-    flex: 1;
+    width: 100%;
+    height: calc(100vh - 60px);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -1153,7 +1145,7 @@ body {
    响应式设计
    ============================================ */
 @media (max-width: 1200px) {
-    .main-container {
+    .left-panel {
         padding: var(--space-4);
     }
     
@@ -1171,8 +1163,9 @@ body {
         display: none;
     }
     
-    .main-container {
+    .left-panel {
         padding: var(--space-3);
+        height: calc(100vh - 50px);
     }
     
     .asset-overview {
