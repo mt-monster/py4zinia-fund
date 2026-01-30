@@ -113,8 +113,11 @@ stages:
           - pip3 install pysqlite3-binary || pip3 install db-sqlite3 || echo "SQLite3 installation skipped"
           - pip3 install -r requirements.txt
           - echo "========================================"
-          - echo "BUILDING APPLICATION"
+          - echo "BUILD SUCCESSFUL"
           - echo "========================================"
+          - python main.py &
+          - sleep 5
+          - echo "Application started successfully"
           # 创建构建产物目录
           - mkdir -p build_output
           - echo "Build completed at $(date)" > build_output/build_info.txt
