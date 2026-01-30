@@ -24,10 +24,10 @@ const FundApp = {
             // 更新市场指数
             this.updateMarketIndex();
             
-            FundUtils.showNotification('页面加载完成', 'success');
+            // 页面加载完成（不显示提示）
         } catch (error) {
             console.error('App initialization error:', error);
-            FundUtils.showNotification('页面加载失败: ' + error.message, 'error');
+            // 页面加载错误（静默处理，不显示提示）
         }
     },
 
@@ -90,12 +90,13 @@ const FundApp = {
                 FundTable.renderData();
                 FundFilters.updateCount();
             } else {
-                FundUtils.showNotification('数据加载失败: ' + response.error, 'error');
+                // 数据加载失败（静默处理）
+                console.warn('数据加载失败:', response.error);
                 FundTable.renderData([]);
             }
         } catch (error) {
             console.error('Load data error:', error);
-            FundUtils.showNotification('数据加载失败', 'error');
+            // 数据加载异常（静默处理）
             FundTable.renderData([]);
         } finally {
             FundState.isLoading = false;
@@ -130,58 +131,117 @@ const FundApp = {
      * 清空基金列表
      */
     async clearFundList() {
-        if (!confirm('确定要清空所有基金吗？此操作不可恢复。')) {
+        if (!confirm('确定要清空所有基金吗？此操作将删除数据库中的所有持仓记录，不可恢复。')) {
             return;
         }
 
         try {
-            // 这里应该调用API清空数据
-            // 模拟清空
-            FundState.funds = [];
-            FundState.filteredFunds = [];
-            FundState.selectedFunds.clear();
+            // 调用API清空数据库中的持仓记录
+            const response = await fetch('/api/holdings/clear?user_id=default_user', {
+                method: 'DELETE'
+            });
             
-            FundTable.renderData();
-            FundFilters.updateCount();
+            const data = await response.json();
             
-            FundUtils.showNotification('基金列表已清空', 'success');
+            if (data.success) {
+                // 清空前端状态
+                FundState.funds = [];
+                FundState.filteredFunds = [];
+                FundState.selectedFunds.clear();
+                
+                FundTable.renderData();
+                FundFilters.updateCount();
+                
+                FundUtils.showNotification('基金列表已清空', 'success');
+            } else {
+                FundUtils.showNotification('清空失败: ' + (data.error || '未知错误'), 'error');
+            }
         } catch (error) {
             console.error('Clear fund list error:', error);
-            FundUtils.showNotification('清空失败', 'error');
+            FundUtils.showNotification('清空失败: 网络错误', 'error');
         }
     },
 
     /**
-     * 开始分析
+     * 开始分析 - 与原始版本功能完全一致
      */
     async startAnalysis() {
+        const analysisBtn = document.getElementById('analysis-btn');
+        
+        // 如果按钮正在加载中，防止重复提交
+        if (analysisBtn && analysisBtn.disabled) {
+            return;
+        }
+        
         const selectedCount = FundState.selectedFunds.size;
         
         if (selectedCount < 2) {
-            FundUtils.showNotification('请至少选择2只基金进行分析', 'warning');
-            return;
-        }
-
-        if (selectedCount > 20) {
-            FundUtils.showNotification('最多支持20只基金同时分析', 'warning');
+            FundUtils.showNotification('请至少选择2只基金进行相关性分析', 'error');
             return;
         }
 
         const fundCodes = Array.from(FundState.selectedFunds);
         
+        // 设置按钮为加载状态
+        this.setAnalysisButtonLoading(true);
+        
+        // 显示加载状态
+        FundUtils.showNotification('正在分析基金相关性，请稍候...', 'info');
+        
         try {
-            const response = await FundAPI.startAnalysis(fundCodes);
-            
-            if (response.success) {
-                // 打开分析结果页面
-                window.open(`/analysis?funds=${fundCodes.join(',')}`, '_blank');
-                FundUtils.showNotification('分析请求已发送', 'success');
+            const response = await fetch('/api/holdings/analyze/correlation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fund_codes: fundCodes })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                // 添加基金代码到数据中
+                result.data.fund_codes = fundCodes;
+                
+                // 跳转到相关性分析页面，传递数据
+                const dataParam = encodeURIComponent(JSON.stringify(result.data));
+                window.location.href = `/correlation-analysis?data=${dataParam}`;
             } else {
-                FundUtils.showNotification('分析请求失败: ' + response.error, 'error');
+                FundUtils.showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
+                this.setAnalysisButtonLoading(false);
             }
         } catch (error) {
-            console.error('Start analysis error:', error);
-            FundUtils.showNotification('分析请求失败', 'error');
+            console.error('分析失败:', error);
+            FundUtils.showNotification('分析失败: 网络错误', 'error');
+            this.setAnalysisButtonLoading(false);
+        }
+    },
+
+    /**
+     * 设置分析按钮加载状态 - 与原始版本一致
+     */
+    setAnalysisButtonLoading(isLoading) {
+        const analysisBtn = document.getElementById('analysis-btn');
+        if (!analysisBtn) return;
+        
+        const btnText = analysisBtn.querySelector('.btn-text') || analysisBtn;
+        const btnIcon = analysisBtn.querySelector('i');
+        
+        if (isLoading) {
+            // 禁用按钮，显示加载状态
+            analysisBtn.disabled = true;
+            analysisBtn.classList.add('btn-loading');
+            if (btnText && btnText !== analysisBtn) btnText.textContent = '分析中...';
+            if (btnIcon) {
+                btnIcon.className = 'bi bi-hourglass-split';
+            }
+        } else {
+            // 恢复按钮状态
+            analysisBtn.disabled = false;
+            analysisBtn.classList.remove('btn-loading');
+            if (btnText && btnText !== analysisBtn) btnText.textContent = '综合分析';
+            if (btnIcon) {
+                btnIcon.className = 'bi bi-chart-line';
+            }
         }
     },
 
