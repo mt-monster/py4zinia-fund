@@ -554,7 +554,7 @@
             return null;
         }
 
-        // 提取顶部相关的基金组合
+        // 提取相关性大于0.5的基金组合
         function getTopCorrelatedPairs(matrix, fundNames, topN = 5) {
             if (!matrix || !fundNames || matrix.length < 2) {
                 return [];
@@ -566,19 +566,22 @@
             for (let i = 0; i < matrix.length; i++) {
                 for (let j = i + 1; j < matrix[i].length; j++) {
                     const correlation = matrix[i][j];
-                    pairs.push({
-                        fund1: fundNames[i],
-                        fund2: fundNames[j],
-                        correlation: correlation
-                    });
+                    // 只添加相关性大于0.5的组合
+                    if (correlation > 0.5) {
+                        pairs.push({
+                            fund1: fundNames[i],
+                            fund2: fundNames[j],
+                            correlation: correlation
+                        });
+                    }
                 }
             }
 
             // 按相关性降序排序
             pairs.sort((a, b) => b.correlation - a.correlation);
 
-            // 返回前topN个
-            return pairs.slice(0, topN);
+            // 返回所有符合条件的组合（不再限制数量）
+            return pairs;
         }
 
         // 获取相关性强度类别

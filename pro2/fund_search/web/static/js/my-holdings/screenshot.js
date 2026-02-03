@@ -201,10 +201,11 @@ const FundScreenshot = {
                             <th style="text-align: right; padding: var(--space-2);">持仓金额</th>
                             <th style="text-align: right; padding: var(--space-2);">收益</th>
                             <th style="text-align: center; padding: var(--space-2);">置信度</th>
+                            <th style="text-align: center; padding: var(--space-2);">删除</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${funds.map(fund => `
+                        ${funds.map((fund, index) => `
                             <tr>
                                 <td style="padding: var(--space-2);">${fund.fund_code}</td>
                                 <td style="padding: var(--space-2);">${fund.fund_name}</td>
@@ -218,6 +219,18 @@ const FundScreenshot = {
                                                  padding: 2px 8px; border-radius: 10px; font-size: var(--text-xs);">
                                         ${((fund.confidence || 0) * 100).toFixed(0)}%
                                     </span>
+                                </td>
+                                <td style="text-align: center; padding: var(--space-2);">
+                                    <button onclick="FundScreenshot.deleteFund(${index})" 
+                                            style="background: var(--danger-light); 
+                                                   color: var(--danger); 
+                                                   border: none; 
+                                                   padding: 4px 12px; 
+                                                   border-radius: var(--border-radius-sm); 
+                                                   cursor: pointer; 
+                                                   font-size: var(--text-xs);">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -334,6 +347,28 @@ const FundScreenshot = {
             if (importBtn) {
                 importBtn.disabled = false;
                 importBtn.textContent = '确认导入';
+            }
+        }
+    },
+
+    /**
+     * 删除基金
+     */
+    deleteFund(index) {
+        // 显示确认对话框
+        if (confirm('确定要删除该基金吗？')) {
+            try {
+                // 从识别结果中移除基金
+                const deletedFund = this.recognizedFunds.splice(index, 1)[0];
+                
+                // 重新渲染识别结果
+                this.renderRecognitionResult({ data: this.recognizedFunds });
+                
+                // 显示成功通知
+                FundUtils.showNotification(`成功删除基金: ${deletedFund.fund_name}`, 'success');
+            } catch (error) {
+                console.error('删除基金失败:', error);
+                FundUtils.showNotification('删除失败，请重试', 'error');
             }
         }
     },

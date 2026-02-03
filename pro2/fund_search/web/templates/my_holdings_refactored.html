@@ -41,7 +41,10 @@
                     <i class="bi bi-funnel"></i> 高级筛选
                 </button>
                 <button class="btn btn-primary" onclick="openScreenshotModal()">
-                    <i class="bi bi-camera"></i> 导入
+                    <i class="bi bi-camera"></i> 截图导入
+                </button>
+                <button class="btn btn-primary" onclick="openManualImportModal()">
+                    <i class="bi bi-plus-circle"></i> 手工导入
                 </button>
                 <button class="btn btn-secondary" onclick="clearFundList()">
                     <i class="bi bi-trash"></i> 清空
@@ -276,6 +279,72 @@
             <!-- 动态生成详情内容 -->
         </div>
     </aside>
+
+    <!-- 手工导入模态框 -->
+    <div class="modal-overlay" id="manual-import-modal" onclick="handleModalBackdrop(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width: 600px;">
+            <header class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-plus-circle"></i> 手工导入基金</h3>
+                <button class="modal-close" onclick="closeManualImportModal()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </header>
+            
+            <div class="modal-body">
+                <nav class="tabs">
+                    <button class="tab-btn active" data-tab="import" onclick="switchManualImportTab('import')">导入基金</button>
+                    <button class="tab-btn" data-tab="history" onclick="switchManualImportTab('history')">导入历史</button>
+                </nav>
+                
+                <!-- 导入基金标签页 -->
+                <div class="tab-content active" id="tab-import">
+                    <div class="form-group">
+                        <label class="form-label">基金代码或名称</label>
+                        <div style="position: relative;">
+                            <input type="text" class="form-control" id="fund-search-input" 
+                                   placeholder="输入基金代码或名称" onkeyup="handleFundSearch(event)">
+                            <div id="fund-search-results" class="search-results" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; z-index: 1000;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">持有金额 (元)</label>
+                        <input type="number" class="form-control" id="holding-amount" 
+                               placeholder="输入持有金额" step="0.01" min="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">购买日期</label>
+                        <input type="date" class="form-control" id="buy-date" 
+                               value="{{ today | default('', true) }}">
+                    </div>
+                    
+                    <div id="fund-info" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;">
+                        <h4 style="margin-bottom: 10px;">基金信息</h4>
+                        <div id="fund-info-content"></div>
+                    </div>
+                </div>
+                
+                <!-- 导入历史标签页 -->
+                <div class="tab-content" id="tab-history">
+                    <div id="import-history-list" style="max-height: 300px; overflow-y: auto;">
+                        <!-- 动态生成导入历史 -->
+                        <div class="empty-state" style="text-align: center; padding: 40px 0; color: #6c757d;">
+                            <i class="bi bi-clock-history" style="font-size: 48px; margin-bottom: 15px;"></i>
+                            <p>暂无导入历史</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <footer class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeManualImportModal()">取消</button>
+                <button class="btn btn-primary" id="confirm-import-btn" onclick="confirmManualImport()" disabled>
+                    确认导入
+                </button>
+            </footer>
+        </div>
+    </div>
 
     <!-- JavaScript 模块 -->
     <script src="{{ url_for('static', filename='js/my-holdings/config.js') }}"></script>
