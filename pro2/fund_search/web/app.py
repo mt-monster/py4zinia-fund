@@ -910,6 +910,137 @@ def get_fund_info(fund_code):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/fund/search', methods=['GET'])
+def search_funds():
+    """搜索基金（支持代码和名称搜索）"""
+    try:
+        keyword = request.args.get('keyword', '').strip()
+        
+        if not keyword:
+            return jsonify({'success': False, 'error': '请输入搜索关键词'}), 400
+        
+        # 尝试从AKShare搜索基金
+        try:
+            import akshare as ak
+            
+            # 使用基金搜索功能
+            search_result = ak.fund_name_em()
+            
+            if search_result is not None and not search_result.empty:
+                # 确定基金名称列名
+                fund_name_col = '基金名称'
+                if '基金名称' not in search_result.columns:
+                    fund_name_col = '基金简称' if '基金简称' in search_result.columns else None
+                
+                if fund_name_col:
+                    # 过滤搜索结果
+                    filtered = search_result[
+                        (search_result['基金代码'].astype(str).str.contains(keyword)) |
+                        (search_result[fund_name_col].str.contains(keyword))
+                    ]
+                else:
+                    # 如果没有找到基金名称列，只按代码搜索
+                    filtered = search_result[
+                        search_result['基金代码'].astype(str).str.contains(keyword)
+                    ]
+                
+                if not filtered.empty:
+                    # 限制结果数量
+                    filtered = filtered.head(10)
+                    
+                    funds = []
+                    for _, row in filtered.iterrows():
+                        fund_code = str(row['基金代码'])
+                        # 使用检测到的列名获取基金名称
+                        fund_name = str(row[fund_name_col]) if fund_name_col else str(row.get('基金简称', fund_code))
+                        
+                        # 尝试获取基金类型和净值
+                        fund_type = None
+                        nav_value = None
+                        nav_date = None
+                        daily_change = None
+                        
+                        try:
+                            # 获取基金基本信息
+                            fund_info = ak.fund_open_fund_info_em(symbol=fund_code, indicator="基本信息")
+                            if fund_info is not None and not fund_info.empty:
+                                for _, info_row in fund_info.iterrows():
+                                    if info_row.get('项目') == '基金类型':
+                                        fund_type = str(info_row.get('数值', '')).strip()
+                                        break
+                            
+                            # 获取基金净值
+                            fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值")
+                            if fund_nav is not None and not fund_nav.empty:
+                                latest_nav = fund_nav.iloc[0]
+                                nav_value = float(latest_nav.get('数值', 0)) if pd.notna(latest_nav.get('数值')) else None
+                                nav_date = str(latest_nav.get('日期', '')) if pd.notna(latest_nav.get('日期')) else None
+                                
+                                # 计算日涨跌幅
+                                if len(fund_nav) > 1:
+                                    prev_nav = fund_nav.iloc[1]
+                                    if pd.notna(prev_nav.get('数值')) and nav_value:
+                                        prev_nav_value = float(prev_nav.get('数值'))
+                                        if prev_nav_value > 0:
+                                            daily_change = round(((nav_value - prev_nav_value) / prev_nav_value) * 100, 2)
+                        except Exception as e:
+                            logger.warning(f"获取基金 {fund_code} 详细信息失败: {str(e)}")
+                        
+                        funds.append({
+                            'fund_code': fund_code,
+                            'fund_name': fund_name,
+                            'fund_type': fund_type,
+                            'nav_value': nav_value,
+                            'nav_date': nav_date,
+                            'daily_change': daily_change
+                        })
+                    
+                    return jsonify({'success': True, 'data': funds})
+        except Exception as e:
+            logger.error(f"从AKShare搜索基金失败: {str(e)}")
+        
+        # 备用方案：从数据库搜索
+        try:
+            # 检查数据库管理器是否可用
+            if not hasattr(db_manager, 'execute_query'):
+                raise Exception("数据库管理器不可用")
+            
+            # 使用参数化查询避免SQL注入和格式问题
+            sql = """
+            SELECT fund_code, fund_name, fund_type
+            FROM fund_info
+            WHERE fund_code LIKE :keyword OR fund_name LIKE :keyword
+            LIMIT 10
+            """
+            
+            df = db_manager.execute_query(sql, {'keyword': f'%{keyword}%'})
+            
+            if not df.empty:
+                funds = []
+                for _, row in df.iterrows():
+                    funds.append({
+                        'fund_code': str(row['fund_code']),
+                        'fund_name': str(row['fund_name']),
+                        'fund_type': str(row['fund_type']) if pd.notna(row['fund_type']) else None
+                    })
+                
+                return jsonify({'success': True, 'data': funds})
+        except Exception as e:
+            error_msg = str(e)
+            # 检查是否是表不存在错误
+            if "Table" in error_msg and "doesn't exist" in error_msg:
+                logger.warning(f"数据库表不存在，跳过数据库搜索: {error_msg}")
+            else:
+                logger.error(f"从数据库搜索基金失败: {error_msg}")
+        
+        # 如果都失败，返回空结果
+        return jsonify({'success': True, 'data': []})
+        
+    except Exception as e:
+        logger.error(f"搜索基金失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/fund/<fund_code>/allocation', methods=['GET'])
 def get_fund_allocation(fund_code):
     """获取基金资产配置数据"""

@@ -281,6 +281,331 @@ function refreshData() { FundApp.refreshData(); }
 function handleSearchKeyup(event) { FundApp.handleSearchKeyup(event); }
 function handleModalBackdrop(event) { /* 已在bindEvents中处理 */ }
 
+/**
+ * 手工导入模块
+ */
+const FundManualImport = {
+    selectedFund: null,
+    importHistory: [],
+    
+    /**
+     * 打开手工导入模态框
+     */
+    openModal() {
+        const modal = document.getElementById('manual-import-modal');
+        if (modal) {
+            modal.classList.add('active');
+            this.resetForm();
+            this.loadImportHistory();
+        }
+    },
+    
+    /**
+     * 关闭手工导入模态框
+     */
+    closeModal() {
+        const modal = document.getElementById('manual-import-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+        this.resetForm();
+    },
+    
+    /**
+     * 重置表单
+     */
+    resetForm() {
+        document.getElementById('fund-search-input').value = '';
+        document.getElementById('holding-amount').value = '';
+        document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('fund-search-results').style.display = 'none';
+        document.getElementById('fund-info').style.display = 'none';
+        document.getElementById('confirm-import-btn').disabled = true;
+        this.selectedFund = null;
+    },
+    
+    /**
+     * 处理基金搜索
+     */
+    async handleSearch(event) {
+        const input = event.target;
+        const value = input.value.trim();
+        const resultsContainer = document.getElementById('fund-search-results');
+        
+        if (value.length < 1) {
+            resultsContainer.style.display = 'none';
+            return;
+        }
+        
+        try {
+            // 调用API搜索基金
+            const response = await fetch(`/api/fund/search?keyword=${encodeURIComponent(value)}`);
+            const data = await response.json();
+            
+            if (data.success && data.data.length > 0) {
+                resultsContainer.innerHTML = data.data.map(fund => `
+                    <div class="search-result-item" onclick="FundManualImport.selectFund(${JSON.stringify(fund).replace(/"/g, '&quot;')})" 
+                         style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee;">
+                        <div style="font-weight: 500;">${fund.fund_code} ${fund.fund_name}</div>
+                        <div style="font-size: 12px; color: #666;">${fund.fund_type || ''}</div>
+                    </div>
+                `).join('');
+                resultsContainer.style.display = 'block';
+            } else {
+                resultsContainer.innerHTML = '<div style="padding: 10px; color: #666;">未找到匹配的基金</div>';
+                resultsContainer.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('搜索基金失败:', error);
+            resultsContainer.innerHTML = '<div style="padding: 10px; color: #d9534f;">搜索失败，请重试</div>';
+            resultsContainer.style.display = 'block';
+        }
+    },
+    
+    /**
+     * 选择基金
+     */
+    selectFund(fund) {
+        this.selectedFund = fund;
+        document.getElementById('fund-search-input').value = `${fund.fund_code} ${fund.fund_name}`;
+        document.getElementById('fund-search-results').style.display = 'none';
+        
+        // 显示基金信息
+        const fundInfoContent = document.getElementById('fund-info-content');
+        fundInfoContent.innerHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>基金代码:</strong> ${fund.fund_code}</div>
+                <div><strong>基金名称:</strong> ${fund.fund_name}</div>
+                <div><strong>基金类型:</strong> ${fund.fund_type || '--'}</div>
+                <div><strong>最新净值:</strong> ${fund.nav_value ? `¥${fund.nav_value}` : '--'}</div>
+                <div><strong>净值日期:</strong> ${fund.nav_date || '--'}</div>
+                <div><strong>日涨跌幅:</strong> ${fund.daily_change ? `${fund.daily_change}%` : '--'}</div>
+            </div>
+        `;
+        document.getElementById('fund-info').style.display = 'block';
+        
+        // 启用确认导入按钮
+        document.getElementById('confirm-import-btn').disabled = false;
+    },
+    
+    /**
+     * 确认手工导入
+     */
+    async confirmImport() {
+        const holdingAmount = parseFloat(document.getElementById('holding-amount').value);
+        const buyDate = document.getElementById('buy-date').value;
+        
+        // 验证输入
+        if (!this.selectedFund) {
+            FundUtils.showNotification('请先选择基金', 'error');
+            return;
+        }
+        
+        if (isNaN(holdingAmount) || holdingAmount <= 0) {
+            FundUtils.showNotification('请输入有效的持有金额', 'error');
+            return;
+        }
+        
+        if (!buyDate) {
+            FundUtils.showNotification('请选择购买日期', 'error');
+            return;
+        }
+        
+        try {
+            // 准备导入数据
+            const fundData = {
+                fund_code: this.selectedFund.fund_code,
+                fund_name: this.selectedFund.fund_name,
+                holding_shares: holdingAmount / (this.selectedFund.nav_value || 1),
+                cost_price: this.selectedFund.nav_value || 1,
+                buy_date: buyDate,
+                confidence: 1.0
+            };
+            
+            // 调用API导入基金
+            const response = await fetch('/api/holdings/import/confirm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: 'default_user',
+                    funds: [fundData]
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // 记录导入历史
+                this.addToImportHistory({
+                    fund_code: this.selectedFund.fund_code,
+                    fund_name: this.selectedFund.fund_name,
+                    holding_amount: holdingAmount,
+                    buy_date: buyDate,
+                    import_date: new Date().toISOString(),
+                    status: 'success'
+                });
+                
+                FundUtils.showNotification(`成功导入基金: ${this.selectedFund.fund_name}`, 'success');
+                
+                // 关闭模态框并刷新数据
+                this.closeModal();
+                await FundApp.refreshData();
+            } else {
+                // 记录导入失败历史
+                this.addToImportHistory({
+                    fund_code: this.selectedFund.fund_code,
+                    fund_name: this.selectedFund.fund_name,
+                    holding_amount: holdingAmount,
+                    buy_date: buyDate,
+                    import_date: new Date().toISOString(),
+                    status: 'failed',
+                    error: data.error
+                });
+                
+                FundUtils.showNotification('导入失败: ' + (data.error || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('导入基金失败:', error);
+            
+            // 记录导入失败历史
+            this.addToImportHistory({
+                fund_code: this.selectedFund.fund_code,
+                fund_name: this.selectedFund.fund_name,
+                holding_amount: holdingAmount,
+                buy_date: buyDate,
+                import_date: new Date().toISOString(),
+                status: 'failed',
+                error: '网络错误'
+            });
+            
+            FundUtils.showNotification('导入失败: 网络错误', 'error');
+        }
+    },
+    
+    /**
+     * 加载导入历史
+     */
+    loadImportHistory() {
+        const history = FundUtils.getStorage('fund_import_history') || [];
+        this.importHistory = history;
+        this.renderImportHistory();
+    },
+    
+    /**
+     * 添加到导入历史
+     */
+    addToImportHistory(record) {
+        this.importHistory.unshift(record);
+        // 只保留最近20条历史记录
+        if (this.importHistory.length > 20) {
+            this.importHistory = this.importHistory.slice(0, 20);
+        }
+        FundUtils.setStorage('fund_import_history', this.importHistory);
+        this.renderImportHistory();
+    },
+    
+    /**
+     * 渲染导入历史
+     */
+    renderImportHistory() {
+        const historyList = document.getElementById('import-history-list');
+        
+        if (this.importHistory.length === 0) {
+            historyList.innerHTML = `
+                <div class="empty-state" style="text-align: center; padding: 40px 0; color: #6c757d;">
+                    <i class="bi bi-clock-history" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <p>暂无导入历史</p>
+                </div>
+            `;
+            return;
+        }
+        
+        historyList.innerHTML = this.importHistory.map(record => `
+            <div style="padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 500;">${record.fund_code} ${record.fund_name}</div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                        持有金额: ¥${record.holding_amount.toFixed(2)} | 购买日期: ${record.buy_date}
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-top: 2px;">
+                        导入时间: ${new Date(record.import_date).toLocaleString()}
+                    </div>
+                </div>
+                <div style="padding: 4px 8px; border-radius: 4px; font-size: 12px;
+                     background: ${record.status === 'success' ? '#d4edda' : '#f8d7da'};
+                     color: ${record.status === 'success' ? '#155724' : '#721c24'};">
+                    ${record.status === 'success' ? '成功' : '失败'}
+                </div>
+            </div>
+        `).join('');
+    }
+};
+
+/**
+ * 切换手工导入标签页
+ */
+function switchManualImportTab(tabName) {
+    // 切换标签按钮状态
+    const tabButtons = document.querySelectorAll('[data-tab]');
+    tabButtons.forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // 切换内容
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    
+    // 如果切换到历史标签，重新加载历史
+    if (tabName === 'history') {
+        FundManualImport.loadImportHistory();
+    }
+}
+
+/**
+ * 处理基金搜索输入 - 添加防抖以防止重复搜索
+ * 3秒防抖，显著减少不必要的API调用
+ */
+let searchTimeout;
+function handleFundSearch(event) {
+    // 清除之前的定时器
+    clearTimeout(searchTimeout);
+    
+    // 设置新的定时器，3秒后执行搜索
+    searchTimeout = setTimeout(() => {
+        FundManualImport.handleSearch(event);
+    }, 3000);
+}
+
+/**
+ * 确认手工导入
+ */
+function confirmManualImport() {
+    FundManualImport.confirmImport();
+}
+
+/**
+ * 打开手工导入模态框
+ */
+function openManualImportModal() {
+    FundManualImport.openModal();
+}
+
+/**
+ * 关闭手工导入模态框
+ */
+function closeManualImportModal() {
+    FundManualImport.closeModal();
+}
+
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', () => {
     FundApp.init();
