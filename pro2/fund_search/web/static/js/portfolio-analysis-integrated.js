@@ -22,7 +22,10 @@ const PortfolioAnalysis = {
         // 添加分析按钮事件
         const analyzeBtn = document.getElementById('portfolio-analyze-btn');
         if (analyzeBtn) {
-            analyzeBtn.addEventListener('click', () => this.showAnalysis());
+            analyzeBtn.addEventListener('click', () => this.showAnalysis().catch(error => {
+                console.error('分析过程中出错:', error);
+                alert('分析失败: ' + error.message);
+            }));
         }
         
         // 监听回测周期变化
@@ -31,7 +34,9 @@ const PortfolioAnalysis = {
             periodSelect.addEventListener('change', () => {
                 // 如果已经显示了分析结果，则自动更新
                 if (document.getElementById('portfolio-analysis-result')) {
-                    this.showAnalysis();
+                    this.showAnalysis().catch(error => {
+                        console.error('自动更新分析失败:', error);
+                    });
                 }
             });
         }
@@ -55,7 +60,9 @@ const PortfolioAnalysis = {
                     if (document.getElementById('portfolio-analysis-result')) {
                         // 稍微延迟以确保DOM完全更新
                         setTimeout(() => {
-                            this.showAnalysis();
+                            this.showAnalysis().catch(error => {
+                                console.error('DOM变化触发的分析更新失败:', error);
+                            });
                         }, 100);
                         break;
                     }
@@ -75,7 +82,7 @@ const PortfolioAnalysis = {
     /**
      * 分析回测结果并显示分析
      */
-    showAnalysis() {
+    async showAnalysis() {
         // 从现有回测结果中提取数据
         const backtestData = this.extractBacktestData();
         if (!backtestData) {
@@ -86,8 +93,8 @@ const PortfolioAnalysis = {
         // 计算绩效指标
         const metrics = this.calculateMetrics(backtestData);
         
-        // 生成净值数据
-        const navData = this.generateNavData(backtestData);
+        // 生成净值数据（等待异步操作完成）
+        const navData = await this.generateNavData(backtestData);
         
         // 渲染分析结果
         this.renderAnalysis(metrics, navData);

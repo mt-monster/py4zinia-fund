@@ -151,6 +151,10 @@ def portfolio_analysis():
 def strategy_test():
     return render_template('strategy_test.html')
 
+@app.route('/chart_debug')
+def chart_debug():
+    return render_template('chart_debug.html')
+
 
 
 # ==================== API 路由 ====================

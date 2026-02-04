@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>净值曲线图表测试</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .chart-container { 
+            border: 1px solid #ccc; 
+            margin: 20px 0; 
+            padding: 10px;
+        }
+        canvas { border: 1px solid #eee; }
+        .controls { margin: 20px 0; }
+        .status { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <h1>净值曲线图表测试</h1>
+    
+    <div class="controls">
+        <button onclick="testChartData()">1. 测试数据获取</button>
+        <button onclick="testChartRender()">2. 测试图表渲染</button>
+        <button onclick="testFullFlow()">3. 测试完整流程</button>
+        <button onclick="clearAll()">清除</button>
+    </div>
+    
+    <div id="status" class="status">准备就绪</div>
+    
+    <div class="chart-container">
+        <h3>净值曲线对比</h3>
+        <canvas id="portfolio-nav-chart" width="800" height="300"></canvas>
+        <div class="chart-legend">
+            <span style="color: #007bff;">● 组合净值</span>
+            <span style="color: #dc3545; margin-left: 20px;">● 沪深300基准</span>
+        </div>
+    </div>
+    
+    <div id="data-display"></div>
+
+    <script>
+        let testData = null;
+        
+        function updateStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = isError ? 'status error' : 'status success';
+            console.log(message);
+        }
+        
+        async function testChartData() {
+            try {
+                updateStatus('正在获取测试数据...');
+                
+                // 模拟获取真实数据的API调用
+                const response = await fetch('/api/dashboard/profit-trend?days=30&fund_codes=000001&weights=1.0');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    testData = {
+                        labels: result.data.labels,
+                        profit: result.data.profit,
+                        benchmark: result.data.benchmark
+                    };
+                    
+                    // 转换为图表需要的格式
+                    const navData = [];
+                    for (let i = 0; i < testData.labels.length; i++) {
+                        navData.push({
+                            date: testData.labels[i],
+                            portfolio: testData.profit[i],
+                            benchmark: testData.benchmark[i]
+                        });
+                    }
+                    
+                    testData.navData = navData;
+                    
+                    updateStatus(`成功获取 ${navData.length} 个数据点`);
+                    
+                    // 显示数据摘要
+                    const dataDisplay = document.getElementById('data-display');
+                    dataDisplay.innerHTML = `
+                        <h4>数据摘要:</h4>
+                        <p><strong>数据点数量:</strong> ${navData.length}</p>
+                        <p><strong>组合净值范围:</strong> ¥${Math.min(...testData.profit).toFixed(2)} - ¥${Math.max(...testData.profit).toFixed(2)}</p>
+                        <p><strong>基准净值范围:</strong> ¥${Math.min(...testData.benchmark).toFixed(2)} - ¥${Math.max(...testData.benchmark).toFixed(2)}</p>
+                        <p><strong>数据来源:</strong> ${result.data.data_source || 'unknown'}</p>
+                    `;
+                } else {
+                    throw new Error(result.error || 'API返回失败');
+                }
+                
+            } catch (error) {
+                updateStatus(`数据获取失败: ${error.message}`, true);
+                console.error('数据获取错误:', error);
+            }
+        }
+        
+        function testChartRender() {
+            if (!testData || !testData.navData) {
+                updateStatus('请先获取测试数据', true);
+                return;
+            }
+            
+            try {
+                updateStatus('正在渲染图表...');
+                drawNavChart(testData.navData);
+                updateStatus('图表渲染完成');
+            } catch (error) {
+                updateStatus(`图表渲染失败: ${error.message}`, true);
+                console.error('图表渲染错误:', error);
+            }
+        }
+        
+        async function testFullFlow() {
+            await testChartData();
+            if (testData && testData.navData) {
+                setTimeout(() => testChartRender(), 100);
+            }
+        }
+        
+        function clearAll() {
+            document.getElementById('status').textContent = '准备就绪';
+            document.getElementById('status').className = 'status';
+            document.getElementById('data-display').innerHTML = '';
+            testData = null;
+            
+            // 清除画布
+            const canvas = document.getElementById('portfolio-nav-chart');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        // 图表绘制函数（从原始代码复制并简化）
+        function drawNavChart(data) {
+            const canvas = document.getElementById('portfolio-nav-chart');
+            if (!canvas) {
+                throw new Error('找不到图表容器');
+            }
+
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            const margin = { top: 20, right: 20, bottom: 40, left: 60 };
+            const chartWidth = width - margin.left - margin.right;
+            const chartHeight = height - margin.top - margin.bottom;
+
+            // 清除画布
+            ctx.clearRect(0, 0, width, height);
+
+            // 计算数据范围
+            const allValues = [...data.map(d => d.portfolio), ...data.map(d => d.benchmark)];
+            const minValue = Math.min(...allValues);
+            const maxValue = Math.max(...allValues);
+            const valueRange = maxValue - minValue;
+            const padding = valueRange * 0.1;
+
+            // 绘制坐标轴
+            drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue - padding, maxValue + padding);
+
+            // 绘制净值曲线
+            drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#007bff');
+            drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#dc3545');
+        }
+
+        function drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue) {
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+
+            // X轴
+            ctx.beginPath();
+            ctx.moveTo(margin.left, margin.top + chartHeight);
+            ctx.lineTo(margin.left + chartWidth, margin.top + chartHeight);
+            ctx.stroke();
+
+            // Y轴
+            ctx.beginPath();
+            ctx.moveTo(margin.left, margin.top);
+            ctx.lineTo(margin.left, margin.top + chartHeight);
+            ctx.stroke();
+
+            // 网格线和标签
+            ctx.strokeStyle = '#e0e0e0';
+            for (let i = 0; i <= 5; i++) {
+                const y = margin.top + (chartHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(margin.left, y);
+                ctx.lineTo(margin.left + chartWidth, y);
+                ctx.stroke();
+
+                // Y轴标签
+                const value = maxValue - (maxValue - minValue) * (i / 5);
+                ctx.fillStyle = '#666';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText('¥' + value.toFixed(0), margin.left - 10, y + 4);
+            }
+
+            // X轴标签
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('回测期', margin.left + chartWidth / 2, margin.top + chartHeight + 30);
+        }
+
+        function drawLine(ctx, margin, chartWidth, chartHeight, data, field, minValue, maxValue, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            data.forEach((point, index) => {
+                const x = margin.left + (chartWidth / (data.length - 1)) * index;
+                const y = margin.top + chartHeight - ((point[field] - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
