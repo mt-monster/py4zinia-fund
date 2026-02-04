@@ -43,17 +43,26 @@ class EnhancedFundData:
     }
     
     @staticmethod
-    def is_qdii_fund(fund_code: str) -> bool:
+    def is_qdii_fund(fund_code: str, fund_name: str = None) -> bool:
         """
         判断是否为QDII基金
         
         参数：
         fund_code: 基金代码
+        fund_name: 基金名称（可选）
         
         返回：
         bool: 是否为QDII基金
         """
-        return fund_code in EnhancedFundData.QDII_FUND_CODES
+        # 检查基金代码是否在预定义列表中
+        if fund_code in EnhancedFundData.QDII_FUND_CODES:
+            return True
+        
+        # 检查基金名称是否包含QDII关键词
+        if fund_name and 'QDII' in fund_name:
+            return True
+        
+        return False
     
     @staticmethod
     def get_sina_realtime_estimation(fund_code: str) -> Optional[Dict]:
@@ -77,15 +86,33 @@ class EnhancedFundData:
             today_response = requests.get(today_url, headers=header, timeout=10)
             
             # 解析JSONP响应
-            today_str = re.split("[()]", today_response.text)[1]
+            parts = re.split("[()]", today_response.text)
+            if len(parts) < 2:
+                logger.debug(f"基金 {fund_code} 新浪接口返回格式异常: {today_response.text[:200]}")
+                return None
+            
+            today_str = parts[1]
+            
+            # 检查是否为null值
+            if today_str.strip() == 'null':
+                logger.debug(f"基金 {fund_code} 新浪接口返回null值")
+                return None
+            
             today_dict_one = ast.literal_eval(today_str)
             
             # 解析分钟级数据
+            if 'detail' not in today_dict_one:
+                logger.debug(f"基金 {fund_code} 新浪接口返回数据缺少detail字段")
+                return None
+                
             minute_list_strs = today_dict_one['detail'].split(',')
             minute_data = {}
             for i in range(0, len(minute_list_strs), 2):
                 if i+1 < len(minute_list_strs):
-                    minute_data[minute_list_strs[i]] = float(minute_list_strs[i+1])
+                    try:
+                        minute_data[minute_list_strs[i]] = float(minute_list_strs[i+1])
+                    except (ValueError, IndexError):
+                        continue  # 跳过无效数据
             
             # 获取最新估算值
             latest_estimate = list(minute_data.values())[-1] if minute_data else None
@@ -196,12 +223,13 @@ class EnhancedFundData:
             return None
     
     @staticmethod
-    def get_realtime_data(fund_code: str) -> Dict:
+    def get_realtime_data(fund_code: str, fund_name: str = None) -> Dict:
         """
         获取基金实时数据
         
         参数：
         fund_code: 基金代码（6位数字）
+        fund_name: 基金名称（可选）
         
         返回：
         dict: 基金实时数据
@@ -212,7 +240,7 @@ class EnhancedFundData:
           如果当日数据没有，顺推使用前一天的数据
         """
         # 判断是否为QDII基金
-        is_qdii = EnhancedFundData.is_qdii_fund(fund_code)
+        is_qdii = EnhancedFundData.is_qdii_fund(fund_code, fund_name)
         
         if is_qdii:
             # QDII基金：仅使用AKShare接口
@@ -225,7 +253,7 @@ class EnhancedFundData:
     @staticmethod
     def _get_qdii_realtime_data(fund_code: str) -> Dict:
         """
-        获取QDII基金实时数据（仅使用AKShare接口）
+        获取QDII基金实时数据
         
         参数：
         fund_code: 基金代码
@@ -234,15 +262,36 @@ class EnhancedFundData:
         dict: 基金实时数据
         
         逻辑：
+        - 优先使用AKShare接口获取数据
+        - 如果AKShare失败，尝试从数据库获取历史数据
         - 如果当日盈亏算不到，就用昨日的
         - 昨日盈亏用前天的，这样顺推一天的数据来计算
+        - 当所有数据源失败时，返回合理的默认值
         """
         try:
             # 从AKShare获取历史净值数据
             fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
             
             if fund_nav.empty:
-                raise ValueError(f"AKShare接口未返回基金 {fund_code} 的净值数据")
+                logger.warning(f"AKShare接口未返回基金 {fund_code} 的净值数据，尝试从数据库获取")
+                # 尝试从数据库获取历史数据
+                db_data = EnhancedFundData._get_historical_data_from_db(fund_code)
+                if db_data:
+                    return db_data
+                # 如果数据库也没有数据，返回默认值
+                return {
+                    'fund_code': fund_code,
+                    'current_nav': 0.0,
+                    'previous_nav': 0.0,
+                    'daily_return': 0.0,
+                    'today_return': 0.0,
+                    'yesterday_return': 0.0,
+                    'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                    'estimate_nav': 0.0,
+                    'estimate_return': 0.0,
+                    'data_source': 'akshare_qdii_error',
+                    'estimate_time': ''
+                }
             
             # 按日期排序
             fund_nav = fund_nav.sort_values('净值日期', ascending=True)
@@ -261,7 +310,7 @@ class EnhancedFundData:
             
             # 获取当日盈亏率（从最新一条数据的日增长率获取）
             # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
-            daily_return_raw = latest_data.get('日增长率', 0)
+            daily_return_raw = latest_data.get('日增长率', None)
             if pd.notna(daily_return_raw):
                 daily_return = float(daily_return_raw)
                 # 判断格式：如果绝对值 < 0.1，说明是小数格式，需要乘100
@@ -269,7 +318,13 @@ class EnhancedFundData:
                     daily_return = daily_return * 100
                 daily_return = round(daily_return, 2)
             else:
-                daily_return = 0.0
+                # 如果日增长率字段不存在或为NaN，通过计算当前净值和前一日净值的差值来得到日涨跌幅数据
+                if previous_nav != 0:
+                    daily_return = (current_nav - previous_nav) / previous_nav * 100
+                else:
+                    daily_return = 0.0
+                daily_return = round(daily_return, 2)
+                logger.info(f"QDII基金 {fund_code} 通过净值计算日涨跌幅: {daily_return}%")
 
             # 获取昨日盈亏率（从前一条数据的日增长率获取）
             # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
@@ -305,12 +360,114 @@ class EnhancedFundData:
         except Exception as e:
             error_msg = str(e)
             logger.error(f"获取QDII基金 {fund_code} 数据失败: {error_msg}")
-            raise RuntimeError(f"无法获取QDII基金 {fund_code} 的数据: {error_msg}")
+            
+            # 检查是否是AKShare返回错误页面
+            if "SyntaxError" in error_msg and "<!doctype html>" in error_msg:
+                logger.warning(f"AKShare返回错误页面，基金 {fund_code} 尝试从数据库获取")
+            
+            # 尝试从数据库获取历史数据
+            try:
+                db_data = EnhancedFundData._get_historical_data_from_db(fund_code)
+                if db_data:
+                    return db_data
+            except Exception as db_e:
+                logger.error(f"从数据库获取QDII基金 {fund_code} 历史数据失败: {str(db_e)}")
+                
+            # 如果所有数据源都失败，返回合理的默认值
+            return {
+                'fund_code': fund_code,
+                'current_nav': 0.0,
+                'previous_nav': 0.0,
+                'daily_return': 0.0,
+                'today_return': 0.0,
+                'yesterday_return': 0.0,
+                'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                'estimate_nav': 0.0,
+                'estimate_return': 0.0,
+                'data_source': 'akshare_qdii_error',
+                'estimate_time': ''
+            }
+    
+    @staticmethod
+    def _get_historical_data_from_db(fund_code: str) -> Dict:
+        """
+        从数据库获取历史基金数据作为备用
+        
+        参数：
+        fund_code: 基金代码
+        
+        返回：
+        dict: 基金历史数据，如果没有数据返回None
+        """
+        try:
+            # 尝试导入数据库模块
+            try:
+                from .enhanced_database import EnhancedDatabaseManager
+            except ImportError:
+                from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            
+            # 数据库配置
+            db_config = {
+                'user': 'root',
+                'password': 'root',
+                'host': 'localhost',
+                'port': 3306,
+                'database': 'fund_analysis',
+                'charset': 'utf8mb4'
+            }
+            
+            db_manager = EnhancedDatabaseManager(db_config)
+            
+            # 查询最新的基金分析结果
+            sql = """
+            SELECT current_estimate as current_nav, 
+                   yesterday_nav as previous_nav, 
+                   today_return, 
+                   prev_day_return as yesterday_return,
+                   analysis_date as nav_date
+            FROM fund_analysis_results
+            WHERE fund_code = :fund_code
+            ORDER BY analysis_date DESC
+            LIMIT 1
+            """
+            
+            df = db_manager.execute_query(sql, {'fund_code': fund_code})
+            
+            if not df.empty:
+                row = df.iloc[0]
+                current_nav = float(row.get('current_nav', 0))
+                previous_nav = float(row.get('previous_nav', 0))
+                today_return = float(row.get('today_return', 0))
+                yesterday_return = float(row.get('yesterday_return', 0))
+                nav_date = str(row.get('nav_date', datetime.now().strftime('%Y-%m-%d')))
+                
+                logger.info(f"从数据库获取QDII基金 {fund_code} 历史数据: 当日净值={current_nav}, 当日盈亏={today_return}%, 昨日盈亏={yesterday_return}%")
+                
+                return {
+                    'fund_code': fund_code,
+                    'current_nav': current_nav,
+                    'previous_nav': previous_nav,
+                    'daily_return': today_return,
+                    'today_return': today_return,
+                    'yesterday_return': yesterday_return,
+                    'nav_date': nav_date,
+                    'estimate_nav': current_nav,
+                    'estimate_return': today_return,
+                    'data_source': 'database_backup',
+                    'estimate_time': ''
+                }
+            
+            logger.warning(f"数据库中未找到基金 {fund_code} 的历史数据")
+            return None
+            
+        except Exception as e:
+            logger.error(f"从数据库获取QDII基金 {fund_code} 历史数据失败: {str(e)}")
+            return None
     
     @staticmethod
     def _get_normal_fund_realtime_data(fund_code: str) -> Dict:
         """
-        获取普通基金实时数据（使用新浪财经实时估算）
+        获取普通基金实时数据（优先使用新浪财经实时估算，失败时使用AKShare历史数据作为备选）
         
         参数：
         fund_code: 基金代码
@@ -322,79 +479,209 @@ class EnhancedFundData:
             # 从新浪财经获取实时估算
             sina_data = EnhancedFundData.get_sina_realtime_estimation(fund_code)
             
-            if not sina_data or sina_data['estimate_nav'] is None:
-                raise ValueError(f"新浪财经接口未返回基金 {fund_code} 的实时估算数据")
-            
-            # 成功从新浪获取实时数据
-            sina_previous_nav = sina_data['previous_nav']
-            estimate_nav = sina_data['estimate_nav']
-            
-            # 计算实时日涨跌幅
-            if sina_previous_nav != 0:
-                daily_return = (estimate_nav - sina_previous_nav) / sina_previous_nav * 100
-            else:
-                daily_return = 0.0
-            
-            logger.info(f"基金 {fund_code} 使用新浪实时数据: {estimate_nav}, 涨跌幅: {daily_return:.2f}%")
-            
-            # 从AKShare获取昨日盈亏率和其他补充数据
-            try:
-                fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
-                if not fund_nav.empty:
-                    fund_nav = fund_nav.sort_values('净值日期', ascending=True)
-                    latest_data = fund_nav.iloc[-1]
-                    nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
-                    current_nav = float(latest_data.get('单位净值', sina_previous_nav))
-                    
-                    # 获取昨日净值（前一日的单位净值）
-                    if len(fund_nav) > 1:
-                        previous_data = fund_nav.iloc[-2]
-                        previous_nav = float(previous_data.get('单位净值', sina_previous_nav))
-                    else:
-                        previous_nav = sina_previous_nav
-                    
-                    # 获取昨日盈亏率（直接从最新一条数据的日增长率获取）
-                    # 注意：akshare返回的日增长率已经是百分数格式（如-0.94），不需要再乘以100
-                    yesterday_return_raw = latest_data.get('日增长率', 0)
-                    if pd.notna(yesterday_return_raw):
-                        yesterday_return = float(yesterday_return_raw)
-                        # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
-                        if abs(yesterday_return) < 0.1:
-                            yesterday_return = yesterday_return * 100
-                        yesterday_return = round(yesterday_return, 2)
-                    else:
-                        yesterday_return = 0.0
+            if sina_data and sina_data['estimate_nav'] is not None:
+                # 成功从新浪获取实时数据
+                sina_previous_nav = sina_data['previous_nav']
+                estimate_nav = sina_data['estimate_nav']
+                
+                # 计算实时日涨跌幅
+                if sina_previous_nav != 0:
+                    daily_return = (estimate_nav - sina_previous_nav) / sina_previous_nav * 100
                 else:
-                    # AKShare数据为空，使用新浪数据作为默认值
+                    daily_return = 0.0
+                
+                logger.info(f"基金 {fund_code} 使用新浪实时数据: {estimate_nav}, 涨跌幅: {daily_return:.2f}%")
+                
+                # 从AKShare获取昨日盈亏率和其他补充数据
+                try:
+                    fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+                    if not fund_nav.empty:
+                        fund_nav = fund_nav.sort_values('净值日期', ascending=True)
+                        latest_data = fund_nav.iloc[-1]
+                        nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
+                        current_nav = float(latest_data.get('单位净值', sina_previous_nav))
+                        
+                        # 获取昨日净值（前一日的单位净值）
+                        if len(fund_nav) > 1:
+                            previous_data = fund_nav.iloc[-2]
+                            previous_nav = float(previous_data.get('单位净值', sina_previous_nav))
+                        else:
+                            previous_nav = sina_previous_nav
+                        
+                        # 获取昨日盈亏率（直接从最新一条数据的日增长率获取）
+                        # 注意：akshare返回的日增长率已经是百分数格式（如-0.94），不需要再乘以100
+                        yesterday_return_raw = latest_data.get('日增长率', 0)
+                        if pd.notna(yesterday_return_raw):
+                            yesterday_return = float(yesterday_return_raw)
+                            # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
+                            if abs(yesterday_return) < 0.1:
+                                yesterday_return = yesterday_return * 100
+                            yesterday_return = round(yesterday_return, 2)
+                        else:
+                            yesterday_return = 0.0
+                    else:
+                        # AKShare数据为空，使用新浪数据作为默认值
+                        nav_date = datetime.now().strftime('%Y-%m-%d')
+                        current_nav = sina_previous_nav
+                        previous_nav = sina_previous_nav
+                        yesterday_return = 0.0
+                except Exception as e:
+                    logger.warning(f"获取基金 {fund_code} AKShare补充数据失败: {e}，使用新浪数据")
                     nav_date = datetime.now().strftime('%Y-%m-%d')
                     current_nav = sina_previous_nav
                     previous_nav = sina_previous_nav
                     yesterday_return = 0.0
-            except Exception as e:
-                logger.warning(f"获取基金 {fund_code} AKShare补充数据失败: {e}，使用新浪数据")
-                nav_date = datetime.now().strftime('%Y-%m-%d')
-                current_nav = sina_previous_nav
-                previous_nav = sina_previous_nav
-                yesterday_return = 0.0
-            
-            return {
-                'fund_code': fund_code,
-                'current_nav': current_nav,
-                'previous_nav': previous_nav,
-                'daily_return': round(daily_return, 2),
-                'today_return': round(daily_return, 2),  # 添加别名，与 enhanced_main.py 保持一致
-                'yesterday_return': yesterday_return,
-                'nav_date': nav_date,
-                'estimate_nav': estimate_nav,
-                'estimate_return': round(daily_return, 2),
-                'data_source': 'sina_realtime',
-                'estimate_time': sina_data.get('estimate_time', '')
-            }
-            
+                
+                return {
+                    'fund_code': fund_code,
+                    'current_nav': current_nav,
+                    'previous_nav': previous_nav,
+                    'daily_return': round(daily_return, 2),
+                    'today_return': round(daily_return, 2),  # 添加别名，与 enhanced_main.py 保持一致
+                    'yesterday_return': yesterday_return,
+                    'nav_date': nav_date,
+                    'estimate_nav': estimate_nav,
+                    'estimate_return': round(daily_return, 2),
+                    'data_source': 'sina_realtime',
+                    'estimate_time': sina_data.get('estimate_time', '')
+                }
+            else:
+                logger.warning(f"新浪财经接口未返回基金 {fund_code} 的实时估算数据，尝试使用AKShare历史数据")
+                
+                # 从AKShare获取历史净值数据作为备选方案
+                fund_nav = ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势")
+                
+                try:
+                    if fund_nav.empty:
+                        logger.warning(f"AKShare接口未返回基金 {fund_code} 的净值数据，尝试从数据库获取")
+                        # 尝试从数据库获取历史数据
+                        db_data = EnhancedFundData._get_historical_data_from_db(fund_code)
+                        if db_data:
+                            logger.info(f"基金 {fund_code} 使用数据库历史数据")
+                            return db_data
+                        # 如果数据库也没有数据，返回默认值
+                        return {
+                            'fund_code': fund_code,
+                            'current_nav': 0.0,
+                            'previous_nav': 0.0,
+                            'daily_return': 0.0,
+                            'today_return': 0.0,
+                            'yesterday_return': 0.0,
+                            'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                            'estimate_nav': 0.0,
+                            'estimate_return': 0.0,
+                            'data_source': 'akshare_normal_error',
+                            'estimate_time': ''
+                        }
+                    
+                    # 对AKShare返回的数据进行处理
+                    fund_nav = fund_nav.sort_values('净值日期', ascending=True)
+                    
+                    # 获取最新的净值数据
+                    latest_data = fund_nav.iloc[-1]
+                    current_nav = float(latest_data.get('单位净值', 0))
+                    nav_date = str(latest_data.get('净值日期', datetime.now().strftime('%Y-%m-%d')))
+                    
+                    # 获取前一日净值（如果有多个记录的话）
+                    if len(fund_nav) > 1:
+                        previous_data = fund_nav.iloc[-2]
+                        previous_nav = float(previous_data.get('单位净值', current_nav))
+                    else:
+                        previous_nav = current_nav
+                    
+                    # 获取日增长率
+                    daily_return_raw = latest_data.get('日增长率', 0)
+                    if pd.notna(daily_return_raw):
+                        daily_return = float(daily_return_raw)
+                        # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
+                        if abs(daily_return) < 0.1:
+                            daily_return = daily_return * 100
+                        daily_return = round(daily_return, 2)
+                    else:
+                        # 如果日增长率为空，通过计算当前净值和前一日净值的差值得到
+                        if previous_nav != 0 and previous_nav != current_nav:
+                            daily_return = (current_nav - previous_nav) / previous_nav * 100
+                            daily_return = round(daily_return, 2)
+                        else:
+                            daily_return = 0.0
+                    
+                    # 获取昨日盈亏率（倒数第二个记录的日增长率，如果存在）
+                    yesterday_return = 0.0
+                    if len(fund_nav) > 1:
+                        second_latest_data = fund_nav.iloc[-2]
+                        yesterday_return_raw = second_latest_data.get('日增长率', 0)
+                        if pd.notna(yesterday_return_raw):
+                            yesterday_return = float(yesterday_return_raw)
+                            # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
+                            if abs(yesterday_return) < 0.1:
+                                yesterday_return = yesterday_return * 100
+                            yesterday_return = round(yesterday_return, 2)
+                except Exception as akshare_e:
+                    logger.warning(f"AKShare接口异常，基金 {fund_code} 尝试从数据库获取: {akshare_e}")
+                    # 尝试从数据库获取历史数据
+                    db_data = EnhancedFundData._get_historical_data_from_db(fund_code)
+                    if db_data:
+                        logger.info(f"基金 {fund_code} 使用数据库历史数据")
+                        return db_data
+                    # 如果数据库也没有数据，返回默认值
+                    return {
+                        'fund_code': fund_code,
+                        'current_nav': 0.0,
+                        'previous_nav': 0.0,
+                        'daily_return': 0.0,
+                        'today_return': 0.0,
+                        'yesterday_return': 0.0,
+                        'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                        'estimate_nav': 0.0,
+                        'estimate_return': 0.0,
+                        'data_source': 'akshare_exception',
+                        'estimate_time': ''
+                    }
+                
+                logger.info(f"基金 {fund_code} 使用AKShare历史数据: 当前净值={current_nav}, 涨跌幅={daily_return:.2f}%")
+                
+                return {
+                    'fund_code': fund_code,
+                    'current_nav': current_nav,
+                    'previous_nav': previous_nav,
+                    'daily_return': daily_return,
+                    'today_return': daily_return,  # 添加别名，与 enhanced_main.py 保持一致
+                    'yesterday_return': yesterday_return,
+                    'nav_date': nav_date,
+                    'estimate_nav': current_nav,  # 使用当前净值作为估算净值
+                    'estimate_return': daily_return,  # 使用当前日涨跌幅作为估算收益率
+                    'data_source': 'akshare_history',
+                    'estimate_time': ''
+                }
+                
         except Exception as e:
             error_msg = str(e)
             logger.error(f"获取基金 {fund_code} 实时数据失败: {error_msg}")
-            raise RuntimeError(f"无法获取基金 {fund_code} 的实时数据: {error_msg}")
+            
+            # 再次尝试从数据库获取历史数据
+            try:
+                db_data = EnhancedFundData._get_historical_data_from_db(fund_code)
+                if db_data:
+                    logger.info(f"基金 {fund_code} 使用数据库历史数据作为最终备选")
+                    return db_data
+            except Exception as db_e:
+                logger.error(f"从数据库获取基金 {fund_code} 历史数据也失败: {db_e}")
+            
+            # 如果所有方法都失败，返回基本的错误数据结构而不是抛出异常
+            # 这样前端可以处理无数据的情况而不至于崩溃
+            return {
+                'fund_code': fund_code,
+                'current_nav': 0.0,
+                'previous_nav': 0.0,
+                'daily_return': 0.0,
+                'today_return': 0.0,
+                'yesterday_return': 0.0,
+                'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                'estimate_nav': 0.0,
+                'estimate_return': 0.0,
+                'data_source': 'all_sources_failed',
+                'estimate_time': ''
+            }
     
     @staticmethod
     def get_historical_data(fund_code: str, days: int = 365) -> pd.DataFrame:
@@ -655,7 +942,7 @@ class EnhancedFundData:
                 basic_info = EnhancedFundData.get_fund_basic_info(fund_code)
                 
                 # 获取实时数据
-                realtime_data = EnhancedFundData.get_realtime_data(fund_code)
+                realtime_data = EnhancedFundData.get_realtime_data(fund_code, basic_info['fund_name'])
                 
                 # 获取绩效指标
                 performance_metrics = EnhancedFundData.get_performance_metrics(fund_code)

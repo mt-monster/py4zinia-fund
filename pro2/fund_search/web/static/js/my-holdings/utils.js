@@ -6,8 +6,9 @@ const FundUtils = {
      * 格式化百分比
      */
     formatPercent(value, decimals = 2) {
-        if (value === null || value === undefined || isNaN(value)) return '--';
+        if (value === null || value === undefined) return '--';
         const num = parseFloat(value);
+        if (isNaN(num)) return '--';
         const sign = num > 0 ? '+' : '';
         return `${sign}${num.toFixed(decimals)}%`;
     },
