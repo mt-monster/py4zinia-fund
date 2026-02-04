@@ -141,6 +141,11 @@ def fund_analysis(fund_code):
     """基金深度分析页"""
     return render_template('fund_analysis.html', fund_code=fund_code)
 
+@app.route('/portfolio-analysis')
+def portfolio_analysis():
+    """投资组合分析页面 - 展示净值曲线和绩效指标"""
+    return render_template('portfolio_analysis.html')
+
 
 # ==================== API 路由 ====================
 
@@ -1662,7 +1667,7 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
         return None
 
 
-def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_invest, days):
+def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_invest, days, period=None):
     """
     Execute independent backtests for multiple funds and aggregate results.
     
@@ -1728,44 +1733,51 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
             })
         
         # Return both individual and aggregated results (Requirement 6.4, 6.5)
+        response_data = {
+            'mode': 'multi_fund',
+            'strategy_id': strategy_id,
+            'total_funds': len(individual_results),
+            'failed_funds': failed_funds,
+            'days': days,
+            
+            # Aggregated portfolio metrics (Requirement 6.3)
+            'portfolio': {
+                'initial_amount': round(total_initial_amount, 2),
+                'final_value': round(total_final_value, 2),
+                'total_return': round(portfolio_total_return, 2),
+                'annualized_return': round(portfolio_annualized_return, 2),
+                'max_drawdown': round(portfolio_max_drawdown, 2),
+                'sharpe_ratio': round(portfolio_sharpe_ratio, 4),
+                'total_trades': total_trades
+            },
+            
+            # Best and worst performing funds (Requirement 6.5)
+            'best_fund': {
+                'fund_code': best_fund['fund_code'],
+                'total_return': best_fund['total_return'],
+                'final_value': best_fund['final_value']
+            },
+            'worst_fund': {
+                'fund_code': worst_fund['fund_code'],
+                'total_return': worst_fund['total_return'],
+                'final_value': worst_fund['final_value']
+            },
+            
+            # Individual fund results (Requirement 6.4)
+            'individual_funds': fund_summaries,
+            'funds': fund_summaries,  # 添加funds键以兼容前端
+            
+            # Full details for first fund (for UI display)
+            'sample_fund_details': individual_results[0] if individual_results else None
+        }
+        
+        # Add period information if provided
+        if period is not None:
+            response_data['period'] = period
+        
         return jsonify({
             'success': True,
-            'data': {
-                'mode': 'multi_fund',
-                'strategy_id': strategy_id,
-                'total_funds': len(individual_results),
-                'failed_funds': failed_funds,
-                
-                # Aggregated portfolio metrics (Requirement 6.3)
-                'portfolio': {
-                    'initial_amount': round(total_initial_amount, 2),
-                    'final_value': round(total_final_value, 2),
-                    'total_return': round(portfolio_total_return, 2),
-                    'annualized_return': round(portfolio_annualized_return, 2),
-                    'max_drawdown': round(portfolio_max_drawdown, 2),
-                    'sharpe_ratio': round(portfolio_sharpe_ratio, 4),
-                    'total_trades': total_trades
-                },
-                
-                # Best and worst performing funds (Requirement 6.5)
-                'best_fund': {
-                    'fund_code': best_fund['fund_code'],
-                    'total_return': best_fund['total_return'],
-                    'final_value': best_fund['final_value']
-                },
-                'worst_fund': {
-                    'fund_code': worst_fund['fund_code'],
-                    'total_return': worst_fund['total_return'],
-                    'final_value': worst_fund['final_value']
-                },
-                
-                # Individual fund results (Requirement 6.4)
-                'individual_funds': fund_summaries,
-                'funds': fund_summaries,  # 添加funds键以兼容前端
-                
-                # Full details for first fund (for UI display)
-                'sample_fund_details': individual_results[0] if individual_results else None
-            }
+            'data': response_data
         })
         
     except Exception as e:
@@ -1792,7 +1804,7 @@ def backtest_holdings():
         strategy_id = data.get('strategy_id', 'enhanced_rule_based')
         initial_amount = data.get('initial_amount', 10000)
         base_invest = data.get('base_invest', 100)
-        days = data.get('days', 90)
+        period = data.get('period', 3)
         
         # Validate parameters (Requirement 4.5)
         validation_errors = []
@@ -1819,13 +1831,17 @@ def backtest_holdings():
         except (TypeError, ValueError):
             validation_errors.append('基准定投金额必须是有效数字')
         
-        # Validate days (must be in [30, 60, 90, 180, 365])
+        # Validate period (must be in [1, 2, 3, 5])
         try:
-            days = int(days)
-            if days not in [30, 60, 90, 180, 365]:
-                validation_errors.append('回测天数必须是30、60、90、180或365天')
+            period = int(period)
+            if period not in [1, 2, 3, 5]:
+                validation_errors.append('回测周期必须是1、2、3或5年')
         except (TypeError, ValueError):
-            validation_errors.append('回测天数必须是有效数字')
+            validation_errors.append('回测周期必须是有效数字')
+        
+        # Convert period (years) to days
+        days_map = {1: 365, 2: 730, 3: 1095, 5: 1825}
+        days = days_map.get(period, 1095)  # Default to 3 years (1095 days)
         
         # Validate strategy_id
         from backtesting.strategy_report_parser import StrategyReportParser
@@ -1850,7 +1866,7 @@ def backtest_holdings():
         # Multi-fund backtesting (Requirements 6.1, 6.2, 6.3, 6.4, 6.5)
         if len(fund_codes) > 1:
             return _execute_multi_fund_backtest(
-                fund_codes, strategy_id, initial_amount, base_invest, days
+                fund_codes, strategy_id, initial_amount, base_invest, days, period
             )
         
         # Single fund backtest (Requirement 4.1, 4.2, 4.3)
@@ -1864,6 +1880,9 @@ def backtest_holdings():
                 'success': False,
                 'error': f'没有找到基金 {fund_code} 的历史数据'
             }), 404
+        
+        # Add period information to result
+        result['period'] = period
         
         # Return complete backtest results (Requirement 4.4)
         return jsonify({
@@ -1895,7 +1914,7 @@ def compare_strategies():
         strategy_ids = data.get('strategy_ids', [])
         initial_amount = data.get('initial_amount', 10000)
         base_invest = data.get('base_invest', 100)
-        days = data.get('days', 90)
+        period = data.get('period', 3)
         
         # Validate parameters
         validation_errors = []
@@ -1926,13 +1945,17 @@ def compare_strategies():
         except (TypeError, ValueError):
             validation_errors.append('基准定投金额必须是有效数字')
         
-        # Validate days (must be in [30, 60, 90, 180, 365])
+        # Validate period (must be in [1, 2, 3, 5])
         try:
-            days = int(days)
-            if days not in [30, 60, 90, 180, 365]:
-                validation_errors.append('回测天数必须是30、60、90、180或365天')
+            period = int(period)
+            if period not in [1, 2, 3, 5]:
+                validation_errors.append('回测周期必须是1、2、3或5年')
         except (TypeError, ValueError):
-            validation_errors.append('回测天数必须是有效数字')
+            validation_errors.append('回测周期必须是有效数字')
+        
+        # Convert period (years) to days
+        days_map = {1: 365, 2: 730, 3: 1095, 5: 1825}
+        days = days_map.get(period, 1095)  # Default to 3 years (1095 days)
         
         # Validate strategy_ids
         from backtesting.strategy_report_parser import StrategyReportParser
@@ -1987,6 +2010,7 @@ def compare_strategies():
                 'initial_amount': initial_amount,
                 'base_invest': base_invest,
                 'days': days,
+                'period': period,
                 'strategies': comparison_results,
                 'best_strategy_id': best_strategy_id
             }
@@ -2478,8 +2502,8 @@ def update_holding(fund_code):
             fund_data_manager = EnhancedFundData()
             strategy_engine = EnhancedInvestmentStrategy()
             
-            # 获取实时数据
-            realtime_data = fund_data_manager.get_realtime_data(fund_code)
+            # 获取实时数据 - 传入fund_name以便正确识别QDII基金
+            realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
             performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
             
             # 计算今日和昨日收益率
@@ -3287,8 +3311,8 @@ def confirm_import_holdings():
                         # 获取基金绩效指标
                         metrics = EnhancedFundData.get_performance_metrics(fund_code)
                         
-                        # 获取实时数据
-                        realtime_data = EnhancedFundData.get_realtime_data(fund_code)
+                        # 获取实时数据 - 传入fund_name以便正确识别QDII基金
+                        realtime_data = EnhancedFundData.get_realtime_data(fund_code, fund_name)
                         logger.info(f"获取基金 {fund_code} 实时数据成功: {realtime_data}")
                         
                         # 构造分析结果数据

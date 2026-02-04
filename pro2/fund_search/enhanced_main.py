@@ -308,7 +308,7 @@ class EnhancedFundAnalysisSystem:
             logger.debug(f"基金 {fund_code} 基本信息: {basic_info}")
             
             # 获取实时数据
-            realtime_data = self.fund_data_manager.get_realtime_data(fund_code)
+            realtime_data = self.fund_data_manager.get_realtime_data(fund_code, fund_name)
             logger.info(f"基金 {fund_code} 实时数据: current_nav={realtime_data.get('current_nav')}, "
                        f"previous_nav={realtime_data.get('previous_nav')}, "
                        f"daily_return={realtime_data.get('daily_return')}, "
@@ -1214,8 +1214,8 @@ class EnhancedFundAnalysisSystem:
                 try:
                     logger.info(f"正在分析基金: {fund_code} ({fund_name})")
                     
-                    # 获取基金实时数据
-                    fund_info = self.fund_data_manager.get_realtime_data(fund_code)
+                    # 获取基金实时数据 - 传入fund_name以便正确识别QDII基金
+                    fund_info = self.fund_data_manager.get_realtime_data(fund_code, fund_name)
                     if not fund_info:
                         logger.warning(f"无法获取基金 {fund_code} 的实时数据")
                         continue

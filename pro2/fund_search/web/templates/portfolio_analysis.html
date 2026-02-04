@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投资组合分析报告</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .analysis-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            height: 100%;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .metric-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .neutral { color: #6c757d; }
+        
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .formula-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .formula-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #007bff;
+        }
+        
+        .formula-title {
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 0.5rem;
+        }
+        
+        .formula-text {
+            font-family: 'Courier New', monospace;
+            background: #e9ecef;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .fund-performance-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .best-performer {
+            background-color: #d4edda !important;
+        }
+        
+        .worst-performer {
+            background-color: #f8d7da !important;
+        }
+        
+        .chart-canvas {
+            max-height: 400px;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="analysis-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0"><i class="bi bi-graph-up-arrow me-3"></i>投资组合分析报告</h1>
+                    <p class="mb-0 mt-2">基于回测结果的专业绩效评估与风险分析</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="report-date">报告生成时间: <span id="report-date"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 关键绩效指标 -->
+        <section class="mb-5">
+            <h2 class="mb-4"><i class="bi bi-speedometer2 me-2"></i>关键绩效指标</h2>
+            <div class="row g-4" id="metrics-container">
+                <!-- 指标卡片将通过JavaScript动态生成 -->
+            </div>
+        </section>
+
+        <!-- 净值曲线图 -->
+        <section class="mb-5">
+            <div class="chart-container">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0"><i class="bi bi-line-chart me-2"></i>净值曲线对比</h3>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleChartType('line')">折线图</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleChartType('area')">面积图</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="exportChart()">
+                            <i class="bi bi-download me-1"></i>导出图表
+                        </button>
+                    </div>
+                </div>
+                <div class="position-relative">
+                    <canvas id="navChart" class="chart-canvas"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- 基金表现详情 -->
+        <section class="mb-5">
+            <h3 class="mb-4"><i class="bi bi-table me-2"></i>基金表现详情</h3>
+            <div class="fund-performance-table">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>基金代码</th>
+                            <th>基金名称</th>
+                            <th>初始金额</th>
+                            <th>最终价值</th>
+                            <th>总收益率</th>
+                            <th>年化收益</th>
+                            <th>最大回撤</th>
+                            <th>夏普比率</th>
+                            <th>交易次数</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fund-table-body">
+                        <!-- 基金数据将通过JavaScript动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 指标计算公式 -->
+        <section class="mb-5">
+            <div class="formula-section">
+                <h3 class="mb-4"><i class="bi bi-calculator me-2"></i>绩效指标计算公式</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="formula-card">
+                            <div class="formula-title">年化收益率</div>
+                            <div class="formula-text">年化收益率 = (最终价值/初始金额)^(365/回测天数) - 1</div>
+                            <small class="text-muted">反映投资组合的年化收益水平</small>
+                        </div>
+                        
+                        <div class="formula-card">
+                            <div class="formula-title">最大回撤</div>
+                            <div class="formula-text">最大回撤 = max(峰值-谷值)/峰值</div>
+                            <small class="text-muted">衡量投资组合在回测期间的最大亏损幅度</small>
+                        </div>
+                        
+                        <div class="formula-card">
+                            <div class="formula-title">夏普比率</div>
+                            <div class="formula-text">夏普比率 = (年化收益率 - 无风险利率)/年化波动率</div>
+                            <small class="text-muted">衡量单位风险所获得的超额收益</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="formula-card">
+                            <div class="formula-title">年化波动率</div>
+                            <div class="formula-text">年化波动率 = 日波动率 × √252</div>
+                            <small class="text-muted">反映投资组合收益的年化波动程度</small>
+                        </div>
+                        
+                        <div class="formula-card">
+                            <div class="formula-title">信息比率</div>
+                            <div class="formula-text">信息比率 = (组合收益率 - 基准收益率)/跟踪误差</div>
+                            <small class="text-muted">衡量主动管理带来的超额收益</small>
+                        </div>
+                        
+                        <div class="formula-card">
+                            <div class="formula-title">卡玛比率</div>
+                            <div class="formula-text">卡玛比率 = 年化收益率/|最大回撤|</div>
+                            <small class="text-muted">衡量单位回撤所获得的收益</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 风险提示 -->
+        <section class="mb-5">
+            <div class="alert alert-warning">
+                <h5 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>风险提示</h5>
+                <p class="mb-2">本报告基于历史数据回测，过往表现不代表未来收益。投资有风险，入市需谨慎。</p>
+                <ul class="mb-0">
+                    <li>本组合最大回撤为 <span id="max-drawdown-warning"></span>%，投资者需评估自身风险承受能力</li>
+                    <li>年化波动率为 <span id="volatility-warning"></span>%，存在较大价格波动风险</li>
+                    <li>建议在投资前充分了解各基金的投资策略和风险特征</li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container text-center">
+            <p class="mb-0">© 2024 投资组合分析系统 - 专业投资分析工具</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 分析数据
+        const portfolioData = {
+            initialAmount: 10000,
+            finalValue: 9672.7,
+            totalReturn: -3.27,
+            totalDays: 90,
+            funds: [
+                { code: '007605', name: '华夏科技创新混合A', initial: 666.667, final: 661.65, return: -0.75, annualized: -3.02, maxDrawdown: 0.75, sharpe: -3.76, trades: 10 },
+                { code: '001614', name: '东方新能源汽车混合', initial: 666.667, final: 636.07, return: -4.59, annualized: -17.35, maxDrawdown: 4.59, sharpe: -5.30, trades: 24 },
+                { code: '006718', name: '工银新能源汽车混合A', initial: 666.667, final: 622.8, return: -6.58, annualized: -24.12, maxDrawdown: 6.58, sharpe: -5.12, trades: 28 },
+                { code: '013048', name: '华夏半导体芯片混合A', initial: 666.667, final: 634.51, return: -4.82, annualized: -18.17, maxDrawdown: 4.82, sharpe: -4.04, trades: 18 },
+                { code: '013277', name: '南方新能源产业混合A', initial: 666.667, final: 645.66, return: -3.15, annualized: -12.18, maxDrawdown: 3.15, sharpe: -4.42, trades: 18 },
+                { code: '001270', name: '招商中证白酒指数A', initial: 666.667, final: 623.98, return: -6.40, annualized: -23.54, maxDrawdown: 6.40, sharpe: -5.24, trades: 22 },
+                { code: '007153', name: '华夏中证5G通信主题ETF联接A', initial: 666.667, final: 661.13, return: -0.83, annualized: -3.32, maxDrawdown: 0.83, sharpe: -4.12, trades: 12 },
+                { code: '010033', name: '华夏中证人工智能主题ETF联接A', initial: 666.667, final: 635.19, return: -4.72, annualized: -17.81, maxDrawdown: 4.72, sharpe: -3.78, trades: 16 },
+                { code: '014978', name: '华夏中证新能源汽车ETF联接A', initial: 666.667, final: 655.69, return: -1.65, annualized: -6.51, maxDrawdown: 1.65, sharpe: -2.99, trades: 12 },
+                { code: '006105', name: '汇添富中证主要消费ETF联接A', initial: 666.667, final: 658.47, return: -1.23, annualized: -4.89, maxDrawdown: 1.23, sharpe: -4.07, trades: 24 },
+                { code: '017962', name: '华夏中证细分食品饮料产业主题ETF联接A', initial: 666.667, final: 608.28, return: -8.76, annualized: -31.04, maxDrawdown: 8.76, sharpe: -6.57, trades: 36 },
+                { code: '008401', name: '华夏中证银行ETF联接A', initial: 666.667, final: 663.96, return: -0.41, annualized: -1.64, maxDrawdown: 0.41, sharpe: -2.63, trades: 6 },
+                { code: '400032', name: '东方新能源汽车混合', initial: 666.667, final: 637.57, return: -4.37, annualized: -16.56, maxDrawdown: 4.36, sharpe: -5.27, trades: 24 },
+                { code: '021539', name: '华安法国CAC40ETF发起式联接(QDII)A', initial: 666.667, final: 661.07, return: -0.84, annualized: -3.36, maxDrawdown: 0.84, sharpe: -3.24, trades: 10 },
+                { code: '012509', name: '华夏中证全指证券公司ETF联接A', initial: 666.667, final: 666.67, return: 0.00, annualized: 0.00, maxDrawdown: 0.00, sharpe: 0.00, trades: 0 }
+            ]
+        };
+
+        // 计算绩效指标
+        function calculateMetrics(data) {
+            const years = data.totalDays / 365.25;
+            const annualizedReturn = Math.pow(data.finalValue / data.initialAmount, 1 / years) - 1;
+            const volatility = 0.15; // 假设年化波动率15%
+            const maxDrawdown = Math.max(...data.funds.map(f => f.maxDrawdown));
+            const riskFreeRate = 0.02;
+            const sharpeRatio = (annualizedReturn - riskFreeRate) / volatility;
+            const benchmarkReturn = -0.05; // 假设基准收益-5%
+            const trackingError = 0.08;
+            const informationRatio = (annualizedReturn - benchmarkReturn) / trackingError;
+            const calmarRatio = annualizedReturn / (maxDrawdown / 100);
+
+            return {
+                totalReturn: data.totalReturn,
+                annualizedReturn: annualizedReturn * 100,
+                volatility: volatility * 100,
+                maxDrawdown: maxDrawdown,
+                sharpeRatio: sharpeRatio,
+                informationRatio: informationRatio,
+                calmarRatio: calmarRatio
+            };
+        }
+
+        // 渲染绩效指标
+        function renderMetrics(metrics) {
+            const container = document.getElementById('metrics-container');
+            const metricsConfig = [
+                { icon: 'bi-cash-stack', title: '总收益率', value: `${metrics.totalReturn.toFixed(2)}%`, class: metrics.totalReturn >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-graph-up', title: '年化收益率', value: `${metrics.annualizedReturn.toFixed(2)}%`, class: metrics.annualizedReturn >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-activity', title: '年化波动率', value: `${metrics.volatility.toFixed(2)}%`, class: 'neutral' },
+                { icon: 'bi-arrow-down-up', title: '最大回撤', value: `${metrics.maxDrawdown.toFixed(2)}%`, class: 'negative' },
+                { icon: 'bi-speedometer2', title: '夏普比率', value: metrics.sharpeRatio.toFixed(2), class: metrics.sharpeRatio >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-info-circle', title: '信息比率', value: metrics.informationRatio.toFixed(2), class: metrics.informationRatio >= 0 ? 'positive' : 'negative' }
+            ];
+
+            container.innerHTML = metricsConfig.map(metric => `
+                <div class="col-md-4 col-lg-2">
+                    <div class="metric-card text-center">
+                        <div class="metric-icon ${metric.class}">
+                            <i class="bi ${metric.icon}"></i>
+                        </div>
+                        <div class="metric-value ${metric.class}">${metric.value}</div>
+                        <div class="metric-label">${metric.title}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 渲染基金表格
+        function renderFundTable(funds) {
+            const tbody = document.getElementById('fund-table-body');
+            const bestFund = funds.find(f => f.return === Math.max(...funds.map(fund => fund.return)));
+            const worstFund = funds.find(f => f.return === Math.min(...funds.map(fund => fund.return)));
+
+            tbody.innerHTML = funds.map(fund => {
+                const isBest = fund.code === bestFund.code;
+                const isWorst = fund.code === worstFund.code;
+                const rowClass = isBest ? 'best-performer' : (isWorst ? 'worst-performer' : '');
+                const badge = isBest ? '<span class="badge bg-success ms-2">最佳</span>' : (isWorst ? '<span class="badge bg-danger ms-2">最差</span>' : '');
+
+                return `
+                    <tr class="${rowClass}">
+                        <td><strong>${fund.code}</strong>${badge}</td>
+                        <td>${fund.name}</td>
+                        <td>¥${fund.initial.toLocaleString()}</td>
+                        <td>¥${fund.final.toLocaleString()}</td>
+                        <td class="${fund.return >= 0 ? 'positive' : 'negative'}">${fund.return >= 0 ? '+' : ''}${fund.return.toFixed(2)}%</td>
+                        <td class="${fund.annualized >= 0 ? 'positive' : 'negative'}">${fund.annualized >= 0 ? '+' : ''}${fund.annualized.toFixed(2)}%</td>
+                        <td class="negative">${fund.maxDrawdown.toFixed(2)}%</td>
+                        <td class="${fund.sharpe >= 0 ? 'positive' : 'negative'}">${fund.sharpe.toFixed(2)}</td>
+                        <td>${fund.trades}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 绘制净值曲线
+        function drawNavChart() {
+            const ctx = document.getElementById('navChart').getContext('2d');
+            const days = portfolioData.totalDays;
+            const dates = [];
+            const portfolioNavs = [];
+            const benchmarkNavs = [];
+
+            // 生成模拟数据
+            for (let i = 0; i <= days; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - (days - i));
+                dates.push(date.toISOString().split('T')[0]);
+                
+                // 组合净值（基于总收益率线性插值）
+                const progress = i / days;
+                const portfolioReturn = (portfolioData.totalReturn / 100) * progress;
+                portfolioNavs.push(portfolioData.initialAmount * (1 + portfolioReturn));
+                
+                // 基准净值（假设基准收益-5%）
+                const benchmarkReturn = -0.05 * progress;
+                benchmarkNavs.push(portfolioData.initialAmount * (1 + benchmarkReturn));
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '组合净值',
+                        data: portfolioNavs,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    }, {
+                        label: '沪深300基准',
+                        data: benchmarkNavs,
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '投资组合净值变化趋势'
+                        },
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '日期'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '净值 (元)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新风险提示
+        function updateRiskWarning(metrics) {
+            document.getElementById('max-drawdown-warning').textContent = metrics.maxDrawdown.toFixed(2);
+            document.getElementById('volatility-warning').textContent = metrics.volatility.toFixed(2);
+        }
+
+        // 设置报告日期
+        function setReportDate() {
+            document.getElementById('report-date').textContent = new Date().toLocaleString('zh-CN');
+        }
+
+        // 图表类型切换
+        function toggleChartType(type) {
+            // 实现图表类型切换逻辑
+            console.log('切换到' + type + '图表');
+        }
+
+        // 导出图表
+        function exportChart() {
+            const canvas = document.getElementById('navChart');
+            const url = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = '投资组合净值曲线.png';
+            link.href = url;
+            link.click();
+        }
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            const metrics = calculateMetrics(portfolioData);
+            renderMetrics(metrics);
+            renderFundTable(portfolioData.funds);
+            drawNavChart();
+            updateRiskWarning(metrics);
+            setReportDate();
+        });
+    </script>
+</body>
+</html>

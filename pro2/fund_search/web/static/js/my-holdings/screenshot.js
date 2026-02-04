@@ -355,8 +355,12 @@ const FundScreenshot = {
      * 删除基金
      */
     deleteFund(index) {
-        // 显示确认对话框
-        if (confirm('确定要删除该基金吗？')) {
+        // 获取要删除的基金信息
+        const fundToDelete = this.recognizedFunds[index];
+        const fundName = fundToDelete ? fundToDelete.fund_name : '该基金';
+        
+        // 显示确认对话框，包含详细的警告信息
+        if (confirm(`警告：此操作不可撤销！\n\n确定要删除基金「${fundName}」吗？\n\n删除后，该基金将从识别结果中移除，且无法恢复。`)) {
             try {
                 // 从识别结果中移除基金
                 const deletedFund = this.recognizedFunds.splice(index, 1)[0];

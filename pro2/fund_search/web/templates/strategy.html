@@ -558,6 +558,30 @@
             color: var(--danger-dark);
         }
         
+        /* Fund performance summary without borders */
+        .fund-performance-summary {
+            padding: 0.5rem 0;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .fund-performance-summary i {
+            font-size: 1rem;
+        }
+        
+        /* Strategy suggestion without borders */
+        .strategy-suggestion {
+            padding: 0.5rem 0;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .strategy-suggestion i {
+            font-size: 1rem;
+        }
+        
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -876,20 +900,29 @@
                                     <div class="invalid-feedback" id="base-invest-error"></div>
                                 </div>
                                 <div class="col-lg-4 col-md-6">
-                                    <label class="form-label">回测天数</label>
-                                    <select class="form-select" id="backtest-days">
-                                        <option value="30">近30天</option>
-                                        <option value="60">近60天</option>
-                                        <option value="90" selected>近90天</option>
-                                        <option value="180">近180天</option>
-                                        <option value="365">近365天</option>
+                                    <label class="form-label">回测周期</label>
+                                    <select class="form-select" id="backtest-period">
+                                        <option value="1">近一年</option>
+                                        <option value="2">近两年</option>
+                                        <option value="3" selected>近三年</option>
+                                        <option value="5">近五年</option>
                                     </select>
-                                    <div class="invalid-feedback" id="backtest-days-error"></div>
+                                    <div class="invalid-feedback" id="backtest-period-error"></div>
                                 </div>
                             </div>
                             <button class="btn btn-success btn-analyze" onclick="runBacktest()" disabled>
                                 <i class="bi bi-play-circle me-1"></i>开始回测
                             </button>
+                            <div class="mt-3" id="backtest-status" style="display:none;">
+                                <div class="alert alert-info">
+                                    <div class="d-flex align-items-center">
+                                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <span id="backtest-status-text">正在准备回测...</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="result-box" id="backtest-result" style="display:none;">
                                 <div id="backtest-result-content"></div>
                             </div>
@@ -919,6 +952,7 @@
             constructor(containerId) {
                 this.container = document.getElementById(containerId);
                 this.selectedFunds = new Set();
+                this.holdings = [];
                 this.selectionChangeCallbacks = [];
                 this.initSelectAll();
             }
@@ -985,12 +1019,15 @@
                     const result = await response.json();
                     
                     if (result.success && result.data) {
+                        this.holdings = result.data;
                         this.renderHoldings(result.data);
                     } else {
+                        this.holdings = [];
                         this.renderEmpty('加载持仓失败');
                     }
                 } catch (error) {
                     console.error('加载持仓失败:', error);
+                    this.holdings = [];
                     this.renderEmpty('加载持仓失败，请刷新重试');
                 }
             }
@@ -1631,23 +1668,12 @@
                 btn.disabled = true;
             }
             
-            // Show progress message in results area
-            const resultsDiv = document.getElementById('backtest-result');
-            const resultsContent = document.getElementById('backtest-result-content');
-            if (resultsDiv && resultsContent) {
-                resultsDiv.style.display = 'block';
-                resultsContent.innerHTML = `
-                    <div class="alert alert-info mb-0">
-                        <div class="d-flex align-items-center">
-                            <div class="spinner-border spinner-border-sm me-3" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <div>
-                                <i class="bi bi-hourglass-split me-2"></i>${message}
-                            </div>
-                        </div>
-                    </div>
-                `;
+            // Show progress message in status area
+            const statusDiv = document.getElementById('backtest-status');
+            const statusText = document.getElementById('backtest-status-text');
+            if (statusDiv && statusText) {
+                statusText.textContent = message;
+                statusDiv.style.display = 'block';
             }
         }
         
@@ -1663,16 +1689,10 @@
                 delete btn.dataset.originalText;
             }
             
-            // Clear loading indicator from results area if it's still there
-            const resultsContent = document.getElementById('backtest-result-content');
-            if (resultsContent) {
-                const loadingAlert = resultsContent.querySelector('.alert.alert-info');
-                const spinner = resultsContent.querySelector('.spinner-border');
-                
-                // Only clear if we find a loading spinner
-                if (loadingAlert && spinner) {
-                    resultsContent.innerHTML = '';
-                }
+            // Hide status area
+            const statusDiv = document.getElementById('backtest-status');
+            if (statusDiv) {
+                statusDiv.style.display = 'none';
             }
         }
         
@@ -1681,6 +1701,9 @@
          * @param {string} message - Success message to display
          */
         function showSuccessMessage(message) {
+            // Hide loading status
+            clearLoadingState();
+            
             const resultsDiv = document.getElementById('backtest-result');
             const resultsContent = document.getElementById('backtest-result-content');
             if (resultsDiv && resultsContent) {
@@ -1699,6 +1722,9 @@
          * @param {string} errorType - Type of error: 'validation', 'missing_data', 'network', 'server', 'backtest'
          */
         function showErrorMessage(message, errorType = 'backtest') {
+            // Hide loading status
+            clearLoadingState();
+            
             const resultsDiv = document.getElementById('backtest-result');
             const resultsContent = document.getElementById('backtest-result-content');
             
@@ -1772,7 +1798,7 @@
             const selectedStrategies = strategySelector.getSelectedStrategies();
             const initialAmount = parseFloat(document.getElementById('initial-amount').value);
             const baseInvest = parseFloat(document.getElementById('base-invest').value);
-            const backtestDays = parseInt(document.getElementById('backtest-days').value);
+            const backtestPeriod = parseInt(document.getElementById('backtest-period').value);
             
             // Validate fund selection (must be exactly one fund)
             if (selectedFunds.length === 0) {
@@ -1807,7 +1833,7 @@
                         strategy_ids: selectedStrategies,
                         initial_amount: initialAmount,
                         base_invest: baseInvest,
-                        days: backtestDays
+                        period: backtestPeriod
                     })
                 });
                 
@@ -1843,7 +1869,7 @@
             let tableHtml = `
                 <div class="alert alert-success mb-3">
                     <i class="bi bi-check-circle me-2"></i>
-                    <strong>策略对比完成</strong> - 基金: ${data.fund_code}, 回测天数: ${data.days}天
+                    <strong>策略对比完成</strong> - 基金: ${data.fund_code}, 回测周期: ${data.period}年
                 </div>
                 <div class="table-responsive">
                     <table class="comparison-table table table-bordered">
@@ -1979,9 +2005,9 @@
                 min: 10,
                 errorMessage: '基准定投金额必须大于等于10元'
             },
-            days: {
-                validValues: [30, 60, 90, 180, 365],
-                errorMessage: '回测天数必须是30、60、90、180或365天'
+            period: {
+                validValues: [1, 2, 3, 5],
+                errorMessage: '回测周期必须是1、2、3或5年'
             }
         };
 
@@ -2036,24 +2062,24 @@
         }
 
         /**
-         * Validate days parameter
-         * @param {number} value - Days value
+         * Validate period parameter
+         * @param {number} value - Period value (years)
          * @returns {Object} Validation result with isValid and error properties
          */
-        function validateDays(value) {
+        function validatePeriod(value) {
             const numValue = parseInt(value);
             
             if (isNaN(numValue)) {
                 return {
                     isValid: false,
-                    error: '回测天数必须是有效数字'
+                    error: '回测周期必须是有效数字'
                 };
             }
             
-            if (!VALIDATION_RULES.days.validValues.includes(numValue)) {
+            if (!VALIDATION_RULES.period.validValues.includes(numValue)) {
                 return {
                     isValid: false,
-                    error: VALIDATION_RULES.days.errorMessage
+                    error: VALIDATION_RULES.period.errorMessage
                 };
             }
             
@@ -2097,7 +2123,7 @@
         function clearAllValidationErrors() {
             clearValidationError('initial-amount');
             clearValidationError('base-invest');
-            clearValidationError('backtest-days');
+            clearValidationError('backtest-period');
         }
 
         /**
@@ -2107,7 +2133,7 @@
          * @param {number} days - Days value
          * @returns {boolean} True if all parameters are valid, false otherwise
          */
-        function validateBacktestParameters(initialAmount, baseInvest, days) {
+        function validateBacktestParameters(initialAmount, baseInvest, period) {
             clearAllValidationErrors();
             let isValid = true;
 
@@ -2125,10 +2151,10 @@
                 isValid = false;
             }
 
-            // Validate days
-            const daysResult = validateDays(days);
-            if (!daysResult.isValid) {
-                showValidationError('backtest-days', daysResult.error);
+            // Validate period
+            const periodResult = validatePeriod(period);
+            if (!periodResult.isValid) {
+                showValidationError('backtest-period', periodResult.error);
                 isValid = false;
             }
 
@@ -2183,19 +2209,46 @@
                 });
             }
 
-            // Days validation on change
-            const daysField = document.getElementById('backtest-days');
-            if (daysField) {
-                daysField.addEventListener('change', function() {
-                    const result = validateDays(this.value);
+            // Period validation on change
+            const periodField = document.getElementById('backtest-period');
+            if (periodField) {
+                periodField.addEventListener('change', function() {
+                    const result = validatePeriod(this.value);
                     if (!result.isValid) {
-                        showValidationError('backtest-days', result.error);
+                        showValidationError('backtest-period', result.error);
                     } else {
-                        clearValidationError('backtest-days');
+                        clearValidationError('backtest-period');
+                        // 自动触发回测（如果已有基金和策略选择）
+                        autoTriggerBacktest();
                     }
                 });
             }
         });
+
+        /**
+         * 自动触发回测功能
+         */
+        function autoTriggerBacktest() {
+            const selectedFunds = fundSelector.getSelectedFunds();
+            const selectedStrategy = strategySelector.getSelectedStrategy();
+            const comparisonMode = document.getElementById('comparison-mode-toggle').checked;
+            
+            // 检查是否满足回测条件
+            if (selectedFunds.length === 0 || (!comparisonMode && !selectedStrategy)) {
+                return;
+            }
+            
+            // 如果是对比模式，需要至少两个策略
+            if (comparisonMode) {
+                const selectedStrategies = strategySelector.getSelectedStrategies();
+                if (selectedStrategies.length < 2) {
+                    return;
+                }
+            }
+            
+            // 自动执行回测
+            runBacktest();
+        }
 
         // ==================== Button Enable/Disable Logic ====================
         
@@ -2391,8 +2444,8 @@
                             <tr><td>赎回金额</td><td>¥${d.redeem_amount}</td></tr>
                             <tr><td>执行金额</td><td>${d.execution_amount}</td></tr>
                         </table>
-                        <div class="alert alert-info mb-0">
-                            <i class="bi bi-lightbulb me-2"></i><strong>综合建议：</strong>${d.final_suggestion}
+                        <div class="strategy-suggestion mb-3">
+                            <i class="bi bi-lightbulb me-2 text-muted"></i><strong>综合建议：</strong>${d.final_suggestion}
                         </div>
                     `;
                 }
@@ -2422,7 +2475,7 @@
             // Get backtest parameters from form
             const initialAmount = parseFloat(document.getElementById('initial-amount').value);
             const baseInvest = parseFloat(document.getElementById('base-invest').value);
-            const backtestDays = parseInt(document.getElementById('backtest-days').value);
+            const backtestPeriod = parseInt(document.getElementById('backtest-period').value);
             
             // ==================== VALIDATION ====================
             // Validate fund selection
@@ -2438,7 +2491,7 @@
             }
             
             // Validate all parameters before proceeding
-            if (!validateBacktestParameters(initialAmount, baseInvest, backtestDays)) {
+            if (!validateBacktestParameters(initialAmount, baseInvest, backtestPeriod)) {
                 // Validation errors are already displayed inline
                 return;
             }
@@ -2457,7 +2510,7 @@
                         strategy_id: selectedStrategy,
                         initial_amount: initialAmount,
                         base_invest: baseInvest,
-                        days: backtestDays
+                        period: backtestPeriod
                     })
                 });
                 const result = await response.json();
@@ -2615,7 +2668,7 @@
             let html = `
                 <div class="alert alert-success mb-3">
                     <i class="bi bi-check-circle me-2"></i>
-                    <strong>多基金回测完成</strong> - 共${funds.length}只基金, 回测天数: ${data.days}天
+                    <strong>多基金回测完成</strong> - 共${funds.length}只基金, 回测周期: ${data.period}年
                 </div>
                 
                 <h6 class="mb-3"><i class="bi bi-pie-chart me-2"></i>组合表现</h6>
@@ -2698,10 +2751,16 @@
                     </table>
                 </div>
                 
-                <div class="alert alert-info mb-0">
-                    <i class="bi bi-info-circle me-2"></i>
+                <div class="fund-performance-summary mb-3">
+                    <i class="bi bi-info-circle me-2 text-muted"></i>
                     <strong>表现最佳:</strong> ${formatFundObject(bestFund)} | 
                     <strong>表现最差:</strong> ${formatFundObject(worstFund)}
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <button id="portfolio-analyze-btn" class="btn btn-primary btn-lg" onclick="PortfolioAnalysis.showAnalysis()">
+                        <i class="bi bi-graph-up-arrow me-2"></i>查看投资组合深度分析
+                    </button>
                 </div>
             `;
             
@@ -2728,5 +2787,8 @@
             }
         }
     </script>
+    
+    <!-- 投资组合分析脚本 -->
+    <script src="/static/js/portfolio-analysis-integrated.js"></script>
 </body>
 </html>
