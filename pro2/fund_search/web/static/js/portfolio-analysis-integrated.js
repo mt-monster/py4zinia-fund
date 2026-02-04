@@ -221,29 +221,123 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 生成净值数据
+     * 生成净值数据（使用真实历史数据）
      */
     generateNavData(data) {
+        // 优先尝试从后端API获取真实数据
+        return this.fetchRealNavData(data);
+    },
+    
+    /**
+     * 从后端获取真实净值数据
+     */
+    async fetchRealNavData(data) {
+        try {
+            // 获取当前页面选择的基金信息
+            const fundCodes = this.getSelectedFundCodes();
+            const weights = this.calculateWeights(fundCodes.length);
+            
+            if (fundCodes.length === 0) {
+                console.warn('未选择基金，使用模拟数据');
+                return this.generateFallbackNavData(data);
+            }
+            
+            const response = await fetch(`/api/dashboard/profit-trend?days=${data.totalDays}&fund_codes=${fundCodes.join(',')}&weights=${weights.join(',')}`);
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success && result.data) {
+                    console.log('✅ 成功获取真实历史净值数据');
+                    
+                    // 转换为所需格式
+                    const navData = [];
+                    const labels = result.data.labels;
+                    const profitData = result.data.profit;
+                    const benchmarkData = result.data.benchmark;
+                    
+                    for (let i = 0; i < labels.length; i++) {
+                        navData.push({
+                            date: labels[i],
+                            portfolio: profitData[i] || 10000,
+                            benchmark: benchmarkData[i] || 10000
+                        });
+                    }
+                    
+                    return navData;
+                }
+            }
+            
+            console.warn('获取真实数据失败，使用备用方案');
+            return this.generateFallbackNavData(data);
+            
+        } catch (error) {
+            console.error('获取真实净值数据时出错:', error);
+            return this.generateFallbackNavData(data);
+        }
+    },
+    
+    /**
+     * 获取页面上选择的基金代码
+     */
+    getSelectedFundCodes() {
+        // 从回测结果中提取基金代码
+        const fundRows = document.querySelectorAll('#backtest-result tbody tr');
+        const fundCodes = [];
+        
+        fundRows.forEach(row => {
+            const codeCell = row.querySelector('td:first-child strong');
+            if (codeCell) {
+                fundCodes.push(codeCell.textContent.trim());
+            }
+        });
+        
+        return fundCodes;
+    },
+    
+    /**
+     * 计算基金权重（平均分配）
+     */
+    calculateWeights(count) {
+        if (count <= 0) return [];
+        return Array(count).fill(1.0 / count);
+    },
+    
+    /**
+     * 备用的净值数据生成方案
+     */
+    generateFallbackNavData(data) {
+        console.warn('⚠️ 使用备用净值数据生成方案');
+        
         const navData = [];
-        const benchmarkData = [];
+        const totalReturnDecimal = data.totalReturn / 100;
         
         for (let i = 0; i <= data.totalDays; i++) {
             const date = new Date();
             date.setDate(date.getDate() - (data.totalDays - i));
             
-            // 组合净值（线性插值）
-            const progress = i / data.totalDays;
-            const portfolioReturn = (data.totalReturn / 100) * progress;
-            const portfolioNav = data.initialAmount * (1 + portfolioReturn);
+            // 组合净值：基于实际收益率，但使用更保守的波动
+            const daysProgress = i / data.totalDays;
+            const expectedReturn = totalReturnDecimal * daysProgress;
             
-            // 基准净值（假设-5%年化收益）
-            const benchmarkReturn = -0.05 * (i / 365.25);
-            const benchmarkNav = data.initialAmount * (1 + benchmarkReturn);
+            // 更小的波动（±0.2%日波动）
+            const strategyVolatility = (Math.random() - 0.5) * 0.004;
+            const strategyReturnToday = expectedReturn + strategyVolatility;
+            const portfolioNav = data.initialAmount * (1 + strategyReturnToday);
+            
+            // 沪深300基准：使用更保守的市场模型
+            const yearsElapsed = i / 365.25;
+            const benchmarkAnnualReturn = -0.03; // 更保守的年化收益假设
+            const benchmarkExpectedReturn = benchmarkAnnualReturn * yearsElapsed;
+            
+            // 更小的基准波动（±0.1%日波动）
+            const benchmarkVolatility = (Math.random() - 0.5) * 0.002;
+            const benchmarkReturnToday = benchmarkExpectedReturn + benchmarkVolatility;
+            const benchmarkNav = data.initialAmount * (1 + benchmarkReturnToday);
             
             navData.push({
                 date: date.toISOString().split('T')[0],
-                portfolio: portfolioNav,
-                benchmark: benchmarkNav
+                portfolio: Math.max(portfolioNav, data.initialAmount * 0.7), // 更严格的下限
+                benchmark: Math.max(benchmarkNav, data.initialAmount * 0.7)
             });
         }
         

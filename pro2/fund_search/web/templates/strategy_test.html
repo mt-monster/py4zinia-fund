@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>策略加载测试</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>策略加载测试</h1>
+    <button onclick="loadStrategies()">加载策略</button>
+    <div id="result"></div>
+
+    <script>
+        async function loadStrategies() {
+            try {
+                const response = await fetch('/api/strategies/metadata');
+                const result = await response.json();
+                
+                const resultDiv = document.getElementById('result');
+                
+                if (result.success && result.data) {
+                    let html = '<h2>成功加载 ' + result.data.length + ' 个策略:</h2><ul>';
+                    result.data.forEach(strategy => {
+                        html += `<li><strong>${strategy.name}</strong>: ${strategy.description} (收益率: ${strategy.total_return}%)</li>`;
+                    });
+                    html += '</ul>';
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.innerHTML = '<p style="color: red;">加载失败: ' + (result.error || '未知错误') + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<p style="color: red;">请求失败: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -9,6 +9,7 @@
 import os
 import sys
 import json
+import random
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import pandas as pd
@@ -146,6 +147,11 @@ def portfolio_analysis():
     """投资组合分析页面 - 展示净值曲线和绩效指标"""
     return render_template('portfolio_analysis.html')
 
+@app.route('/strategy_test')
+def strategy_test():
+    return render_template('strategy_test.html')
+
+
 
 # ==================== API 路由 ====================
 
@@ -250,29 +256,110 @@ def get_dashboard_stats():
 
 @app.route('/api/dashboard/profit-trend', methods=['GET'])
 def get_profit_trend():
-    """获取收益趋势数据"""
+    """获取收益趋势数据（使用真实历史数据）"""
     try:
         user_id = request.args.get('user_id', 'default_user')
         days = request.args.get('days', 30, type=int)
+        total_return = request.args.get('total_return', 20, type=float)  # 默认20%总收益
+        fund_codes = request.args.get('fund_codes', '000001')  # 基金代码，逗号分隔
+        weights = request.args.get('weights', '1.0')  # 权重，逗号分隔
         
-        # 生成模拟的趋势数据（实际应该从历史记录表获取）
+        # 解析基金代码和权重
+        fund_code_list = [code.strip() for code in fund_codes.split(',')]
+        weight_list = [float(w.strip()) for w in weights.split(',')]
+        
+        # 确保权重和基金代码数量一致
+        if len(weight_list) == 1 and len(fund_code_list) > 1:
+            # 如果只有一个权重，平均分配
+            weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
+        elif len(weight_list) != len(fund_code_list):
+            # 如果权重数量不匹配，平均分配
+            weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
+        
+        # 归一化权重
+        weight_sum = sum(weight_list)
+        if weight_sum > 0:
+            weight_list = [w/weight_sum for w in weight_list]
+        
+        # 导入真实数据获取器
+        from web.real_data_fetcher import data_fetcher
+        
+        # 获取沪深300真实历史数据
+        csi300_data = data_fetcher.get_csi300_history(days)
+        
+        # 获取基金组合真实历史净值
+        portfolio_data = data_fetcher.calculate_portfolio_nav(
+            fund_code_list, weight_list, initial_amount=10000, days=days
+        )
+        
+        if csi300_data.empty or portfolio_data.empty:
+            # 如果获取真实数据失败，返回错误
+            return jsonify({
+                'success': False,
+                'error': '无法获取真实历史数据，请检查网络连接或基金代码是否正确'
+            }), 500
+        
+        # 准备返回数据
         labels = []
         profit_data = []
         benchmark_data = []
         
-        for i in range(days, 0, -1):
-            date = datetime.now() - timedelta(days=i)
-            labels.append(date.strftime('%m-%d'))
-            # 模拟数据
-            profit_data.append(round(10000 + (days - i) * 500 + (i % 5) * 100, 2))
-            benchmark_data.append(round(10000 + (days - i) * 400, 2))
+        # 找到共同的日期范围
+        portfolio_dates = set(portfolio_data['date'].dt.date)
+        csi300_dates = set(csi300_data['date'].dt.date)
+        common_dates = sorted(list(portfolio_dates.intersection(csi300_dates)))[:days]
+        
+        if not common_dates:
+            # 如果没有共同日期，分别处理
+            logger.warning("没有共同日期，分别处理数据")
+            
+            # 使用沪深300数据的时间范围
+            csi300_sorted = csi300_data.sort_values('date')
+            for _, row in csi300_sorted.tail(days).iterrows():
+                labels.append(row['date'].strftime('%m-%d'))
+                benchmark_data.append(round(row['price'], 2))
+                # 基金数据使用最近的可用数据
+                if not portfolio_data.empty:
+                    latest_portfolio = portfolio_data.iloc[-1]['portfolio_nav']
+                    profit_data.append(round(latest_portfolio, 2))
+                else:
+                    profit_data.append(10000)  # 默认值
+        else:
+            # 有共同日期的情况
+            for date in common_dates:
+                # 格式化日期标签
+                labels.append(date.strftime('%m-%d'))
+                
+                # 获取沪深300数据
+                csi300_row = csi300_data[csi300_data['date'].dt.date == date]
+                if not csi300_row.empty:
+                    benchmark_value = csi300_row.iloc[0]['price']
+                    # 标准化到10000起点
+                    if len(csi300_data) > 0:
+                        first_price = csi300_data.iloc[0]['price']
+                        normalized_benchmark = 10000 * (benchmark_value / first_price)
+                        benchmark_data.append(round(normalized_benchmark, 2))
+                    else:
+                        benchmark_data.append(round(benchmark_value, 2))
+                else:
+                    benchmark_data.append(benchmark_data[-1] if benchmark_data else 10000)
+                
+                # 获取基金组合数据
+                portfolio_row = portfolio_data[portfolio_data['date'].dt.date == date]
+                if not portfolio_row.empty:
+                    profit_data.append(round(portfolio_row.iloc[0]['portfolio_nav'], 2))
+                else:
+                    profit_data.append(profit_data[-1] if profit_data else 10000)
         
         return jsonify({
             'success': True,
             'data': {
                 'labels': labels,
                 'profit': profit_data,
-                'benchmark': benchmark_data
+                'benchmark': benchmark_data,
+                'fund_codes': fund_code_list,
+                'weights': weight_list,
+                'data_source': 'real_historical_data'  # 标记数据来源
             }
         })
         
@@ -2178,8 +2265,10 @@ def get_strategies_metadata():
     try:
         from backtesting.strategy_report_parser import StrategyReportParser
         
-        # 策略报告路径
-        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        # 策略报告路径 - 使用绝对路径
+        import os
+        base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        report_path = os.path.join(base_path, 'fund_backtest', 'strategy_results', 'strategy_comparison_report.md')
         
         # 解析策略报告
         parser = StrategyReportParser(report_path)

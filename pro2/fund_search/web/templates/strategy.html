@@ -558,17 +558,7 @@
             color: var(--danger-dark);
         }
         
-        /* Fund performance summary without borders */
-        .fund-performance-summary {
-            padding: 0.5rem 0;
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-        
-        .fund-performance-summary i {
-            font-size: 1rem;
-        }
+
         
         /* Strategy suggestion without borders */
         .strategy-suggestion {
@@ -2751,11 +2741,7 @@
                     </table>
                 </div>
                 
-                <div class="fund-performance-summary mb-3">
-                    <i class="bi bi-info-circle me-2 text-muted"></i>
-                    <strong>表现最佳:</strong> ${formatFundObject(bestFund)} | 
-                    <strong>表现最差:</strong> ${formatFundObject(worstFund)}
-                </div>
+
                 
                 <div class="mt-4 text-center">
                     <button id="portfolio-analyze-btn" class="btn btn-primary btn-lg" onclick="PortfolioAnalysis.showAnalysis()">
