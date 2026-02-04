@@ -75,6 +75,39 @@
     margin-bottom: 20px;
 }
 
+/* 净值曲线图表专用样式 */
+#portfolio-nav-chart {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.chart-section {
+    margin: 20px 0;
+}
+
+.chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+}
+
+.legend-item.portfolio {
+    color: #007bff;
+}
+
+.legend-item.benchmark {
+    color: #dc3545;
+}
+
 .chart-wrapper {
     position: relative;
     width: 140px;
