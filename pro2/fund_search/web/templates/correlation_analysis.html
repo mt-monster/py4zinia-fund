@@ -554,7 +554,7 @@
             return null;
         }
 
-        // 提取相关性大于0.5的基金组合
+        // 提取相关性大于0.8的基金组合
         function getTopCorrelatedPairs(matrix, fundNames, topN = 5) {
             if (!matrix || !fundNames || matrix.length < 2) {
                 return [];
@@ -566,8 +566,8 @@
             for (let i = 0; i < matrix.length; i++) {
                 for (let j = i + 1; j < matrix[i].length; j++) {
                     const correlation = matrix[i][j];
-                    // 只添加相关性大于0.5的组合
-                    if (correlation > 0.5) {
+                    // 只添加相关性大于0.8的组合
+                    if (correlation > 0.8) {
                         pairs.push({
                             fund1: fundNames[i],
                             fund2: fundNames[j],
