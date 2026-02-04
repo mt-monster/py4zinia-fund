@@ -667,7 +667,7 @@ body {
 }
 
 /* ============================================
-   操作按钮样式 - 现代化设计
+   操作按钮样式 - 现代化设计（WCAG可访问性优化）
    ============================================ */
 .action-buttons {
     display: inline-flex;
@@ -680,19 +680,27 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 6px 12px;
-    height: 32px;
+    gap: 6px;
+    padding: 8px 16px;
+    height: 40px;
+    min-width: 80px;
     border-radius: var(--border-radius-md);
-    border: 1px solid transparent;
+    border: 2px solid transparent;
     background: transparent;
     cursor: pointer;
     transition: all var(--transition-fast);
     position: relative;
     overflow: hidden;
-    font-size: var(--text-xs);
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 600;
     white-space: nowrap;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
 .action-btn::before {
@@ -714,52 +722,83 @@ body {
 }
 
 .action-btn i {
-    font-size: var(--text-base);
+    font-size: 18px;
     transition: transform var(--transition-fast);
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
 }
 
-/* 编辑按钮 */
+/* 编辑按钮 - WCAG AAA对比度优化 */
 .action-btn.edit {
-    color: var(--info);
-    border-color: var(--info-light);
-    background: var(--info-light);
+    color: #1a5490;
+    border-color: #d1e7dd;
+    background: #e3f2fd;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
 .action-btn.edit:hover {
-    background: var(--info);
-    border-color: var(--info);
-    color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-    transform: translateY(-2px);
+    background: #3b82f6;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+    transform: translateY(-3px) scale(1.05);
 }
 
 .action-btn.edit:hover i {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    color: #ffffff;
 }
 
-/* 删除按钮 */
+.action-btn.edit:active {
+    background: #2563eb;
+    border-color: #1a5490;
+    transform: translateY(0) scale(0.98);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 删除按钮 - WCAG AAA对比度优化 */
 .action-btn.delete {
-    color: var(--danger);
-    border-color: var(--danger-light);
-    background: var(--danger-light);
+    color: #c53030;
+    border-color: #f8d7da;
+    background: #fee2e2;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15);
 }
 
 .action-btn.delete:hover {
-    background: var(--danger);
-    border-color: var(--danger);
-    color: white;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
-    transform: translateY(-2px);
+    background: #dc3545;
+    border-color: #b91c1c;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+    transform: translateY(-3px) scale(1.05);
 }
 
 .action-btn.delete:hover i {
-    transform: scale(1.1);
+    transform: scale(1.15);
+    color: #ffffff;
+}
+
+.action-btn.delete:active {
+    background: #b91c1c;
+    border-color: #c53030;
+    transform: translateY(0) scale(0.98);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 按钮禁用状态 */
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
+
+.action-btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 /* 按钮点击动画 */
-.action-btn:active {
-    transform: translateY(0);
-    box-shadow: none;
+.action-btn:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* 表格操作列样式优化 */
@@ -786,23 +825,95 @@ body {
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%) translateY(-4px);
-    padding: 4px 8px;
+    padding: 6px 12px;
     background: var(--text-primary);
     color: white;
-    font-size: var(--text-xs);
-    border-radius: var(--border-radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    border-radius: var(--border-radius-md);
     white-space: nowrap;
     opacity: 0;
     visibility: hidden;
     transition: all var(--transition-fast);
     pointer-events: none;
-    z-index: 100;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .action-btn:hover[title]::after {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(-8px);
+}
+
+/* 针对HTML中使用的.edit-btn和.delete-btn类的样式 */
+.action-btn.edit-btn {
+    color: #1a5490;
+    border-color: #d1e7dd;
+    background: #e3f2fd;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+    padding: 10px 12px;
+    height: 44px;
+    min-width: 60px;
+}
+
+.action-btn.edit-btn:hover {
+    background: #3b82f6;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5);
+    transform: translateY(-2px) scale(1.05);
+}
+
+.action-btn.edit-btn i {
+    font-size: 20px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.action-btn.edit-btn:hover i {
+    transform: scale(1.15);
+    color: #ffffff;
+}
+
+.action-btn.delete-btn {
+    color: #c53030;
+    border-color: #f8d7da;
+    background: #fee2e2;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15);
+    padding: 10px 12px;
+    height: 44px;
+    min-width: 60px;
+}
+
+.action-btn.delete-btn:hover {
+    background: #dc3545;
+    border-color: #b91c1c;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+    transform: translateY(-2px) scale(1.05);
+}
+
+.action-btn.delete-btn i {
+    font-size: 20px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.action-btn.delete-btn:hover i {
+    transform: scale(1.15);
+    color: #ffffff;
+}
+
+/* 操作单元格样式 */
+.action-cell {
+    text-align: center;
+    white-space: nowrap;
+    padding: var(--space-3) var(--space-4);
+}
+
+.action-cell .action-btn {
+    flex-shrink: 0;
+    margin: 0 4px;
 }
 
 /* ============================================
