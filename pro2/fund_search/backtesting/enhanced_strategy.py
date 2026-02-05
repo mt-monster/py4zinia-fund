@@ -4,12 +4,22 @@
 """
 增强版投资策略模块
 提供优化的基金投资策略逻辑
+
+优化内容：
+- 增强趋势检测（多周期确认、ADX趋势强度）
+- 动态阈值调整（基于历史波动率）
+- 分层止损机制
+- 市场状态识别
+- 信号确认机制
+- 冷却期管理
+- 智能定投策略
 """
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, Optional
-from datetime import datetime
+from typing import Dict, Tuple, Optional, List
+from datetime import datetime, timedelta
+from collections import deque
 import logging
 
 # 只获取logger，不配置basicConfig（由主程序配置）
@@ -40,6 +50,31 @@ class EnhancedInvestmentStrategy:
         
         # 从YAML配置文件加载策略规则
         self.strategy_rules = self._load_strategy_rules_from_yaml()
+        
+        # 信号历史记录（用于信号确认）
+        self.signal_history: Dict[str, deque] = {}
+        
+        # 冷却期管理
+        self.cooldown_tracker: Dict[str, datetime] = {}
+        
+        # 历史净值缓存（用于趋势检测）
+        self.nav_cache: Dict[str, pd.Series] = {}
+        
+        # 分层止损配置
+        self.layered_stop_loss = {
+            'levels': [
+                {'threshold': -0.05, 'action': 'reduce', 'ratio': 0.20},
+                {'threshold': -0.10, 'action': 'reduce', 'ratio': 0.30},
+                {'threshold': -0.15, 'action': 'exit', 'ratio': 1.00}
+            ],
+            'cooldown_days': 5
+        }
+        
+        # 信号确认配置
+        self.signal_confirmation = {
+            'min_confirmation_days': 2,
+            'enabled': True
+        }
     
     def _get_default_config(self) -> Dict:
         """获取默认配置"""
@@ -924,14 +959,411 @@ class EnhancedInvestmentStrategy:
         float: 年化波动率或None
         """
         try:
-            # 这里应该从数据库获取历史净值计算波动率
-            # 暂时返回None表示使用默认配置
+            # 尝试从缓存获取历史净值
+            if fund_code in self.nav_cache and len(self.nav_cache[fund_code]) >= 20:
+                nav_series = self.nav_cache[fund_code]
+                returns = nav_series.pct_change().dropna()
+                if len(returns) >= 20:
+                    volatility = returns.std() * np.sqrt(252)
+                    return float(volatility)
             return None
             
         except Exception as e:
             logger.error(f"计算历史波动率失败: {str(e)}")
             return None
     
+    # ==================== 增强功能方法 ====================
+    
+    def update_nav_cache(self, fund_code: str, nav_series: pd.Series) -> None:
+        """
+        更新净值缓存（供外部调用）
+        
+        参数：
+        fund_code: 基金代码
+        nav_series: 净值序列
+        """
+        self.nav_cache[fund_code] = nav_series
+    
+    def detect_enhanced_trend(self, fund_code: str, nav_history: Optional[pd.Series] = None) -> Dict:
+        """
+        增强趋势检测（多周期确认 + ADX趋势强度）
+        
+        参数：
+        fund_code: 基金代码
+        nav_history: 净值历史（可选，如果不提供则从缓存获取）
+        
+        返回：
+        dict: 趋势检测结果
+        """
+        try:
+            # 获取净值数据
+            if nav_history is not None:
+                nav = nav_history
+            elif fund_code in self.nav_cache:
+                nav = self.nav_cache[fund_code]
+            else:
+                return {
+                    'trend': 'unknown',
+                    'strength': 0.0,
+                    'confidence': 'low',
+                    'details': '无历史数据'
+                }
+            
+            if len(nav) < 20:
+                return {
+                    'trend': 'unknown',
+                    'strength': 0.0,
+                    'confidence': 'low',
+                    'details': '数据不足'
+                }
+            
+            # 计算多周期均线
+            ma5 = nav.rolling(5).mean()
+            ma10 = nav.rolling(10).mean()
+            ma20 = nav.rolling(20).mean()
+            
+            # 计算ADX趋势强度
+            adx = self._calculate_adx(nav)
+            
+            # 判断趋势方向
+            current_ma5 = ma5.iloc[-1]
+            current_ma10 = ma10.iloc[-1]
+            current_ma20 = ma20.iloc[-1]
+            
+            # 多头排列：MA5 > MA10 > MA20
+            if current_ma5 > current_ma10 > current_ma20:
+                if adx > 25:
+                    trend = 'strong_uptrend'
+                    confidence = 'high'
+                else:
+                    trend = 'weak_uptrend'
+                    confidence = 'medium'
+            # 空头排列：MA5 < MA10 < MA20
+            elif current_ma5 < current_ma10 < current_ma20:
+                if adx > 25:
+                    trend = 'strong_downtrend'
+                    confidence = 'high'
+                else:
+                    trend = 'weak_downtrend'
+                    confidence = 'medium'
+            # 均线交织
+            else:
+                trend = 'consolidation'
+                confidence = 'medium'
+            
+            # 计算趋势强度评分
+            strength = min(1.0, adx / 40.0) if adx > 0 else 0.0
+            
+            return {
+                'trend': trend,
+                'strength': strength,
+                'adx': adx,
+                'confidence': confidence,
+                'ma5': current_ma5,
+                'ma10': current_ma10,
+                'ma20': current_ma20,
+                'details': f"{trend}, ADX={adx:.1f}"
+            }
+            
+        except Exception as e:
+            logger.error(f"增强趋势检测失败: {str(e)}")
+            return {
+                'trend': 'unknown',
+                'strength': 0.0,
+                'confidence': 'low',
+                'details': f'计算错误: {str(e)}'
+            }
+    
+    def _calculate_adx(self, nav: pd.Series, period: int = 14) -> float:
+        """
+        计算ADX（平均趋向指数）
+        
+        参数：
+        nav: 净值序列
+        period: 计算周期
+        
+        返回：
+        float: ADX值
+        """
+        try:
+            if len(nav) < period + 1:
+                return 0.0
+            
+            # 计算价格变化
+            high = nav.rolling(2).max()
+            low = nav.rolling(2).min()
+            close = nav
+            
+            # 计算+DM和-DM
+            plus_dm = high.diff()
+            minus_dm = low.diff().abs()
+            
+            plus_dm = np.where((plus_dm > minus_dm) & (plus_dm > 0), plus_dm, 0)
+            minus_dm = np.where((minus_dm > plus_dm) & (minus_dm > 0), minus_dm, 0)
+            
+            # 计算TR (True Range)
+            tr = nav.diff().abs()
+            
+            # 平滑计算
+            atr = pd.Series(tr).rolling(period).mean()
+            plus_di = 100 * pd.Series(plus_dm).rolling(period).mean() / atr
+            minus_di = 100 * pd.Series(minus_dm).rolling(period).mean() / atr
+            
+            # 计算DX
+            dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
+            
+            # 计算ADX (DX的平滑平均)
+            adx = pd.Series(dx).rolling(period).mean().iloc[-1]
+            
+            return float(adx) if not np.isnan(adx) else 0.0
+            
+        except Exception as e:
+            logger.error(f"计算ADX失败: {str(e)}")
+            return 0.0
+    
+    def detect_market_regime(self, market_data: Optional[Dict] = None) -> Dict:
+        """
+        市场状态识别
+        
+        参数：
+        market_data: 市场数据（包含波动率、市场宽度等）
+        
+        返回：
+        dict: 市场状态结果
+        """
+        try:
+            if market_data is None:
+                market_data = {}
+            
+            vix = market_data.get('volatility_index', 0.15)
+            market_return = market_data.get('market_index_return', 0.0)
+            market_breadth = market_data.get('advance_decline_ratio', 1.0)
+            sentiment = market_data.get('market_sentiment', 0.5)
+            
+            # 判断市场状态
+            if vix < 0.15 and market_return > 0.3 and market_breadth > 1.2:
+                regime = 'bull_market'
+                risk_level = 'low'
+                position_adjustment = 1.2
+                description = '牛市环境，可适当增加仓位'
+            elif vix > 0.30 or market_return < -0.5 or market_breadth < 0.7:
+                regime = 'bear_market'
+                risk_level = 'high'
+                position_adjustment = 0.5
+                description = '熊市环境，建议降低仓位'
+            elif vix > 0.25:
+                regime = 'volatile'
+                risk_level = 'medium'
+                position_adjustment = 0.7
+                description = '高波动环境，谨慎操作'
+            else:
+                regime = 'ranging'
+                risk_level = 'low'
+                position_adjustment = 1.0
+                description = '震荡市场，适合区间操作'
+            
+            return {
+                'regime': regime,
+                'risk_level': risk_level,
+                'position_adjustment': position_adjustment,
+                'description': description,
+                'vix': vix,
+                'market_return': market_return,
+                'market_breadth': market_breadth,
+                'sentiment': sentiment
+            }
+            
+        except Exception as e:
+            logger.error(f"市场状态识别失败: {str(e)}")
+            return {
+                'regime': 'unknown',
+                'risk_level': 'medium',
+                'position_adjustment': 1.0,
+                'description': '无法识别市场状态'
+            }
+    
+    def check_layered_stop_loss(self, fund_code: str, current_loss: float, 
+                                 current_position: float) -> Dict:
+        """
+        分层止损检查
+        
+        参数：
+        fund_code: 基金代码
+        current_loss: 当前亏损比例（负数）
+        current_position: 当前持仓金额
+        
+        返回：
+        dict: 止损操作建议
+        """
+        try:
+            result = {
+                'triggered': False,
+                'action': 'hold',
+                'reduce_ratio': 0.0,
+                'reduce_amount': 0.0,
+                'message': '未触发止损',
+                'level': None
+            }
+            
+            # 检查是否在冷却期内
+            if self._is_in_cooldown(fund_code):
+                cooldown_end = self.cooldown_tracker.get(fund_code)
+                result['message'] = f'冷却期内（至{cooldown_end.strftime("%Y-%m-%d")}），暂不操作'
+                return result
+            
+            # 遍历止损级别
+            for i, level in enumerate(self.layered_stop_loss['levels']):
+                if current_loss <= level['threshold']:
+                    result['triggered'] = True
+                    result['action'] = level['action']
+                    result['reduce_ratio'] = level['ratio']
+                    result['reduce_amount'] = current_position * level['ratio']
+                    result['level'] = i + 1
+                    
+                    if level['action'] == 'exit':
+                        result['message'] = f'触发第{i+1}级止损（亏损{current_loss:.1%}），建议全部退出'
+                    else:
+                        result['message'] = f'触发第{i+1}级止损（亏损{current_loss:.1%}），建议减仓{level["ratio"]:.0%}'
+                    
+                    # 设置冷却期
+                    self._set_cooldown(fund_code)
+                    break
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"分层止损检查失败: {str(e)}")
+            return {
+                'triggered': False,
+                'action': 'hold',
+                'reduce_ratio': 0.0,
+                'message': f'检查失败: {str(e)}'
+            }
+    
+    def _is_in_cooldown(self, fund_code: str) -> bool:
+        """检查基金是否在冷却期内"""
+        if fund_code not in self.cooldown_tracker:
+            return False
+        return datetime.now() < self.cooldown_tracker[fund_code]
+    
+    def _set_cooldown(self, fund_code: str) -> None:
+        """设置冷却期"""
+        cooldown_days = self.layered_stop_loss.get('cooldown_days', 5)
+        self.cooldown_tracker[fund_code] = datetime.now() + timedelta(days=cooldown_days)
+    
+    def clear_cooldown(self, fund_code: str) -> None:
+        """清除冷却期（手动重置）"""
+        if fund_code in self.cooldown_tracker:
+            del self.cooldown_tracker[fund_code]
+    
+    def confirm_signal(self, fund_code: str, signal: str, 
+                       min_days: Optional[int] = None) -> Dict:
+        """
+        信号确认机制
+        
+        参数：
+        fund_code: 基金代码
+        signal: 当前信号（buy, sell, hold）
+        min_days: 最小确认天数（可选）
+        
+        返回：
+        dict: 确认结果
+        """
+        try:
+            if not self.signal_confirmation['enabled']:
+                return {
+                    'confirmed': True,
+                    'signal': signal,
+                    'consecutive_days': 1,
+                    'message': '信号确认已禁用'
+                }
+            
+            min_confirmation = min_days or self.signal_confirmation['min_confirmation_days']
+            
+            # 初始化信号历史
+            if fund_code not in self.signal_history:
+                self.signal_history[fund_code] = deque(maxlen=10)
+            
+            # 记录当前信号
+            self.signal_history[fund_code].append({
+                'signal': signal,
+                'timestamp': datetime.now()
+            })
+            
+            # 计算连续相同信号的天数
+            consecutive = 0
+            for record in reversed(self.signal_history[fund_code]):
+                if record['signal'] == signal:
+                    consecutive += 1
+                else:
+                    break
+            
+            # 判断是否确认
+            confirmed = consecutive >= min_confirmation
+            
+            return {
+                'confirmed': confirmed,
+                'signal': signal if confirmed else 'hold',
+                'consecutive_days': consecutive,
+                'required_days': min_confirmation,
+                'message': f'信号已确认（{consecutive}天）' if confirmed else f'等待确认（{consecutive}/{min_confirmation}天）'
+            }
+            
+        except Exception as e:
+            logger.error(f"信号确认失败: {str(e)}")
+            return {
+                'confirmed': True,
+                'signal': signal,
+                'consecutive_days': 0,
+                'message': f'确认失败: {str(e)}'
+            }
+    
+    def calculate_dynamic_threshold(self, fund_code: str, 
+                                     base_threshold: float,
+                                     threshold_type: str = 'buy') -> float:
+        """
+        计算动态阈值（基于历史波动率）
+        
+        参数：
+        fund_code: 基金代码
+        base_threshold: 基础阈值
+        threshold_type: 阈值类型（buy, sell, stop_loss）
+        
+        返回：
+        float: 动态调整后的阈值
+        """
+        try:
+            volatility = self._calculate_historical_volatility(fund_code)
+            
+            if volatility is None:
+                return base_threshold
+            
+            # 基准波动率（15%年化）
+            baseline_volatility = 0.15
+            
+            # 计算调整系数
+            adjustment_ratio = volatility / baseline_volatility
+            
+            # 限制调整范围
+            adjustment_ratio = max(0.5, min(2.0, adjustment_ratio))
+            
+            # 不同类型阈值的调整方向不同
+            if threshold_type == 'buy':
+                # 高波动时，买入阈值放宽（需要更大跌幅才买入）
+                return base_threshold * adjustment_ratio
+            elif threshold_type == 'sell':
+                # 高波动时，卖出阈值收紧（更早止盈）
+                return base_threshold / adjustment_ratio
+            elif threshold_type == 'stop_loss':
+                # 高波动时，止损阈值放宽（给予更多空间）
+                return base_threshold * adjustment_ratio
+            else:
+                return base_threshold
+                
+        except Exception as e:
+            logger.error(f"计算动态阈值失败: {str(e)}")
+            return base_threshold
+
     def calculate_kelly_position(self, fund_code: str, total_capital: float, 
                                  base_position: float = 100.0) -> Dict:
         """
@@ -1232,6 +1664,279 @@ class MeanReversionStrategy:
                 else:
                     signals.append(0)
         return signals
+
+
+class SmartDCAStrategy:
+    """
+    智能定投策略
+    
+    基于估值和市场状态动态调整定投金额：
+    - 估值低时加大投入
+    - 估值高时减少投入
+    - 结合技术趋势和市场情绪
+    """
+    
+    def __init__(self, base_amount: float = 1000.0):
+        """
+        初始化智能定投策略
+        
+        参数：
+        base_amount: 基础定投金额
+        """
+        self.base_amount = base_amount
+        self.enhanced_strategy = EnhancedInvestmentStrategy()
+        
+        # 估值分位配置
+        self.valuation_config = {
+            'extremely_low': {'threshold': 20, 'multiplier': 2.0},
+            'low': {'threshold': 40, 'multiplier': 1.5},
+            'normal': {'threshold': 60, 'multiplier': 1.0},
+            'high': {'threshold': 80, 'multiplier': 0.5},
+            'extremely_high': {'threshold': 100, 'multiplier': 0.0}
+        }
+    
+    def calculate_investment_amount(self, fund_data: Dict, 
+                                     market_data: Optional[Dict] = None) -> Dict:
+        """
+        计算本期定投金额
+        
+        参数：
+        fund_data: 基金数据（包含估值分位等）
+        market_data: 市场数据（可选）
+        
+        返回：
+        dict: 定投金额和调整原因
+        """
+        try:
+            reasons = []
+            multiplier = 1.0
+            
+            # 1. 估值调整
+            pe_percentile = fund_data.get('pe_percentile', 50)
+            valuation_adjustment = self._get_valuation_multiplier(pe_percentile)
+            multiplier *= valuation_adjustment['multiplier']
+            reasons.append(valuation_adjustment['reason'])
+            
+            # 2. 技术趋势调整
+            if 'nav_history' in fund_data:
+                trend_result = self.enhanced_strategy.detect_enhanced_trend(
+                    fund_data.get('fund_code', 'unknown'),
+                    fund_data['nav_history']
+                )
+                trend_adjustment = self._get_trend_multiplier(trend_result)
+                multiplier *= trend_adjustment['multiplier']
+                reasons.append(trend_adjustment['reason'])
+            
+            # 3. 市场环境调整
+            if market_data:
+                market_regime = self.enhanced_strategy.detect_market_regime(market_data)
+                multiplier *= market_regime['position_adjustment']
+                reasons.append(f"市场状态: {market_regime['description']}")
+            
+            # 4. 计算最终金额
+            final_amount = self.base_amount * multiplier
+            
+            # 限制调整范围
+            final_amount = max(0, min(self.base_amount * 3, final_amount))
+            
+            return {
+                'base_amount': self.base_amount,
+                'final_amount': final_amount,
+                'multiplier': multiplier,
+                'pe_percentile': pe_percentile,
+                'reasons': reasons,
+                'recommendation': self._get_recommendation(multiplier)
+            }
+            
+        except Exception as e:
+            logger.error(f"智能定投计算失败: {str(e)}")
+            return {
+                'base_amount': self.base_amount,
+                'final_amount': self.base_amount,
+                'multiplier': 1.0,
+                'reasons': [f'计算失败: {str(e)}'],
+                'recommendation': '使用基础定投金额'
+            }
+    
+    def _get_valuation_multiplier(self, pe_percentile: float) -> Dict:
+        """根据估值分位获取调整系数"""
+        if pe_percentile < 20:
+            return {
+                'multiplier': 2.0,
+                'valuation': 'extremely_low',
+                'reason': f'估值极低（{pe_percentile:.0f}%分位），大幅加仓'
+            }
+        elif pe_percentile < 40:
+            return {
+                'multiplier': 1.5,
+                'valuation': 'low',
+                'reason': f'估值偏低（{pe_percentile:.0f}%分位），适当加仓'
+            }
+        elif pe_percentile < 60:
+            return {
+                'multiplier': 1.0,
+                'valuation': 'normal',
+                'reason': f'估值正常（{pe_percentile:.0f}%分位），正常定投'
+            }
+        elif pe_percentile < 80:
+            return {
+                'multiplier': 0.5,
+                'valuation': 'high',
+                'reason': f'估值偏高（{pe_percentile:.0f}%分位），减少投入'
+            }
+        else:
+            return {
+                'multiplier': 0.0,
+                'valuation': 'extremely_high',
+                'reason': f'估值极高（{pe_percentile:.0f}%分位），暂停定投'
+            }
+    
+    def _get_trend_multiplier(self, trend_result: Dict) -> Dict:
+        """根据趋势获取调整系数"""
+        trend = trend_result.get('trend', 'unknown')
+        
+        trend_map = {
+            'strong_downtrend': {'multiplier': 1.3, 'reason': '强下跌趋势，逢低加仓'},
+            'weak_downtrend': {'multiplier': 1.1, 'reason': '弱下跌趋势，适当加仓'},
+            'consolidation': {'multiplier': 1.0, 'reason': '震荡整理，正常定投'},
+            'weak_uptrend': {'multiplier': 0.9, 'reason': '弱上涨趋势，适当减仓'},
+            'strong_uptrend': {'multiplier': 0.7, 'reason': '强上涨趋势，减少投入'},
+            'unknown': {'multiplier': 1.0, 'reason': '趋势不明，正常定投'}
+        }
+        
+        return trend_map.get(trend, trend_map['unknown'])
+    
+    def _get_recommendation(self, multiplier: float) -> str:
+        """根据最终倍数生成建议"""
+        if multiplier >= 1.5:
+            return '强烈建议加大定投金额'
+        elif multiplier >= 1.2:
+            return '建议适当增加定投金额'
+        elif multiplier >= 0.8:
+            return '建议正常定投'
+        elif multiplier >= 0.5:
+            return '建议减少定投金额'
+        elif multiplier > 0:
+            return '建议大幅减少定投金额'
+        else:
+            return '建议暂停本期定投'
+    
+    def generate_signals(self, data: pd.DataFrame, pe_percentile_col: str = 'pe_percentile') -> List[Dict]:
+        """
+        生成定投信号序列
+        
+        参数：
+        data: 包含净值和估值数据的DataFrame
+        pe_percentile_col: 估值分位列名
+        
+        返回：
+        list: 每期定投信号
+        """
+        signals = []
+        
+        for i in range(len(data)):
+            fund_data = {
+                'pe_percentile': data[pe_percentile_col].iloc[i] if pe_percentile_col in data.columns else 50
+            }
+            
+            result = self.calculate_investment_amount(fund_data)
+            signals.append({
+                'date': data.index[i] if hasattr(data.index[i], 'strftime') else str(data.index[i]),
+                'amount': result['final_amount'],
+                'multiplier': result['multiplier'],
+                'recommendation': result['recommendation']
+            })
+        
+        return signals
+
+
+class MomentumReversionHybrid:
+    """
+    动量反转混合策略
+    
+    核心理念：
+    - 强趋势时：跟随动量
+    - 震荡市时：均值回归
+    """
+    
+    def __init__(self, adx_threshold: float = 25.0, 
+                 momentum_lookback: int = 20,
+                 reversion_window: int = 20):
+        """
+        初始化混合策略
+        
+        参数：
+        adx_threshold: ADX阈值，区分趋势和震荡
+        momentum_lookback: 动量回看周期
+        reversion_window: 均值回归窗口
+        """
+        self.adx_threshold = adx_threshold
+        self.momentum_strategy = MomentumStrategy(lookback_period=momentum_lookback)
+        self.reversion_strategy = MeanReversionStrategy(window=reversion_window)
+        self.enhanced_strategy = EnhancedInvestmentStrategy()
+    
+    def generate_signals(self, data: pd.DataFrame) -> List[int]:
+        """
+        生成交易信号
+        
+        参数：
+        data: 包含nav列的DataFrame
+        
+        返回：
+        list: 信号列表 (1=买入, -1=卖出, 0=持有)
+        """
+        signals = []
+        nav_series = data['nav']
+        
+        # 预生成两种策略的信号
+        momentum_signals = self.momentum_strategy.generate_signals(data)
+        reversion_signals = self.reversion_strategy.generate_signals(data)
+        
+        for i in range(len(data)):
+            if i < 30:  # 需要足够数据计算ADX
+                signals.append(0)
+                continue
+            
+            # 计算当前ADX
+            adx = self.enhanced_strategy._calculate_adx(nav_series.iloc[:i+1])
+            
+            # 根据ADX选择策略
+            if adx > self.adx_threshold:
+                # 强趋势，使用动量策略
+                signals.append(momentum_signals[i])
+            else:
+                # 震荡市，使用均值回归
+                signals.append(reversion_signals[i])
+        
+        return signals
+    
+    def get_current_regime(self, data: pd.DataFrame) -> Dict:
+        """
+        获取当前市场状态和适用策略
+        
+        参数：
+        data: 包含nav列的DataFrame
+        
+        返回：
+        dict: 市场状态和策略选择
+        """
+        nav_series = data['nav']
+        adx = self.enhanced_strategy._calculate_adx(nav_series)
+        
+        if adx > self.adx_threshold:
+            return {
+                'regime': 'trending',
+                'adx': adx,
+                'active_strategy': 'momentum',
+                'description': f'趋势市场（ADX={adx:.1f}），使用动量策略'
+            }
+        else:
+            return {
+                'regime': 'ranging',
+                'adx': adx,
+                'active_strategy': 'mean_reversion',
+                'description': f'震荡市场（ADX={adx:.1f}），使用均值回归策略'
+            }
 
 
 def calculate_performance_metrics(returns: np.ndarray) -> dict:

@@ -1596,6 +1596,8 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
         trades = []
         returns_history = []
         cumulative_pnl = 0.0
+        equity_curve = []
+
         
         # 为高级策略准备DataFrame（需要包含nav列）
         if use_advanced_strategy:
@@ -1695,6 +1697,15 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
             if total_value_before > 0:
                 daily_strategy_return = (total_value_after - total_value_before) / total_value_before
                 strategy_returns.append(daily_strategy_return)
+            
+            # Record equity curve
+            # 确保日期格式为 YYYY-MM-DD
+            date_str = str(row['analysis_date'])[:10]  # 截取前10个字符，保证格式为YYYY-MM-DD
+            equity_curve.append({
+                'date': date_str,
+                'value': round(total_value_after, 2)
+            })
+
         
         # Calculate final results (Requirement 4.4)
         final_value = balance + holdings
@@ -1704,11 +1715,12 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
         years = days / 365.0
         annualized_return = ((final_value / initial_amount) ** (1 / years) - 1) * 100 if years > 0 else 0
         
-        # Calculate max drawdown
+        # Calculate max drawdown - FIXED: 基于每日权益曲线计算，而非仅交易点
+        # 这对于交易频率较低的策略（如 enhanced_rule_based）至关重要
         peak = initial_amount
         max_dd = 0
-        for trade in trades:
-            current_value = trade['balance'] + trade['holdings']
+        for point in equity_curve:
+            current_value = point['value']
             if current_value > peak:
                 peak = current_value
             drawdown = (peak - current_value) / peak * 100 if peak > 0 else 0
@@ -1749,8 +1761,10 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
             'sharpe_ratio': round(sharpe_ratio, 4),
             'trades_count': len(trades),
             'trades': trades,
+            'equity_curve': equity_curve,
             'evaluation': evaluation_dict
         }
+
     except Exception as e:
         logger.error(f"Single fund backtest failed for {fund_code}: {str(e)}")
         import traceback
@@ -2083,7 +2097,9 @@ def compare_strategies():
                     'error': f'没有找到基金 {fund_code} 的历史数据'
                 }), 404
             
+
             comparison_results.append(result)
+
         
         # Identify best performing strategy by total return (Requirement 7.4)
         best_strategy = max(comparison_results, key=lambda x: x['total_return'])
@@ -2093,7 +2109,97 @@ def compare_strategies():
         for result in comparison_results:
             result['is_best'] = (result['strategy_id'] == best_strategy_id)
         
+        # 获取沪深300基准数据
+        benchmark_curve = []
+        try:
+            from web.real_data_fetcher import data_fetcher
+            csi300_data = data_fetcher.get_csi300_history(days + 60)  # 多获取一些数据以确保覆盖
+            
+            logger.info(f"沪深300数据获取结果: 类型={type(csi300_data)}, 空={csi300_data is None or (hasattr(csi300_data, 'empty') and csi300_data.empty)}")
+            
+            if csi300_data is not None and not csi300_data.empty:
+                logger.info(f"沪深300数据列: {list(csi300_data.columns)}, 行数: {len(csi300_data)}")
+                
+                # 使用第一个策略的equity_curve日期作为基准
+                if comparison_results and comparison_results[0].get('equity_curve'):
+                    strategy_dates = [point['date'] for point in comparison_results[0]['equity_curve']]
+                    logger.info(f"策略日期样本: 首={strategy_dates[0] if strategy_dates else 'N/A'}, 末={strategy_dates[-1] if strategy_dates else 'N/A'}, 总数={len(strategy_dates)}")
+                    
+                    # 处理沪深300数据 - 创建日期到价格的映射
+                    csi300_data = csi300_data.sort_values('date')
+                    csi300_data['date_str'] = csi300_data['date'].dt.strftime('%Y-%m-%d')
+                    
+                    # 创建日期->价格映射，便于快速查找
+                    price_map = dict(zip(csi300_data['date_str'], csi300_data['price']))
+                    all_csi300_dates = sorted(csi300_data['date_str'].tolist())
+                    
+                    logger.info(f"沪深300日期范围: {all_csi300_dates[0] if all_csi300_dates else 'N/A'} 至 {all_csi300_dates[-1] if all_csi300_dates else 'N/A'}")
+                    
+                    # 找到策略第一个日期对应的或之前最近的沪深300价格作为基准
+                    first_strategy_date = strategy_dates[0] if strategy_dates else None
+                    first_price = None
+                    
+                    # 查找基准价格：优先使用策略第一天的沪深300价格，否则使用之前最近的价格
+                    if first_strategy_date:
+                        if first_strategy_date in price_map:
+                            first_price = price_map[first_strategy_date]
+                        else:
+                            # 查找策略开始日期之前最近的沪深300价格
+                            earlier_dates = [d for d in all_csi300_dates if d <= first_strategy_date]
+                            if earlier_dates:
+                                first_price = price_map[earlier_dates[-1]]
+                            elif all_csi300_dates:
+                                # 如果没有更早的日期，使用沪深300最早的价格
+                                first_price = price_map[all_csi300_dates[0]]
+                    
+                    if first_price is None and all_csi300_dates:
+                        first_price = price_map[all_csi300_dates[0]]
+                    
+                    logger.info(f"基准起始价格: {first_price}")
+                    
+                    # 为每个策略日期生成基准数据
+                    matched_count = 0
+                    last_price = first_price  # 用于填充缺失日期
+                    
+                    for date_str in strategy_dates:
+                        if date_str in price_map:
+                            current_price = price_map[date_str]
+                            last_price = current_price
+                            matched_count += 1
+                        else:
+                            # 如果没有精确匹配，查找最近的历史价格
+                            earlier_dates = [d for d in all_csi300_dates if d <= date_str]
+                            if earlier_dates:
+                                current_price = price_map[earlier_dates[-1]]
+                                last_price = current_price
+                            else:
+                                current_price = last_price
+                        
+                        # 计算累计价值（归一化到初始金额）
+                        if first_price and first_price > 0:
+                            value = initial_amount * (current_price / first_price)
+                        else:
+                            value = initial_amount
+                        
+                        benchmark_curve.append({
+                            'date': date_str,
+                            'value': round(value, 2)
+                        })
+                    
+                    logger.info(f"沪深300基准数据获取成功，共 {len(benchmark_curve)} 个数据点，精确匹配 {matched_count} 个日期")
+                else:
+                    logger.warning("没有找到策略的equity_curve数据")
+            else:
+                logger.warning("沪深300数据为空")
+        except Exception as e:
+            logger.warning(f"获取沪深300基准数据失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        logger.info(f"Strategy comparison completed: {len(comparison_results)} strategies, best={best_strategy_id}")
+        
         # Return comparison results (Requirement 7.3, 7.5)
+
         return jsonify({
             'success': True,
             'data': {
@@ -2103,7 +2209,8 @@ def compare_strategies():
                 'days': days,
                 'period': period,
                 'strategies': comparison_results,
-                'best_strategy_id': best_strategy_id
+                'best_strategy_id': best_strategy_id,
+                'benchmark_curve': benchmark_curve  # 沪深300基准曲线
             }
         })
         

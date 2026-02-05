@@ -101,10 +101,13 @@ class StrategyReportParser:
                 continue
             
             try:
+                # 表格格式: | strategy_id | 中文名称 | 总收益率 | ...
+                # cells[0] = strategy_id (如 'enhanced_rule_based')
+                # cells[1] = 中文显示名称 (如 '增强型规则策略')
                 strategy = {
                     'strategy_id': cells[0].strip(),
-                    'name': cells[0].strip(),
-                    'description': cells[1].strip(),
+                    'name': cells[1].strip(),  # FIXED: 使用中文名称而非strategy_id
+                    'description': cells[1].strip(),  # 描述使用中文名称
                     'total_return': self._parse_percentage(cells[2]),
                     'annualized_return': self._parse_percentage(cells[3]),
                     'annualized_volatility': self._parse_percentage(cells[4]),

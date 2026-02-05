@@ -336,8 +336,10 @@ class StrategyComparisonEngine:
         # 4. 生成对比报告
         print(f"\n4. 生成策略对比报告...")
         comparison_report = self.generate_comparison_report()
+        self.comparison_report = comparison_report
         
         return {
+
             'portfolio': portfolio,
             'strategy_results': self.strategy_results,
             'strategy_metrics': self.strategy_metrics,

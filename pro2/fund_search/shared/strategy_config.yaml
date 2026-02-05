@@ -287,3 +287,80 @@ default_strategy:
   redeem_amount: 0
   label: "🔴 **未知状态**"
   description: "不买入，不赎回"
+
+# ============================================
+# 增强功能配置 (Enhanced Features)
+# ============================================
+
+# 分层止损配置
+layered_stop_loss:
+  enabled: true
+  levels:
+    - threshold: -0.05
+      action: reduce
+      ratio: 0.20
+      description: "第一级止损：亏损5%时减仓20%"
+    - threshold: -0.10
+      action: reduce
+      ratio: 0.30
+      description: "第二级止损：亏损10%时减仓30%"
+    - threshold: -0.15
+      action: exit
+      ratio: 1.00
+      description: "第三级止损：亏损15%时全部退出"
+  cooldown_days: 5
+
+# 信号确认配置
+signal_confirmation:
+  enabled: true
+  min_confirmation_days: 2
+  strong_signal_days: 3
+
+# 动态阈值配置
+dynamic_threshold:
+  enabled: true
+  baseline_volatility: 0.15
+  min_adjustment: 0.5
+  max_adjustment: 2.0
+
+# 趋势检测配置
+trend_detection:
+  ma_periods: [5, 10, 20]
+  adx_period: 14
+  strong_trend_threshold: 25
+  weak_trend_threshold: 15
+
+# 市场状态配置
+market_regime:
+  bull_market:
+    vix_max: 0.15
+    return_min: 0.3
+    breadth_min: 1.2
+    position_adjustment: 1.2
+  bear_market:
+    vix_min: 0.30
+    return_max: -0.5
+    breadth_max: 0.7
+    position_adjustment: 0.5
+  volatile:
+    vix_min: 0.25
+    position_adjustment: 0.7
+  ranging:
+    position_adjustment: 1.0
+
+# 智能定投配置
+smart_dca:
+  enabled: true
+  valuation_thresholds:
+    extremely_low: 20
+    low: 40
+    normal: 60
+    high: 80
+  multipliers:
+    extremely_low: 2.0
+    low: 1.5
+    normal: 1.0
+    high: 0.5
+    extremely_high: 0.0
+  max_multiplier: 3.0
+  min_multiplier: 0.0
