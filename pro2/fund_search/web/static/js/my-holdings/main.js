@@ -238,7 +238,7 @@ const FundApp = {
             // 恢复按钮状态
             analysisBtn.disabled = false;
             analysisBtn.classList.remove('btn-loading');
-            if (btnText && btnText !== analysisBtn) btnText.textContent = '综合分析';
+            if (btnText && btnText !== analysisBtn) btnText.textContent = '相关性分析';
             if (btnIcon) {
                 btnIcon.className = 'bi bi-chart-line';
             }

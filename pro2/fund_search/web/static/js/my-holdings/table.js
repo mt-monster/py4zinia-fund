@@ -271,7 +271,7 @@ const FundTable = {
         const btn = document.getElementById('analysis-btn');
         const count = FundState.selectedFunds.size;
         btn.disabled = count < 2;
-        btn.innerHTML = `<i class="bi bi-chart-line"></i> 分析 (${count})`;
+        btn.innerHTML = `<i class="bi bi-chart-line"></i> 相关性分析 (${count})`;
     },
 
     /**
