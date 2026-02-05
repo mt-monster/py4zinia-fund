@@ -117,11 +117,15 @@ const PortfolioAnalysis = {
             return;
         }
 
-        // 计算绩效指标
-        const metrics = this.calculateMetrics(backtestData);
-        
-        // 生成净值数据（等待异步操作完成）
+        // 【重要】先获取净值数据，再计算绩效指标
+        // 确保绩效指标和净值曲线使用同一数据源
         const navData = await this.generateNavData(backtestData);
+        
+        // 将净值数据附加到回测数据中，用于计算真实绩效指标
+        backtestData.navData = navData;
+        
+        // 基于真实净值数据计算绩效指标
+        const metrics = this.calculateMetrics(backtestData);
         
         // 渲染分析结果
         this.renderAnalysis(metrics, navData);
@@ -619,12 +623,34 @@ const PortfolioAnalysis = {
      */
     drawNavChart(data) {
         const canvas = document.getElementById('portfolio-nav-chart');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('❌ 找不到 portfolio-nav-chart canvas 元素');
+            return;
+        }
+
+        console.log('📊 开始绘制净值曲线，数据点数量:', data ? data.length : 0);
+        
+        if (!data || data.length === 0) {
+            console.error('❌ 净值数据为空');
+            return;
+        }
 
         const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-        const margin = { top: 20, right: 20, bottom: 40, left: 60 };
+        
+        // 处理高清屏
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        
+        // 设置 canvas 实际尺寸
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        
+        // 缩放上下文以匹配 CSS 尺寸
+        ctx.scale(dpr, dpr);
+        
+        const width = rect.width;
+        const height = rect.height;
+        const margin = { top: 30, right: 30, bottom: 60, left: 70 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
 
@@ -638,18 +664,303 @@ const PortfolioAnalysis = {
         const valueRange = maxValue - minValue;
         const padding = valueRange * 0.1;
 
+        // 保存图表状态以供鼠标事件使用
+        this.chartState = {
+            data: data,
+            margin: margin,
+            chartWidth: chartWidth,
+            chartHeight: chartHeight,
+            minValue: minValue - padding,
+            maxValue: maxValue + padding,
+            canvas: canvas,
+            width: width,
+            height: height
+        };
+
+        // 绘制背景
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
+
         // 绘制坐标轴
-        this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue - padding, maxValue + padding);
+        this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue - padding, maxValue + padding, data);
 
         // 绘制净值曲线
         this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#007bff');
         this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#dc3545');
+
+        // 绘制图例
+        this.drawLegend(ctx, margin, chartWidth);
+
+        // 添加鼠标悬停事件
+        this.bindChartEvents(canvas, ctx);
+        
+        console.log('✅ 净值曲线绘制完成');
+    },
+
+    /**
+     * 绘制图例
+     */
+    drawLegend(ctx, margin, chartWidth) {
+        const legendX = margin.left + chartWidth - 180;
+        const legendY = margin.top + 10;
+        
+        ctx.font = '12px Arial';
+        
+        // 组合净值图例
+        ctx.fillStyle = '#007bff';
+        ctx.fillRect(legendX, legendY, 20, 3);
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'left';
+        ctx.fillText('组合净值', legendX + 25, legendY + 5);
+        
+        // 沪深300基准图例
+        ctx.fillStyle = '#dc3545';
+        ctx.fillRect(legendX + 90, legendY, 20, 3);
+        ctx.fillStyle = '#333';
+        ctx.fillText('沪深300', legendX + 115, legendY + 5);
+    },
+
+    /**
+     * 绑定图表鼠标事件
+     */
+    bindChartEvents(canvas, ctx) {
+        console.log('🔗 绑定图表鼠标事件');
+        
+        // 移除旧事件
+        if (this.chartMouseMoveHandler) {
+            canvas.removeEventListener('mousemove', this.chartMouseMoveHandler);
+        }
+        if (this.chartMouseLeaveHandler) {
+            canvas.removeEventListener('mouseleave', this.chartMouseLeaveHandler);
+        }
+
+        // 创建或获取tooltip元素
+        let tooltip = document.getElementById('chart-tooltip');
+        if (tooltip) {
+            tooltip.remove(); // 移除旧的tooltip
+        }
+        
+        tooltip = document.createElement('div');
+        tooltip.id = 'chart-tooltip';
+        tooltip.style.cssText = `
+            position: fixed;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            pointer-events: none;
+            z-index: 99999;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            min-width: 220px;
+            line-height: 1.8;
+            font-family: Arial, sans-serif;
+        `;
+        document.body.appendChild(tooltip);
+        
+        // 设置 canvas 样式以显示手形光标
+        canvas.style.cursor = 'crosshair';
+
+        // 鼠标移动事件处理
+        this.chartMouseMoveHandler = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            const state = this.chartState;
+            if (!state) {
+                console.warn('⚠️ chartState 未定义');
+                return;
+            }
+            
+            const { data, margin, chartWidth, chartHeight, minValue, maxValue } = state;
+            
+            // 检查是否在图表区域内
+            if (x < margin.left || x > margin.left + chartWidth ||
+                y < margin.top || y > margin.top + chartHeight) {
+                tooltip.style.display = 'none';
+                return;
+            }
+            
+            // 计算最近的数据点
+            const dataIndex = Math.round((x - margin.left) / chartWidth * (data.length - 1));
+            const clampedIndex = Math.max(0, Math.min(data.length - 1, dataIndex));
+            const point = data[clampedIndex];
+            
+            if (!point) {
+                tooltip.style.display = 'none';
+                return;
+            }
+            
+            // 计算当日收益率
+            let dailyReturn = 0;
+            let benchmarkDailyReturn = 0;
+            if (clampedIndex > 0) {
+                const prevPoint = data[clampedIndex - 1];
+                dailyReturn = ((point.portfolio - prevPoint.portfolio) / prevPoint.portfolio * 100);
+                benchmarkDailyReturn = ((point.benchmark - prevPoint.benchmark) / prevPoint.benchmark * 100);
+            }
+            
+            // 计算累计收益率
+            const totalReturn = ((point.portfolio - data[0].portfolio) / data[0].portfolio * 100);
+            const benchmarkReturn = ((point.benchmark - data[0].benchmark) / data[0].benchmark * 100);
+            const excessReturn = totalReturn - benchmarkReturn;
+            
+            // 颜色
+            const dailyColor = dailyReturn >= 0 ? '#4ade80' : '#f87171';
+            const totalColor = totalReturn >= 0 ? '#4ade80' : '#f87171';
+            const excessColor = excessReturn >= 0 ? '#4ade80' : '#f87171';
+            
+            // 构建tooltip内容
+            tooltip.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); font-size: 14px;">
+                    📅 ${point.date || '未知日期'}
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>💼 组合净值:</span>
+                        <span style="color: #60a5fa; font-weight: bold;">¥${point.portfolio.toFixed(2)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📊 沪深300:</span>
+                        <span style="color: #f472b6; font-weight: bold;">¥${point.benchmark.toFixed(2)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📈 当日收益:</span>
+                        <span style="color: ${dailyColor}; font-weight: bold;">${dailyReturn >= 0 ? '+' : ''}${dailyReturn.toFixed(3)}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📉 累计收益:</span>
+                        <span style="color: ${totalColor}; font-weight: bold;">${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>🎯 超额收益:</span>
+                        <span style="color: ${excessColor}; font-weight: bold;">${excessReturn >= 0 ? '+' : ''}${excessReturn.toFixed(2)}%</span>
+                    </div>
+                </div>
+            `;
+            
+            // 定位tooltip - 使用 fixed 定位
+            let tooltipX = event.clientX + 15;
+            let tooltipY = event.clientY - 10;
+            
+            // 确保tooltip不超出视口
+            const tooltipWidth = 240;
+            const tooltipHeight = 200;
+            
+            if (tooltipX + tooltipWidth > window.innerWidth) {
+                tooltipX = event.clientX - tooltipWidth - 15;
+            }
+            if (tooltipY + tooltipHeight > window.innerHeight) {
+                tooltipY = event.clientY - tooltipHeight - 10;
+            }
+            if (tooltipY < 10) {
+                tooltipY = 10;
+            }
+            
+            tooltip.style.left = tooltipX + 'px';
+            tooltip.style.top = tooltipY + 'px';
+            tooltip.style.display = 'block';
+            
+            // 绘制高亮点
+            this.drawHighlightPoint(canvas, clampedIndex, point);
+        };
+
+        // 鼠标离开事件处理
+        this.chartMouseLeaveHandler = () => {
+            tooltip.style.display = 'none';
+            this.redrawChart();
+        };
+
+        canvas.addEventListener('mousemove', this.chartMouseMoveHandler);
+        canvas.addEventListener('mouseleave', this.chartMouseLeaveHandler);
+        
+        console.log('✅ 图表鼠标事件绑定完成');
+    },
+
+    /**
+     * 绘制高亮数据点
+     */
+    drawHighlightPoint(canvas, index, point) {
+        // 重新绘制图表
+        this.redrawChart();
+        
+        const state = this.chartState;
+        if (!state) return;
+        
+        const ctx = canvas.getContext('2d');
+        const { data, margin, chartWidth, chartHeight, minValue, maxValue } = state;
+        
+        // 计算点坐标
+        const x = margin.left + (chartWidth / (data.length - 1)) * index;
+        const yPortfolio = margin.top + chartHeight - ((point.portfolio - minValue) / (maxValue - minValue)) * chartHeight;
+        const yBenchmark = margin.top + chartHeight - ((point.benchmark - minValue) / (maxValue - minValue)) * chartHeight;
+        
+        // 绘制垂直参考线
+        ctx.strokeStyle = 'rgba(100, 100, 100, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, margin.top + chartHeight);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // 绘制高亮圆点 - 组合净值
+        ctx.fillStyle = '#007bff';
+        ctx.beginPath();
+        ctx.arc(x, yPortfolio, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 绘制高亮圆点 - 基准
+        ctx.fillStyle = '#dc3545';
+        ctx.beginPath();
+        ctx.arc(x, yBenchmark, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    },
+
+    /**
+     * 重新绘制图表（不触发事件绑定）
+     */
+    redrawChart() {
+        const state = this.chartState;
+        if (!state) return;
+        
+        const canvas = state.canvas;
+        const ctx = canvas.getContext('2d');
+        const { data, margin, chartWidth, chartHeight, minValue, maxValue, width, height } = state;
+        
+        // 处理高清屏
+        const dpr = window.devicePixelRatio || 1;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        
+        // 清除画布
+        ctx.clearRect(0, 0, width, height);
+        
+        // 绘制背景
+        ctx.fillStyle = '#fafafa';
+        ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
+        
+        // 重新绘制坐标轴和曲线
+        this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue, data);
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue, maxValue, '#007bff');
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue, maxValue, '#dc3545');
+        this.drawLegend(ctx, margin, chartWidth);
     },
 
     /**
      * 绘制坐标轴
      */
-    drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue) {
+    drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue, data) {
+        // 绘制坐标轴线
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
 
@@ -665,10 +976,18 @@ const PortfolioAnalysis = {
         ctx.lineTo(margin.left, margin.top + chartHeight);
         ctx.stroke();
 
-        // 网格线和标签
+        // Y轴网格线和标签
         ctx.strokeStyle = '#e0e0e0';
+        ctx.fillStyle = '#666';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        
         for (let i = 0; i <= 5; i++) {
             const y = margin.top + (chartHeight / 5) * i;
+            
+            // 网格线
+            ctx.strokeStyle = '#e8e8e8';
             ctx.beginPath();
             ctx.moveTo(margin.left, y);
             ctx.lineTo(margin.left + chartWidth, y);
@@ -677,16 +996,126 @@ const PortfolioAnalysis = {
             // Y轴标签
             const value = maxValue - (maxValue - minValue) * (i / 5);
             ctx.fillStyle = '#666';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'right';
-            ctx.fillText('¥' + value.toFixed(0), margin.left - 10, y + 4);
+            ctx.fillText('¥' + value.toFixed(0), margin.left - 8, y);
         }
 
-        // X轴标签（日期）
-        ctx.fillStyle = '#666';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('回测期', margin.left + chartWidth / 2, margin.top + chartHeight + 30);
+        // X轴日期标签
+        if (data && data.length > 0) {
+            console.log('📅 绘制X轴日期标签，数据长度:', data.length);
+            
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            
+            // 根据数据量动态计算显示间隔
+            const totalPoints = data.length;
+            let labelCount = 6; // 目标显示的标签数量
+            
+            if (totalPoints <= 30) {
+                labelCount = Math.min(totalPoints, 6);
+            } else if (totalPoints <= 90) {
+                labelCount = 6;
+            } else if (totalPoints <= 365) {
+                labelCount = 8;
+            } else {
+                labelCount = 10;
+            }
+            
+            const labelInterval = Math.max(1, Math.floor((totalPoints - 1) / (labelCount - 1)));
+            
+            // 绘制X轴刻度和标签
+            for (let i = 0; i < totalPoints; i += labelInterval) {
+                const x = margin.left + (chartWidth / (totalPoints - 1)) * i;
+                const point = data[i];
+                
+                if (point && point.date) {
+                    // 绘制刻度线
+                    ctx.strokeStyle = '#999';
+                    ctx.beginPath();
+                    ctx.moveTo(x, margin.top + chartHeight);
+                    ctx.lineTo(x, margin.top + chartHeight + 6);
+                    ctx.stroke();
+                    
+                    // 格式化日期显示
+                    const dateStr = this.formatDateLabel(point.date);
+                    ctx.fillStyle = '#555';
+                    ctx.font = '10px Arial';
+                    
+                    // 旋转绘制日期标签
+                    ctx.save();
+                    ctx.translate(x, margin.top + chartHeight + 12);
+                    ctx.rotate(-Math.PI / 5);  // 旋转36度
+                    ctx.textAlign = 'right';
+                    ctx.fillText(dateStr, 0, 0);
+                    ctx.restore();
+                }
+            }
+            
+            // 确保最后一个日期显示
+            const lastIndex = totalPoints - 1;
+            const lastX = margin.left + chartWidth;
+            const lastPoint = data[lastIndex];
+            
+            if (lastPoint && lastPoint.date && lastIndex % labelInterval !== 0) {
+                ctx.strokeStyle = '#999';
+                ctx.beginPath();
+                ctx.moveTo(lastX, margin.top + chartHeight);
+                ctx.lineTo(lastX, margin.top + chartHeight + 6);
+                ctx.stroke();
+                
+                const dateStr = this.formatDateLabel(lastPoint.date);
+                ctx.fillStyle = '#555';
+                ctx.font = '10px Arial';
+                ctx.save();
+                ctx.translate(lastX, margin.top + chartHeight + 12);
+                ctx.rotate(-Math.PI / 5);
+                ctx.textAlign = 'right';
+                ctx.fillText(dateStr, 0, 0);
+                ctx.restore();
+            }
+            
+            console.log('✅ X轴日期标签绘制完成');
+        } else {
+            console.warn('⚠️ 没有数据用于绘制X轴标签');
+        }
+    },
+
+    /**
+     * 格式化日期标签
+     */
+    formatDateLabel(dateStr) {
+        if (!dateStr) {
+            console.warn('⚠️ 日期字符串为空');
+            return '';
+        }
+        
+        try {
+            // 处理不同的日期格式
+            let formattedDate = '';
+            
+            if (dateStr.includes('-')) {
+                // 格式: "YYYY-MM-DD" 或 "YYYY-M-D"
+                const parts = dateStr.split('-');
+                if (parts.length >= 3) {
+                    const month = parts[1].padStart(2, '0');
+                    const day = parts[2].padStart(2, '0');
+                    formattedDate = `${month}/${day}`;
+                }
+            } else if (dateStr.includes('/')) {
+                // 格式: "YYYY/MM/DD" 或 "MM/DD/YYYY"
+                const parts = dateStr.split('/');
+                if (parts.length >= 2) {
+                    formattedDate = `${parts[0]}/${parts[1]}`;
+                }
+            } else {
+                // 其他格式，尝试截取
+                formattedDate = dateStr.length > 5 ? dateStr.substring(5) : dateStr;
+            }
+            
+            return formattedDate || dateStr;
+        } catch (e) {
+            console.error('日期格式化错误:', e);
+            return dateStr;
+        }
     },
 
     /**
@@ -807,8 +1236,14 @@ const PortfolioAnalysis = {
 
             .chart-container {
                 position: relative;
-                height: 300px;
+                height: 350px;
                 margin: 1rem 0;
+                padding-bottom: 20px;
+            }
+            
+            .chart-container canvas {
+                width: 100% !important;
+                height: 100% !important;
             }
 
             .chart-legend {
