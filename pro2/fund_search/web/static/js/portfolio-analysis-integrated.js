@@ -479,7 +479,7 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 渲染分析结果
+     * 渲染分析结果 - 优化后的UI结构
      */
     renderAnalysis(metrics, navData) {
         // 创建分析结果容器
@@ -488,27 +488,38 @@ const PortfolioAnalysis = {
             existingAnalysis.remove();
         }
 
+        // 计算超额收益
+        const excessReturn = navData && navData.length > 1 
+            ? ((navData[navData.length - 1].portfolio - navData[0].portfolio) / navData[0].portfolio * 100) - 
+              ((navData[navData.length - 1].benchmark - navData[0].benchmark) / navData[0].benchmark * 100)
+            : 0;
+
         const analysisHTML = `
             <div id="portfolio-analysis-result" class="portfolio-analysis-container">
                 <div class="analysis-header">
-                    <h4><i class="bi bi-graph-up-arrow me-2"></i>投资组合深度分析</h4>
-                    <button type="button" class="btn-close" onclick="PortfolioAnalysis.closeAnalysis()"></button>
+                    <div class="header-content">
+                        <h4><i class="bi bi-graph-up-arrow"></i>投资组合深度分析</h4>
+                        <div class="header-subtitle">基于历史数据的专业绩效评估与风险分析</div>
+                    </div>
+                    <button type="button" class="btn-close-analysis" onclick="PortfolioAnalysis.closeAnalysis()" title="关闭分析">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
                 
                 <div class="metrics-section">
-                    <h5 class="mb-3">关键绩效指标</h5>
+                    <h5 class="section-title"><i class="bi bi-speedometer2"></i>关键绩效指标</h5>
                     <div class="metrics-grid">
                         <div class="metric-card">
                             <div class="metric-icon"><i class="bi bi-cash-stack"></i></div>
                             <div class="metric-value ${metrics.totalReturn >= 0 ? 'positive' : 'negative'}">
-                                ${metrics.totalReturn.toFixed(2)}%
+                                ${metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toFixed(2)}%
                             </div>
                             <div class="metric-label">总收益率</div>
                         </div>
                         <div class="metric-card">
                             <div class="metric-icon"><i class="bi bi-graph-up"></i></div>
                             <div class="metric-value ${metrics.annualizedReturn >= 0 ? 'positive' : 'negative'}">
-                                ${metrics.annualizedReturn.toFixed(2)}%
+                                ${metrics.annualizedReturn >= 0 ? '+' : ''}${metrics.annualizedReturn.toFixed(2)}%
                             </div>
                             <div class="metric-label">年化收益率</div>
                         </div>
@@ -518,19 +529,19 @@ const PortfolioAnalysis = {
                             <div class="metric-label">年化波动率</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-icon"><i class="bi bi-arrow-down-up"></i></div>
+                            <div class="metric-icon"><i class="bi bi-arrow-down-circle"></i></div>
                             <div class="metric-value negative">${metrics.maxDrawdown.toFixed(2)}%</div>
                             <div class="metric-label">最大回撤</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-icon"><i class="bi bi-speedometer2"></i></div>
+                            <div class="metric-icon"><i class="bi bi-speedometer"></i></div>
                             <div class="metric-value ${metrics.sharpeRatio >= 0 ? 'positive' : 'negative'}">
                                 ${metrics.sharpeRatio.toFixed(2)}
                             </div>
                             <div class="metric-label">夏普比率</div>
                         </div>
                         <div class="metric-card">
-                            <div class="metric-icon"><i class="bi bi-info-circle"></i></div>
+                            <div class="metric-icon"><i class="bi bi-bar-chart-line"></i></div>
                             <div class="metric-value ${metrics.informationRatio >= 0 ? 'positive' : 'negative'}">
                                 ${metrics.informationRatio.toFixed(2)}
                             </div>
@@ -540,66 +551,72 @@ const PortfolioAnalysis = {
                 </div>
 
                 <div class="chart-section">
-                    <h5 class="mb-3">净值曲线对比</h5>
+                    <h5 class="section-title"><i class="bi bi-graph-up-arrow"></i>净值曲线对比</h5>
                     <div class="chart-container">
-                        <canvas id="portfolio-nav-chart" width="800" height="300"></canvas>
+                        <canvas id="portfolio-nav-chart"></canvas>
                     </div>
                     <div class="chart-legend">
-                        <span class="legend-item portfolio"><i class="bi bi-circle-fill me-1"></i>组合净值</span>
-                        <span class="legend-item benchmark"><i class="bi bi-circle-fill me-1"></i>沪深300基准</span>
+                        <span class="legend-item portfolio"><i class="bi bi-circle-fill me-2"></i>组合净值</span>
+                        <span class="legend-item benchmark"><i class="bi bi-circle-fill me-2"></i>沪深300基准</span>
                     </div>
                 </div>
 
                 <div class="analysis-summary">
-                    <h5 class="mb-3">分析总结</h5>
+                    <h5 class="section-title"><i class="bi bi-clipboard-data"></i>分析总结</h5>
                     <div class="summary-content">
                         <div class="summary-item">
-                            <strong>回测周期：</strong>
+                            <strong>回测周期</strong>
                             <span class="positive">
-                                近${metrics.period}年（${metrics.totalDays}天）
+                                近${metrics.period}年（${metrics.totalDays}个交易日）
                             </span>
                         </div>
                         <div class="summary-item">
-                            <strong>组合表现：</strong>
+                            <strong>组合表现</strong>
                             <span class="${metrics.totalReturn >= 0 ? 'positive' : 'negative'}">
-                                ${metrics.totalReturn >= 0 ? '盈利' : '亏损'}${Math.abs(metrics.totalReturn).toFixed(2)}%
+                                ${metrics.totalReturn >= 0 ? '盈利' : '亏损'} ${Math.abs(metrics.totalReturn).toFixed(2)}%
                             </span>
                         </div>
                         <div class="summary-item">
-                            <strong>风险水平：</strong>
+                            <strong>超额收益</strong>
+                            <span class="${excessReturn >= 0 ? 'positive' : 'negative'}">
+                                ${excessReturn >= 0 ? '跑赢基准' : '跑输基准'} ${Math.abs(excessReturn).toFixed(2)}%
+                            </span>
+                        </div>
+                        <div class="summary-item">
+                            <strong>风险水平</strong>
                             <span class="${metrics.volatility > 20 ? 'negative' : metrics.volatility > 15 ? 'warning' : 'positive'}">
-                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}
+                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(1)}%）
                             </span>
                         </div>
                         <div class="summary-item">
-                            <strong>夏普比率：</strong>
+                            <strong>夏普比率</strong>
                             <span class="${metrics.sharpeRatio >= 1 ? 'positive' : metrics.sharpeRatio >= 0 ? 'warning' : 'negative'}">
-                                ${metrics.sharpeRatio >= 1 ? '优秀' : metrics.sharpeRatio >= 0 ? '一般' : '较差'}
+                                ${metrics.sharpeRatio >= 1 ? '优秀' : metrics.sharpeRatio >= 0 ? '一般' : '较差'}（${metrics.sharpeRatio.toFixed(2)}）
                             </span>
                         </div>
                         <div class="summary-item">
-                            <strong>最大回撤：</strong>
-                            <span class="${metrics.maxDrawdown > 10 ? 'negative' : metrics.maxDrawdown > 5 ? 'warning' : 'positive'}">
-                                ${metrics.maxDrawdown > 10 ? '风险较高' : metrics.maxDrawdown > 5 ? '风险适中' : '风险较低'}
+                            <strong>回撤控制</strong>
+                            <span class="${metrics.maxDrawdown > 15 ? 'negative' : metrics.maxDrawdown > 8 ? 'warning' : 'positive'}">
+                                ${metrics.maxDrawdown > 15 ? '需关注' : metrics.maxDrawdown > 8 ? '适中' : '良好'}（最大回撤 ${metrics.maxDrawdown.toFixed(2)}%）
                             </span>
                         </div>
                     </div>
                 </div>
 
                 <div class="formula-section">
-                    <h5 class="mb-3">指标说明</h5>
+                    <h5 class="section-title"><i class="bi bi-calculator"></i>指标说明</h5>
                     <div class="formula-grid">
                         <div class="formula-item">
-                            <strong>年化收益率：</strong> 将总收益率年化，便于不同期限的比较
+                            <strong>年化收益率</strong>：将总收益率按时间年化，便于不同期限投资的横向比较
                         </div>
                         <div class="formula-item">
-                            <strong>夏普比率：</strong> 衡量单位风险获得的超额收益，大于1为优秀
+                            <strong>夏普比率</strong>：衡量单位风险所获得的超额收益，大于1为优秀，小于0表示风险调整后收益为负
                         </div>
                         <div class="formula-item">
-                            <strong>最大回撤：</strong> 回测期间的最大亏损幅度，反映组合抗风险能力
+                            <strong>最大回撤</strong>：回测期间从峰值到谷值的最大跌幅，反映组合的极端风险承受情况
                         </div>
                         <div class="formula-item">
-                            <strong>信息比率：</strong> 衡量相对基准的超额收益能力
+                            <strong>信息比率</strong>：衡量相对于基准的超额收益能力，反映主动管理的效率
                         </div>
                     </div>
                 </div>
@@ -684,9 +701,9 @@ const PortfolioAnalysis = {
         // 绘制坐标轴
         this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue - padding, maxValue + padding, data);
 
-        // 绘制净值曲线
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#007bff');
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#dc3545');
+        // 绘制净值曲线 - 使用与首页一致的主题色
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#4361ee');
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#ef476f');
 
         // 绘制图例
         this.drawLegend(ctx, margin, chartWidth);
@@ -698,7 +715,7 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 绘制图例
+     * 绘制图例 - 使用主题色
      */
     drawLegend(ctx, margin, chartWidth) {
         const legendX = margin.left + chartWidth - 180;
@@ -706,15 +723,15 @@ const PortfolioAnalysis = {
         
         ctx.font = '12px Arial';
         
-        // 组合净值图例
-        ctx.fillStyle = '#007bff';
+        // 组合净值图例 - 主题色
+        ctx.fillStyle = '#4361ee';
         ctx.fillRect(legendX, legendY, 20, 3);
         ctx.fillStyle = '#333';
         ctx.textAlign = 'left';
         ctx.fillText('组合净值', legendX + 25, legendY + 5);
         
-        // 沪深300基准图例
-        ctx.fillStyle = '#dc3545';
+        // 沪深300基准图例 - 危险色
+        ctx.fillStyle = '#ef476f';
         ctx.fillRect(legendX + 90, legendY, 20, 3);
         ctx.fillStyle = '#333';
         ctx.fillText('沪深300', legendX + 115, legendY + 5);
@@ -744,18 +761,20 @@ const PortfolioAnalysis = {
         tooltip.id = 'chart-tooltip';
         tooltip.style.cssText = `
             position: fixed;
-            background: rgba(0, 0, 0, 0.9);
+            background: linear-gradient(135deg, rgba(67, 97, 238, 0.95) 0%, rgba(58, 12, 163, 0.95) 100%);
             color: white;
-            padding: 12px 16px;
-            border-radius: 8px;
+            padding: 14px 18px;
+            border-radius: 12px;
             font-size: 13px;
             pointer-events: none;
             z-index: 99999;
             display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            box-shadow: 0 8px 32px rgba(67, 97, 238, 0.3);
             min-width: 220px;
             line-height: 1.8;
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         `;
         document.body.appendChild(tooltip);
         
@@ -812,7 +831,7 @@ const PortfolioAnalysis = {
             const totalColor = totalReturn >= 0 ? '#4ade80' : '#f87171';
             const excessColor = excessReturn >= 0 ? '#4ade80' : '#f87171';
             
-            // 构建tooltip内容
+            // 构建tooltip内容 - 使用与首页一致的配色
             tooltip.innerHTML = `
                 <div style="font-weight: bold; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); font-size: 14px;">
                     📅 ${point.date || '未知日期'}
@@ -820,11 +839,11 @@ const PortfolioAnalysis = {
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                     <div style="display: flex; justify-content: space-between;">
                         <span>💼 组合净值:</span>
-                        <span style="color: #60a5fa; font-weight: bold;">¥${point.portfolio.toFixed(2)}</span>
+                        <span style="color: #818cf8; font-weight: bold;">¥${point.portfolio.toFixed(2)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>📊 沪深300:</span>
-                        <span style="color: #f472b6; font-weight: bold;">¥${point.benchmark.toFixed(2)}</span>
+                        <span style="color: #fb7185; font-weight: bold;">¥${point.benchmark.toFixed(2)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>📈 当日收益:</span>
@@ -907,8 +926,8 @@ const PortfolioAnalysis = {
         ctx.stroke();
         ctx.setLineDash([]);
         
-        // 绘制高亮圆点 - 组合净值
-        ctx.fillStyle = '#007bff';
+        // 绘制高亮圆点 - 组合净值（主题色）
+        ctx.fillStyle = '#4361ee';
         ctx.beginPath();
         ctx.arc(x, yPortfolio, 7, 0, Math.PI * 2);
         ctx.fill();
@@ -916,8 +935,8 @@ const PortfolioAnalysis = {
         ctx.lineWidth = 2;
         ctx.stroke();
         
-        // 绘制高亮圆点 - 基准
-        ctx.fillStyle = '#dc3545';
+        // 绘制高亮圆点 - 基准（危险色）
+        ctx.fillStyle = '#ef476f';
         ctx.beginPath();
         ctx.arc(x, yBenchmark, 7, 0, Math.PI * 2);
         ctx.fill();
@@ -951,8 +970,8 @@ const PortfolioAnalysis = {
         
         // 重新绘制坐标轴和曲线
         this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue, data);
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue, maxValue, '#007bff');
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue, maxValue, '#dc3545');
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue, maxValue, '#4361ee');
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue, maxValue, '#ef476f');
         this.drawLegend(ctx, margin, chartWidth);
     },
 
@@ -1151,7 +1170,7 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 添加样式
+     * 添加样式 - 与网站首页保持一致的设计风格
      */
     addStyles() {
         if (document.getElementById('portfolio-analysis-styles')) return;
@@ -1159,31 +1178,111 @@ const PortfolioAnalysis = {
         const style = document.createElement('style');
         style.id = 'portfolio-analysis-styles';
         style.textContent = `
+            /* ============================================
+               设计系统变量 - 与首页保持一致
+               ============================================ */
             .portfolio-analysis-container {
-                background: white;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                margin: 2rem 0;
-                overflow: hidden;
+                --primary-color: #4361ee;
+                --primary-dark: #3a56d4;
+                --primary-light: #edf2ff;
+                --secondary-color: #6c757d;
+                --success-color: #06d6a0;
+                --success-dark: #05b38a;
+                --success-light: #e8fcf3;
+                --danger-color: #ef476f;
+                --danger-dark: #d4355d;
+                --danger-light: #fceced;
+                --warning-color: #ffd166;
+                --warning-dark: #e6bc5c;
+                --warning-light: #fff9e6;
+                --info-color: #118ab2;
+                --light-bg: #f8f9fa;
+                --border-color: #e0e0e0;
+                --text-primary: #212529;
+                --text-secondary: #6c757d;
+                --card-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+                --card-shadow-hover: 0 12px 30px rgba(67, 97, 238, 0.15);
+                --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                --border-radius: 12px;
+                --spacing-xs: 0.25rem;
+                --spacing-sm: 0.5rem;
+                --spacing-md: 1rem;
+                --spacing-lg: 1.5rem;
+                --spacing-xl: 2rem;
             }
 
+            /* ============================================
+               主容器样式
+               ============================================ */
+            .portfolio-analysis-container {
+                background: white;
+                border-radius: var(--border-radius);
+                box-shadow: var(--card-shadow);
+                margin: var(--spacing-xl) 0;
+                overflow: hidden;
+                border: none;
+                font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            }
+
+            .portfolio-analysis-container:hover {
+                box-shadow: var(--card-shadow-hover);
+            }
+
+            /* ============================================
+               头部样式 - 渐变色与首页导航一致
+               ============================================ */
             .analysis-header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
                 color: white;
-                padding: 1.5rem 2rem;
+                padding: var(--spacing-lg) var(--spacing-xl);
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .analysis-header::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+                opacity: 0.5;
             }
 
             .analysis-header h4 {
                 margin: 0;
-                font-weight: 600;
+                font-weight: 700;
+                font-size: 1.25rem;
+                letter-spacing: 0.5px;
+                position: relative;
+                z-index: 1;
+                display: flex;
+                align-items: center;
             }
 
+            .analysis-header h4 i {
+                margin-right: 0.75rem;
+                font-size: 1.4rem;
+            }
+
+            .analysis-header .header-subtitle {
+                font-size: 0.85rem;
+                opacity: 0.9;
+                margin-top: 0.25rem;
+                font-weight: 400;
+            }
+
+            /* ============================================
+               各区域样式
+               ============================================ */
             .metrics-section, .chart-section, .analysis-summary, .formula-section {
-                padding: 2rem;
-                border-bottom: 1px solid #e9ecef;
+                padding: var(--spacing-xl);
+                border-bottom: 1px solid var(--border-color);
+                position: relative;
             }
 
             .metrics-section:last-child, .chart-section:last-child, 
@@ -1191,54 +1290,128 @@ const PortfolioAnalysis = {
                 border-bottom: none;
             }
 
+            /* ============================================
+               Section 标题样式
+               ============================================ */
+            .section-title {
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                margin-bottom: var(--spacing-lg);
+                display: flex;
+                align-items: center;
+                position: relative;
+                padding-left: var(--spacing-md);
+            }
+
+            .section-title::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 4px;
+                height: 100%;
+                background: linear-gradient(180deg, var(--primary-color), var(--success-color));
+                border-radius: 2px;
+            }
+
+            .section-title i {
+                margin-right: 0.5rem;
+                color: var(--primary-color);
+            }
+
+            /* ============================================
+               指标网格
+               ============================================ */
             .metrics-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 1.5rem;
-                margin-top: 1rem;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: var(--spacing-lg);
+                margin-top: var(--spacing-md);
             }
 
-            .metric-card {
-                background: #f8f9fa;
-                border-radius: 8px;
-                padding: 1.5rem;
+            /* ============================================
+               指标卡片 - 与首页风格一致
+               ============================================ */
+            .portfolio-analysis-container .metric-card {
+                background: white;
+                border-radius: var(--border-radius);
+                padding: var(--spacing-lg);
                 text-align: center;
-                transition: transform 0.2s ease;
-                border: 1px solid #e9ecef;
+                transition: var(--transition);
+                border: 1px solid var(--border-color);
+                position: relative;
+                overflow: hidden;
+                height: 100%;
             }
 
-            .metric-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            .portfolio-analysis-container .metric-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 3px;
+                background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+                transform: scaleX(0);
+                transform-origin: left;
+                transition: var(--transition);
+            }
+
+            .portfolio-analysis-container .metric-card:hover {
+                transform: translateY(-5px);
+                box-shadow: var(--card-shadow-hover);
+                border-color: var(--primary-color);
+            }
+
+            .portfolio-analysis-container .metric-card:hover::before {
+                transform: scaleX(1);
             }
 
             .metric-icon {
-                font-size: 2rem;
-                margin-bottom: 0.5rem;
-                color: #007bff;
+                font-size: 2.2rem;
+                margin-bottom: var(--spacing-sm);
+                color: var(--primary-color);
+                opacity: 0.9;
             }
 
-            .metric-value {
-                font-size: 1.8rem;
-                font-weight: bold;
-                margin-bottom: 0.5rem;
+            .portfolio-analysis-container .metric-value {
+                font-size: 1.7rem;
+                font-weight: 800;
+                margin-bottom: var(--spacing-xs);
+                line-height: 1.2;
             }
 
-            .metric-value.positive { color: #28a745; }
-            .metric-value.negative { color: #dc3545; }
-            .metric-value.warning { color: #ffc107; }
+            .portfolio-analysis-container .metric-value.positive { 
+                color: var(--success-color); 
+            }
+            .portfolio-analysis-container .metric-value.negative { 
+                color: var(--danger-color); 
+            }
+            .portfolio-analysis-container .metric-value.warning { 
+                color: var(--warning-color); 
+            }
 
-            .metric-label {
-                color: #6c757d;
+            .portfolio-analysis-container .metric-label {
+                color: var(--text-secondary);
                 font-size: 0.9rem;
                 font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
 
+            /* ============================================
+               图表容器样式
+               ============================================ */
             .chart-container {
                 position: relative;
-                height: 350px;
-                margin: 1rem 0;
-                padding-bottom: 20px;
+                height: 380px;
+                margin: var(--spacing-md) 0;
+                padding: var(--spacing-md);
+                background: var(--light-bg);
+                border-radius: var(--border-radius);
+                border: 1px solid var(--border-color);
             }
             
             .chart-container canvas {
@@ -1246,84 +1419,251 @@ const PortfolioAnalysis = {
                 height: 100% !important;
             }
 
+            /* ============================================
+               图例样式
+               ============================================ */
             .chart-legend {
                 display: flex;
                 justify-content: center;
-                gap: 2rem;
-                margin-top: 1rem;
+                gap: var(--spacing-xl);
+                margin-top: var(--spacing-md);
+                padding: var(--spacing-sm) 0;
             }
 
             .legend-item {
                 display: flex;
                 align-items: center;
                 font-size: 0.9rem;
+                font-weight: 500;
+                padding: var(--spacing-xs) var(--spacing-sm);
+                border-radius: 20px;
+                transition: var(--transition);
             }
 
-            .legend-item.portfolio { color: #007bff; }
-            .legend-item.benchmark { color: #dc3545; }
+            .legend-item:hover {
+                background: var(--light-bg);
+            }
 
+            .legend-item.portfolio { 
+                color: var(--primary-color); 
+            }
+            .legend-item.portfolio i {
+                color: var(--primary-color);
+            }
+            .legend-item.benchmark { 
+                color: var(--danger-color); 
+            }
+            .legend-item.benchmark i {
+                color: var(--danger-color);
+            }
+
+            /* ============================================
+               分析总结样式
+               ============================================ */
             .summary-content {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 1rem;
-                margin-top: 1rem;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: var(--spacing-md);
+                margin-top: var(--spacing-md);
             }
 
             .summary-item {
-                background: #f8f9fa;
-                padding: 1rem;
-                border-radius: 6px;
-                border-left: 4px solid #007bff;
+                background: white;
+                padding: var(--spacing-md) var(--spacing-lg);
+                border-radius: var(--border-radius);
+                border-left: 4px solid var(--primary-color);
+                transition: var(--transition);
+                border: 1px solid var(--border-color);
+                border-left: 4px solid var(--primary-color);
             }
 
+            .summary-item:hover {
+                transform: translateX(5px);
+                box-shadow: var(--card-shadow);
+            }
+
+            .summary-item strong {
+                color: var(--text-secondary);
+                font-weight: 600;
+                font-size: 0.85rem;
+            }
+
+            .summary-item span {
+                font-weight: 700;
+                font-size: 0.95rem;
+            }
+
+            .summary-item span.positive {
+                color: var(--success-color);
+            }
+
+            .summary-item span.negative {
+                color: var(--danger-color);
+            }
+
+            .summary-item span.warning {
+                color: var(--warning-color);
+            }
+
+            /* ============================================
+               公式说明样式
+               ============================================ */
             .formula-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 1rem;
-                margin-top: 1rem;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: var(--spacing-md);
+                margin-top: var(--spacing-md);
             }
 
             .formula-item {
-                background: #f8f9fa;
-                padding: 1rem;
-                border-radius: 6px;
-                border-left: 4px solid #28a745;
+                background: white;
+                padding: var(--spacing-md);
+                border-radius: var(--border-radius);
+                border-left: 4px solid var(--success-color);
                 font-size: 0.9rem;
+                transition: var(--transition);
+                border: 1px solid var(--border-color);
+                border-left: 4px solid var(--success-color);
             }
 
-            .btn-close {
-                background: none;
+            .formula-item:hover {
+                transform: translateX(5px);
+                box-shadow: var(--card-shadow);
+            }
+
+            .formula-item strong {
+                color: var(--primary-color);
+                font-weight: 600;
+            }
+
+            /* ============================================
+               关闭按钮
+               ============================================ */
+            .btn-close-analysis {
+                background: rgba(255, 255, 255, 0.2);
                 border: none;
-                font-size: 1.5rem;
+                font-size: 1.25rem;
                 color: white;
                 cursor: pointer;
-                opacity: 0.8;
+                opacity: 0.9;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: var(--transition);
+                position: relative;
+                z-index: 1;
             }
 
-            .btn-close:hover {
+            .btn-close-analysis:hover {
                 opacity: 1;
+                background: rgba(255, 255, 255, 0.3);
+                transform: rotate(90deg);
             }
 
-            h5 {
-                color: #495057;
-                font-weight: 600;
-                margin-bottom: 1rem;
+            /* ============================================
+               响应式设计
+               ============================================ */
+            @media (max-width: 992px) {
+                .metrics-grid {
+                    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                    gap: var(--spacing-md);
+                }
             }
 
             @media (max-width: 768px) {
                 .metrics-grid {
-                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                    gap: 1rem;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: var(--spacing-sm);
                 }
                 
                 .analysis-header {
-                    padding: 1rem;
+                    padding: var(--spacing-md);
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: var(--spacing-sm);
+                }
+
+                .analysis-header h4 {
+                    font-size: 1.1rem;
+                }
+
+                .btn-close-analysis {
+                    position: absolute;
+                    top: var(--spacing-md);
+                    right: var(--spacing-md);
                 }
                 
                 .metrics-section, .chart-section, .analysis-summary, .formula-section {
-                    padding: 1.5rem;
+                    padding: var(--spacing-lg);
+                }
+
+                .portfolio-analysis-container .metric-value {
+                    font-size: 1.4rem;
+                }
+
+                .chart-container {
+                    height: 300px;
+                }
+
+                .summary-content {
+                    grid-template-columns: 1fr;
+                }
+
+                .formula-grid {
+                    grid-template-columns: 1fr;
                 }
             }
+
+            @media (max-width: 576px) {
+                .metrics-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                .portfolio-analysis-container .metric-card {
+                    padding: var(--spacing-md);
+                }
+
+                .portfolio-analysis-container .metric-value {
+                    font-size: 1.2rem;
+                }
+
+                .metric-icon {
+                    font-size: 1.5rem;
+                }
+            }
+
+            /* ============================================
+               动画效果
+               ============================================ */
+            @keyframes slideInUp {
+                from {
+                    opacity: 0;
+                    transform: translateY(30px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .portfolio-analysis-container {
+                animation: slideInUp 0.4s ease-out;
+            }
+
+            .portfolio-analysis-container .metric-card {
+                animation: slideInUp 0.4s ease-out;
+                animation-fill-mode: both;
+            }
+
+            .portfolio-analysis-container .metric-card:nth-child(1) { animation-delay: 0.05s; }
+            .portfolio-analysis-container .metric-card:nth-child(2) { animation-delay: 0.1s; }
+            .portfolio-analysis-container .metric-card:nth-child(3) { animation-delay: 0.15s; }
+            .portfolio-analysis-container .metric-card:nth-child(4) { animation-delay: 0.2s; }
+            .portfolio-analysis-container .metric-card:nth-child(5) { animation-delay: 0.25s; }
+            .portfolio-analysis-container .metric-card:nth-child(6) { animation-delay: 0.3s; }
         `;
 
         document.head.appendChild(style);
