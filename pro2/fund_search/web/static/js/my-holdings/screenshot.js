@@ -428,3 +428,6 @@ const FundScreenshot = {
         });
     }
 };
+
+// 将 FundScreenshot 暴露给全局作用域，使 HTML 中的 onclick 事件可以访问
+window.FundScreenshot = FundScreenshot;
