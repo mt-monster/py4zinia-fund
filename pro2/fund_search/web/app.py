@@ -2897,13 +2897,17 @@ def analyze_comprehensive():
         # Generate analysis summary
         summary = generate_analysis_summary(asset_allocation, industry_distribution, top_stocks, fund_codes_count)
         
+        # 获取策略分析数据（集成enhanced_main.py逻辑）
+        strategy_analysis = get_fund_strategy_analysis(fund_codes)
+        
         return jsonify({
             'success': True,
             'data': {
                 'asset_allocation': asset_allocation,
                 'industry_distribution': industry_distribution,
                 'top_stocks': top_stocks,
-                'summary': summary
+                'summary': summary,
+                'strategy_analysis': strategy_analysis
             }
         })
     except Exception as e:
@@ -3227,6 +3231,25 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
         fund_codes_count: 基金数量（用于加权平均）
     """
     try:
+        # 首先收集每只股票关联的基金信息
+        stock_fund_map = {}
+        if 'fund_code' in holdings_df.columns:
+            for _, row in holdings_df.iterrows():
+                stock_key = (str(row.get('stock_code', '')), str(row.get('stock_name', '')))
+                fund_code = str(row.get('fund_code', ''))
+                proportion = float(row.get('proportion', 0))
+                
+                if stock_key not in stock_fund_map:
+                    stock_fund_map[stock_key] = []
+                
+                # 避免重复添加同一基金
+                existing_codes = [f['fund_code'] for f in stock_fund_map[stock_key]]
+                if fund_code and fund_code not in existing_codes:
+                    stock_fund_map[stock_key].append({
+                        'fund_code': fund_code,
+                        'proportion': round(proportion, 2)
+                    })
+        
         # Group by stock code and name, sum the proportions
         grouped = holdings_df.groupby(['stock_code', 'stock_name'], as_index=False)['proportion'].sum()
         
@@ -3239,12 +3262,22 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
         for _, row in sorted_holdings.iterrows():
             raw_proportion = float(row.get('proportion', 0))
             adjusted_proportion = raw_proportion / max(fund_codes_count, 1)
+            stock_code = str(row.get('stock_code', row.get('code', '')))
+            stock_name = str(row.get('stock_name', row.get('name', '')))
+            stock_key = (stock_code, stock_name)
+            
+            # 获取关联基金列表
+            related_funds = stock_fund_map.get(stock_key, [])
+            fund_count = len(related_funds) if related_funds else 1
+            
             stock_info = {
-                'stock_name': str(row.get('stock_name', row.get('name', ''))),
-                'stock_code': str(row.get('stock_code', row.get('code', ''))),
+                'stock_name': stock_name,
+                'stock_code': stock_code,
                 'proportion': round(adjusted_proportion, 2),
                 'market_value': round(adjusted_proportion * total_asset / 100, 2),
-                'change_percent': row.get('change_percent', row.get('涨跌幅', '--'))
+                'change_percent': row.get('change_percent', row.get('涨跌幅', '--')),
+                'fund_count': fund_count,
+                'related_funds': related_funds
             }
             top_stocks.append(stock_info)
         
@@ -3293,6 +3326,192 @@ def generate_analysis_summary(asset_allocation, industry_distribution, top_stock
     except Exception as e:
         logger.error(f"生成分析摘要失败: {e}")
         return {}
+
+
+def get_fund_strategy_analysis(fund_codes):
+    """
+    获取基金策略分析数据（集成enhanced_main.py的策略逻辑）
+    
+    Args:
+        fund_codes: 基金代码列表
+        
+    Returns:
+        dict: 包含策略分析结果的字典
+    """
+    try:
+        from data_retrieval.enhanced_fund_data import EnhancedFundData
+        from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+        
+        fund_data_manager = EnhancedFundData()
+        strategy_engine = EnhancedInvestmentStrategy()
+        
+        results = []
+        buy_count = 0
+        sell_count = 0
+        hold_count = 0
+        
+        for fund_code in fund_codes:
+            try:
+                # 获取基金名称
+                fund_name = get_fund_name_from_db(fund_code) or fund_code
+                
+                # 获取实时数据
+                realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+                performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
+                
+                # 计算今日和昨日收益率
+                today_return = float(realtime_data.get('today_return', 0.0))
+                yesterday_return = float(realtime_data.get('yesterday_return', 0.0))
+                
+                # 投资策略分析
+                strategy_result = strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
+                
+                # 补充策略逻辑说明
+                strategy_explanation = get_strategy_explanation(today_return, yesterday_return, strategy_result)
+                
+                fund_result = {
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'today_return': round(today_return, 2),
+                    'yesterday_return': round(yesterday_return, 2),
+                    'return_diff': round(today_return - yesterday_return, 2),
+                    'status_label': strategy_result.get('status_label', ''),
+                    'operation_suggestion': strategy_result.get('operation_suggestion', ''),
+                    'execution_amount': strategy_result.get('execution_amount', ''),
+                    'action': strategy_result.get('action', 'hold'),
+                    'buy_multiplier': strategy_result.get('buy_multiplier', 0.0),
+                    'redeem_amount': strategy_result.get('redeem_amount', 0.0),
+                    'strategy_explanation': strategy_explanation,
+                    'composite_score': performance_metrics.get('composite_score', 0.0),
+                    'sharpe_ratio': performance_metrics.get('sharpe_ratio', 0.0)
+                }
+                
+                results.append(fund_result)
+                
+                # 统计操作类型
+                action = strategy_result.get('action', 'hold')
+                if action in ['buy', 'strong_buy', 'weak_buy']:
+                    buy_count += 1
+                elif action in ['sell', 'redeem']:
+                    sell_count += 1
+                else:
+                    hold_count += 1
+                    
+            except Exception as e:
+                logger.warning(f"分析基金 {fund_code} 策略失败: {e}")
+                results.append({
+                    'fund_code': fund_code,
+                    'fund_name': fund_code,
+                    'today_return': 0,
+                    'yesterday_return': 0,
+                    'return_diff': 0,
+                    'status_label': '🔴 数据获取失败',
+                    'operation_suggestion': '暂无建议',
+                    'execution_amount': '持有不动',
+                    'action': 'hold',
+                    'buy_multiplier': 0,
+                    'redeem_amount': 0,
+                    'strategy_explanation': '无法获取数据，建议人工核查',
+                    'composite_score': 0,
+                    'sharpe_ratio': 0
+                })
+                hold_count += 1
+        
+        return {
+            'funds': results,
+            'summary': {
+                'total_count': len(fund_codes),
+                'buy_count': buy_count,
+                'sell_count': sell_count,
+                'hold_count': hold_count,
+                'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M')
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"获取策略分析数据失败: {e}")
+        return {'funds': [], 'summary': {'total_count': 0, 'buy_count': 0, 'sell_count': 0, 'hold_count': 0}}
+
+
+def get_strategy_explanation(today_return, yesterday_return, strategy_result):
+    """
+    生成策略判断的详细解释
+    
+    Args:
+        today_return: 今日收益率
+        yesterday_return: 昨日收益率
+        strategy_result: 策略分析结果
+        
+    Returns:
+        str: 策略解释文本
+    """
+    return_diff = today_return - yesterday_return
+    action = strategy_result.get('action', 'hold')
+    status_label = strategy_result.get('status_label', '')
+    
+    explanation_parts = []
+    
+    # 收益率趋势分析
+    if today_return > 0 and yesterday_return > 0:
+        if return_diff > 1:
+            explanation_parts.append(f"连续上涨且涨幅扩大(差值+{return_diff:.2f}%)，处于上升趋势强势区")
+        elif return_diff > 0:
+            explanation_parts.append(f"连续上涨但涨幅放缓(差值+{return_diff:.2f}%)，可能接近阶段顶部")
+        elif return_diff >= -1:
+            explanation_parts.append(f"连续上涨涨幅收窄(差值{return_diff:.2f}%)，上涨动能减弱")
+        else:
+            explanation_parts.append(f"连续上涨但涨幅大幅回落(差值{return_diff:.2f}%)，注意回调风险")
+    elif today_return > 0 and yesterday_return <= 0:
+        explanation_parts.append(f"由跌转涨形成反转(今日+{today_return:.2f}% vs 昨日{yesterday_return:.2f}%)，可能是买入时机")
+    elif today_return == 0 and yesterday_return > 0:
+        explanation_parts.append(f"涨势暂停进入休整(今日0% vs 昨日+{yesterday_return:.2f}%)，观察后续走势")
+    elif today_return < 0 and yesterday_return > 0:
+        explanation_parts.append(f"由涨转跌形成反转(今日{today_return:.2f}% vs 昨日+{yesterday_return:.2f}%)，需要防范风险")
+    elif today_return == 0 and yesterday_return <= 0:
+        explanation_parts.append(f"下跌企稳(今日0% vs 昨日{yesterday_return:.2f}%)，可能是建仓时机")
+    elif today_return < 0 and yesterday_return == 0:
+        if today_return <= -2:
+            explanation_parts.append(f"首次大跌(今日{today_return:.2f}%)，跌幅较大可考虑分批建仓")
+        elif today_return <= -0.5:
+            explanation_parts.append(f"首次下跌(今日{today_return:.2f}%)，可适度建仓")
+        else:
+            explanation_parts.append(f"微跌试探(今日{today_return:.2f}%)，观察为主")
+    elif today_return < 0 and yesterday_return < 0:
+        if return_diff > 1 and today_return <= -2:
+            explanation_parts.append(f"连续下跌且跌幅加速(差值+{return_diff:.2f}%)，暴跌中可分批抄底")
+        elif return_diff > 1:
+            explanation_parts.append(f"连续下跌跌幅扩大(差值+{return_diff:.2f}%)，下跌趋势加速")
+        elif (yesterday_return - today_return) > 0 and yesterday_return <= -2:
+            explanation_parts.append(f"暴跌后跌幅收窄(差值{return_diff:.2f}%)，可能企稳")
+        elif (yesterday_return - today_return) > 0:
+            explanation_parts.append(f"下跌动能减弱(差值{return_diff:.2f}%)，跌速放缓")
+        else:
+            explanation_parts.append(f"阴跌持续(差值{return_diff:.2f}%)，可能在筑底")
+    
+    # 操作建议解释
+    if action in ['buy', 'strong_buy', 'weak_buy']:
+        buy_mult = strategy_result.get('buy_multiplier', 1.0)
+        explanation_parts.append(f"策略建议：买入({buy_mult}×定投额)")
+    elif action in ['sell', 'redeem']:
+        redeem_amt = strategy_result.get('redeem_amount', 0)
+        explanation_parts.append(f"策略建议：赎回(¥{redeem_amt})")
+    else:
+        explanation_parts.append("策略建议：持有观望")
+    
+    return '；'.join(explanation_parts)
+
+
+def get_fund_name_from_db(fund_code):
+    """从数据库获取基金名称"""
+    try:
+        sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
+        result = db_manager.execute_query(sql, {'fund_code': fund_code})
+        if result is not None and not result.empty:
+            return result.iloc[0]['fund_name']
+        return None
+    except Exception as e:
+        logger.warning(f"获取基金名称失败: {e}")
+        return None
 
 
 # ==================== 截图识别导入 API ====================
