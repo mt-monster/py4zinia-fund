@@ -52,26 +52,53 @@
             background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); 
             box-shadow: 0 4px 12px rgba(67, 97, 238, 0.15);
             padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
         }
         
         .navbar-brand {
             font-weight: 700;
+            font-size: 1.25rem;
             letter-spacing: 0.5px;
+            color: #fff !important;
+            display: flex;
+            align-items: center;
+        }
+        
+        .navbar-brand i {
+            font-size: 1.3rem;
+        }
+        
+        .navbar-nav {
+            gap: 0.5rem;
         }
         
         .nav-link {
             font-weight: 500;
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.85) !important;
             transition: var(--transition);
             border-radius: 8px;
             padding: 0.5rem 1rem !important;
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-link i {
+            font-size: 1rem;
         }
         
         .nav-link:hover {
             background: rgba(255, 255, 255, 0.15);
+            color: #fff !important;
+            transform: translateY(-1px);
         }
         
         .nav-link.active {
             background: rgba(255, 255, 255, 0.25);
+            color: #fff !important;
+            font-weight: 600;
         }
         
         /* Enhanced Card Styling */
@@ -804,18 +831,6 @@
                                 <div class="text-center text-muted py-3">
                                     <div class="spinner-border spinner-border-sm me-2"></div>加载中...
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-lg-4 col-md-12">
-                    <!-- 策略配置 -->
-                    <div class="card">
-                        <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-2"></i>策略配置</h6></div>
-                        <div class="card-body" id="strategy-config">
-                            <div class="text-center text-muted py-3">
-                                <div class="spinner-border spinner-border-sm me-2"></div>加载中...
                             </div>
                         </div>
                     </div>
@@ -2287,7 +2302,6 @@
         // ==================== Existing Code ====================
         document.addEventListener('DOMContentLoaded', () => {
             loadStrategies();
-            loadStrategyConfig();
             fundSelector.loadHoldings();
             strategySelector.loadStrategies();
             
@@ -2329,40 +2343,6 @@
                     }
                 }
             } catch (error) { console.error('加载策略失败:', error); }
-        }
-
-        async function loadStrategyConfig() {
-            try {
-                const response = await fetch('/api/strategy/config');
-                const result = await response.json();
-                if (result.success && result.data) {
-                    const config = result.data;
-                    document.getElementById('strategy-config').innerHTML = `
-                        <div class="mb-3">
-                            <h6 class="text-danger"><i class="bi bi-shield-exclamation me-1"></i>止损配置</h6>
-                            <div class="config-item"><span>警告阈值</span><span class="text-warning">${(config.stop_loss.warning_threshold * 100).toFixed(0)}%</span></div>
-                            <div class="config-item"><span>止损阈值</span><span class="text-danger">${(config.stop_loss.stop_loss_threshold * 100).toFixed(0)}%</span></div>
-                        </div>
-                        <div class="mb-3">
-                            <h6 class="text-info"><i class="bi bi-activity me-1"></i>波动率配置</h6>
-                            <div class="config-item"><span>高波动阈值</span><span>${(config.volatility.high_threshold * 100).toFixed(0)}%</span></div>
-                            <div class="config-item"><span>低波动阈值</span><span>${(config.volatility.low_threshold * 100).toFixed(0)}%</span></div>
-                            <div class="config-item"><span>高波动调整</span><span class="text-danger">×${config.volatility.high_adjustment}</span></div>
-                            <div class="config-item"><span>低波动调整</span><span class="text-success">×${config.volatility.low_adjustment}</span></div>
-                        </div>
-                        <div>
-                            <h6 class="text-primary"><i class="bi bi-graph-up me-1"></i>趋势配置</h6>
-                            <div class="config-item"><span>短期均线</span><span>${config.trend.ma_short_period}日</span></div>
-                            <div class="config-item"><span>长期均线</span><span>${config.trend.ma_long_period}日</span></div>
-                            <div class="config-item"><span>上涨调整</span><span class="text-success">×${config.trend.uptrend_adjustment}</span></div>
-                            <div class="config-item"><span>下跌调整</span><span class="text-danger">×${config.trend.downtrend_adjustment}</span></div>
-                        </div>
-                    `;
-                }
-            } catch (error) { 
-                console.error('加载配置失败:', error);
-                document.getElementById('strategy-config').innerHTML = '<div class="text-danger">加载配置失败</div>';
-            }
         }
 
         async function analyzeUnifiedStrategy() {
