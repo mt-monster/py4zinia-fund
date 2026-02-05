@@ -327,49 +327,106 @@ class SmartFundParser:
         return None
     
     def _find_holding_info(self, texts: List[str], current_index: int) -> Dict:
-        """在当前位置附近查找持仓信息（持仓金额、盈亏金额、盈亏率）"""
+        """在当前位置附近查找持仓信息（持仓金额、盈亏金额、盈亏率、昨日收益）"""
         holding_info = {
             'holding_amount': None,
             'profit_amount': None,
-            'profit_rate': None
+            'profit_rate': None,
+            'yesterday_profit': None,  # 新增昨日收益
+            'yesterday_profit_rate': None,  # 新增昨日收益率
         }
         
-        # 在后续几行中查找持仓相关数据
-        for j in range(current_index + 1, min(current_index + 8, len(texts))):
+        # 收集当前基金相关的所有数值文本
+        collected_values = []
+        
+        # 在后续几行中查找持仓相关数据（通常基金名称后面的2-6行是相关数据）
+        for j in range(current_index + 1, min(current_index + 10, len(texts))):
             if j >= len(texts):
                 break
                 
             text = texts[j].strip()
             
-            # 跳过交易信息
-            if '交易:' in text or '笔' in text:
+            # 如果遇到另一个基金名称，停止搜索
+            if self._is_fund_name_start(text) and len(text) > 4:
+                break
+            
+            # 跳过交易信息行（如"交易：1笔买入中合计10.00元"）
+            if '交易' in text or '笔' in text or '合计' in text:
                 continue
             
-            # 查找持仓金额（通常是较大的数字，如681.30, 664.00等）
-            if holding_info['holding_amount'] is None:
-                holding_amount = self._extract_holding_amount(text)
-                if holding_amount:
-                    holding_info['holding_amount'] = holding_amount
-                    logger.debug(f"找到持仓金额 {holding_amount} 在位置 {j}: {text}")
-                    continue
-            
-            # 查找盈亏金额（通常带+/-符号，如+21.11, +83.08等）
-            if holding_info['profit_amount'] is None:
-                profit_amount = self._extract_profit_amount(text)
-                if profit_amount:
-                    holding_info['profit_amount'] = profit_amount
-                    logger.debug(f"找到盈亏金额 {profit_amount} 在位置 {j}: {text}")
-                    continue
-            
-            # 查找盈亏率（带%符号，如+3.20%, +15.08%等）
-            if holding_info['profit_rate'] is None:
-                profit_rate = self._extract_profit_rate(text)
-                if profit_rate:
-                    holding_info['profit_rate'] = profit_rate
-                    logger.debug(f"找到盈亏率 {profit_rate}% 在位置 {j}: {text}")
-                    continue
+            # 收集数值信息
+            value_info = self._parse_value_text(text)
+            if value_info:
+                collected_values.append(value_info)
+        
+        # 智能分配数值到对应字段
+        self._assign_values_to_fields(collected_values, holding_info)
         
         return holding_info
+    
+    def _parse_value_text(self, text: str) -> Optional[Dict]:
+        """解析数值文本，返回类型和值"""
+        text = text.strip()
+        
+        # 持仓金额格式（正数，如283.37, 228.32, 321.03）
+        amount_match = re.match(r'^(\d{2,5}\.\d{2})$', text)
+        if amount_match:
+            value = float(amount_match.group(1))
+            # 持仓金额通常在50-100000之间
+            if 50 <= value <= 100000:
+                return {'type': 'amount', 'value': value, 'text': text}
+        
+        # 带符号的金额（如+0.75, -1.57, -14.91, -15.80）- 盈亏金额
+        profit_match = re.match(r'^([+\-])(\d+\.\d{2})$', text)
+        if profit_match:
+            sign = 1 if profit_match.group(1) == '+' else -1
+            value = sign * float(profit_match.group(2))
+            return {'type': 'profit_amount', 'value': value, 'text': text}
+        
+        # 百分比格式（如-5.17%, -6.94%, +3.20%）- 盈亏率
+        rate_match = re.match(r'^([+\-])?(\d+\.\d{1,2})%$', text)
+        if rate_match:
+            sign = 1 if rate_match.group(1) != '-' else -1
+            value = sign * float(rate_match.group(2))
+            return {'type': 'profit_rate', 'value': value, 'text': text}
+        
+        return None
+    
+    def _assign_values_to_fields(self, values: List[Dict], holding_info: Dict):
+        """智能分配数值到对应字段
+        
+        基于截图布局规则：
+        - 第一列：金额（持仓金额）
+        - 第二列：昨日收益（带+/-符号）
+        - 第三列：持仓收益（带+/-符号，绝对值通常较大）
+        - 第四列：收益率（带%符号）
+        """
+        amounts = [v for v in values if v['type'] == 'amount']
+        profit_amounts = [v for v in values if v['type'] == 'profit_amount']
+        profit_rates = [v for v in values if v['type'] == 'profit_rate']
+        
+        # 分配持仓金额（取最大的金额作为持仓金额）
+        if amounts:
+            holding_info['holding_amount'] = max(amounts, key=lambda x: x['value'])['value']
+            logger.debug(f"识别持仓金额: {holding_info['holding_amount']}")
+        
+        # 分配盈亏金额
+        if profit_amounts:
+            if len(profit_amounts) >= 2:
+                # 按绝对值排序，较小的是昨日收益，较大的是持仓收益
+                sorted_profits = sorted(profit_amounts, key=lambda x: abs(x['value']))
+                holding_info['yesterday_profit'] = sorted_profits[0]['value']
+                holding_info['profit_amount'] = sorted_profits[-1]['value']
+                logger.debug(f"识别昨日收益: {holding_info['yesterday_profit']}, 持仓收益: {holding_info['profit_amount']}")
+            else:
+                # 只有一个盈亏金额，作为持仓收益
+                holding_info['profit_amount'] = profit_amounts[0]['value']
+                logger.debug(f"识别持仓收益: {holding_info['profit_amount']}")
+        
+        # 分配收益率（通常只有一个收益率，是持仓收益率）
+        if profit_rates:
+            holding_info['profit_rate'] = profit_rates[0]['value']
+            logger.debug(f"识别收益率: {holding_info['profit_rate']}%")
     
     def _extract_holding_amount(self, text: str) -> Optional[float]:
         """提取持仓金额"""
@@ -567,51 +624,128 @@ class SmartFundParser:
         return any(re.match(p, text) for p in ui_patterns)
 
     def _reconstruct_fund_names_v2(self, texts: List[str]) -> List[str]:
-        """简化版：重组被OCR分割的基金名称"""
+        """增强版：重组被OCR分割的基金名称，支持更复杂的分割情况"""
         reconstructed = []
-        skip_count = 0
+        skip_indices = set()
 
         for i, text in enumerate(texts):
-            if skip_count > 0:
-                skip_count -= 1
+            if i in skip_indices:
                 continue
 
             text = text.strip()
+            if not text:
+                continue
 
             # 只处理可能是基金名称开头的文本
             if not self._is_fund_name_start(text):
                 reconstructed.append(text)
                 continue
 
-            # 最多向后看2个文本，避免过度组合
+            # 尝试向后组合，最多看4个文本
             combined = text
-            for j in range(i + 1, min(i + 3, len(texts))):
+            combined_indices = [i]
+            
+            for j in range(i + 1, min(i + 5, len(texts))):
                 next_text = texts[j].strip()
-
-                # 严格判断：只有明显是名称延续才合并
+                
+                # 如果遇到数值数据，停止组合
+                if self._is_holding_data(next_text):
+                    break
+                
+                # 如果是另一个基金名称的开头（且不是ETF/LOF等后缀），停止组合
+                if self._is_fund_name_start(next_text) and len(next_text) > 3:
+                    # 但如果下一个文本是ETF开头或者括号开头，应该继续合并
+                    if not next_text.startswith('ETF') and not next_text.startswith('('):
+                        break
+                
+                # 如果是明确的基金名称延续，合并
                 if self._is_strict_fund_name_continuation(next_text, combined):
                     combined += next_text
-                    skip_count += 1
+                    combined_indices.append(j)
+                    skip_indices.add(j)
+                # 如果是短片段且可能是名称的一部分
+                elif self._is_possible_name_fragment(next_text, combined):
+                    combined += next_text
+                    combined_indices.append(j)
+                    skip_indices.add(j)
                 else:
                     break
 
             reconstructed.append(combined)
+            if len(combined_indices) > 1:
+                logger.debug(f"名称重组: {[texts[idx] for idx in combined_indices]} -> {combined}")
 
         return reconstructed
 
     def _is_strict_fund_name_continuation(self, text: str, current_name: str) -> bool:
         """严格判断是否是基金名称的延续"""
-        # 排除明显不是名称的文本
-        if len(text) <= 2:  # 太短的片段
+        if not text:
             return False
+            
+        # 排除明显不是名称的文本
         if re.match(r'^[\d\.\+\-]', text):  # 数字开头
             return False
-        if any(c in text for c in ['%', '￥', '$', '元']):  # 包含金额符号
+        if any(c in text for c in ['%', '￥', '$', '元', '份']):  # 包含金额符号
             return False
-        if text in ['基金', '股票', '债券', '混合', '指数', '理财']:  # 常见独立词汇
+        if text in ['基金', '理财', '证监会批准', '民生银行资金监管', '资金安全险']:
             return False
-
-        return True
+        
+        # 常见的基金名称后续片段（这些应该与前面的名称合并）
+        fund_suffixes = [
+            'ETF联接', 'ETF', 'LOF', 'QDII', 'FOF',
+            '联接A', '联接C', '联接', '股票A', '股票C', '混合A', '混合C',
+            '指数A', '指数C', '债券A', '债券C',
+            '(QDII)', '(LOF)', '(FOF)', '(QDII)A', '(QDII)C',
+            '严选', '精选', '优选', '增强', '成长', '价值', '龙头',
+            '印度', '中证', '沪深', '银行', '科技', '医药', '消费',
+        ]
+        
+        # 如果文本以ETF开头，很可能是ETF联接A等后缀
+        if text.startswith('ETF'):
+            return True
+        
+        for suffix in fund_suffixes:
+            if suffix in text:
+                return True
+        
+        # 如果当前名称不完整（没有A/C后缀），且下一个片段是类型标识
+        if not re.search(r'[AC]$', current_name):
+            if re.match(r'^[AC]$', text):  # 单独的A或C
+                return True
+        
+        # 短中文片段且不包含明显的非名称词
+        if len(text) <= 8 and re.search(r'[\u4e00-\u9fa5]', text):
+            exclude_words = ['交易', '买入', '卖出', '赎回', '持仓', '收益', '盈亏', 
+                           '全部', '昨日', '今日', '合计', '元', '份', '笔']
+            if not any(word in text for word in exclude_words):
+                return True
+        
+        return False
+    
+    def _is_possible_name_fragment(self, text: str, current_name: str) -> bool:
+        """判断是否是可能的名称片段（更宽松的判断）"""
+        if not text or len(text) > 10:
+            return False
+        
+        # 数字开头排除
+        if re.match(r'^[\d\.\+\-]', text):
+            return False
+        
+        # 特殊分类标识
+        special_patterns = [
+            r'^\(QDII',  # (QDII开头
+            r'^[AC]$',   # 单独的A或C
+            r'^混合[AC]?$',
+            r'^股票[AC]?$',
+            r'^债券[AC]?$',
+            r'^指数[AC]?$',
+        ]
+        
+        for pattern in special_patterns:
+            if re.match(pattern, text):
+                return True
+        
+        return False
 
     def _reconstruct_fund_names(self, texts: List[str]) -> List[str]:
         """尝试重组被OCR分割的基金名称，同时保留持仓信息（旧版，保留兼容）"""
@@ -711,28 +845,130 @@ class SmartFundParser:
         if not re.search(r'[\u4e00-\u9fa5]', text):
             return False
         
-        # 常见基金名称开头模式
+        # 常见基金公司名称开头模式（按首字母排序，覆盖主流基金公司）
         fund_start_patterns = [
-            r'^[A-Z]',          # 以大写字母开头（如ETF名称）
-            r'^天弘',           # 天弘基金
-            r'^景顺',           # 景顺长城
-            r'^广发',           # 广发基金
-            r'^富国',           # 富国基金
-            r'^易方达',         # 易方达基金
-            r'^华夏',           # 华夏基金
-            r'^南方',           # 南方基金
-            r'^嘉实',           # 嘉实基金
+            # A-B
+            r'^安信',           # 安信基金
+            r'^宝盈',           # 宝盈基金
+            r'^北信瑞丰',       # 北信瑞丰
             r'^博时',           # 博时基金
-            r'^招商',           # 招商基金
+            r'^博道',           # 博道基金
+            # C-D
+            r'^财通',           # 财通基金
+            r'^长城',           # 长城基金
+            r'^长盛',           # 长盛基金
+            r'^长信',           # 长信基金
+            r'^创金合信',       # 创金合信
+            r'^大成',           # 大成基金
+            r'^德邦',           # 德邦基金
+            r'^东方',           # 东方基金
+            r'^东吴',           # 东吴基金
+            # F-G
+            r'^方正富邦',       # 方正富邦
+            r'^富安达',         # 富安达
+            r'^富国',           # 富国基金
+            r'^富荣',           # 富荣基金
             r'^工银',           # 工银瑞信
-            r'^建信',           # 建信基金
-            r'^中欧',           # 中欧基金
-            r'^汇添富',         # 汇添富基金
-            r'^银华',           # 银华基金
-            r'^华安',           # 华安基金
+            r'^光大',           # 光大保德信
+            r'^广发',           # 广发基金
+            r'^国富',           # 国富基金
+            r'^国海',           # 国海富兰克林
+            r'^国金',           # 国金基金
+            r'^国联',           # 国联安基金
+            r'^国融',           # 国融基金
+            r'^国寿安保',       # 国寿安保
             r'^国泰',           # 国泰基金
+            r'^国投瑞银',       # 国投瑞银
+            # H
+            r'^海富通',         # 海富通基金
+            r'^恒生',           # 恒生前海
+            r'^恒越',           # 恒越基金
+            r'^红塔红土',       # 红塔红土
+            r'^红土创新',       # 红土创新
+            r'^弘毅',           # 弘毅远方
+            r'^宏利',           # 宏利基金
+            r'^华安',           # 华安基金
+            r'^华宝',           # 华宝基金
+            r'^华富',           # 华富基金
+            r'^华商',           # 华商基金
+            r'^华泰',           # 华泰柏瑞
+            r'^华夏',           # 华夏基金
+            r'^汇安',           # 汇安基金
+            r'^汇丰晋信',       # 汇丰晋信
+            r'^汇添富',         # 汇添富基金
+            # J-K
+            r'^嘉合',           # 嘉合基金
+            r'^嘉实',           # 嘉实基金
+            r'^建信',           # 建信基金
+            r'^交银',           # 交银施罗德
+            r'^金信',           # 金信基金
+            r'^金鹰',           # 金鹰基金
+            r'^金元顺安',       # 金元顺安
+            r'^景顺',           # 景顺长城
+            r'^九泰',           # 九泰基金
+            r'^凯石',           # 凯石基金
+            # L-M
+            r'^蓝海',           # 蓝海华腾
+            r'^民生',           # 民生加银
+            r'^摩根',           # 摩根基金
+            # N-P
+            r'^南方',           # 南方基金
+            r'^南华',           # 南华基金
+            r'^农银',           # 农银汇理
+            r'^诺安',           # 诺安基金
+            r'^诺德',           # 诺德基金
             r'^鹏华',           # 鹏华基金
+            r'^鹏扬',           # 鹏扬基金
+            r'^浦银安盛',       # 浦银安盛
+            r'^平安',           # 平安基金
+            # Q-R
+            r'^前海',           # 前海开源
+            r'^融通',           # 融通基金
+            r'^睿远',           # 睿远基金
+            # S
+            r'^上海',           # 上海东方证券
+            r'^上投',           # 上投摩根
+            r'^申万',           # 申万菱信
+            r'^泰达',           # 泰达宏利
+            r'^泰信',           # 泰信基金
+            r'^泰康',           # 泰康资产
+            r'^天弘',           # 天弘基金
+            r'^天治',           # 天治基金
+            # W-X
+            r'^万家',           # 万家基金
+            r'^西部',           # 西部利得
+            r'^先锋',           # 先锋基金
+            r'^新华',           # 新华基金
+            r'^鑫元',           # 鑫元基金
+            r'^信达澳银',       # 信达澳亚
+            r'^信诚',           # 信诚基金
+            r'^兴全',           # 兴全基金
+            r'^兴银',           # 兴银基金
+            r'^兴业',           # 兴业基金
+            # Y
+            r'^易方达',         # 易方达基金
+            r'^银河',           # 银河基金
+            r'^银华',           # 银华基金
+            r'^英大',           # 英大基金
+            r'^永赢',           # 永赢基金
+            r'^圆信永丰',       # 圆信永丰
+            # Z
+            r'^招商',           # 招商基金
+            r'^浙商',           # 浙商基金
+            r'^中庚',           # 中庚基金
+            r'^中海',           # 中海基金
+            r'^中航',           # 中航基金
+            r'^中欧',           # 中欧基金
+            r'^中融',           # 中融基金
+            r'^中泰',           # 中泰证券
+            r'^中信',           # 中信保诚
+            r'^中信建投',       # 中信建投
             r'^中银',           # 中银基金
+            r'^中邮',           # 中邮创业
+            r'^中加',           # 中加基金
+            r'^中金',           # 中金基金
+            # ETF联接等特殊格式
+            r'^[A-Z]',          # 以大写字母开头（如ETF名称）
         ]
         
         for pattern in fund_start_patterns:
@@ -740,8 +976,8 @@ class SmartFundParser:
                 return True
         
         # 如果文本较长且包含基金相关关键词，也可能是基金名称开头
-        if len(text) >= 4:
-            fund_keywords = ['基金', '股票', '债券', '混合', '指数', '货币', 'ETF', 'LOF', 'QDII', 'FOF']
+        if len(text) >= 3:
+            fund_keywords = ['基金', '股票', '债券', '混合', '指数', '货币', 'ETF', 'LOF', 'QDII', 'FOF', '联接', '增强', '精选', '优选', '龙头', '成长', '价值', '稳健', '灵活配置']
             for keyword in fund_keywords:
                 if keyword in text:
                     return True

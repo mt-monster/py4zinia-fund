@@ -183,10 +183,11 @@ class BaiduOCR:
     
     def _optimize_image(self, image_bytes: bytes, max_size: int = 4 * 1024 * 1024) -> bytes:
         """
-        优化图片以满足百度OCR要求
+        优化图片以满足百度OCR要求并提升识别精度
         - 最大4MB
         - 最短边至少15px，最长边最大4096px
         - 支持jpg/png/bmp格式
+        - 增强对比度和清晰度以提升识别率
         """
         try:
             image = Image.open(io.BytesIO(image_bytes))
@@ -207,9 +208,17 @@ class BaiduOCR:
                 image = image.resize(new_size, Image.Resampling.LANCZOS)
                 logger.info(f"图片尺寸调整: {width}x{height} -> {new_size[0]}x{new_size[1]}")
             
-            # 如果尺寸过小，提示警告
-            if min(width, height) < min_dimension:
-                logger.warning(f"图片尺寸过小: {width}x{height}, 可能影响识别效果")
+            # 如果尺寸过小，放大以提升识别率
+            if min(width, height) < 800:
+                # 对于小图片，放大2倍以提升文字识别率
+                scale_factor = max(2, 800 / min(width, height))
+                new_size = (int(width * scale_factor), int(height * scale_factor))
+                if max(new_size) <= max_dimension:
+                    image = image.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.info(f"图片放大以提升识别率: {width}x{height} -> {new_size[0]}x{new_size[1]}")
+            
+            # 图像增强处理（针对基金截图优化）
+            image = self._enhance_image_for_ocr(image)
             
             # 压缩图片以满足大小限制
             quality = 95
@@ -234,6 +243,39 @@ class BaiduOCR:
         except Exception as e:
             logger.warning(f"图片优化失败，使用原图: {e}")
             return image_bytes
+    
+    def _enhance_image_for_ocr(self, image: Image.Image) -> Image.Image:
+        """
+        针对OCR识别增强图像质量
+        - 增强对比度
+        - 锐化处理
+        - 去除噪点
+        """
+        try:
+            from PIL import ImageEnhance, ImageFilter
+            
+            # 1. 对比度增强（提升文字与背景的区分度）
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(1.2)  # 增强20%对比度
+            
+            # 2. 亮度微调（确保文字清晰可见）
+            enhancer = ImageEnhance.Brightness(image)
+            image = enhancer.enhance(1.05)  # 微调亮度
+            
+            # 3. 锐化处理（使文字边缘更清晰）
+            enhancer = ImageEnhance.Sharpness(image)
+            image = enhancer.enhance(1.5)  # 增强锐度
+            
+            # 4. 颜色饱和度微调（使文字颜色更鲜明）
+            enhancer = ImageEnhance.Color(image)
+            image = enhancer.enhance(1.1)
+            
+            logger.debug("图像增强处理完成")
+            return image
+            
+        except Exception as e:
+            logger.warning(f"图像增强处理失败: {e}")
+            return image
     
     def recognize_fund_screenshot(self, image_data) -> List[Dict]:
         """
