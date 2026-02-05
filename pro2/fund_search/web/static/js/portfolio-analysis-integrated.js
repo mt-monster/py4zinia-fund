@@ -11,21 +11,47 @@ const PortfolioAnalysis = {
      * 初始化投资组合分析
      */
     init() {
+        console.log('🚀 PortfolioAnalysis.init() 开始执行');
         this.bindEvents();
         this.addStyles();
+        console.log('✅ PortfolioAnalysis.init() 执行完成');
     },
 
     /**
      * 绑定事件
      */
     bindEvents() {
+        console.log('🔍 PortfolioAnalysis.bindEvents() 开始执行');
+        
         // 添加分析按钮事件
         const analyzeBtn = document.getElementById('portfolio-analyze-btn');
+        console.log('🔍 查找按钮元素:', analyzeBtn);
+        
         if (analyzeBtn) {
-            analyzeBtn.addEventListener('click', () => this.showAnalysis().catch(error => {
-                console.error('分析过程中出错:', error);
-                alert('分析失败: ' + error.message);
-            }));
+            // 先移除可能存在的旧事件监听器
+            const newAnalyzeBtn = analyzeBtn.cloneNode(true);
+            analyzeBtn.parentNode.replaceChild(newAnalyzeBtn, analyzeBtn);
+            
+            console.log('✅ 找到分析按钮，添加点击事件监听器');
+            newAnalyzeBtn.addEventListener('click', (event) => {
+                console.log('🖱️ 按钮被点击');
+                event.preventDefault(); // 防止默认行为
+                event.stopPropagation(); // 阻止事件冒泡
+                this.showAnalysis().catch(error => {
+                    console.error('❌ 分析过程中出错:', error);
+                    alert('分析失败: ' + error.message);
+                });
+            });
+            
+            // 同时添加键盘事件支持
+            newAnalyzeBtn.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    newAnalyzeBtn.click();
+                }
+            });
+        } else {
+            console.warn('⚠️ 未找到分析按钮元素');
         }
         
         // 监听回测周期变化
@@ -43,6 +69,7 @@ const PortfolioAnalysis = {
         
         // 监听回测结果更新
         this.observeBacktestResults();
+        console.log('✅ PortfolioAnalysis.bindEvents() 执行完成');
     },
     
     /**
@@ -186,44 +213,140 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 计算关键绩效指标
+     * 计算关键绩效指标（基于真实净值时间序列）
      */
     calculateMetrics(data) {
-        const years = data.totalDays / 365.25;
-        const annualizedReturn = Math.pow(data.finalValue / data.initialAmount, 1 / years) - 1;
+        // 使用真实的净值数据进行计算
+        const navData = data.navData || [];
         
-        // 计算波动率（基于基金收益率的标准差）
-        const fundReturns = data.funds.map(f => f.return / 100);
-        const avgReturn = fundReturns.reduce((sum, ret) => sum + ret, 0) / fundReturns.length;
-        const variance = fundReturns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / fundReturns.length;
-        const volatility = Math.sqrt(variance * 252); // 年化波动率
+        if (navData.length === 0) {
+            console.warn('⚠️ 缺少净值数据，使用基础估算');
+            return this.calculateBasicMetrics(data);
+        }
         
-        // 最大回撤（取所有基金的最大回撤）
-        const maxDrawdown = Math.max(...data.funds.map(f => f.maxDrawdown));
+        console.log('📊 基于真实净值数据计算绩效指标');
         
-        // 夏普比率（假设无风险利率2%）
-        const riskFreeRate = 0.02;
-        const sharpeRatio = (annualizedReturn - riskFreeRate) / volatility;
+        // 1. 总收益率
+        const initialValue = navData[0].portfolio;
+        const finalValue = navData[navData.length - 1].portfolio;
+        const totalReturn = ((finalValue - initialValue) / initialValue) * 100;
         
-        // 信息比率（相对沪深300基准）
-        const benchmarkReturn = -0.05; // 假设基准-5%
-        const trackingError = 0.08; // 假设跟踪误差8%
-        const informationRatio = (annualizedReturn - benchmarkReturn) / trackingError;
+        // 2. 年化收益率
+        const totalDays = navData.length - 1;
+        const years = totalDays / 365.25;
+        const annualizedReturn = (Math.pow(finalValue / initialValue, 1 / years) - 1) * 100;
         
-        // 卡玛比率
-        const calmarRatio = annualizedReturn / (maxDrawdown / 100);
-
+        // 3. 计算日收益率序列
+        const dailyReturns = [];
+        for (let i = 1; i < navData.length; i++) {
+            const dailyReturn = (navData[i].portfolio - navData[i-1].portfolio) / navData[i-1].portfolio;
+            dailyReturns.push(dailyReturn);
+        }
+        
+        // 4. 年化波动率
+        const avgDailyReturn = dailyReturns.reduce((sum, r) => sum + r, 0) / dailyReturns.length;
+        const variance = dailyReturns.reduce((sum, r) => sum + Math.pow(r - avgDailyReturn, 2), 0) / (dailyReturns.length - 1);
+        const dailyVolatility = Math.sqrt(variance);
+        const annualizedVolatility = dailyVolatility * Math.sqrt(252) * 100; // 年化波动率
+        
+        // 5. 最大回撤
+        let peak = navData[0].portfolio;
+        let maxDrawdown = 0;
+        
+        for (let i = 0; i < navData.length; i++) {
+            if (navData[i].portfolio > peak) {
+                peak = navData[i].portfolio;
+            }
+            const drawdown = (peak - navData[i].portfolio) / peak;
+            if (drawdown > maxDrawdown) {
+                maxDrawdown = drawdown;
+            }
+        }
+        maxDrawdown = maxDrawdown * 100; // 转换为百分比
+        
+        // 6. 夏普比率（假设无风险利率2%）
+        const riskFreeRate = 2.0; // 无风险利率2%
+        const sharpeRatio = (annualizedReturn - riskFreeRate) / annualizedVolatility;
+        
+        // 7. 信息比率（相对于沪深300基准）
+        const benchmarkReturns = [];
+        for (let i = 1; i < navData.length; i++) {
+            const benchmarkReturn = (navData[i].benchmark - navData[i-1].benchmark) / navData[i-1].benchmark;
+            benchmarkReturns.push(benchmarkReturn);
+        }
+        
+        const excessReturns = [];
+        for (let i = 0; i < dailyReturns.length; i++) {
+            excessReturns.push(dailyReturns[i] - (benchmarkReturns[i] || 0));
+        }
+        
+        const avgExcessReturn = excessReturns.reduce((sum, r) => sum + r, 0) / excessReturns.length;
+        const trackingVariance = excessReturns.reduce((sum, r) => sum + Math.pow(r - avgExcessReturn, 2), 0) / (excessReturns.length - 1);
+        const trackingError = Math.sqrt(trackingVariance) * Math.sqrt(252) * 100; // 年化跟踪误差
+        const informationRatio = (avgExcessReturn * 252 * 100) / trackingError; // 年化超额收益 / 年化跟踪误差
+        
+        // 8. 卡玛比率
+        const calmarRatio = annualizedReturn / Math.abs(maxDrawdown);
+        
+        console.log('📈 绩效指标计算结果:');
+        console.log(`   - 总收益率: ${totalReturn.toFixed(2)}%`);
+        console.log(`   - 年化收益率: ${annualizedReturn.toFixed(2)}%`);
+        console.log(`   - 年化波动率: ${annualizedVolatility.toFixed(2)}%`);
+        console.log(`   - 最大回撤: ${maxDrawdown.toFixed(2)}%`);
+        console.log(`   - 夏普比率: ${sharpeRatio.toFixed(2)}`);
+        console.log(`   - 信息比率: ${informationRatio.toFixed(2)}`);
+        console.log(`   - 卡玛比率: ${calmarRatio.toFixed(2)}`);
+        
         return {
-            totalReturn: data.totalReturn,
-            annualizedReturn: annualizedReturn * 100,
-            volatility: volatility * 100,
+            totalReturn: totalReturn,
+            annualizedReturn: annualizedReturn,
+            volatility: annualizedVolatility,
             maxDrawdown: maxDrawdown,
             sharpeRatio: sharpeRatio,
             informationRatio: informationRatio,
             calmarRatio: calmarRatio,
-            period: data.period,
+            period: data.period || 3,
+            totalDays: totalDays,
+            fundCount: data.funds ? data.funds.length : 0
+        };
+    },
+    
+    /**
+     * 基础指标计算（当缺少净值数据时使用）
+     */
+    calculateBasicMetrics(data) {
+        const years = data.totalDays / 365.25;
+        const annualizedReturn = (Math.pow(data.finalValue / data.initialAmount, 1 / years) - 1) * 100;
+        
+        // 基于经验值估算波动率（更合理的范围）
+        const estimatedVolatility = Math.abs(annualizedReturn) * 0.8 + 15; // 基于收益率的经验估算
+        
+        // 基于经验值估算最大回撤
+        const estimatedDrawdown = Math.min(Math.abs(annualizedReturn) * 0.6 + 10, 50); // 不超过50%
+        
+        // 夏普比率
+        const riskFreeRate = 2.0;
+        const sharpeRatio = (annualizedReturn - riskFreeRate) / estimatedVolatility;
+        
+        // 信息比率（保守估计）
+        const informationRatio = (annualizedReturn + 5) / 15; // 假设基准-5%，跟踪误差15%
+        
+        // 卡玛比率
+        const calmarRatio = annualizedReturn / Math.abs(estimatedDrawdown);
+        
+        console.warn('⚠️ 使用基础估算指标（缺少真实净值数据）');
+        
+        return {
+            totalReturn: data.totalReturn,
+            annualizedReturn: annualizedReturn,
+            volatility: estimatedVolatility,
+            maxDrawdown: estimatedDrawdown,
+            sharpeRatio: sharpeRatio,
+            informationRatio: informationRatio,
+            calmarRatio: calmarRatio,
+            period: data.period || 3,
             totalDays: data.totalDays,
-            fundCount: data.funds.length
+            fundCount: data.funds ? data.funds.length : 0
         };
     },
 

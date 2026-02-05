@@ -936,6 +936,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 投资组合分析脚本 -->
+    <script src="/static/js/portfolio-analysis-integrated.js"></script>
     <script>
         // ==================== Fund Selector Component ====================
         class FundSelector {
@@ -2744,7 +2747,7 @@
 
                 
                 <div class="mt-4 text-center">
-                    <button id="portfolio-analyze-btn" class="btn btn-primary btn-lg" onclick="PortfolioAnalysis.showAnalysis()">
+                    <button id="portfolio-analyze-btn" class="btn btn-primary btn-lg">
                         <i class="bi bi-graph-up-arrow me-2"></i>查看投资组合深度分析
                     </button>
                 </div>
@@ -2753,6 +2756,16 @@
             // Display in results area
             document.getElementById('backtest-result').style.display = 'block';
             document.getElementById('backtest-result-content').innerHTML = html;
+            
+            // 重新绑定投资组合分析按钮事件（因为按钮是动态生成的）
+            setTimeout(() => {
+                if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.bindEvents) {
+                    PortfolioAnalysis.bindEvents();
+                    console.log('✅ 投资组合分析按钮事件重新绑定完成');
+                } else {
+                    console.warn('⚠️ PortfolioAnalysis 对象不可用，无法重新绑定事件');
+                }
+            }, 100);
             
             // Add animation class
             const resultsDiv = document.getElementById('backtest-result');
@@ -2774,7 +2787,5 @@
         }
     </script>
     
-    <!-- 投资组合分析脚本 -->
-    <script src="/static/js/portfolio-analysis-integrated.js"></script>
 </body>
 </html>
