@@ -118,12 +118,4 @@ fund_info = self.fund_data_manager.get_realtime_data(fund_code, fund_name)
 
 3. **错误处理**：
    - 如果AKShare接口失败，系统会尝试从数据库获取历史数据
-   - 如果所有数据源都失败，会返回默认值（0.0）
-
-## 修复日期
-
-2026-02-04
-
-## 修复人员
-
-Kiro AI Assistant
+   - 如果所有数据源都失败，会返回默

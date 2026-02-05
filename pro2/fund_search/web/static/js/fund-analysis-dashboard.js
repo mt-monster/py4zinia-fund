@@ -157,11 +157,17 @@ class FundAnalysisDashboard {
         const fundList = card.querySelector('.fund-list');
         if (!fundList) return;
         
+        // 从strategy_analysis获取基金数据
         let data = [];
-        if (this.data.fund_distribution && this.data.fund_distribution.length > 0) {
-            data = this.data.fund_distribution;
-        } else if (this.data.fund_holdings && this.data.fund_holdings.length > 0) {
-            data = this.data.fund_holdings;
+        if (this.data.strategy_analysis && this.data.strategy_analysis.funds) {
+            data = this.data.strategy_analysis.funds.map(fund => ({
+                fund_code: fund.fund_code,
+                fund_name: fund.fund_name,
+                ratio: fund.composite_score * 100,
+                proportion: fund.composite_score * 100,
+                today_return: fund.today_return,
+                status_label: fund.status_label
+            }));
         }
         
         const isExpanded = this.cardExpandState.holdings;
@@ -169,7 +175,7 @@ class FundAnalysisDashboard {
         
         fundList.innerHTML = displayData.length > 0 ? displayData.map((fund, index) => `
             <div class="fund-list-item ${index >= 6 ? 'card-item-expanded' : ''}">
-                <span class="fund-list-name" style="color: ${this.colors[index % this.colors.length]}">${fund.name || fund.fund_name}</span>
+                <span class="fund-list-name" style="color: ${this.colors[index % this.colors.length]}">${fund.fund_name || fund.fund_code}</span>
                 <span class="fund-list-ratio">${(fund.ratio || fund.proportion || 0).toFixed(2)}%</span>
             </div>
         `).join('') : '<div class="empty-hint">暂无持仓数据</div>';
@@ -428,15 +434,19 @@ class FundAnalysisDashboard {
         // 从fund_codes获取基金数量
         const fundCount = this.data.fund_codes ? this.data.fund_codes.length : 0;
         
-        // 从top_stocks或其他数据中获取基金持仓信息
-        // 这里我们使用虚拟数据结构，实际应从API获取
+        // 从strategy_analysis获取基金持仓信息（这是API实际返回的数据）
         let fundList = [];
         
-        // 如果有fund_distribution数据则使用
-        if (this.data.fund_distribution && this.data.fund_distribution.length > 0) {
-            fundList = this.data.fund_distribution;
-        } else if (this.data.fund_holdings && this.data.fund_holdings.length > 0) {
-            fundList = this.data.fund_holdings;
+        // 如果有strategy_analysis数据则使用
+        if (this.data.strategy_analysis && this.data.strategy_analysis.funds) {
+            fundList = this.data.strategy_analysis.funds.map(fund => ({
+                fund_code: fund.fund_code,
+                fund_name: fund.fund_name,
+                ratio: fund.composite_score * 100, // 使用综合评分作为相对权重
+                proportion: fund.composite_score * 100,
+                today_return: fund.today_return,
+                status_label: fund.status_label
+            }));
         }
         
         return `
@@ -451,7 +461,7 @@ class FundAnalysisDashboard {
                 <div class="fund-list" data-default-count="6">
                     ${fundList.length > 0 ? fundList.slice(0, 6).map((fund, index) => `
                         <div class="fund-list-item">
-                            <span class="fund-list-name" style="color: ${this.colors[index % this.colors.length]}">${fund.name || fund.fund_name}</span>
+                            <span class="fund-list-name" style="color: ${this.colors[index % this.colors.length]}">${fund.fund_name || fund.fund_code}</span>
                             <span class="fund-list-ratio">${(fund.ratio || fund.proportion || 0).toFixed(2)}%</span>
                         </div>
                     `).join('') : `
@@ -549,7 +559,6 @@ class FundAnalysisDashboard {
                                     <span class="legend-text">${name}</span>
                                 </div>
                                 <div class="legend-data">
-                                    <span class="legend-amount">${this.formatAmount(value)}元</span>
                                     <span class="legend-pct">${value.toFixed(2)}%</span>
                                 </div>
                             </div>

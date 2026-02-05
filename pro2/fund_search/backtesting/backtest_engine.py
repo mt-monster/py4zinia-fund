@@ -751,8 +751,9 @@ class FundBacktest:
         # 绘制可视化图表
         try:
             # 设置中文显示，解决中文乱码问题
-            plt.rcParams['font.sans-serif'] = ['SimHei', 'Arial Unicode MS', 'Microsoft YaHei']
-            plt.rcParams['axes.unicode_minus'] = False
+            # 设置matplotlib中文字体支持（Windows优先使用微软雅黑）
+            plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+            plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
             
             # 创建三个子图，垂直排列
             fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))

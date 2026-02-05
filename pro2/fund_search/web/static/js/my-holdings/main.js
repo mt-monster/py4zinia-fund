@@ -202,9 +202,9 @@ const FundApp = {
                 // 添加基金代码到数据中
                 result.data.fund_codes = fundCodes;
                 
-                // 跳转到相关性分析页面，传递数据
-                const dataParam = encodeURIComponent(JSON.stringify(result.data));
-                window.location.href = `/correlation-analysis?data=${dataParam}`;
+                // 使用 sessionStorage 存储数据，避免URL过长
+                sessionStorage.setItem('correlationAnalysisData', JSON.stringify(result.data));
+                window.location.href = '/correlation-analysis';
             } else {
                 FundUtils.showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
                 this.setAnalysisButtonLoading(false);
