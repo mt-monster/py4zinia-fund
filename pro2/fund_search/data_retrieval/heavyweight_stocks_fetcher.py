@@ -16,6 +16,7 @@ from typing import Optional, Dict, List, Any
 from datetime import datetime, timedelta
 import json
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -356,15 +357,17 @@ class HeavyweightStocksFetcher:
         }
     
     def fetch_heavyweight_stocks_batch(self, fund_codes: List[str], 
-                                       date: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+                                       date: Optional[str] = None,
+                                       max_workers: int = 5) -> Dict[str, Dict[str, Any]]:
         """
-        批量获取多个基金的重仓股数据
+        批量获取多个基金的重仓股数据（并发优化版）
         
-        优先从数据库获取，缺失的数据再从API获取
+        优先从数据库获取，缺失的数据使用线程池并发从API获取
         
         Args:
             fund_codes: 基金代码列表
             date: 报告期日期（可选）
+            max_workers: 最大并发线程数，默认5
             
         Returns:
             Dict: 以基金代码为key的结果字典
@@ -374,7 +377,7 @@ class HeavyweightStocksFetcher:
         if not fund_codes:
             return results
         
-        # 1. 尝试从数据库批量获取
+        # 1. 尝试从数据库批量获取（优化为单次查询）
         db_data = {}
         missing_funds = fund_codes
         
@@ -402,12 +405,67 @@ class HeavyweightStocksFetcher:
                 logger.warning(f"从数据库批量获取失败: {e}")
                 missing_funds = fund_codes
         
-        # 2. 从API获取缺失的数据
-        for fund_code in missing_funds:
-            result = self.fetch_heavyweight_stocks(fund_code, date, use_cache=True)
-            results[fund_code] = result
+        # 2. 使用线程池并发获取缺失的数据
+        if missing_funds:
+            logger.info(f"开始并发获取 {len(missing_funds)} 只基金的重仓股数据，最大并发数: {max_workers}")
+            start_time = time.time()
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有任务
+                future_to_fund = {
+                    executor.submit(self._fetch_single_fund_with_timeout, fund_code, date): fund_code 
+                    for fund_code in missing_funds
+                }
+                
+                # 收集结果
+                for future in as_completed(future_to_fund):
+                    fund_code = future_to_fund[future]
+                    try:
+                        result = future.result(timeout=30)  # 30秒超时
+                        results[fund_code] = result
+                        
+                        # 更新缓存
+                        if result.get('success') and result.get('data'):
+                            cache_key = self._get_cache_key(fund_code, date)
+                            self._set_cached_data(cache_key, result['data'])
+                    except Exception as e:
+                        logger.error(f"获取基金 {fund_code} 重仓股时发生错误: {e}")
+                        results[fund_code] = {
+                            'success': False,
+                            'data': [],
+                            'source': 'none',
+                            'error': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        }
+            
+            elapsed = time.time() - start_time
+            logger.info(f"并发获取完成，耗时: {elapsed:.2f}秒")
         
         return results
+    
+    def _fetch_single_fund_with_timeout(self, fund_code: str, date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        带超时的单只基金重仓股获取
+        
+        Args:
+            fund_code: 基金代码
+            date: 报告期日期（可选）
+            
+        Returns:
+            Dict: 重仓股数据结果
+        """
+        try:
+            result = self.fetch_heavyweight_stocks(fund_code, date, use_cache=True)
+            return result
+        except Exception as e:
+            logger.error(f"获取基金 {fund_code} 重仓股失败: {e}")
+            return {
+                'success': False,
+                'data': [],
+                'source': 'none',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
     
     def clear_cache(self, fund_code: Optional[str] = None):
         """清除缓存"""
@@ -508,19 +566,21 @@ def fetch_heavyweight_stocks(fund_code: str, date: Optional[str] = None,
 
 
 def fetch_heavyweight_stocks_batch(fund_codes: List[str], 
-                                   date: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+                                   date: Optional[str] = None,
+                                   max_workers: int = 5) -> Dict[str, Dict[str, Any]]:
     """
-    便捷函数：批量获取重仓股数据
+    便捷函数：批量获取重仓股数据（并发优化版）
     
     Args:
         fund_codes: 基金代码列表
         date: 报告期日期（可选）
+        max_workers: 最大并发线程数，默认5
         
     Returns:
         Dict: 以基金代码为key的结果字典
     """
     fetcher = get_fetcher()
-    return fetcher.fetch_heavyweight_stocks_batch(fund_codes, date)
+    return fetcher.fetch_heavyweight_stocks_batch(fund_codes, date, max_workers)
 
 
 if __name__ == "__main__":
