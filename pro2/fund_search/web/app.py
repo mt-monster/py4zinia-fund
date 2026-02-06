@@ -2829,6 +2829,79 @@ def get_holdings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/holdings/import/confirm', methods=['POST'])
+def import_holding_confirm():
+    """手工导入基金持仓确认"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id', 'default_user')
+        funds = data.get('funds', [])
+        
+        if not funds:
+            return jsonify({'success': False, 'error': '没有提供基金数据'}), 400
+            
+        imported_count = 0
+        errors = []
+        
+        for fund_data in funds:
+            try:
+                fund_code = fund_data.get('fund_code')
+                fund_name = fund_data.get('fund_name')
+                holding_shares = float(fund_data.get('holding_shares', 0))
+                cost_price = float(fund_data.get('cost_price', 0))
+                buy_date = fund_data.get('buy_date')
+                notes = fund_data.get('notes', '手工导入')
+                
+                # 计算持有金额
+                holding_amount = holding_shares * cost_price
+                
+                sql = """
+                INSERT INTO user_holdings 
+                (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
+                VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
+                """
+                
+                success = db_manager.execute_sql(sql, {
+                    'user_id': user_id,
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'holding_shares': holding_shares,
+                    'cost_price': cost_price,
+                    'holding_amount': holding_amount,
+                    'buy_date': buy_date,
+                    'notes': notes
+                })
+                
+                if success:
+                    imported_count += 1
+                else:
+                    errors.append(f"基金 {fund_code} 导入失败")
+                    
+            except Exception as e:
+                errors.append(f"基金 {fund_data.get('fund_code', 'unknown')} 处理异常: {str(e)}")
+        
+        if imported_count > 0:
+            message = f"成功导入 {imported_count} 只基金"
+            if errors:
+                message += f"，{len(errors)} 只基金导入失败"
+            return jsonify({
+                'success': True, 
+                'message': message,
+                'imported_count': imported_count,
+                'errors': errors
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'error': '所有基金导入失败',
+                'errors': errors
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"导入持仓失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/holdings', methods=['POST'])
 def add_holding():
     """添加持仓"""

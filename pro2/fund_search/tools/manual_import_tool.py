@@ -19,12 +19,15 @@ class ManualImportTool:
     def __init__(self):
         self.importer = PortfolioImporter()
     
-    def validate_fund_code(self, fund_code: str) -> Dict:
+    def validate_fund_code(self, fund_code: str, fund_name: Optional[str] = None, 
+                          offline_mode: bool = False) -> Dict:
         """
         验证基金代码
         
         参数：
         fund_code: 6位基金代码
+        fund_name: 基金名称（可选，离线模式下使用）
+        offline_mode: 是否使用离线模式（跳过网络验证）
         
         返回：
         dict: 验证结果
@@ -36,6 +39,19 @@ class ManualImportTool:
                 'fund_info': None
             }
         
+        # 离线模式：直接使用用户提供的基金名称，跳过网络验证
+        if offline_mode:
+            fund_info = {
+                'fund_code': fund_code,
+                'fund_name': fund_name or f'基金 {fund_code}',
+                'fund_type': '',
+            }
+            return {
+                'valid': True,
+                'message': f'离线模式: 接受基金代码 {fund_code}',
+                'fund_info': fund_info
+            }
+        
         try:
             # 通过akshare查找基金信息
             from ..data_retrieval.akshare_fund_lookup import AkshareFundLookup
@@ -44,9 +60,21 @@ class ManualImportTool:
             fund_list = lookup.get_fund_list()
             
             if fund_list.empty:
+                # 网络获取失败，但如果有提供基金名称，允许离线导入
+                if fund_name:
+                    fund_info = {
+                        'fund_code': fund_code,
+                        'fund_name': fund_name,
+                        'fund_type': '',
+                    }
+                    return {
+                        'valid': True,
+                        'message': f'网络不可用，使用离线模式: {fund_name}',
+                        'fund_info': fund_info
+                    }
                 return {
                     'valid': False,
-                    'message': '无法获取基金列表，请检查网络连接',
+                    'message': '无法获取基金列表，请检查网络连接。您也可以提供基金名称进行离线导入。',
                     'fund_info': None
                 }
             
@@ -67,6 +95,18 @@ class ManualImportTool:
                     'fund_info': fund_info
                 }
             else:
+                # 基金代码不在列表中，但如果提供了名称，允许离线导入
+                if fund_name:
+                    fund_info = {
+                        'fund_code': fund_code,
+                        'fund_name': fund_name,
+                        'fund_type': '',
+                    }
+                    return {
+                        'valid': True,
+                        'message': f'基金代码 {fund_code} 未在在线列表中找到，使用离线模式: {fund_name}',
+                        'fund_info': fund_info
+                    }
                 return {
                     'valid': False,
                     'message': f'基金代码 {fund_code} 不存在',
@@ -75,6 +115,18 @@ class ManualImportTool:
                 
         except Exception as e:
             logger.error(f"验证基金代码时出错: {e}")
+            # 发生异常时，如果提供了基金名称，允许离线导入
+            if fund_name:
+                fund_info = {
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'fund_type': '',
+                }
+                return {
+                    'valid': True,
+                    'message': f'验证出错，使用离线模式: {fund_name}',
+                    'fund_info': fund_info
+                }
             return {
                 'valid': False,
                 'message': f'验证失败: {e}',
@@ -86,6 +138,8 @@ class ManualImportTool:
                           change_percent: Optional[float] = None,
                           position_value: Optional[float] = None,
                           shares: Optional[float] = None,
+                          fund_name: Optional[str] = None,
+                          offline_mode: bool = False,
                           user_id: str = "default") -> Dict:
         """
         手工添加持仓
@@ -97,13 +151,15 @@ class ManualImportTool:
         change_percent: 涨跌百分比
         position_value: 持仓金额
         shares: 持有份额
+        fund_name: 基金名称（可选，离线模式下使用）
+        offline_mode: 是否使用离线模式（跳过网络验证）
         user_id: 用户ID
         
         返回：
         dict: 添加结果
         """
         # 验证基金代码
-        validation = self.validate_fund_code(fund_code)
+        validation = self.validate_fund_code(fund_code, fund_name, offline_mode)
         
         if not validation['valid']:
             return {
@@ -213,10 +269,13 @@ def interactive_manual_import():
         print("1. 添加单个基金持仓")
         print("2. 验证基金代码")
         print("3. 退出")
+        print("4. 离线模式添加（无需网络验证）")
         
-        choice = input("请输入选择 (1-3): ").strip()
+        choice = input("请输入选择 (1-4): ").strip()
         
-        if choice == '1':
+        offline_mode = (choice == '4')
+        
+        if choice in ('1', '4'):
             # 添加单个基金持仓
             fund_code = input("请输入基金代码 (6位数字): ").strip()
             
@@ -224,11 +283,21 @@ def interactive_manual_import():
                 print("基金代码不能为空")
                 continue
             
+            fund_name = None
+            if offline_mode:
+                fund_name = input("请输入基金名称: ").strip()
+                if not fund_name:
+                    print("离线模式下基金名称不能为空")
+                    continue
+            
             # 验证基金代码
-            validation = tool.validate_fund_code(fund_code)
+            validation = tool.validate_fund_code(fund_code, fund_name, offline_mode)
             
             if not validation['valid']:
                 print(f"验证失败: {validation['message']}")
+                # 提示用户可以重试或使用离线模式
+                if not offline_mode:
+                    print("提示: 如果网络连接有问题，请选择选项4使用离线模式导入")
                 continue
             
             print(f"找到基金: {validation['fund_info']['fund_name']}")
@@ -265,6 +334,8 @@ def interactive_manual_import():
                 change_percent=change_percent,
                 position_value=position_value,
                 shares=shares,
+                fund_name=fund_name,
+                offline_mode=offline_mode,
                 user_id=user_id
             )
             
