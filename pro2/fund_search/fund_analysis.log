@@ -2598,3 +2598,497 @@
 2026-01-23 16:31:40,943 - __main__ - WARNING - 通知发送失败，但分析流程已完成
 2026-01-23 16:31:40,946 - __main__ - INFO - 完整的基金分析流程执行完成
 2026-01-23 16:31:40,946 - __main__ - INFO - 基金分析任务成功完成
+2026-02-05 22:03:09,884 - backtesting.enhanced_strategy - INFO - 成功从YAML加载了 10 个策略规则
+2026-02-05 22:03:09,934 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-05 22:03:09,935 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-05 22:03:09,955 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-05 22:03:09,955 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-05 22:03:09,955 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-05 22:03:09,955 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-05 22:03:09,956 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-05 22:03:09,956 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-05 22:03:09,956 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-05 22:03:09,970 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-05 22:03:09,972 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-05 22:03:09,975 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-05 22:03:09,975 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-05 22:03:09,976 - __main__ - INFO - 成功设置中文字体: SimHei
+2026-02-05 22:03:09,976 - __main__ - INFO - 策略对比分析系统已加载
+2026-02-05 22:03:09,976 - __main__ - INFO - 增强版基金分析系统初始化完成
+2026-02-05 22:03:09,977 - __main__ - INFO - 运行完整分析流程（默认）
+2026-02-05 22:03:09,977 - __main__ - INFO - 开始运行完整的基金分析流程
+2026-02-05 22:03:09,977 - __main__ - INFO - 正在加载Excel文件: D:\codes\py4zinia\pro2\fund_search\京东金融.xlsx
+2026-02-05 22:03:11,379 - __main__ - INFO - 成功读取Excel文件，共 53 行数据
+2026-02-05 22:03:11,412 - __main__ - INFO - 过滤后有效基金数据: 53 条
+2026-02-05 22:03:11,467 - __main__ - INFO - 开始分析所有基金，共 53 只基金
+2026-02-05 22:03:11,469 - __main__ - INFO - 开始分析基金: 010033 - 安信成长精选混合A
+2026-02-05 22:03:14,505 - data_retrieval.enhanced_fund_data - INFO - 基金 010033 使用新浪实时数据: 1.4991, 涨跌幅: -1.25%
+2026-02-05 22:03:14,923 - __main__ - INFO - 基金 010033 实时数据: current_nav=1.4868, previous_nav=1.5181, daily_return=-1.25, yesterday_return=-2.06, data_source=sina_realtime
+2026-02-05 22:03:15,873 - __main__ - INFO - 基金 010033 收益率计算完成: today_return=-1.25%, prev_day_return=-2.06%
+2026-02-05 22:03:15,874 - __main__ - INFO - 基金 010033 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:15,875 - __main__ - INFO - 开始分析基金: 002611 - 博时黄金ETF联接C
+2026-02-05 22:03:17,290 - data_retrieval.enhanced_fund_data - INFO - 基金 002611 使用新浪实时数据: 3.4486, 涨跌幅: -3.60%
+2026-02-05 22:03:17,681 - __main__ - INFO - 基金 002611 实时数据: current_nav=3.4746, previous_nav=3.5773, daily_return=-3.6, yesterday_return=-2.87, data_source=sina_realtime
+2026-02-05 22:03:18,534 - __main__ - INFO - 基金 002611 收益率计算完成: today_return=-3.6%, prev_day_return=-2.87%
+2026-02-05 22:03:18,534 - __main__ - INFO - 基金 002611 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:18,534 - __main__ - INFO - 开始分析基金: 013466 - 博时智选量化多因子股票C
+2026-02-05 22:03:19,989 - data_retrieval.enhanced_fund_data - INFO - 基金 013466 使用新浪实时数据: 1.2559, 涨跌幅: -0.44%
+2026-02-05 22:03:20,350 - __main__ - INFO - 基金 013466 实时数据: current_nav=1.2451, previous_nav=1.2615, daily_return=-0.44, yesterday_return=-1.3, data_source=sina_realtime
+2026-02-05 22:03:21,035 - __main__ - INFO - 基金 013466 收益率计算完成: today_return=-0.44%, prev_day_return=-1.3%
+2026-02-05 22:03:21,035 - __main__ - INFO - 基金 013466 分析完成: status=🟦 **跌速放缓**, action=weak_buy, buy_multiplier=1.0, redeem_amount=0
+2026-02-05 22:03:21,036 - __main__ - INFO - 开始分析基金: 096001 - 大成标普500等权重指数(QDII)A人民币
+2026-02-05 22:03:22,133 - data_retrieval.enhanced_fund_data - INFO - 基金 096001 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:03:22,689 - data_retrieval.enhanced_fund_data - INFO - QDII基金 096001 使用AKShare数据: 当日净值=2.6696, 当日盈亏=0.73%, 昨日盈亏=-0.34% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:03:22,689 - __main__ - INFO - 基金 096001 实时数据: current_nav=2.6696, previous_nav=2.6503, daily_return=0.73, yesterday_return=-0.34, data_source=akshare_qdii
+2026-02-05 22:03:23,598 - __main__ - INFO - 基金 096001 收益率计算完成: today_return=0.73%, prev_day_return=-0.34%
+2026-02-05 22:03:23,598 - __main__ - INFO - 基金 096001 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:03:23,598 - __main__ - INFO - 开始分析基金: 001614 - 东方区域发展混合
+2026-02-05 22:03:24,952 - data_retrieval.enhanced_fund_data - INFO - 基金 001614 使用新浪实时数据: 1.4209, 涨跌幅: -0.21%
+2026-02-05 22:03:25,361 - __main__ - INFO - 基金 001614 实时数据: current_nav=1.4204, previous_nav=1.4239, daily_return=-0.21, yesterday_return=-0.25, data_source=sina_realtime
+2026-02-05 22:03:26,149 - __main__ - INFO - 基金 001614 收益率计算完成: today_return=-0.21%, prev_day_return=-0.25%
+2026-02-05 22:03:26,150 - __main__ - INFO - 基金 001614 分析完成: status=🔴 **温和下跌** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:03:26,152 - __main__ - INFO - 开始分析基金: 400032 - 东方主题精选混合
+2026-02-05 22:03:27,516 - data_retrieval.enhanced_fund_data - INFO - 基金 400032 使用新浪实时数据: 1.114, 涨跌幅: 0.13%
+2026-02-05 22:03:27,874 - __main__ - INFO - 基金 400032 实时数据: current_nav=1.1126, previous_nav=1.0972, daily_return=0.13, yesterday_return=1.4, data_source=sina_realtime
+2026-02-05 22:03:28,796 - __main__ - INFO - 基金 400032 收益率计算完成: today_return=0.13%, prev_day_return=1.4%
+2026-02-05 22:03:28,797 - __main__ - INFO - 基金 400032 分析完成: status=🟠 **连涨放缓** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:03:28,798 - __main__ - INFO - 开始分析基金: 002170 - 东吴移动互联混合C
+2026-02-05 22:03:30,325 - data_retrieval.enhanced_fund_data - INFO - 基金 002170 使用新浪实时数据: 5.8055, 涨跌幅: -0.96%
+2026-02-05 22:03:30,740 - __main__ - INFO - 基金 002170 实时数据: current_nav=5.8126, previous_nav=5.8618, daily_return=-0.96, yesterday_return=-0.84, data_source=sina_realtime
+2026-02-05 22:03:31,558 - __main__ - INFO - 基金 002170 收益率计算完成: today_return=-0.96%, prev_day_return=-0.84%
+2026-02-05 22:03:31,558 - __main__ - INFO - 基金 002170 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:31,559 - __main__ - INFO - 开始分析基金: 161022 - 富国创业板ETF联接A
+2026-02-05 22:03:32,944 - data_retrieval.enhanced_fund_data - INFO - 基金 161022 使用新浪实时数据: 1.1757, 涨跌幅: -1.49%
+2026-02-05 22:03:33,371 - __main__ - INFO - 基金 161022 实时数据: current_nav=1.1935, previous_nav=1.1982, daily_return=-1.49, yesterday_return=-0.39, data_source=sina_realtime
+2026-02-05 22:03:34,270 - __main__ - INFO - 基金 161022 收益率计算完成: today_return=-1.49%, prev_day_return=-0.39%
+2026-02-05 22:03:34,271 - __main__ - INFO - 基金 161022 分析完成: status=🔴 **温和下跌** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:03:34,272 - __main__ - INFO - 开始分析基金: 100055 - 富国全球科技互联网股票(QDII)A
+2026-02-05 22:03:35,122 - data_retrieval.enhanced_fund_data - INFO - 基金 100055 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:03:35,540 - data_retrieval.enhanced_fund_data - INFO - QDII基金 100055 使用AKShare数据: 当日净值=3.8578, 当日盈亏=-2.68%, 昨日盈亏=-0.56% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:03:35,540 - __main__ - INFO - 基金 100055 实时数据: current_nav=3.8578, previous_nav=3.964, daily_return=-2.68, yesterday_return=-0.56, data_source=akshare_qdii
+2026-02-05 22:03:36,413 - __main__ - INFO - 基金 100055 收益率计算完成: today_return=-2.68%, prev_day_return=-0.56%
+2026-02-05 22:03:36,414 - __main__ - INFO - 基金 100055 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:36,415 - __main__ - INFO - 开始分析基金: 012061 - 富国全球消费精选混合(QDII)美元现汇
+2026-02-05 22:03:37,406 - data_retrieval.enhanced_fund_data - INFO - 基金 012061 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:03:37,833 - data_retrieval.enhanced_fund_data - INFO - QDII基金 012061 使用AKShare数据: 当日净值=0.2497, 当日盈亏=-0.16%, 昨日盈亏=1.01% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:03:37,833 - __main__ - INFO - 基金 012061 实时数据: current_nav=0.2497, previous_nav=0.2501, daily_return=-0.16, yesterday_return=1.01, data_source=akshare_qdii
+2026-02-05 22:03:38,625 - __main__ - INFO - 基金 012061 收益率计算完成: today_return=-0.16%, prev_day_return=1.01%
+2026-02-05 22:03:38,626 - __main__ - INFO - 基金 012061 分析完成: status=🟠 **连涨放缓**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:03:38,627 - __main__ - INFO - 开始分析基金: 013048 - 富国中证新能源汽车指数C
+2026-02-05 22:03:43,130 - data_retrieval.enhanced_fund_data - INFO - 基金 013048 使用新浪实时数据: 1.1299, 涨跌幅: -2.17%
+2026-02-05 22:03:43,506 - __main__ - INFO - 基金 013048 实时数据: current_nav=1.13, previous_nav=1.155, daily_return=-2.17, yesterday_return=-2.16, data_source=sina_realtime
+2026-02-05 22:03:44,389 - __main__ - INFO - 基金 013048 收益率计算完成: today_return=-2.17%, prev_day_return=-2.16%
+2026-02-05 22:03:44,389 - __main__ - INFO - 基金 013048 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:44,390 - __main__ - INFO - 开始分析基金: 017512 - 广发北证50成份指数A
+2026-02-05 22:03:45,657 - data_retrieval.enhanced_fund_data - INFO - 基金 017512 使用新浪实时数据: 1.7791, 涨跌幅: -1.95%
+2026-02-05 22:03:46,033 - __main__ - INFO - 基金 017512 实时数据: current_nav=1.8145, previous_nav=1.8269, daily_return=-1.95, yesterday_return=-0.68, data_source=sina_realtime
+2026-02-05 22:03:46,806 - __main__ - INFO - 基金 017512 收益率计算完成: today_return=-1.95%, prev_day_return=-0.68%
+2026-02-05 22:03:46,807 - __main__ - INFO - 基金 017512 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:46,808 - __main__ - INFO - 开始分析基金: 017963 - 广发医药创新混合发起式C
+2026-02-05 22:03:48,467 - data_retrieval.enhanced_fund_data - INFO - 基金 017963 使用新浪实时数据: 1.1334, 涨跌幅: -0.30%
+2026-02-05 22:03:48,868 - __main__ - INFO - 基金 017963 实时数据: current_nav=1.1392, previous_nav=1.1368, daily_return=-0.3, yesterday_return=0.21, data_source=sina_realtime
+2026-02-05 22:03:49,537 - __main__ - INFO - 基金 017963 收益率计算完成: today_return=-0.3%, prev_day_return=0.21%
+2026-02-05 22:03:49,537 - __main__ - INFO - 基金 017963 分析完成: status=🟣 **小幅回调** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:03:49,538 - __main__ - INFO - 开始分析基金: 006486 - 广发中证1000ETF联接A
+2026-02-05 22:03:50,955 - data_retrieval.enhanced_fund_data - INFO - 基金 006486 使用新浪实时数据: 1.6874, 涨跌幅: -1.63%
+2026-02-05 22:03:51,365 - __main__ - INFO - 基金 006486 实时数据: current_nav=1.6892, previous_nav=1.7154, daily_return=-1.63, yesterday_return=-1.53, data_source=sina_realtime
+2026-02-05 22:03:52,189 - __main__ - INFO - 基金 006486 收益率计算完成: today_return=-1.63%, prev_day_return=-1.53%
+2026-02-05 22:03:52,189 - __main__ - INFO - 基金 006486 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:52,190 - __main__ - INFO - 开始分析基金: 005693 - 广发中证军工ETF联接C
+2026-02-05 22:03:53,518 - data_retrieval.enhanced_fund_data - INFO - 基金 005693 使用新浪实时数据: 1.3993, 涨跌幅: -1.21%
+2026-02-05 22:03:53,899 - __main__ - INFO - 基金 005693 实时数据: current_nav=1.3996, previous_nav=1.4165, daily_return=-1.21, yesterday_return=-1.19, data_source=sina_realtime
+2026-02-05 22:03:54,711 - __main__ - INFO - 基金 005693 收益率计算完成: today_return=-1.21%, prev_day_return=-1.19%
+2026-02-05 22:03:54,714 - __main__ - INFO - 基金 005693 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:54,715 - __main__ - INFO - 开始分析基金: 006373 - 国富全球科技互联混合(QDII)人民币A
+2026-02-05 22:03:55,466 - data_retrieval.enhanced_fund_data - INFO - 基金 006373 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:03:55,857 - data_retrieval.enhanced_fund_data - INFO - QDII基金 006373 使用AKShare数据: 当日净值=5.0047, 当日盈亏=-3.45%, 昨日盈亏=-0.8% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:03:55,857 - __main__ - INFO - 基金 006373 实时数据: current_nav=5.0047, previous_nav=5.1836, daily_return=-3.45, yesterday_return=-0.8, data_source=akshare_qdii
+2026-02-05 22:03:56,635 - __main__ - INFO - 基金 006373 收益率计算完成: today_return=-3.45%, prev_day_return=-0.8%
+2026-02-05 22:03:56,635 - __main__ - INFO - 基金 006373 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:56,635 - __main__ - INFO - 开始分析基金: 006195 - 国金量化多因子A
+2026-02-05 22:03:57,878 - data_retrieval.enhanced_fund_data - INFO - 基金 006195 使用新浪实时数据: 3.2285, 涨跌幅: -1.70%
+2026-02-05 22:03:58,274 - __main__ - INFO - 基金 006195 实时数据: current_nav=3.226, previous_nav=3.2843, daily_return=-1.7, yesterday_return=-1.78, data_source=sina_realtime
+2026-02-05 22:03:59,067 - __main__ - INFO - 基金 006195 收益率计算完成: today_return=-1.7%, prev_day_return=-1.78%
+2026-02-05 22:03:59,070 - __main__ - INFO - 基金 006195 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:03:59,071 - __main__ - INFO - 开始分析基金: 257060 - 国联安上证商品ETF联接A
+2026-02-05 22:04:00,493 - data_retrieval.enhanced_fund_data - INFO - 基金 257060 使用新浪实时数据: 1.6954, 涨跌幅: -3.13%
+2026-02-05 22:04:00,886 - __main__ - INFO - 基金 257060 实时数据: current_nav=1.7502, previous_nav=1.7195, daily_return=-3.13, yesterday_return=1.79, data_source=sina_realtime
+2026-02-05 22:04:01,761 - __main__ - INFO - 基金 257060 收益率计算完成: today_return=-3.13%, prev_day_return=1.79%
+2026-02-05 22:04:01,761 - __main__ - INFO - 基金 257060 分析完成: status=🔴 **反转下跌**, action=sell, buy_multiplier=0.0, redeem_amount=0.08
+2026-02-05 22:04:01,763 - __main__ - INFO - 开始分析基金: 006719 - 国融融盛龙头严选混合C
+2026-02-05 22:04:03,175 - data_retrieval.enhanced_fund_data - INFO - 基金 006719 使用新浪实时数据: 1.6058, 涨跌幅: -1.66%
+2026-02-05 22:04:03,607 - __main__ - INFO - 基金 006719 实时数据: current_nav=1.6094, previous_nav=1.6329, daily_return=-1.66, yesterday_return=-1.44, data_source=sina_realtime
+2026-02-05 22:04:04,326 - __main__ - INFO - 基金 006719 收益率计算完成: today_return=-1.66%, prev_day_return=-1.44%
+2026-02-05 22:04:04,326 - __main__ - INFO - 基金 006719 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:04,327 - __main__ - INFO - 开始分析基金: 012728 - 国泰中证动漫游戏ETF联接A
+2026-02-05 22:04:05,599 - data_retrieval.enhanced_fund_data - INFO - 基金 012728 使用新浪实时数据: 1.634, 涨跌幅: 0.22%
+2026-02-05 22:04:05,960 - __main__ - INFO - 基金 012728 实时数据: current_nav=1.6346, previous_nav=1.6304, daily_return=0.22, yesterday_return=0.26, data_source=sina_realtime
+2026-02-05 22:04:06,720 - __main__ - INFO - 基金 012728 收益率计算完成: today_return=0.22%, prev_day_return=0.26%
+2026-02-05 22:04:06,721 - __main__ - INFO - 基金 012728 分析完成: status=🟢 **温和上涨** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:04:06,721 - __main__ - INFO - 开始分析基金: 007817 - 国泰中证全指通信设备ETF联接A
+2026-02-05 22:04:07,959 - data_retrieval.enhanced_fund_data - INFO - 基金 007817 使用新浪实时数据: 2.9168, 涨跌幅: -2.23%
+2026-02-05 22:04:08,319 - __main__ - INFO - 基金 007817 实时数据: current_nav=2.9163, previous_nav=2.9832, daily_return=-2.23, yesterday_return=-2.24, data_source=sina_realtime
+2026-02-05 22:04:09,090 - __main__ - INFO - 基金 007817 收益率计算完成: today_return=-2.23%, prev_day_return=-2.24%
+2026-02-05 22:04:09,093 - __main__ - INFO - 基金 007817 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:09,095 - __main__ - INFO - 开始分析基金: 022328 - 宏利高端装备股票C
+2026-02-05 22:04:10,521 - data_retrieval.enhanced_fund_data - INFO - 基金 022328 使用新浪实时数据: 1.6269, 涨跌幅: -1.53%
+2026-02-05 22:04:10,898 - __main__ - INFO - 基金 022328 实时数据: current_nav=1.6315, previous_nav=1.6522, daily_return=-1.53, yesterday_return=-1.25, data_source=sina_realtime
+2026-02-05 22:04:11,618 - __main__ - INFO - 基金 022328 收益率计算完成: today_return=-1.53%, prev_day_return=-1.25%
+2026-02-05 22:04:11,618 - __main__ - INFO - 基金 022328 分析完成: status=🟣 **持续下跌** ⭐, action=buy, buy_multiplier=1.7999999999999998, redeem_amount=0
+2026-02-05 22:04:11,619 - __main__ - INFO - 开始分析基金: 006105 - 宏利印度股票(QDII)A
+2026-02-05 22:04:12,409 - data_retrieval.enhanced_fund_data - INFO - 基金 006105 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:12,834 - data_retrieval.enhanced_fund_data - INFO - QDII基金 006105 使用AKShare数据: 当日净值=1.4046, 当日盈亏=-0.32%, 昨日盈亏=3.08% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:12,835 - __main__ - INFO - 基金 006105 实时数据: current_nav=1.4046, previous_nav=1.4091, daily_return=-0.32, yesterday_return=3.08, data_source=akshare_qdii
+2026-02-05 22:04:13,644 - __main__ - INFO - 基金 006105 收益率计算完成: today_return=-0.32%, prev_day_return=3.08%
+2026-02-05 22:04:13,645 - __main__ - INFO - 基金 006105 分析完成: status=🔴 **反转下跌**, action=sell, buy_multiplier=0.0, redeem_amount=0.08
+2026-02-05 22:04:13,645 - __main__ - INFO - 开始分析基金: 021540 - 华安法国CAC40ETF发起式联接(QDII)C
+2026-02-05 22:04:14,370 - data_retrieval.enhanced_fund_data - INFO - 基金 021540 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:14,756 - data_retrieval.enhanced_fund_data - INFO - QDII基金 021540 使用AKShare数据: 当日净值=1.121, 当日盈亏=0.88%, 昨日盈亏=-0.53% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:14,757 - __main__ - INFO - 基金 021540 实时数据: current_nav=1.121, previous_nav=1.1112, daily_return=0.88, yesterday_return=-0.53, data_source=akshare_qdii
+2026-02-05 22:04:15,456 - __main__ - INFO - 基金 021540 收益率计算完成: today_return=0.88%, prev_day_return=-0.53%
+2026-02-05 22:04:15,457 - __main__ - INFO - 基金 021540 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:04:15,457 - __main__ - INFO - 开始分析基金: 015016 - 华安国际龙头(DAX)ETF联接C
+2026-02-05 22:04:16,269 - data_retrieval.enhanced_fund_data - INFO - 基金 015016 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:16,661 - data_retrieval.enhanced_fund_data - INFO - QDII基金 015016 使用AKShare数据: 当日净值=2.0211, 当日盈亏=-0.7%, 昨日盈亏=-0.57% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:16,661 - __main__ - INFO - 基金 015016 实时数据: current_nav=2.0211, previous_nav=2.0354, daily_return=-0.7, yesterday_return=-0.57, data_source=akshare_qdii
+2026-02-05 22:04:17,434 - __main__ - INFO - 基金 015016 收益率计算完成: today_return=-0.7%, prev_day_return=-0.57%
+2026-02-05 22:04:17,435 - __main__ - INFO - 基金 015016 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:17,435 - __main__ - INFO - 开始分析基金: 014978 - 华安纳斯达克100ETF联接(QDII)C
+2026-02-05 22:04:18,161 - data_retrieval.enhanced_fund_data - INFO - 基金 014978 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:18,560 - data_retrieval.enhanced_fund_data - INFO - QDII基金 014978 使用AKShare数据: 当日净值=7.1397, 当日盈亏=-1.67%, 昨日盈亏=0.74% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:18,560 - __main__ - INFO - 基金 014978 实时数据: current_nav=7.1397, previous_nav=7.2606, daily_return=-1.67, yesterday_return=0.74, data_source=akshare_qdii
+2026-02-05 22:04:19,314 - __main__ - INFO - 基金 014978 收益率计算完成: today_return=-1.67%, prev_day_return=0.74%
+2026-02-05 22:04:19,315 - __main__ - INFO - 基金 014978 分析完成: status=🔴 **反转下跌**, action=sell, buy_multiplier=0.0, redeem_amount=0.08
+2026-02-05 22:04:19,317 - __main__ - INFO - 开始分析基金: 002179 - 华安事件驱动量化混合A
+2026-02-05 22:04:20,668 - data_retrieval.enhanced_fund_data - INFO - 基金 002179 使用新浪实时数据: 2.5294, 涨跌幅: -1.85%
+2026-02-05 22:04:21,036 - __main__ - INFO - 基金 002179 实时数据: current_nav=2.544, previous_nav=2.577, daily_return=-1.85, yesterday_return=-1.28, data_source=sina_realtime
+2026-02-05 22:04:21,895 - __main__ - INFO - 基金 002179 收益率计算完成: today_return=-1.85%, prev_day_return=-1.28%
+2026-02-05 22:04:21,896 - __main__ - INFO - 基金 002179 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:21,896 - __main__ - INFO - 开始分析基金: 007844 - 华宝油气C
+2026-02-05 22:04:22,805 - data_retrieval.enhanced_fund_data - INFO - 基金 007844 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:23,173 - data_retrieval.enhanced_fund_data - INFO - QDII基金 007844 使用AKShare数据: 当日净值=0.766, 当日盈亏=2.65%, 昨日盈亏=2.63% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:23,174 - __main__ - INFO - 基金 007844 实时数据: current_nav=0.766, previous_nav=0.7462, daily_return=2.65, yesterday_return=2.63, data_source=akshare_qdii
+2026-02-05 22:04:23,985 - __main__ - INFO - 基金 007844 收益率计算完成: today_return=2.65%, prev_day_return=2.63%
+2026-02-05 22:04:23,985 - __main__ - INFO - 基金 007844 分析完成: status=🟢 **强势突破** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:04:23,986 - __main__ - INFO - 开始分析基金: 004206 - 华商元亨混合A
+2026-02-05 22:04:25,211 - data_retrieval.enhanced_fund_data - INFO - 基金 004206 使用新浪实时数据: 2.9835, 涨跌幅: -1.75%
+2026-02-05 22:04:25,590 - __main__ - INFO - 基金 004206 实时数据: current_nav=3.0057, previous_nav=3.0365, daily_return=-1.75, yesterday_return=-1.01, data_source=sina_realtime
+2026-02-05 22:04:26,450 - __main__ - INFO - 基金 004206 收益率计算完成: today_return=-1.75%, prev_day_return=-1.01%
+2026-02-05 22:04:26,453 - __main__ - INFO - 基金 004206 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:26,455 - __main__ - INFO - 开始分析基金: 011937 - 华夏阿尔法精选混合C
+2026-02-05 22:04:27,878 - data_retrieval.enhanced_fund_data - INFO - 基金 011937 使用新浪实时数据: 0.9336, 涨跌幅: -0.98%
+2026-02-05 22:04:28,230 - __main__ - INFO - 基金 011937 实时数据: current_nav=0.9364, previous_nav=0.9428, daily_return=-0.98, yesterday_return=-0.68, data_source=sina_realtime
+2026-02-05 22:04:28,901 - __main__ - INFO - 基金 011937 收益率计算完成: today_return=-0.98%, prev_day_return=-0.68%
+2026-02-05 22:04:28,901 - __main__ - INFO - 基金 011937 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:28,901 - __main__ - INFO - 开始分析基金: 008086 - 华夏中证5G通信主题ETF联接A
+2026-02-05 22:04:30,218 - data_retrieval.enhanced_fund_data - INFO - 基金 008086 使用新浪实时数据: 2.1845, 涨跌幅: -1.86%
+2026-02-05 22:04:30,651 - __main__ - INFO - 基金 008086 实时数据: current_nav=2.1904, previous_nav=2.2259, daily_return=-1.86, yesterday_return=-1.59, data_source=sina_realtime
+2026-02-05 22:04:31,515 - __main__ - INFO - 基金 008086 收益率计算完成: today_return=-1.86%, prev_day_return=-1.59%
+2026-02-05 22:04:31,516 - __main__ - INFO - 基金 008086 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:31,516 - __main__ - INFO - 开始分析基金: 020422 - 华夏中证港股通内地金融ETF发起式联接A
+2026-02-05 22:04:32,626 - data_retrieval.enhanced_fund_data - INFO - 基金 020422 使用新浪实时数据: 1.8202, 涨跌幅: -0.11%
+2026-02-05 22:04:32,992 - __main__ - INFO - 基金 020422 实时数据: current_nav=1.8222, previous_nav=1.8067, daily_return=-0.11, yesterday_return=0.86, data_source=sina_realtime
+2026-02-05 22:04:33,796 - __main__ - INFO - 基金 020422 收益率计算完成: today_return=-0.11%, prev_day_return=0.86%
+2026-02-05 22:04:33,797 - __main__ - INFO - 基金 020422 分析完成: status=🟠 **连涨放缓**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:04:33,797 - __main__ - INFO - 开始分析基金: 005551 - 汇安成长优选混合C
+2026-02-05 22:04:35,264 - data_retrieval.enhanced_fund_data - INFO - 基金 005551 使用新浪实时数据: 2.4429, 涨跌幅: -3.13%
+2026-02-05 22:04:35,660 - __main__ - INFO - 基金 005551 实时数据: current_nav=2.4861, previous_nav=2.5218, daily_return=-3.13, yesterday_return=-1.42, data_source=sina_realtime
+2026-02-05 22:04:36,472 - __main__ - INFO - 基金 005551 收益率计算完成: today_return=-3.13%, prev_day_return=-1.42%
+2026-02-05 22:04:36,474 - __main__ - INFO - 基金 005551 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:36,474 - __main__ - INFO - 开始分析基金: 012863 - 汇添富中证电池主题ETF发起式联接C
+2026-02-05 22:04:37,760 - data_retrieval.enhanced_fund_data - INFO - 基金 012863 使用新浪实时数据: 0.7736, 涨跌幅: -2.43%
+2026-02-05 22:04:38,117 - __main__ - INFO - 基金 012863 实时数据: current_nav=0.7726, previous_nav=0.7929, daily_return=-2.43, yesterday_return=-2.56, data_source=sina_realtime
+2026-02-05 22:04:39,029 - __main__ - INFO - 基金 012863 收益率计算完成: today_return=-2.43%, prev_day_return=-2.56%
+2026-02-05 22:04:39,030 - __main__ - INFO - 基金 012863 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:39,030 - __main__ - INFO - 开始分析基金: 007153 - 汇添富中证银行ETF联接A
+2026-02-05 22:04:40,266 - data_retrieval.enhanced_fund_data - INFO - 基金 007153 使用新浪实时数据: 1.4238, 涨跌幅: 1.47%
+2026-02-05 22:04:40,623 - __main__ - INFO - 基金 007153 实时数据: current_nav=1.4251, previous_nav=1.4032, daily_return=1.47, yesterday_return=1.56, data_source=sina_realtime
+2026-02-05 22:04:41,298 - __main__ - INFO - 基金 007153 收益率计算完成: today_return=1.47%, prev_day_return=1.56%
+2026-02-05 22:04:41,298 - __main__ - INFO - 基金 007153 分析完成: status=🟢 **强势突破**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:04:41,299 - __main__ - INFO - 开始分析基金: 501311 - 嘉实恒生港股通新经济指数(LOF)A
+2026-02-05 22:04:42,550 - data_retrieval.enhanced_fund_data - INFO - 基金 501311 使用新浪实时数据: 1.1065, 涨跌幅: 0.03%
+2026-02-05 22:04:42,900 - __main__ - INFO - 基金 501311 实时数据: current_nav=1.1062, previous_nav=1.1177, daily_return=0.03, yesterday_return=-1.03, data_source=sina_realtime
+2026-02-05 22:04:43,590 - __main__ - INFO - 基金 501311 收益率计算完成: today_return=0.03%, prev_day_return=-1.03%
+2026-02-05 22:04:43,591 - __main__ - INFO - 基金 501311 分析完成: status=🔵 **小幅反转** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-05 22:04:43,591 - __main__ - INFO - 开始分析基金: 007605 - 嘉实沪深300红利低波动ETF联接A
+2026-02-05 22:04:44,858 - data_retrieval.enhanced_fund_data - INFO - 基金 007605 使用新浪实时数据: 1.2806, 涨跌幅: 0.58%
+2026-02-05 22:04:45,199 - __main__ - INFO - 基金 007605 实时数据: current_nav=1.2791, previous_nav=1.2732, daily_return=0.58, yesterday_return=0.46, data_source=sina_realtime
+2026-02-05 22:04:46,024 - __main__ - INFO - 基金 007605 收益率计算完成: today_return=0.58%, prev_day_return=0.46%
+2026-02-05 22:04:46,025 - __main__ - INFO - 基金 007605 分析完成: status=🟡 **连涨加速**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:04:46,025 - __main__ - INFO - 开始分析基金: 008706 - 建信富时100指数(QDII)C人民币
+2026-02-05 22:04:46,704 - data_retrieval.enhanced_fund_data - INFO - 基金 008706 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:47,039 - data_retrieval.enhanced_fund_data - INFO - QDII基金 008706 使用AKShare数据: 当日净值=1.4709, 当日盈亏=0.62%, 昨日盈亏=-0.34% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:47,039 - __main__ - INFO - 基金 008706 实时数据: current_nav=1.4709, previous_nav=1.4619, daily_return=0.62, yesterday_return=-0.34, data_source=akshare_qdii
+2026-02-05 22:04:47,766 - __main__ - INFO - 基金 008706 收益率计算完成: today_return=0.62%, prev_day_return=-0.34%
+2026-02-05 22:04:47,766 - __main__ - INFO - 基金 008706 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:04:47,767 - __main__ - INFO - 开始分析基金: 018861 - 景顺长城量化港股通股票C
+2026-02-05 22:04:49,193 - data_retrieval.enhanced_fund_data - INFO - 基金 018861 使用新浪实时数据: 1.1695, 涨跌幅: -0.43%
+2026-02-05 22:04:49,636 - __main__ - INFO - 基金 018861 实时数据: current_nav=1.174, previous_nav=1.1745, daily_return=-0.43, yesterday_return=-4.0, data_source=sina_realtime
+2026-02-05 22:04:50,308 - __main__ - INFO - 基金 018861 收益率计算完成: today_return=-0.43%, prev_day_return=-4.0%
+2026-02-05 22:04:50,308 - __main__ - INFO - 基金 018861 分析完成: status=🟦 **跌速放缓**, action=weak_buy, buy_multiplier=1.0, redeem_amount=0
+2026-02-05 22:04:50,308 - __main__ - INFO - 开始分析基金: 501225 - 景顺长城全球半导体芯片股票A(QDII-LOF)(人民币)
+2026-02-05 22:04:50,950 - data_retrieval.enhanced_fund_data - INFO - 基金 501225 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:51,338 - data_retrieval.enhanced_fund_data - INFO - QDII基金 501225 使用AKShare数据: 当日净值=2.1383, 当日盈亏=-3.42%, 昨日盈亏=-1.22% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:51,338 - __main__ - INFO - 基金 501225 实时数据: current_nav=2.1383, previous_nav=2.2141, daily_return=-3.42, yesterday_return=-1.22, data_source=akshare_qdii
+2026-02-05 22:04:52,105 - __main__ - INFO - 基金 501225 收益率计算完成: today_return=-3.42%, prev_day_return=-1.22%
+2026-02-05 22:04:52,105 - __main__ - INFO - 基金 501225 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:52,106 - __main__ - INFO - 开始分析基金: 162415 - 美国消费
+2026-02-05 22:04:52,963 - data_retrieval.enhanced_fund_data - INFO - 基金 162415 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:04:53,375 - data_retrieval.enhanced_fund_data - INFO - QDII基金 162415 使用AKShare数据: 当日净值=3.023, 当日盈亏=-0.76%, 昨日盈亏=-0.91% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:04:53,375 - __main__ - INFO - 基金 162415 实时数据: current_nav=3.023, previous_nav=3.046, daily_return=-0.76, yesterday_return=-0.91, data_source=akshare_qdii
+2026-02-05 22:04:54,068 - __main__ - INFO - 基金 162415 收益率计算完成: today_return=-0.76%, prev_day_return=-0.91%
+2026-02-05 22:04:54,068 - __main__ - INFO - 基金 162415 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:54,069 - __main__ - INFO - 开始分析基金: 008811 - 鹏华科技创新混合
+2026-02-05 22:04:55,365 - data_retrieval.enhanced_fund_data - INFO - 基金 008811 使用新浪实时数据: 1.8379, 涨跌幅: -2.97%
+2026-02-05 22:04:55,797 - __main__ - INFO - 基金 008811 实时数据: current_nav=1.8674, previous_nav=1.8941, daily_return=-2.97, yesterday_return=-1.41, data_source=sina_realtime
+2026-02-05 22:04:56,535 - __main__ - INFO - 基金 008811 收益率计算完成: today_return=-2.97%, prev_day_return=-1.41%
+2026-02-05 22:04:56,536 - __main__ - INFO - 基金 008811 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:56,536 - __main__ - INFO - 开始分析基金: 018495 - 融通产业趋势臻选股票C
+2026-02-05 22:04:57,871 - data_retrieval.enhanced_fund_data - INFO - 基金 018495 使用新浪实时数据: 2.13, 涨跌幅: -1.85%
+2026-02-05 22:04:58,282 - __main__ - INFO - 基金 018495 实时数据: current_nav=2.1105, previous_nav=2.1701, daily_return=-1.85, yesterday_return=-2.75, data_source=sina_realtime
+2026-02-05 22:04:58,998 - __main__ - INFO - 基金 018495 收益率计算完成: today_return=-1.85%, prev_day_return=-2.75%
+2026-02-05 22:04:58,998 - __main__ - INFO - 基金 018495 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:04:58,999 - __main__ - INFO - 开始分析基金: 018048 - 申万菱信数字产业股票型发起式A
+2026-02-05 22:05:00,276 - data_retrieval.enhanced_fund_data - INFO - 基金 018048 使用新浪实时数据: 1.388, 涨跌幅: -1.60%
+2026-02-05 22:05:00,654 - __main__ - INFO - 基金 018048 实时数据: current_nav=1.4105, previous_nav=1.4652, daily_return=-1.6, yesterday_return=-3.73, data_source=sina_realtime
+2026-02-05 22:05:01,347 - __main__ - INFO - 基金 018048 收益率计算完成: today_return=-1.6%, prev_day_return=-3.73%
+2026-02-05 22:05:01,348 - __main__ - INFO - 基金 018048 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:01,348 - __main__ - INFO - 开始分析基金: 007721 - 天弘标普500发起(QDII-FOF)A
+2026-02-05 22:05:02,576 - data_retrieval.enhanced_fund_data - INFO - 基金 007721 是QDII基金，使用AKShare接口获取数据
+2026-02-05 22:05:02,953 - data_retrieval.enhanced_fund_data - INFO - QDII基金 007721 使用AKShare数据: 当日净值=2.0881, 当日盈亏=-0.56%, 昨日盈亏=-0.89% (AKShare日增长率直接使用，不进行格式转换)
+2026-02-05 22:05:02,954 - __main__ - INFO - 基金 007721 实时数据: current_nav=2.0881, previous_nav=2.0999, daily_return=-0.56, yesterday_return=-0.89, data_source=akshare_qdii
+2026-02-05 22:05:03,746 - __main__ - INFO - 基金 007721 收益率计算完成: today_return=-0.56%, prev_day_return=-0.89%
+2026-02-05 22:05:03,746 - __main__ - INFO - 基金 007721 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:03,747 - __main__ - INFO - 开始分析基金: 025833 - 天弘中证电网设备主题指数发起C
+2026-02-05 22:05:05,041 - data_retrieval.enhanced_fund_data - WARNING - 新浪财经接口未返回基金 025833 的实时估算数据，尝试使用AKShare历史数据
+2026-02-05 22:05:05,370 - data_retrieval.enhanced_fund_data - INFO - 基金 025833 使用AKShare历史数据: 当前净值=1.2068, 涨跌幅=-4.54%
+2026-02-05 22:05:05,370 - __main__ - INFO - 基金 025833 实时数据: current_nav=1.2068, previous_nav=1.2642, daily_return=-4.54, yesterday_return=0.41, data_source=akshare_history
+2026-02-05 22:05:06,143 - __main__ - INFO - 基金 025833 收益率计算完成: today_return=-4.54%, prev_day_return=0.41%
+2026-02-05 22:05:06,143 - __main__ - INFO - 基金 025833 分析完成: status=🔴 **反转下跌** ⚠️, action=sell, buy_multiplier=0.5, redeem_amount=0.08
+2026-02-05 22:05:06,145 - __main__ - INFO - 开始分析基金: 519180 - 万家180指数A
+2026-02-05 22:05:07,538 - data_retrieval.enhanced_fund_data - INFO - 基金 519180 使用新浪实时数据: 1.1888, 涨跌幅: -0.61%
+2026-02-05 22:05:07,892 - __main__ - INFO - 基金 519180 实时数据: current_nav=1.1961, previous_nav=1.1848, daily_return=-0.61, yesterday_return=0.95, data_source=sina_realtime
+2026-02-05 22:05:08,736 - __main__ - INFO - 基金 519180 收益率计算完成: today_return=-0.61%, prev_day_return=0.95%
+2026-02-05 22:05:08,737 - __main__ - INFO - 基金 519180 分析完成: status=🔴 **反转下跌**, action=sell, buy_multiplier=0.0, redeem_amount=0.08
+2026-02-05 22:05:08,737 - __main__ - INFO - 开始分析基金: 519196 - 万家新兴蓝筹A
+2026-02-05 22:05:10,070 - data_retrieval.enhanced_fund_data - INFO - 基金 519196 使用新浪实时数据: 4.6535, 涨跌幅: -0.91%
+2026-02-05 22:05:10,508 - __main__ - INFO - 基金 519196 实时数据: current_nav=4.6964, previous_nav=4.7405, daily_return=-0.91, yesterday_return=-0.93, data_source=sina_realtime
+2026-02-05 22:05:11,331 - __main__ - INFO - 基金 519196 收益率计算完成: today_return=-0.91%, prev_day_return=-0.93%
+2026-02-05 22:05:11,331 - __main__ - INFO - 基金 519196 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:11,333 - __main__ - INFO - 开始分析基金: 012509 - 兴全安悦稳健养老一年持有混合(FOF)A
+2026-02-05 22:05:12,580 - data_retrieval.enhanced_fund_data - WARNING - 新浪财经接口未返回基金 012509 的实时估算数据，尝试使用AKShare历史数据
+2026-02-05 22:05:13,035 - data_retrieval.enhanced_fund_data - INFO - 基金 012509 使用AKShare历史数据: 当前净值=1.1805, 涨跌幅=0.37%
+2026-02-05 22:05:13,035 - __main__ - INFO - 基金 012509 实时数据: current_nav=1.1805, previous_nav=1.1762, daily_return=0.37, yesterday_return=-0.8, data_source=akshare_history
+2026-02-05 22:05:13,803 - __main__ - INFO - 基金 012509 收益率计算完成: today_return=0.37%, prev_day_return=-0.8%
+2026-02-05 22:05:13,803 - __main__ - INFO - 基金 012509 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:05:13,804 - __main__ - INFO - 开始分析基金: 010391 - 易方达战略新兴产业股票A
+2026-02-05 22:05:15,211 - data_retrieval.enhanced_fund_data - INFO - 基金 010391 使用新浪实时数据: 1.7119, 涨跌幅: -1.73%
+2026-02-05 22:05:15,568 - __main__ - INFO - 基金 010391 实时数据: current_nav=1.7035, previous_nav=1.742, daily_return=-1.73, yesterday_return=-2.21, data_source=sina_realtime
+2026-02-05 22:05:16,385 - __main__ - INFO - 基金 010391 收益率计算完成: today_return=-1.73%, prev_day_return=-2.21%
+2026-02-05 22:05:16,385 - __main__ - INFO - 基金 010391 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:16,387 - __main__ - INFO - 开始分析基金: 001270 - 英大灵活配置A
+2026-02-05 22:05:17,748 - data_retrieval.enhanced_fund_data - INFO - 基金 001270 使用新浪实时数据: 1.4396, 涨跌幅: -2.87%
+2026-02-05 22:05:18,181 - __main__ - INFO - 基金 001270 实时数据: current_nav=1.451, previous_nav=1.4822, daily_return=-2.87, yesterday_return=-2.1, data_source=sina_realtime
+2026-02-05 22:05:19,050 - __main__ - INFO - 基金 001270 收益率计算完成: today_return=-2.87%, prev_day_return=-2.1%
+2026-02-05 22:05:19,050 - __main__ - INFO - 基金 001270 分析完成: status=🟣 **持续下跌**, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:19,050 - __main__ - INFO - 开始分析基金: 010052 - 长城久嘉创新成长混合C
+2026-02-05 22:05:20,407 - data_retrieval.enhanced_fund_data - INFO - 基金 010052 使用新浪实时数据: 2.7166, 涨跌幅: -1.70%
+2026-02-05 22:05:20,830 - __main__ - INFO - 基金 010052 实时数据: current_nav=2.7262, previous_nav=2.7637, daily_return=-1.7, yesterday_return=-1.36, data_source=sina_realtime
+2026-02-05 22:05:21,589 - __main__ - INFO - 基金 010052 收益率计算完成: today_return=-1.7%, prev_day_return=-1.36%
+2026-02-05 22:05:21,589 - __main__ - INFO - 基金 010052 分析完成: status=🟣 **持续下跌** ⚠️, action=weak_buy, buy_multiplier=0.8999999999999999, redeem_amount=0
+2026-02-05 22:05:21,590 - __main__ - INFO - 开始分析基金: 010341 - 招商产业精选股票A
+2026-02-05 22:05:22,811 - data_retrieval.enhanced_fund_data - INFO - 基金 010341 使用新浪实时数据: 1.3074, 涨跌幅: -0.20%
+2026-02-05 22:05:23,173 - __main__ - INFO - 基金 010341 实时数据: current_nav=1.3106, previous_nav=1.31, daily_return=-0.2, yesterday_return=5.0, data_source=sina_realtime
+2026-02-05 22:05:23,971 - __main__ - INFO - 基金 010341 收益率计算完成: today_return=-0.2%, prev_day_return=5.0%
+2026-02-05 22:05:23,971 - __main__ - INFO - 基金 010341 分析完成: status=🟠 **连涨放缓**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-05 22:05:23,971 - __main__ - INFO - 所有基金分析完成，共分析 53 只基金
+2026-02-05 22:05:23,975 - __main__ - INFO - 开始生成分析图表报告
+2026-02-05 22:05:28,569 - backtesting.enhanced_analytics - INFO - 绩效概览图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\基金绩效概览_20260205.png
+2026-02-05 22:05:31,735 - backtesting.enhanced_analytics - INFO - 收益率分析图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\收益率分析_20260205.png
+2026-02-05 22:05:35,853 - backtesting.enhanced_analytics - INFO - 风险分析图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\风险分析_20260205.png
+2026-02-05 22:05:38,474 - backtesting.enhanced_analytics - INFO - 综合评分分析图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\综合评分分析_20260205.png
+2026-02-05 22:05:40,095 - backtesting.enhanced_analytics - INFO - 相关性分析图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\相关性分析_20260205.png
+2026-02-05 22:05:42,966 - backtesting.enhanced_analytics - INFO - 投资建议汇总图表已保存: D:\codes\py4zinia\pro2\fund_search\..\reports\投资建议汇总_20260205.png
+2026-02-05 22:05:42,967 - backtesting.enhanced_analytics - INFO - 综合报告生成完成，共生成 6 个图表
+2026-02-05 22:05:42,967 - __main__ - INFO - 分析图表报告生成完成，共生成 6 个图表
+2026-02-05 22:05:42,967 - __main__ - INFO - 开始保存分析结果到数据库
+2026-02-05 22:05:42,968 - data_retrieval.enhanced_database - INFO - 开始批量插入数据...
+2026-02-05 22:05:43,016 - data_retrieval.enhanced_database - INFO - 基金 010033 基本信息已保存
+2026-02-05 22:05:43,047 - data_retrieval.enhanced_database - INFO - 基金 002611 基本信息已保存
+2026-02-05 22:05:43,053 - data_retrieval.enhanced_database - INFO - 基金 013466 基本信息已保存
+2026-02-05 22:05:43,061 - data_retrieval.enhanced_database - INFO - 基金 096001 基本信息已保存
+2026-02-05 22:05:43,074 - data_retrieval.enhanced_database - INFO - 基金 001614 基本信息已保存
+2026-02-05 22:05:43,080 - data_retrieval.enhanced_database - INFO - 基金 400032 基本信息已保存
+2026-02-05 22:05:43,091 - data_retrieval.enhanced_database - INFO - 基金 002170 基本信息已保存
+2026-02-05 22:05:43,099 - data_retrieval.enhanced_database - INFO - 基金 161022 基本信息已保存
+2026-02-05 22:05:43,105 - data_retrieval.enhanced_database - INFO - 基金 100055 基本信息已保存
+2026-02-05 22:05:43,111 - data_retrieval.enhanced_database - INFO - 基金 012061 基本信息已保存
+2026-02-05 22:05:43,119 - data_retrieval.enhanced_database - INFO - 基金 013048 基本信息已保存
+2026-02-05 22:05:43,126 - data_retrieval.enhanced_database - INFO - 基金 017512 基本信息已保存
+2026-02-05 22:05:43,147 - data_retrieval.enhanced_database - INFO - 基金 017963 基本信息已保存
+2026-02-05 22:05:43,156 - data_retrieval.enhanced_database - INFO - 基金 006486 基本信息已保存
+2026-02-05 22:05:43,172 - data_retrieval.enhanced_database - INFO - 基金 005693 基本信息已保存
+2026-02-05 22:05:43,178 - data_retrieval.enhanced_database - INFO - 基金 006373 基本信息已保存
+2026-02-05 22:05:43,184 - data_retrieval.enhanced_database - INFO - 基金 006195 基本信息已保存
+2026-02-05 22:05:43,198 - data_retrieval.enhanced_database - INFO - 基金 257060 基本信息已保存
+2026-02-05 22:05:43,204 - data_retrieval.enhanced_database - INFO - 基金 006719 基本信息已保存
+2026-02-05 22:05:43,210 - data_retrieval.enhanced_database - INFO - 基金 012728 基本信息已保存
+2026-02-05 22:05:43,214 - data_retrieval.enhanced_database - INFO - 基金 007817 基本信息已保存
+2026-02-05 22:05:43,220 - data_retrieval.enhanced_database - INFO - 基金 022328 基本信息已保存
+2026-02-05 22:05:43,231 - data_retrieval.enhanced_database - INFO - 基金 006105 基本信息已保存
+2026-02-05 22:05:43,236 - data_retrieval.enhanced_database - INFO - 基金 021540 基本信息已保存
+2026-02-05 22:05:43,251 - data_retrieval.enhanced_database - INFO - 基金 015016 基本信息已保存
+2026-02-05 22:05:43,262 - data_retrieval.enhanced_database - INFO - 基金 014978 基本信息已保存
+2026-02-05 22:05:43,290 - data_retrieval.enhanced_database - INFO - 基金 002179 基本信息已保存
+2026-02-05 22:05:43,298 - data_retrieval.enhanced_database - INFO - 基金 007844 基本信息已保存
+2026-02-05 22:05:43,302 - data_retrieval.enhanced_database - INFO - 基金 004206 基本信息已保存
+2026-02-05 22:05:43,306 - data_retrieval.enhanced_database - INFO - 基金 011937 基本信息已保存
+2026-02-05 22:05:43,319 - data_retrieval.enhanced_database - INFO - 基金 008086 基本信息已保存
+2026-02-05 22:05:43,324 - data_retrieval.enhanced_database - INFO - 基金 020422 基本信息已保存
+2026-02-05 22:05:43,337 - data_retrieval.enhanced_database - INFO - 基金 005551 基本信息已保存
+2026-02-05 22:05:43,346 - data_retrieval.enhanced_database - INFO - 基金 012863 基本信息已保存
+2026-02-05 22:05:43,353 - data_retrieval.enhanced_database - INFO - 基金 007153 基本信息已保存
+2026-02-05 22:05:43,364 - data_retrieval.enhanced_database - INFO - 基金 501311 基本信息已保存
+2026-02-05 22:05:43,367 - data_retrieval.enhanced_database - INFO - 基金 007605 基本信息已保存
+2026-02-05 22:05:43,373 - data_retrieval.enhanced_database - INFO - 基金 008706 基本信息已保存
+2026-02-05 22:05:43,384 - data_retrieval.enhanced_database - INFO - 基金 018861 基本信息已保存
+2026-02-05 22:05:43,400 - data_retrieval.enhanced_database - INFO - 基金 501225 基本信息已保存
+2026-02-05 22:05:43,418 - data_retrieval.enhanced_database - INFO - 基金 162415 基本信息已保存
+2026-02-05 22:05:43,430 - data_retrieval.enhanced_database - INFO - 基金 008811 基本信息已保存
+2026-02-05 22:05:43,440 - data_retrieval.enhanced_database - INFO - 基金 018495 基本信息已保存
+2026-02-05 22:05:43,450 - data_retrieval.enhanced_database - INFO - 基金 018048 基本信息已保存
+2026-02-05 22:05:43,456 - data_retrieval.enhanced_database - INFO - 基金 007721 基本信息已保存
+2026-02-05 22:05:43,465 - data_retrieval.enhanced_database - INFO - 基金 025833 基本信息已保存
+2026-02-05 22:05:43,469 - data_retrieval.enhanced_database - INFO - 基金 519180 基本信息已保存
+2026-02-05 22:05:43,475 - data_retrieval.enhanced_database - INFO - 基金 519196 基本信息已保存
+2026-02-05 22:05:43,482 - data_retrieval.enhanced_database - INFO - 基金 012509 基本信息已保存
+2026-02-05 22:05:43,490 - data_retrieval.enhanced_database - INFO - 基金 010391 基本信息已保存
+2026-02-05 22:05:43,505 - data_retrieval.enhanced_database - INFO - 基金 001270 基本信息已保存
+2026-02-05 22:05:43,521 - data_retrieval.enhanced_database - INFO - 基金 010052 基本信息已保存
+2026-02-05 22:05:43,525 - data_retrieval.enhanced_database - INFO - 基金 010341 基本信息已保存
+2026-02-05 22:05:43,580 - data_retrieval.enhanced_database - INFO - 基金 010033 绩效数据已保存
+2026-02-05 22:05:43,593 - data_retrieval.enhanced_database - INFO - 基金 002611 绩效数据已保存
+2026-02-05 22:05:43,599 - data_retrieval.enhanced_database - INFO - 基金 013466 绩效数据已保存
+2026-02-05 22:05:43,602 - data_retrieval.enhanced_database - INFO - 基金 096001 绩效数据已保存
+2026-02-05 22:05:43,607 - data_retrieval.enhanced_database - INFO - 基金 001614 绩效数据已保存
+2026-02-05 22:05:43,613 - data_retrieval.enhanced_database - INFO - 基金 400032 绩效数据已保存
+2026-02-05 22:05:43,617 - data_retrieval.enhanced_database - INFO - 基金 002170 绩效数据已保存
+2026-02-05 22:05:43,623 - data_retrieval.enhanced_database - INFO - 基金 161022 绩效数据已保存
+2026-02-05 22:05:43,629 - data_retrieval.enhanced_database - INFO - 基金 100055 绩效数据已保存
+2026-02-05 22:05:43,642 - data_retrieval.enhanced_database - INFO - 基金 012061 绩效数据已保存
+2026-02-05 22:05:43,650 - data_retrieval.enhanced_database - INFO - 基金 013048 绩效数据已保存
+2026-02-05 22:05:43,655 - data_retrieval.enhanced_database - INFO - 基金 017512 绩效数据已保存
+2026-02-05 22:05:43,661 - data_retrieval.enhanced_database - INFO - 基金 017963 绩效数据已保存
+2026-02-05 22:05:43,670 - data_retrieval.enhanced_database - INFO - 基金 006486 绩效数据已保存
+2026-02-05 22:05:43,674 - data_retrieval.enhanced_database - INFO - 基金 005693 绩效数据已保存
+2026-02-05 22:05:43,684 - data_retrieval.enhanced_database - INFO - 基金 006373 绩效数据已保存
+2026-02-05 22:05:43,688 - data_retrieval.enhanced_database - INFO - 基金 006195 绩效数据已保存
+2026-02-05 22:05:43,692 - data_retrieval.enhanced_database - INFO - 基金 257060 绩效数据已保存
+2026-02-05 22:05:43,704 - data_retrieval.enhanced_database - INFO - 基金 006719 绩效数据已保存
+2026-02-05 22:05:43,707 - data_retrieval.enhanced_database - INFO - 基金 012728 绩效数据已保存
+2026-02-05 22:05:43,710 - data_retrieval.enhanced_database - INFO - 基金 007817 绩效数据已保存
+2026-02-05 22:05:43,717 - data_retrieval.enhanced_database - INFO - 基金 022328 绩效数据已保存
+2026-02-05 22:05:43,720 - data_retrieval.enhanced_database - INFO - 基金 006105 绩效数据已保存
+2026-02-05 22:05:43,724 - data_retrieval.enhanced_database - INFO - 基金 021540 绩效数据已保存
+2026-02-05 22:05:43,732 - data_retrieval.enhanced_database - INFO - 基金 015016 绩效数据已保存
+2026-02-05 22:05:43,736 - data_retrieval.enhanced_database - INFO - 基金 014978 绩效数据已保存
+2026-02-05 22:05:43,740 - data_retrieval.enhanced_database - INFO - 基金 002179 绩效数据已保存
+2026-02-05 22:05:43,750 - data_retrieval.enhanced_database - INFO - 基金 007844 绩效数据已保存
+2026-02-05 22:05:43,754 - data_retrieval.enhanced_database - INFO - 基金 004206 绩效数据已保存
+2026-02-05 22:05:43,757 - data_retrieval.enhanced_database - INFO - 基金 011937 绩效数据已保存
+2026-02-05 22:05:43,764 - data_retrieval.enhanced_database - INFO - 基金 008086 绩效数据已保存
+2026-02-05 22:05:43,768 - data_retrieval.enhanced_database - INFO - 基金 020422 绩效数据已保存
+2026-02-05 22:05:43,771 - data_retrieval.enhanced_database - INFO - 基金 005551 绩效数据已保存
+2026-02-05 22:05:43,783 - data_retrieval.enhanced_database - INFO - 基金 012863 绩效数据已保存
+2026-02-05 22:05:43,788 - data_retrieval.enhanced_database - INFO - 基金 007153 绩效数据已保存
+2026-02-05 22:05:43,792 - data_retrieval.enhanced_database - INFO - 基金 501311 绩效数据已保存
+2026-02-05 22:05:43,802 - data_retrieval.enhanced_database - INFO - 基金 007605 绩效数据已保存
+2026-02-05 22:05:43,809 - data_retrieval.enhanced_database - INFO - 基金 008706 绩效数据已保存
+2026-02-05 22:05:43,818 - data_retrieval.enhanced_database - INFO - 基金 018861 绩效数据已保存
+2026-02-05 22:05:43,822 - data_retrieval.enhanced_database - INFO - 基金 501225 绩效数据已保存
+2026-02-05 22:05:43,825 - data_retrieval.enhanced_database - INFO - 基金 162415 绩效数据已保存
+2026-02-05 22:05:43,834 - data_retrieval.enhanced_database - INFO - 基金 008811 绩效数据已保存
+2026-02-05 22:05:43,837 - data_retrieval.enhanced_database - INFO - 基金 018495 绩效数据已保存
+2026-02-05 22:05:43,839 - data_retrieval.enhanced_database - INFO - 基金 018048 绩效数据已保存
+2026-02-05 22:05:43,848 - data_retrieval.enhanced_database - INFO - 基金 007721 绩效数据已保存
+2026-02-05 22:05:43,853 - data_retrieval.enhanced_database - INFO - 基金 025833 绩效数据已保存
+2026-02-05 22:05:43,856 - data_retrieval.enhanced_database - INFO - 基金 519180 绩效数据已保存
+2026-02-05 22:05:43,862 - data_retrieval.enhanced_database - INFO - 基金 519196 绩效数据已保存
+2026-02-05 22:05:43,873 - data_retrieval.enhanced_database - INFO - 基金 012509 绩效数据已保存
+2026-02-05 22:05:43,879 - data_retrieval.enhanced_database - INFO - 基金 010391 绩效数据已保存
+2026-02-05 22:05:43,886 - data_retrieval.enhanced_database - INFO - 基金 001270 绩效数据已保存
+2026-02-05 22:05:43,889 - data_retrieval.enhanced_database - INFO - 基金 010052 绩效数据已保存
+2026-02-05 22:05:43,891 - data_retrieval.enhanced_database - INFO - 基金 010341 绩效数据已保存
+2026-02-05 22:05:43,904 - data_retrieval.enhanced_database - INFO - 基金 010033 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,907 - data_retrieval.enhanced_database - INFO - 基金 002611 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,911 - data_retrieval.enhanced_database - INFO - 基金 013466 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,925 - data_retrieval.enhanced_database - INFO - 基金 096001 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,944 - data_retrieval.enhanced_database - INFO - 基金 001614 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,953 - data_retrieval.enhanced_database - INFO - 基金 400032 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,956 - data_retrieval.enhanced_database - INFO - 基金 002170 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,958 - data_retrieval.enhanced_database - INFO - 基金 161022 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,967 - data_retrieval.enhanced_database - INFO - 基金 100055 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,970 - data_retrieval.enhanced_database - INFO - 基金 012061 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:43,976 - data_retrieval.enhanced_database - INFO - 基金 013048 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,003 - data_retrieval.enhanced_database - INFO - 基金 017512 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,008 - data_retrieval.enhanced_database - INFO - 基金 017963 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,021 - data_retrieval.enhanced_database - INFO - 基金 006486 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,025 - data_retrieval.enhanced_database - INFO - 基金 005693 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,033 - data_retrieval.enhanced_database - INFO - 基金 006373 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,037 - data_retrieval.enhanced_database - INFO - 基金 006195 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,049 - data_retrieval.enhanced_database - INFO - 基金 257060 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,054 - data_retrieval.enhanced_database - INFO - 基金 006719 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,070 - data_retrieval.enhanced_database - INFO - 基金 012728 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,077 - data_retrieval.enhanced_database - INFO - 基金 007817 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,083 - data_retrieval.enhanced_database - INFO - 基金 022328 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,086 - data_retrieval.enhanced_database - INFO - 基金 006105 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,089 - data_retrieval.enhanced_database - INFO - 基金 021540 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,090 - data_retrieval.enhanced_database - INFO - 基金 015016 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,098 - data_retrieval.enhanced_database - INFO - 基金 014978 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,101 - data_retrieval.enhanced_database - INFO - 基金 002179 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,103 - data_retrieval.enhanced_database - INFO - 基金 007844 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,107 - data_retrieval.enhanced_database - INFO - 基金 004206 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,110 - data_retrieval.enhanced_database - INFO - 基金 011937 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,116 - data_retrieval.enhanced_database - INFO - 基金 008086 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,120 - data_retrieval.enhanced_database - INFO - 基金 020422 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,124 - data_retrieval.enhanced_database - INFO - 基金 005551 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,128 - data_retrieval.enhanced_database - INFO - 基金 012863 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,138 - data_retrieval.enhanced_database - INFO - 基金 007153 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,142 - data_retrieval.enhanced_database - INFO - 基金 501311 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,151 - data_retrieval.enhanced_database - INFO - 基金 007605 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,168 - data_retrieval.enhanced_database - INFO - 基金 008706 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,172 - data_retrieval.enhanced_database - INFO - 基金 018861 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,177 - data_retrieval.enhanced_database - INFO - 基金 501225 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,186 - data_retrieval.enhanced_database - INFO - 基金 162415 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,201 - data_retrieval.enhanced_database - INFO - 基金 008811 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,211 - data_retrieval.enhanced_database - INFO - 基金 018495 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,224 - data_retrieval.enhanced_database - INFO - 基金 018048 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,237 - data_retrieval.enhanced_database - INFO - 基金 007721 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,243 - data_retrieval.enhanced_database - INFO - 基金 025833 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,251 - data_retrieval.enhanced_database - INFO - 基金 519180 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,256 - data_retrieval.enhanced_database - INFO - 基金 519196 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,272 - data_retrieval.enhanced_database - INFO - 基金 012509 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,284 - data_retrieval.enhanced_database - INFO - 基金 010391 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,290 - data_retrieval.enhanced_database - INFO - 基金 001270 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,303 - data_retrieval.enhanced_database - INFO - 基金 010052 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,312 - data_retrieval.enhanced_database - INFO - 基金 010341 分析结果已保存到fund_analysis_results表
+2026-02-05 22:05:44,323 - data_retrieval.enhanced_database - INFO - 分析汇总数据已保存，日期: 2026-02-05
+2026-02-05 22:05:44,324 - data_retrieval.enhanced_database - INFO - 批量插入数据完成
+2026-02-05 22:05:44,324 - __main__ - INFO - 分析结果已成功保存到数据库
+2026-02-05 22:05:44,324 - __main__ - INFO - 开始生成和发送通知报告
+2026-02-05 22:05:44,415 - __main__ - INFO - 成功合并持仓数据，共 47 条记录
+2026-02-05 22:05:44,417 - __main__ - INFO - 成功计算累计盈亏
+2026-02-05 22:05:46,061 - data_retrieval.enhanced_notification - WARNING - 频率限制或服务端验证错误，等待 5 秒后重试 (尝试 1/3)
+2026-02-05 22:05:51,581 - data_retrieval.enhanced_notification - WARNING - 频率限制或服务端验证错误，等待 10 秒后重试 (尝试 2/3)
+2026-02-05 22:06:02,111 - data_retrieval.enhanced_notification - ERROR - 微信通知发送失败: 服务端验证错误
+2026-02-05 22:06:02,112 - data_retrieval.enhanced_notification - INFO - 频率控制：等待 5.0 秒
+2026-02-05 22:06:07,692 - data_retrieval.enhanced_notification - WARNING - 频率限制或服务端验证错误，等待 5 秒后重试 (尝试 1/3)
+2026-02-05 22:06:13,250 - data_retrieval.enhanced_notification - WARNING - 频率限制或服务端验证错误，等待 10 秒后重试 (尝试 2/3)
+2026-02-05 22:06:23,752 - data_retrieval.enhanced_notification - ERROR - 邮件通知发送失败: 服务端验证错误
+2026-02-05 22:06:23,752 - data_retrieval.enhanced_notification - WARNING - 邮件发送失败，正在生成本地HTML报告...
+2026-02-05 22:06:23,778 - data_retrieval.enhanced_notification - INFO - HTML报告已保存至: D:\codes\py4zinia\reports\fund_analysis_report_20260205_220623.html
+2026-02-05 22:06:23,779 - data_retrieval.enhanced_notification - ERROR - 所有通知发送失败
+2026-02-05 22:06:23,779 - __main__ - ERROR - 通知报告发送失败
+2026-02-05 22:06:23,779 - __main__ - WARNING - 通知发送失败，但分析流程已完成
+2026-02-05 22:06:23,783 - __main__ - INFO - 完整的基金分析流程执行完成
+2026-02-05 22:06:23,783 - __main__ - INFO - 基金分析任务成功完成

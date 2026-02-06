@@ -1518,3 +1518,93 @@ textarea:focus-visible {
         transition: none;
     }
 }
+
+
+/* ============================================
+   22. 投资建议模态框样式
+   ============================================ */
+
+/* 大型模态框 */
+.modal-large {
+    max-width: 1200px;
+    width: 90vw;
+}
+
+/* 投资建议容器 */
+.investment-advice-container {
+    min-height: 400px;
+}
+
+/* 旋转动画 */
+.spinning {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+/* 分析结果部分样式 */
+.analysis-section {
+    margin-bottom: var(--space-6);
+}
+
+.analysis-section h2 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-4);
+    padding-bottom: var(--space-2);
+    border-bottom: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.analysis-section h2 i {
+    color: var(--info);
+}
+
+/* 错误信息样式 */
+.error-message {
+    background: var(--danger-light);
+    color: var(--danger);
+    padding: var(--space-5);
+    border-radius: var(--border-radius-md);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.error-message i {
+    font-size: var(--text-3xl);
+}
+
+/* 图表容器样式，防止负半径错误 */
+#fund-analysis-dashboard {
+    min-height: 500px;
+    width: 100%;
+    position: relative;
+}
+
+#fund-analysis-dashboard canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .modal-large {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .investment-advice-container {
+        min-height: auto;
+    }
+    
+    #fund-analysis-dashboard {
+        min-height: 400px;
+    }
+}

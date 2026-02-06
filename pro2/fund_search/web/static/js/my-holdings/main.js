@@ -189,6 +189,8 @@ const FundApp = {
         FundUtils.showNotification('正在分析基金相关性，请稍候...', 'info');
         
         try {
+            console.log('🎯 开始相关性分析，选中的基金:', fundCodes);
+            
             const response = await fetch('/api/holdings/analyze/correlation', {
                 method: 'POST',
                 headers: {
@@ -198,21 +200,85 @@ const FundApp = {
             });
 
             const result = await response.json();
+            console.log('📊 API响应结果:', result);
+            
             if (result.success) {
                 // 添加基金代码到数据中
                 result.data.fund_codes = fundCodes;
                 
+                console.log('💾 准备存储到sessionStorage的数据:', result.data);
+                
                 // 使用 sessionStorage 存储数据，避免URL过长
                 sessionStorage.setItem('correlationAnalysisData', JSON.stringify(result.data));
+                console.log('✅ 数据已存储到sessionStorage');
+                
                 window.location.href = '/correlation-analysis';
             } else {
                 FundUtils.showNotification('分析失败: ' + (result.error || '未知错误'), 'error');
                 this.setAnalysisButtonLoading(false);
             }
         } catch (error) {
-            console.error('分析失败:', error);
+            console.error('❌ 分析失败:', error);
             FundUtils.showNotification('分析失败: 网络错误', 'error');
             this.setAnalysisButtonLoading(false);
+        }
+    },
+
+    /**
+     * 开始投资建议分析 - 跳转到独立页面
+     */
+    async startInvestmentAdvice() {
+        // 获取选中的基金代码
+        const fundCodes = FundTable.getSelectedFundCodes();
+        
+        if (fundCodes.length === 0) {
+            FundUtils.showNotification('请先选择至少一只基金', 'warning');
+            return;
+        }
+        
+        // 设置按钮加载状态
+        this.setInvestmentAdviceButtonLoading(true);
+        
+        try {
+            console.log('💡 开始投资建议分析，选中的基金:', fundCodes);
+            
+            // 存储数据到sessionStorage
+            sessionStorage.setItem('investmentAdviceData', JSON.stringify({
+                fund_codes: fundCodes,
+                timestamp: new Date().toISOString()
+            }));
+            console.log('✅ 数据已存储到sessionStorage');
+            
+            // 跳转到投资建议页面
+            window.location.href = '/investment-advice';
+        } catch (error) {
+            console.error('❌ 投资建议分析启动失败:', error);
+            FundUtils.showNotification('启动失败: ' + error.message, 'error');
+            this.setInvestmentAdviceButtonLoading(false);
+        }
+    },
+
+    /**
+     * 设置投资建议按钮加载状态
+     */
+    setInvestmentAdviceButtonLoading(isLoading) {
+        const adviceBtn = document.getElementById('investment-advice-btn');
+        if (!adviceBtn) return;
+        
+        const btnIcon = adviceBtn.querySelector('i');
+        
+        if (isLoading) {
+            adviceBtn.disabled = true;
+            adviceBtn.classList.add('btn-loading');
+            if (btnIcon) {
+                btnIcon.className = 'bi bi-hourglass-split';
+            }
+        } else {
+            adviceBtn.disabled = false;
+            adviceBtn.classList.remove('btn-loading');
+            if (btnIcon) {
+                btnIcon.className = 'bi bi-lightbulb';
+            }
         }
     },
 
@@ -276,6 +342,7 @@ function resetColumns() { FundSettings.reset(); }
 
 function toggleSelectAll() { FundTable.toggleSelectAll(); }
 function startAnalysis() { FundApp.startAnalysis(); }
+function startInvestmentAdvice() { FundApp.startInvestmentAdvice(); }
 function clearFundList() { FundApp.clearFundList(); }
 function refreshData() { FundApp.refreshData(); }
 function handleSearchKeyup(event) { FundApp.handleSearchKeyup(event); }

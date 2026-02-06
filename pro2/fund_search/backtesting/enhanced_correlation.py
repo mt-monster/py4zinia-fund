@@ -400,33 +400,63 @@ class EnhancedCorrelationAnalyzer:
                 
             fund_columns = [col for col in aligned_data.columns if col != 'date']
             
-            # 只分析前两只基金（如果有多只）
+            # 分析所有基金组合（如果有多只基金）
             if len(fund_columns) >= 2:
-                fund1_col, fund2_col = fund_columns[0], fund_columns[1]
-                fund1_name = fund_names.get(fund1_col, fund1_col)
-                fund2_name = fund_names.get(fund2_col, fund2_col)
+                # 生成所有基金组合的分析数据
+                all_combinations_data = []
                 
-                # 计算相关系数
-                returns1 = aligned_data[fund1_col]
-                returns2 = aligned_data[fund2_col]
-                corr_results = self._calculate_single_pair_correlation(returns1, returns2)
+                # 对于每一对基金组合进行分析
+                for i in range(len(fund_columns)):
+                    for j in range(i + 1, len(fund_columns)):
+                        fund1_col, fund2_col = fund_columns[i], fund_columns[j]
+                        fund1_name = fund_names.get(fund1_col, fund1_col)
+                        fund2_name = fund_names.get(fund2_col, fund2_col)
+                        
+                        # 计算相关系数
+                        returns1 = aligned_data[fund1_col]
+                        returns2 = aligned_data[fund2_col]
+                        corr_results = self._calculate_single_pair_correlation(returns1, returns2)
+                        
+                        # 生成各类图表数据
+                        scatter_data = self._generate_scatter_data(returns1, returns2)
+                        nav_comparison_data = self._generate_nav_comparison_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name)
+                        rolling_data = self._generate_rolling_correlation_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name)
+                        distribution_data = self._generate_distribution_data(returns1, returns2, fund1_name, fund2_name)
+                        
+                        combination_data = {
+                            'fund1_name': fund1_name,
+                            'fund2_name': fund2_name,
+                            'correlation_results': corr_results,
+                            'scatter_data': scatter_data,
+                            'nav_comparison_data': nav_comparison_data,
+                            'rolling_correlation_data': rolling_data,
+                            'distribution_data': distribution_data
+                        }
+                        
+                        all_combinations_data.append(combination_data)
                 
-                # 生成各类图表数据
-                scatter_data = self._generate_scatter_data(returns1, returns2)
-                nav_comparison_data = self._generate_nav_comparison_data(returns1, returns2, aligned_data['date'])
-                rolling_data = self._generate_rolling_correlation_data(returns1, returns2, aligned_data['date'])
-                distribution_data = self._generate_distribution_data(returns1, returns2)
+                # 返回第一个组合的数据作为主数据显示，同时包含所有组合信息
+                primary_data = all_combinations_data[0] if all_combinations_data else {}
+                
+                # 生成所有基金的净值对比数据（支持多只基金同时显示）
+                all_funds_nav_data = self._generate_all_funds_nav_comparison(
+                    aligned_data, fund_columns, fund_names
+                )
+                
+                # 生成所有基金的收益率分布数据（支持多只基金同时显示）
+                all_funds_distribution = self._generate_all_funds_distribution(
+                    aligned_data, fund_columns, fund_names
+                )
                 
                 return {
-                    'fund1_name': fund1_name,
-                    'fund2_name': fund2_name,
-                    'correlation_results': corr_results,
-                    'scatter_data': scatter_data,
-                    'nav_comparison_data': nav_comparison_data,
-                    'rolling_correlation_data': rolling_data,
-                    'distribution_data': distribution_data,
+                    'primary_combination': primary_data,
+                    'all_combinations': all_combinations_data,
+                    'all_funds_nav_comparison': all_funds_nav_data,  # 新增：所有基金的净值对比数据
+                    'all_funds_distribution': all_funds_distribution,  # 新增：所有基金的收益率分布数据
                     'metadata': {
                         'data_points': len(aligned_data),
+                        'fund_count': len(fund_columns),
+                        'combination_count': len(all_combinations_data),
                         'date_range': {
                             'start': aligned_data['date'].min().strftime('%Y-%m-%d'),
                             'end': aligned_data['date'].max().strftime('%Y-%m-%d')
@@ -438,6 +468,94 @@ class EnhancedCorrelationAnalyzer:
             
         except Exception as e:
             logger.error(f"生成交互式相关性数据失败: {e}")
+            return {}
+
+    def _generate_all_funds_nav_comparison(self, aligned_data: pd.DataFrame, 
+                                           fund_columns: List[str], 
+                                           fund_names: Dict[str, str]) -> Dict:
+        """
+        生成所有基金的净值对比数据（支持多只基金同时显示）
+        
+        参数:
+        aligned_data: 对齐后的基金数据
+        fund_columns: 基金代码列表
+        fund_names: 基金代码到基金名称的映射
+        
+        返回:
+        dict: 包含所有基金的净值数据
+        """
+        try:
+            # 格式化日期
+            formatted_dates = [date.strftime('%Y-%m-%d') for date in aligned_data['date']]
+            
+            # 为每只基金计算净值
+            funds_data = []
+            for fund_col in fund_columns:
+                returns = aligned_data[fund_col]
+                
+                # 将收益率转换为净值
+                nav = self._returns_to_nav_for_plot(returns)
+                
+                # 归一化处理（起始值设为100）
+                normalized_nav = (nav / nav.iloc[0]) * 100
+                
+                funds_data.append({
+                    'fund_code': fund_col,
+                    'fund_name': fund_names.get(fund_col, fund_col),
+                    'values': normalized_nav.tolist()
+                })
+            
+            return {
+                'dates': formatted_dates,
+                'funds': funds_data,
+                'fund_count': len(funds_data)
+            }
+            
+        except Exception as e:
+            logger.error(f"生成所有基金净值对比数据失败: {e}")
+            return {}
+
+    def _generate_all_funds_distribution(self, aligned_data: pd.DataFrame,
+                                         fund_columns: List[str],
+                                         fund_names: Dict[str, str]) -> Dict:
+        """
+        生成所有基金的收益率分布数据（支持多只基金同时显示）
+        
+        参数:
+        aligned_data: 对齐后的基金数据
+        fund_columns: 基金代码列表
+        fund_names: 基金代码到基金名称的映射
+        
+        返回:
+        dict: 包含所有基金的收益率分布数据
+        """
+        try:
+            # 定义收益率区间
+            bins = [-np.inf, -5, -3, -1, 1, 3, 5, np.inf]
+            labels = ['<-5%', '-5~-3%', '-3~-1%', '-1~1%', '1~3%', '3~5%', '>5%']
+            
+            # 为每只基金计算收益率分布
+            funds_distribution = []
+            for fund_col in fund_columns:
+                returns = aligned_data[fund_col]
+                
+                # 计算分布
+                hist, _ = np.histogram(returns, bins=bins)
+                
+                funds_distribution.append({
+                    'fund_code': fund_col,
+                    'fund_name': fund_names.get(fund_col, fund_col),
+                    'counts': hist.tolist()
+                })
+            
+            return {
+                'bins': labels,
+                'funds': funds_distribution,
+                'fund_count': len(funds_distribution)
+            }
+            
+        except Exception as e:
+            logger.error(f"生成所有基金收益率分布数据失败: {e}")
             return {}
 
     def _generate_scatter_data(self, returns1: pd.Series, returns2: pd.Series) -> Dict:
@@ -482,7 +600,7 @@ class EnhancedCorrelationAnalyzer:
             return {'slope': 0, 'intercept': 0, 'equation': 'y = 0'}
 
     def _generate_nav_comparison_data(self, returns1: pd.Series, returns2: pd.Series, 
-                                    dates: pd.Series) -> Dict:
+                                    dates: pd.Series, fund1_name: str, fund2_name: str) -> Dict:
         """生成净值对比数据"""
         # 将收益率转换为净值
         nav1 = self._returns_to_nav_for_plot(returns1)
@@ -498,11 +616,13 @@ class EnhancedCorrelationAnalyzer:
         return {
             'dates': formatted_dates,
             'fund1_values': normalized_nav1.tolist(),
-            'fund2_values': normalized_nav2.tolist()
+            'fund2_values': normalized_nav2.tolist(),
+            'fund1_name': fund1_name,
+            'fund2_name': fund2_name
         }
 
     def _generate_rolling_correlation_data(self, returns1: pd.Series, returns2: pd.Series,
-                                         dates: pd.Series) -> Dict:
+                                         dates: pd.Series, fund1_name: str, fund2_name: str) -> Dict:
         """生成滚动相关性数据"""
         # 计算滚动相关系数
         rolling_corr = returns1.rolling(window=self.rolling_window).corr(returns2)
@@ -525,11 +645,15 @@ class EnhancedCorrelationAnalyzer:
         
         return {
             'dates': formatted_dates,
-            'values': sampled_corr.tolist(),
-            'overall_corr': float(overall_corr)
+            'correlations': sampled_corr.tolist(),
+            'overall_corr': float(overall_corr),
+            'window': self.rolling_window,
+            'fund1_name': fund1_name,
+            'fund2_name': fund2_name
         }
 
-    def _generate_distribution_data(self, returns1: pd.Series, returns2: pd.Series) -> Dict:
+    def _generate_distribution_data(self, returns1: pd.Series, returns2: pd.Series, 
+                                    fund1_name: str, fund2_name: str) -> Dict:
         """生成收益率分布数据"""
         # 定义收益率区间
         bins = [-np.inf, -5, -3, -1, 1, 3, 5, np.inf]
@@ -540,9 +664,11 @@ class EnhancedCorrelationAnalyzer:
         hist2, _ = np.histogram(returns2, bins=bins)
         
         return {
-            'labels': labels,
-            'fund1_data': hist1.tolist(),
-            'fund2_data': hist2.tolist()
+            'bins': labels,
+            'fund1_counts': hist1.tolist(),
+            'fund2_counts': hist2.tolist(),
+            'fund1_name': fund1_name,
+            'fund2_name': fund2_name
         }
 
     def generate_correlation_charts(self, fund_data_dict: Dict[str, pd.DataFrame], 

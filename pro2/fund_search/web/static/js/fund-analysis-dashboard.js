@@ -657,6 +657,13 @@ class FundAnalysisDashboard {
         const dpr = window.devicePixelRatio || 1;
         
         const rect = canvas.getBoundingClientRect();
+        
+        // 检查容器尺寸是否有效
+        if (rect.width <= 0 || rect.height <= 0) {
+            console.warn('Canvas容器尺寸无效，跳过渲染:', rect.width, rect.height);
+            return;
+        }
+        
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
@@ -665,8 +672,9 @@ class FundAnalysisDashboard {
         
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-        const radius = Math.min(centerX, centerY) - 4;
-        const innerRadius = radius * 0.65;
+        // 确保半径不会为负数
+        const radius = Math.max(10, Math.min(centerX, centerY) - 4);
+        const innerRadius = Math.max(5, radius * 0.65);
         
         const entries = Object.entries(data).filter(([key, value]) => value > 0);
         const total = entries.reduce((sum, [, value]) => sum + value, 0);

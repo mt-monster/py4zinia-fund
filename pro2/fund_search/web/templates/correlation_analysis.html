@@ -16,6 +16,20 @@
             padding: 0;
             box-sizing: border-box;
         }
+        
+        /* 加载动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+        }
+        
+        .loading-spinner i {
+            color: #007bff;
+        }
 
         body {
             font-family: Arial, sans-serif;
@@ -31,25 +45,6 @@
             width: 100%;
         }
 
-        .header {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: #7f8c8d;
-            font-size: 14px;
-        }
-
         .analysis-section {
             background-color: #fff;
             padding: 30px;
@@ -57,6 +52,28 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
             width: 100%;
+        }
+
+        /* 合并后的统一样式 */
+        .unified-section {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .unified-section .header-content {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .unified-section .header-content p {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin: 0;
         }
 
         .analysis-section h2 {
@@ -855,17 +872,16 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <!-- <h1>基金相关性分析</h1> -->
-            <p>分析基金之间的相关性，帮助您分散投资风险</p>
-        </div>
+        <div class="unified-section">
+            <div class="header-content">
+                <p>分析基金之间的相关性，帮助您分散投资风险</p>
+            </div>
+                
 
-        <div class="analysis-section">
-            <!-- <h2>分析结果</h2> -->
-
+                
             <div id="analysis-content">
                 <div class="error-message">
-                    <p>请从基金持仓页面选择基金进行相关性分析</p>
+                    <p>请选择两只基金开始相关性分析</p>
                 </div>
             </div>
         </div>
@@ -902,40 +918,82 @@
 
         <div class="button-container">
             <a href="/my-holdings-new" class="btn btn-primary">返回持仓页面</a>
-            <button id="test-charts-btn" class="btn btn-secondary" style="margin-left: 10px;">测试图表渲染</button>
+            <button id="test-charts-btn" class="btn btn-secondary" style="margin-left: 10px;" onclick="testCharts()">测试图表渲染</button>
         </div>
         
         <script>
-            // 测试按钮事件
-            document.getElementById('test-charts-btn').addEventListener('click', async function() {
+            // 测试图表渲染功能
+            function testCharts() {
                 console.log('🧪 开始测试图表渲染...');
                 
+                // 从sessionStorage获取数据
+                const sessionData = sessionStorage.getItem('correlationAnalysisData');
+                if (!sessionData) {
+                    alert('请先从持仓页面选择至少2只基金进行分析');
+                    return;
+                }
+                
                 try {
-                    const response = await fetch('/api/holdings/analyze/correlation-interactive', {
+                    const data = JSON.parse(sessionData);
+                    const fundCodes = data.fund_codes;
+                    
+                    if (!fundCodes || fundCodes.length < 2) {
+                        alert('请先从持仓页面选择至少2只基金进行分析');
+                        return;
+                    }
+                    
+                    // 调用API获取图表数据
+                    fetch('/api/holdings/analyze/correlation-interactive', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ 
-                            fund_codes: ['002179', '013277']
+                            fund_codes: fundCodes
                         })
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        console.log('📊 API响应:', result);
+                        
+                        if (result.success && result.data) {
+                            console.log('✅ API调用成功，开始渲染图表');
+                            renderInteractiveCorrelationCharts(result.data);
+                        } else {
+                            console.error('❌ API调用失败:', result.error);
+                            showChartError(result.error || 'API调用失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ 测试过程中出错:', error);
+                        showChartError('测试过程中出错: ' + error.message);
                     });
-                    
-                    const result = await response.json();
-                    console.log('📊 API响应:', result);
-                    
-                    if (result.success && result.data) {
-                        console.log('✅ API调用成功，开始渲染图表');
-                        renderInteractiveCorrelationCharts(result.data);
-                    } else {
-                        console.error('❌ API调用失败:', result.error);
-                        showChartError(result.error || 'API调用失败');
-                    }
                 } catch (error) {
-                    console.error('❌ 测试过程中出错:', error);
-                    showChartError('测试过程中出错: ' + error.message);
+                    console.error('❌ 解析session数据失败:', error);
+                    alert('数据解析失败，请重新从持仓页面进入');
                 }
-            });
+            }
+            
+            // 页面加载时自动分析sessionStorage中的基金数据
+            window.onload = function() {
+                console.log('=== 相关性分析页面加载开始 ===');
+                const data = getAnalysisData();
+                console.log('从sessionStorage获取的数据:', data);
+                
+                if (data && data.fund_codes && data.fund_codes.length > 0) {
+                    console.log('检测到传递的基金代码:', data.fund_codes);
+                    // 自动加载分析结果
+                    renderAnalysisResult(data);
+                    loadComprehensiveAnalysis(data.fund_codes);
+                    loadEnhancedCorrelationAnalysis(data.fund_codes);
+                    loadCorrelationCharts(data.fund_codes);
+                } else {
+                    console.log('未检测到传递的基金数据，显示默认界面');
+                    renderAnalysisResult(data);
+                }
+                
+                console.log('=== 页面加载完成 ===');
+            };
         </script>
     </div>
 
@@ -1121,17 +1179,25 @@
             contentDiv.innerHTML = html;
         }
 
-        // 页面加载时渲染分析结果
+        // 页面加载时只渲染基本界面
         window.onload = function() {
+            console.log('=== 相关性分析页面加载开始 ===');
             const data = getAnalysisData();
-            renderAnalysisResult(data);
+            console.log('从sessionStorage获取的数据:', data);
             
-            // 如果有基金代码，加载综合分析、增强相关性分析和图表
             if (data && data.fund_codes && data.fund_codes.length > 0) {
+                console.log('检测到传递的基金代码:', data.fund_codes);
+                // 自动加载分析结果
+                renderAnalysisResult(data);
                 loadComprehensiveAnalysis(data.fund_codes);
                 loadEnhancedCorrelationAnalysis(data.fund_codes);
                 loadCorrelationCharts(data.fund_codes);
+            } else {
+                console.log('未检测到传递的基金数据，显示默认界面');
+                renderAnalysisResult(data);
             }
+            
+            console.log('=== 页面加载完成 ===');
         };
 
         // 加载相关性图表
@@ -1182,7 +1248,11 @@
             section.style.display = 'block';
             
             // 确保FundCorrelationCharts模块已加载
-            if (window.initCorrelationCharts && chartData.scatter_data) {
+            // 检查新的多基金数据结构或传统的双基金数据结构
+            const hasValidData = chartData.scatter_data || 
+                               (chartData.primary_combination && chartData.primary_combination.scatter_data);
+            
+            if (window.initCorrelationCharts && hasValidData) {
                 console.log('✅ 使用全局initCorrelationCharts函数初始化图表');
                 // 使用全局函数初始化交互式图表
                 window.initCorrelationCharts(container, chartData);
@@ -1191,7 +1261,12 @@
             } else {
                 console.error('❌ 图表模块未加载或数据格式不正确');
                 console.log('initCorrelationCharts:', window.initCorrelationCharts);
-                console.log('scatter_data:', chartData.scatter_data);
+                console.log('数据结构检查:', {
+                    has_scatter_data: !!chartData.scatter_data,
+                    has_primary_combination: !!(chartData.primary_combination),
+                    has_primary_scatter: !!(chartData.primary_combination && chartData.primary_combination.scatter_data),
+                    all_keys: Object.keys(chartData)
+                });
                 // 回退到错误显示
                 showChartError('图表模块未加载或数据格式不正确');
             }
@@ -1497,28 +1572,8 @@
             console.log('FundCorrelationCharts模块状态:', window.FundCorrelationCharts);
             console.log('initCorrelationCharts函数状态:', window.initCorrelationCharts);
             
-            // 测试API调用
-            fetch('/api/holdings/analyze/correlation-interactive', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    fund_codes: ['002179', '013277']
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('API测试结果:', data);
-                if (data.success && data.data.scatter_data) {
-                    console.log('✅ API测试成功，数据格式正确');
-                } else {
-                    console.log('❌ API测试失败或数据格式不正确');
-                }
-            })
-            .catch(error => {
-                console.error('❌ API测试失败:', error);
-            });
+            // 图表模块加载检查
+            console.log('图表模块加载状态检查完成');
         });
     </script>
 </body>
