@@ -536,16 +536,7 @@ def get_allocation():
 
 def get_fund_type_for_allocation(fund_code: str) -> str:
     """为资产配置获取基金类型"""
-    try:
-        # 尝试从 fund_info 获取
-        sql = "SELECT fund_type FROM fund_info WHERE fund_code = :fund_code LIMIT 1"
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['fund_type']):
-            return df.iloc[0]['fund_type']
-    except:
-        pass
-    
-    # 尝试从 fund_analysis_results 获取基金名称推断
+    # 从 fund_analysis_results 获取基金名称推断类型
     try:
         sql = """
         SELECT fund_name FROM fund_analysis_results 
@@ -3415,37 +3406,27 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
         
         logger.info(f"获取到 {len(df_holdings)} 条持仓记录")
         
-        # 第二步：为每个基金获取类型（优先从 fund_info，其次从 fund_analysis_results）
+        # 第二步：为每个基金获取类型（从 fund_analysis_results 推断）
         fund_codes = df_holdings['fund_code'].tolist()
         fund_type_map = {}
         
         for fund_code in fund_codes:
             fund_type = None
             
-            # 尝试从 fund_info 获取
+            # 从 fund_analysis_results 获取基金名称推断类型
             try:
-                sql_type = "SELECT fund_type FROM fund_info WHERE fund_code = :fund_code LIMIT 1"
-                df_type = db_manager.execute_query(sql_type, {'fund_code': fund_code})
-                if not df_type.empty and pd.notna(df_type.iloc[0]['fund_type']):
-                    fund_type = df_type.iloc[0]['fund_type']
+                sql_name = """
+                SELECT fund_name FROM fund_analysis_results 
+                WHERE fund_code = :fund_code 
+                ORDER BY analysis_date DESC LIMIT 1
+                """
+                df_name = db_manager.execute_query(sql_name, {'fund_code': fund_code})
+                if not df_name.empty and pd.notna(df_name.iloc[0]['fund_name']):
+                    fund_name = df_name.iloc[0]['fund_name']
+                    # 从基金名称推断类型
+                    fund_type = infer_fund_type_from_name(fund_name)
             except Exception as e:
-                logger.debug(f"从 fund_info 获取 {fund_code} 类型失败: {e}")
-            
-            # 如果 fund_info 没有，尝试从 fund_analysis_results 获取基金名称推断
-            if not fund_type:
-                try:
-                    sql_name = """
-                    SELECT fund_name FROM fund_analysis_results 
-                    WHERE fund_code = :fund_code 
-                    ORDER BY analysis_date DESC LIMIT 1
-                    """
-                    df_name = db_manager.execute_query(sql_name, {'fund_code': fund_code})
-                    if not df_name.empty and pd.notna(df_name.iloc[0]['fund_name']):
-                        fund_name = df_name.iloc[0]['fund_name']
-                        # 从基金名称推断类型
-                        fund_type = infer_fund_type_from_name(fund_name)
-                except Exception as e:
-                    logger.debug(f"从 fund_analysis_results 获取 {fund_code} 名称失败: {e}")
+                logger.debug(f"从 fund_analysis_results 获取 {fund_code} 名称失败: {e}")
             
             fund_type_map[fund_code] = fund_type if fund_type else '其他'
         

@@ -1599,7 +1599,7 @@ class EnhancedDatabaseManager:
     def get_all_heavyweight_stocks_for_funds(self, fund_codes: List[str],
                                               max_age_days: int = 7) -> Dict[str, List[Dict]]:
         """
-        批量获取多个基金的重仓股数据
+        批量获取多个基金的重仓股数据（优化版，单次SQL查询）
         
         参数：
             fund_codes: 基金代码列表
@@ -1609,17 +1609,94 @@ class EnhancedDatabaseManager:
             Dict[str, List[Dict]]: 以基金代码为key的重仓股数据字典
         """
         result = {}
-        missing_funds = []
+        missing_funds = list(fund_codes)  # 默认所有基金都需要重新获取
         
-        for fund_code in fund_codes:
-            stocks = self.get_heavyweight_stocks(fund_code, max_age_days)
-            if stocks:
+        if not fund_codes:
+            return result, missing_funds
+        
+        try:
+            # 计算过期时间
+            cutoff_date = datetime.now() - timedelta(days=max_age_days)
+            
+            # 使用单次SQL查询获取所有基金的重仓股数据
+            # 使用子查询获取每只基金的最新记录
+            sql = """
+            SELECT 
+                fhs.fund_code,
+                fhs.stock_code, 
+                fhs.stock_name, 
+                fhs.holding_ratio, 
+                fhs.market_value, 
+                fhs.change_percent, 
+                fhs.report_period, 
+                fhs.updated_at
+            FROM fund_heavyweight_stocks fhs
+            INNER JOIN (
+                SELECT fund_code, MAX(updated_at) as max_updated_at
+                FROM fund_heavyweight_stocks
+                WHERE fund_code IN :fund_codes
+                GROUP BY fund_code
+            ) latest ON fhs.fund_code = latest.fund_code 
+                    AND fhs.updated_at = latest.max_updated_at
+            WHERE fhs.fund_code IN :fund_codes
+            ORDER BY fhs.fund_code, fhs.ranking ASC
+            """
+            
+            # 将列表转换为SQL IN 语句需要的格式
+            fund_codes_tuple = tuple(fund_codes) if len(fund_codes) > 1 else (fund_codes[0], '')
+            df = self.execute_query(sql, {'fund_codes': fund_codes_tuple})
+            
+            if df.empty:
+                logger.info(f"数据库中未找到 {len(fund_codes)} 只基金的重仓股数据")
+                return result, missing_funds
+            
+            # 检查数据是否过期并整理结果
+            valid_funds = set()
+            expired_funds = []
+            
+            for fund_code in fund_codes:
+                fund_data = df[df['fund_code'] == fund_code]
+                if fund_data.empty:
+                    continue
+                    
+                # 检查数据是否过期
+                latest_update = fund_data['updated_at'].iloc[0]
+                if isinstance(latest_update, str):
+                    latest_update = pd.to_datetime(latest_update)
+                
+                age = datetime.now() - latest_update
+                if age.days > max_age_days:
+                    expired_funds.append(fund_code)
+                    continue
+                
+                # 转换为标准格式
+                stocks = []
+                for _, row in fund_data.iterrows():
+                    stocks.append({
+                        'code': row['stock_code'],
+                        'name': row['stock_name'],
+                        'holding_ratio': self._format_percentage(row['holding_ratio']),
+                        'market_value': self._format_market_value(row['market_value']),
+                        'change_percent': self._format_change_percent(row['change_percent']),
+                        'report_period': row['report_period']
+                    })
+                
                 result[fund_code] = stocks
-            else:
-                missing_funds.append(fund_code)
-        
-        if missing_funds:
-            logger.info(f"以下基金需要重新获取重仓股数据: {missing_funds}")
+                valid_funds.add(fund_code)
+            
+            # 需要重新获取的基金 = 未在数据库中找到的 + 已过期的
+            missing_funds = [f for f in fund_codes if f not in valid_funds]
+            
+            if expired_funds:
+                logger.info(f"以下基金的重仓股数据已过期，需要重新获取: {expired_funds}")
+            
+            logger.info(f"批量查询：从数据库获取 {len(result)} 只基金，{len(missing_funds)} 只需要重新获取")
+            
+        except Exception as e:
+            logger.error(f"批量获取重仓股数据失败: {str(e)}")
+            # 出错时返回空结果，所有基金都需要重新获取
+            result = {}
+            missing_funds = list(fund_codes)
         
         return result, missing_funds
     
