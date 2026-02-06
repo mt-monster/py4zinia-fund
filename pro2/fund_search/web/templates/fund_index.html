@@ -956,8 +956,115 @@
         let selectedFund = null;
         let navChart = null;
 
-        // ==================== DataSorter 类 ====================
-        // 负责执行数据排序逻辑
+        class FundTableManager {
+            constructor() {
+                this.table = document.querySelector('.fund-table');
+                this.observer = null;
+                this.init();
+            }
+        
+            init() {
+                this.setupColumnWidthObserver();
+                this.adjustColumnWidths();
+                this.bindEvents();
+            }
+        
+            // 设置列宽观察器
+            setupColumnWidthObserver() {
+                // 使用 ResizeObserver 监听表格尺寸变化
+                if (window.ResizeObserver) {
+                    this.observer = new ResizeObserver(() => {
+                        this.debounceAdjustColumnWidths();
+                    });
+                    this.observer.observe(this.table);
+                }
+                
+                // 监听窗口大小变化
+                window.addEventListener('resize', () => {
+                    this.debounceAdjustColumnWidths();
+                });
+            }
+        
+            // 防抖调整列宽
+            debounceAdjustColumnWidths() {
+                clearTimeout(this.resizeTimer);
+                this.resizeTimer = setTimeout(() => {
+                    this.adjustColumnWidths();
+                }, 150);
+            }
+        
+            // 调整列宽的核心逻辑
+            adjustColumnWidths() {
+                if (!this.table) return;
+        
+                const fundNameHeader = this.table.querySelector('th[data-column="fund_name"]');
+                const fundNameCells = this.table.querySelectorAll('td[data-column="fund_name"]');
+                
+                if (!fundNameHeader || fundNameCells.length === 0) return;
+        
+                // 计算最长基金名称的显示宽度
+                let maxWidth = 0;
+                const tempSpan = document.createElement('span');
+                tempSpan.style.visibility = 'hidden';
+                tempSpan.style.position = 'absolute';
+                tempSpan.style.font = getComputedStyle(fundNameHeader).font;
+                tempSpan.style.padding = getComputedStyle(fundNameHeader).padding;
+                document.body.appendChild(tempSpan);
+        
+                // 测量所有基金名称的宽度
+                fundNameCells.forEach(cell => {
+                    const fullName = cell.getAttribute('data-full-name') || cell.textContent;
+                    tempSpan.textContent = fullName;
+                    const width = tempSpan.offsetWidth;
+                    if (width > maxWidth) {
+                        maxWidth = width;
+                    }
+                });
+        
+                document.body.removeChild(tempSpan);
+        
+                // 设置合适的列宽（添加一些padding）
+                const minWidth = 120;  // 最小宽度
+                const maxWidthLimit = 300; // 最大宽度限制
+                const calculatedWidth = Math.max(minWidth, Math.min(maxWidth + 40, maxWidthLimit));
+        
+                // 应用宽度到表头和所有单元格
+                fundNameHeader.style.width = `${calculatedWidth}px`;
+                fundNameHeader.style.minWidth = `${calculatedWidth}px`;
+                fundNameCells.forEach(cell => {
+                    cell.style.width = `${calculatedWidth}px`;
+                    cell.style.minWidth = `${calculatedWidth}px`;
+                });
+        
+                // 触发表格重新布局
+                this.table.style.tableLayout = 'auto';
+                this.table.offsetWidth; // 强制重绘
+                this.table.style.tableLayout = 'fixed';
+            }
+        
+            // 绑定事件
+            bindEvents() {
+                // 监听数据加载完成事件
+                document.addEventListener('fundsLoaded', () => {
+                    setTimeout(() => {
+                        this.adjustColumnWidths();
+                    }, 100);
+                });
+        
+                // 监听排序事件
+                document.addEventListener('sortComplete', () => {
+                    this.adjustColumnWidths();
+                });
+            }
+        
+            // 销毁观察器
+            destroy() {
+                if (this.observer) {
+                    this.observer.disconnect();
+                }
+                window.removeEventListener('resize', this.debounceAdjustColumnWidths);
+            }
+        }
         class DataSorter {
             // 判断是否为空值
             isNullValue(value) {
@@ -1201,7 +1308,11 @@
                 // 定义列数据映射
                 const columnDataMap = {
                     'fund_code': (fund) => ({ value: fund.fund_code, class: 'fund-code' }),
-                    'fund_name': (fund) => ({ value: this.truncate(fund.fund_name || '--', 12), class: '' }),
+                    'fund_name': (fund) => ({ 
+                        value: fund.fund_name || '--', 
+                        class: 'fund-name-cell',
+                        attributes: { 'data-full-name': fund.fund_name || '--' }
+                    }),
                     'today_return': (fund) => {
                         const val = fund.today_return || 0;
                         return { value: this.formatPercent(val), class: val >= 0 ? 'positive' : 'negative' };
@@ -2381,6 +2492,9 @@
             initSorting();  // 初始化排序功能
             initColumnConfig();  // 初始化列配置
             loadFunds();
+            
+            // 初始化基金表格管理器
+            const fundTableManager = new FundTableManager();
             
             document.getElementById('search-input').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') loadFunds();

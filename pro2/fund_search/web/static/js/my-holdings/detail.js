@@ -81,21 +81,101 @@ const FundDetail = {
     },
 
     /**
+     * 获取基金类型
+     * 返回: 'index'(指数型), 'stock'(股票型), 'hybrid'(混合型), 'qdii'(QDII), 'other'(其他)
+     */
+    getFundType(fund) {
+        const name = (fund.fund_name || '').toUpperCase();
+        
+        // QDII基金 (最高优先级)
+        if (name.includes('QDII') || name.includes('全球') || name.includes('海外') || 
+            name.includes('美国') || name.includes('香港') || name.includes('亚太') || 
+            name.includes('环球') || name.includes('德国') || name.includes('日本') ||
+            name.includes('印度') || name.includes('越南') || name.includes('欧洲')) {
+            return 'qdii';
+        }
+        
+        // 指数型基金
+        if (name.includes('指数') || name.includes('ETF') || name.includes('INDEX') ||
+            name.includes('沪深300') || name.includes('中证500') || name.includes('上证50') ||
+            name.includes('创业板') || name.includes('科创板') || name.includes('联接')) {
+            return 'index';
+        }
+        
+        // 股票型基金
+        if (name.includes('股票') || name.includes('EQUITY') || name.includes('GROWTH') || 
+            name.includes('VALUE') || name.includes('红利') || name.includes('精选') ||
+            name.includes('优选') || name.includes('成长') || name.includes('价值')) {
+            return 'stock';
+        }
+        
+        // 混合型基金
+        if (name.includes('混合') || name.includes('MIX') || name.includes('灵活配置') || 
+            name.includes('偏股') || name.includes('偏债') || name.includes('平衡')) {
+            return 'hybrid';
+        }
+        
+        // 默认为其他
+        return 'other';
+    },
+
+    /**
+     * 获取基金类型的CSS类名
+     */
+    getFundTypeClass(fundType) {
+        const classMap = {
+            'index': 'fund-type-index',
+            'stock': 'fund-type-stock',
+            'hybrid': 'fund-type-hybrid',
+            'qdii': 'fund-type-qdii',
+            'other': 'fund-type-other'
+        };
+        return classMap[fundType] || 'fund-type-other';
+    },
+
+    /**
+     * 获取基金类型的显示标签
+     */
+    getFundTypeLabel(fundType) {
+        const labelMap = {
+            'index': '指数',
+            'stock': '股票',
+            'hybrid': '混合',
+            'qdii': 'QDII',
+            'other': '其他'
+        };
+        return labelMap[fundType] || '其他';
+    },
+
+    /**
      * 渲染详情面板
      */
     renderPanel() {
         const panelBody = document.getElementById('detail-panel-body');
         const panelTitle = document.querySelector('.detail-panel-title');
+        const panelHeader = document.querySelector('.detail-panel-header');
         if (!panelBody || !this.currentFund) return;
 
         const fund = this.currentFund;
+        const fundType = this.getFundType(fund);
+        const typeClass = this.getFundTypeClass(fundType);
+        const typeLabel = this.getFundTypeLabel(fundType);
         
-        // 更新标题为基金名称
+        // 更新标题为基金名称，添加基金类型标识
         if (panelTitle) {
             panelTitle.innerHTML = `
                 <span class="fund-title-name">${fund.fund_name || '基金详情'}</span>
                 <span class="fund-title-code">${fund.fund_code}</span>
+                <span class="fund-type-tag ${typeClass}">${typeLabel}</span>
             `;
+        }
+        
+        // 为详情面板头部添加基金类型样式
+        if (panelHeader) {
+            // 移除所有基金类型类
+            panelHeader.classList.remove('fund-type-index', 'fund-type-stock', 'fund-type-hybrid', 'fund-type-qdii', 'fund-type-other');
+            // 添加当前基金类型类
+            panelHeader.classList.add(typeClass);
         }
 
         // 格式化各项数据
