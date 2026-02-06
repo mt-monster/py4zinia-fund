@@ -4,6 +4,7 @@
 """
 重仓股数据获取模块
 通过akshare API获取基金重仓股数据，支持错误处理和备用数据源
+支持数据库存储，当接口获取太慢时从数据库读取
 """
 
 import akshare as ak
@@ -58,12 +59,19 @@ def retry_on_error(max_retries=3, delay=1):
 
 
 class HeavyweightStocksFetcher:
-    """重仓股数据获取器"""
+    """重仓股数据获取器
     
-    def __init__(self, cache_duration=300):  # 默认缓存5分钟
+    支持多级缓存策略：
+    1. 内存缓存（最快，5分钟）
+    2. 数据库缓存（较快，7天有效期）
+    3. API接口获取（最慢，但最新）
+    """
+    
+    def __init__(self, db_manager=None, cache_duration=300):  # 默认缓存5分钟
         self._cache = {}
         self._cache_duration = cache_duration
         self._cache_timestamps = {}
+        self._db_manager = db_manager  # 数据库管理器
         
         # 备用数据源配置
         self._fallback_sources = [
@@ -71,6 +79,9 @@ class HeavyweightStocksFetcher:
             self._fetch_from_eastmoney,
             self._fetch_from_sina
         ]
+        
+        # 数据库缓存有效期（天）
+        self._db_cache_max_age = 7
     
     def _get_cache_key(self, fund_code: str, date: Optional[str] = None) -> str:
         """生成缓存键"""
@@ -252,6 +263,8 @@ class HeavyweightStocksFetcher:
         """
         获取重仓股数据（主入口）
         
+        缓存优先级：内存缓存 > 数据库缓存 > API接口
+        
         Args:
             fund_code: 基金代码
             date: 报告期日期（可选，格式：YYYYMMDD）
@@ -267,7 +280,7 @@ class HeavyweightStocksFetcher:
         """
         cache_key = self._get_cache_key(fund_code, date)
         
-        # 检查缓存
+        # 1. 检查内存缓存
         if use_cache:
             cached_data = self._get_cached_data(cache_key)
             if cached_data is not None:
@@ -278,7 +291,26 @@ class HeavyweightStocksFetcher:
                     'timestamp': datetime.now().isoformat()
                 }
         
-        # 尝试所有数据源
+        # 2. 检查数据库缓存
+        if use_cache and self._db_manager:
+            try:
+                db_data = self._db_manager.get_heavyweight_stocks(
+                    fund_code, 
+                    max_age_days=self._db_cache_max_age
+                )
+                if db_data:
+                    # 存入内存缓存
+                    self._set_cached_data(cache_key, db_data)
+                    return {
+                        'success': True,
+                        'data': db_data,
+                        'source': 'database',
+                        'timestamp': datetime.now().isoformat()
+                    }
+            except Exception as e:
+                logger.warning(f"从数据库获取缓存失败: {e}")
+        
+        # 3. 从API获取数据
         last_error = None
         for source_func in self._fallback_sources:
             try:
@@ -288,9 +320,16 @@ class HeavyweightStocksFetcher:
                 if not data or len(data) == 0:
                     raise DataValidationError("获取的数据为空")
                 
-                # 缓存数据
+                # 存入内存缓存
                 if use_cache:
                     self._set_cached_data(cache_key, data)
+                
+                # 存入数据库缓存
+                if self._db_manager:
+                    try:
+                        self._db_manager.save_heavyweight_stocks(fund_code, data)
+                    except Exception as db_e:
+                        logger.warning(f"保存到数据库失败: {db_e}")
                 
                 return {
                     'success': True,
@@ -316,6 +355,60 @@ class HeavyweightStocksFetcher:
             'timestamp': datetime.now().isoformat()
         }
     
+    def fetch_heavyweight_stocks_batch(self, fund_codes: List[str], 
+                                       date: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """
+        批量获取多个基金的重仓股数据
+        
+        优先从数据库获取，缺失的数据再从API获取
+        
+        Args:
+            fund_codes: 基金代码列表
+            date: 报告期日期（可选）
+            
+        Returns:
+            Dict: 以基金代码为key的结果字典
+        """
+        results = {}
+        
+        if not fund_codes:
+            return results
+        
+        # 1. 尝试从数据库批量获取
+        db_data = {}
+        missing_funds = fund_codes
+        
+        if self._db_manager:
+            try:
+                db_data, missing_funds = self._db_manager.get_all_heavyweight_stocks_for_funds(
+                    fund_codes, 
+                    max_age_days=self._db_cache_max_age
+                )
+                
+                # 数据库中获取到的数据直接放入结果
+                for fund_code, stocks in db_data.items():
+                    results[fund_code] = {
+                        'success': True,
+                        'data': stocks,
+                        'source': 'database',
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    # 同时更新内存缓存
+                    cache_key = self._get_cache_key(fund_code, date)
+                    self._set_cached_data(cache_key, stocks)
+                
+                logger.info(f"批量获取：从数据库获取 {len(db_data)} 只基金，{len(missing_funds)} 只需要从API获取")
+            except Exception as e:
+                logger.warning(f"从数据库批量获取失败: {e}")
+                missing_funds = fund_codes
+        
+        # 2. 从API获取缺失的数据
+        for fund_code in missing_funds:
+            result = self.fetch_heavyweight_stocks(fund_code, date, use_cache=True)
+            results[fund_code] = result
+        
+        return results
+    
     def clear_cache(self, fund_code: Optional[str] = None):
         """清除缓存"""
         if fund_code:
@@ -324,23 +417,77 @@ class HeavyweightStocksFetcher:
             for key in keys_to_remove:
                 self._cache.pop(key, None)
                 self._cache_timestamps.pop(key, None)
-            logger.info(f"已清除基金 {fund_code} 的缓存")
+            logger.info(f"已清除基金 {fund_code} 的内存缓存")
         else:
             # 清除所有缓存
             self._cache.clear()
             self._cache_timestamps.clear()
-            logger.info("已清除所有缓存")
+            logger.info("已清除所有内存缓存")
+    
+    def clear_database_cache(self, fund_code: Optional[str] = None) -> bool:
+        """
+        清除数据库中的缓存数据
+        
+        Args:
+            fund_code: 基金代码，为None则清除所有
+            
+        Returns:
+            bool: 是否成功
+        """
+        if not self._db_manager:
+            logger.warning("数据库管理器未初始化，无法清除数据库缓存")
+            return False
+        
+        try:
+            if fund_code:
+                sql = "DELETE FROM fund_heavyweight_stocks WHERE fund_code = :fund_code"
+                self._db_manager.execute_sql(sql, {'fund_code': fund_code})
+                logger.info(f"已清除基金 {fund_code} 的数据库缓存")
+            else:
+                sql = "TRUNCATE TABLE fund_heavyweight_stocks"
+                self._db_manager.execute_sql(sql)
+                logger.info("已清除所有数据库缓存")
+            return True
+        except Exception as e:
+            logger.error(f"清除数据库缓存失败: {e}")
+            return False
 
 
 # 全局实例
 _fetcher_instance = None
 
-def get_fetcher() -> HeavyweightStocksFetcher:
-    """获取全局数据获取器实例"""
+def get_fetcher(db_manager=None) -> HeavyweightStocksFetcher:
+    """
+    获取全局数据获取器实例
+    
+    Args:
+        db_manager: 数据库管理器实例，用于持久化缓存
+        
+    Returns:
+        HeavyweightStocksFetcher: 数据获取器实例
+    """
     global _fetcher_instance
     if _fetcher_instance is None:
-        _fetcher_instance = HeavyweightStocksFetcher()
+        _fetcher_instance = HeavyweightStocksFetcher(db_manager=db_manager)
+    elif db_manager is not None and _fetcher_instance._db_manager is None:
+        # 如果之前创建的实例没有db_manager，现在有传入，则更新
+        _fetcher_instance._db_manager = db_manager
     return _fetcher_instance
+
+
+def init_fetcher(db_manager):
+    """
+    初始化数据获取器的数据库连接
+    
+    Args:
+        db_manager: 数据库管理器实例
+    """
+    global _fetcher_instance
+    if _fetcher_instance is None:
+        _fetcher_instance = HeavyweightStocksFetcher(db_manager=db_manager)
+    else:
+        _fetcher_instance._db_manager = db_manager
+    logger.info("重仓股数据获取器已初始化数据库连接")
 
 
 def fetch_heavyweight_stocks(fund_code: str, date: Optional[str] = None, 
@@ -358,6 +505,22 @@ def fetch_heavyweight_stocks(fund_code: str, date: Optional[str] = None,
     """
     fetcher = get_fetcher()
     return fetcher.fetch_heavyweight_stocks(fund_code, date, use_cache)
+
+
+def fetch_heavyweight_stocks_batch(fund_codes: List[str], 
+                                   date: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+    """
+    便捷函数：批量获取重仓股数据
+    
+    Args:
+        fund_codes: 基金代码列表
+        date: 报告期日期（可选）
+        
+    Returns:
+        Dict: 以基金代码为key的结果字典
+    """
+    fetcher = get_fetcher()
+    return fetcher.fetch_heavyweight_stocks_batch(fund_codes, date)
 
 
 if __name__ == "__main__":

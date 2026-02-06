@@ -20,6 +20,7 @@ function initCorrelationCharts(container, chartData) {
     console.log('📊 初始化相关性图表模块');
     console.log('容器:', container);
     console.log('图表数据:', chartData);
+    console.log('数据结构类型:', chartData.primary_combination ? '多基金组合' : '传统双基金');
     
     // 清空容器
     container.innerHTML = '';
@@ -28,10 +29,46 @@ function initCorrelationCharts(container, chartData) {
     injectChartStyles();
     
     // 创建四个图表容器 - 适配后端实际返回的数据结构
-    const scatterData = chartData.scatter_data;
-    const lineData = chartData.nav_comparison_data || chartData.line_data;  // 后端返回nav_comparison_data
-    const rollingData = chartData.rolling_correlation_data || chartData.rolling_data;  // 后端返回rolling_correlation_data
-    const distributionData = chartData.distribution_data;
+    // 处理新的数据结构：包含primary_combination、all_combinations、all_funds_nav_comparison和all_funds_distribution
+    let scatterData, lineData, rollingData, distributionData;
+    
+    if (chartData.primary_combination) {
+        // 新的数据结构：多基金组合分析
+        const primaryCombination = chartData.primary_combination;
+        scatterData = primaryCombination.scatter_data;
+        rollingData = primaryCombination.rolling_correlation_data || primaryCombination.rolling_data;
+        
+        // 优先使用 all_funds_nav_comparison（支持多只基金显示）
+        if (chartData.all_funds_nav_comparison && chartData.all_funds_nav_comparison.funds) {
+            lineData = chartData.all_funds_nav_comparison;
+            console.log('📊 使用所有基金净值对比数据，基金数量:', lineData.funds.length);
+        } else {
+            lineData = primaryCombination.nav_comparison_data || primaryCombination.line_data;
+        }
+        
+        // 优先使用 all_funds_distribution（支持多只基金显示）
+        if (chartData.all_funds_distribution && chartData.all_funds_distribution.funds) {
+            distributionData = chartData.all_funds_distribution;
+            console.log('📊 使用所有基金收益率分布数据，基金数量:', distributionData.funds.length);
+        } else {
+            distributionData = primaryCombination.distribution_data;
+        }
+        
+        console.log('📊 处理多基金组合数据，主组合:', {
+            fund1: primaryCombination.fund1_name,
+            fund2: primaryCombination.fund2_name,
+            combinationCount: chartData.all_combinations ? chartData.all_combinations.length : 0,
+            totalFunds: lineData.funds ? lineData.funds.length : 2
+        });
+    } else {
+        // 兼容旧的数据结构
+        scatterData = chartData.scatter_data;
+        lineData = chartData.nav_comparison_data || chartData.line_data;
+        rollingData = chartData.rolling_correlation_data || chartData.rolling_data;
+        distributionData = chartData.distribution_data;
+        
+        console.log('📊 处理传统双基金数据结构');
+    }
     
     console.log('数据检查:', {
         scatterData: !!scatterData,
@@ -40,6 +77,12 @@ function initCorrelationCharts(container, chartData) {
         distributionData: !!distributionData,
         distributionKeys: distributionData ? Object.keys(distributionData) : null
     });
+    
+    // 检查必需的数据是否存在
+    if (!scatterData && !lineData && !rollingData && !distributionData) {
+        console.error('❌ 没有任何有效的图表数据');
+        return;
+    }
     
     if (scatterData) {
         const scatterWrapper = createChartWrapper('scatter-correlation-chart', '日收益率散点图');
@@ -326,6 +369,7 @@ function initScatterChart(scatterData) {
 
 /**
  * 初始化净值走势对比图
+ * 支持多只基金同时显示
  */
 function initLineChart(lineData) {
     const canvas = document.getElementById('nav-comparison-chart');
@@ -341,32 +385,74 @@ function initLineChart(lineData) {
         correlationCharts.line.destroy();
     }
     
+    // 定义颜色方案（支持多只基金）
+    const colors = [
+        { border: 'rgba(59, 130, 246, 0.8)', background: 'rgba(59, 130, 246, 0.1)' },   // 蓝色
+        { border: 'rgba(16, 185, 129, 0.8)', background: 'rgba(16, 185, 129, 0.1)' },   // 绿色
+        { border: 'rgba(239, 68, 68, 0.8)', background: 'rgba(239, 68, 68, 0.1)' },     // 红色
+        { border: 'rgba(245, 158, 11, 0.8)', background: 'rgba(245, 158, 11, 0.1)' },   // 橙色
+        { border: 'rgba(139, 92, 246, 0.8)', background: 'rgba(139, 92, 246, 0.1)' },   // 紫色
+        { border: 'rgba(236, 72, 153, 0.8)', background: 'rgba(236, 72, 153, 0.1)' },   // 粉色
+        { border: 'rgba(6, 182, 212, 0.8)', background: 'rgba(6, 182, 212, 0.1)' },     // 青色
+        { border: 'rgba(99, 102, 241, 0.8)', background: 'rgba(99, 102, 241, 0.1)' }    // 靛蓝
+    ];
+    
+    let datasets = [];
+    let labels = [];
+    
+    // 检查是否是新的多基金数据结构 (all_funds_nav_comparison)
+    if (lineData.funds && Array.isArray(lineData.funds)) {
+        console.log('📊 使用多基金数据结构，基金数量:', lineData.funds.length);
+        labels = lineData.dates;
+        
+        datasets = lineData.funds.map((fund, index) => {
+            const color = colors[index % colors.length];
+            return {
+                label: fund.fund_name,
+                data: fund.values,
+                borderColor: color.border,
+                backgroundColor: color.background,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1
+            };
+        });
+    } else {
+        // 兼容旧的双基金数据结构
+        console.log('📊 使用传统双基金数据结构');
+        labels = lineData.dates;
+        datasets = [
+            {
+                label: lineData.fund1_name,
+                data: lineData.fund1_values,
+                borderColor: colors[0].border,
+                backgroundColor: colors[0].background,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1
+            },
+            {
+                label: lineData.fund2_name,
+                data: lineData.fund2_values,
+                borderColor: colors[1].border,
+                backgroundColor: colors[1].background,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1
+            }
+        ];
+    }
+    
+    console.log('📊 创建净值走势图，数据集数量:', datasets.length);
+    
     correlationCharts.line = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: lineData.dates,
-            datasets: [
-                {
-                    label: lineData.fund1_name,
-                    data: lineData.fund1_values,
-                    borderColor: 'rgba(59, 130, 246, 0.8)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    tension: 0.1
-                },
-                {
-                    label: lineData.fund2_name,
-                    data: lineData.fund2_values,
-                    borderColor: 'rgba(16, 185, 129, 0.8)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHoverRadius: 4,
-                    tension: 0.1
-                }
-            ]
+            labels: labels,
+            datasets: datasets
         },
         options: {
             responsive: true,
@@ -583,6 +669,7 @@ function initRollingChart(rollingData) {
 
 /**
  * 初始化收益率分布对比图
+ * 支持多只基金同时显示
  */
 function initDistributionChart(distributionData) {
     console.log('📈 初始化收益率分布图，接收数据:', distributionData);
@@ -599,30 +686,72 @@ function initDistributionChart(distributionData) {
         return;
     }
     
-    // 检查后端实际使用的字段名
-    const bins = distributionData.bins || distributionData.labels;
-    const fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
-    const fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
+    // 定义颜色方案（支持多只基金）- 与净值走势图使用相同的颜色
+    const colors = [
+        { background: 'rgba(59, 130, 246, 0.6)', border: 'rgba(59, 130, 246, 0.8)' },   // 蓝色
+        { background: 'rgba(16, 185, 129, 0.6)', border: 'rgba(16, 185, 129, 0.8)' },   // 绿色
+        { background: 'rgba(239, 68, 68, 0.6)', border: 'rgba(239, 68, 68, 0.8)' },     // 红色
+        { background: 'rgba(245, 158, 11, 0.6)', border: 'rgba(245, 158, 11, 0.8)' },   // 橙色
+        { background: 'rgba(139, 92, 246, 0.6)', border: 'rgba(139, 92, 246, 0.8)' },   // 紫色
+        { background: 'rgba(236, 72, 153, 0.6)', border: 'rgba(236, 72, 153, 0.8)' },   // 粉色
+        { background: 'rgba(6, 182, 212, 0.6)', border: 'rgba(6, 182, 212, 0.8)' },     // 青色
+        { background: 'rgba(99, 102, 241, 0.6)', border: 'rgba(99, 102, 241, 0.8)' }    // 靛蓝
+    ];
     
-    if (!bins || !fund1_counts || !fund2_counts) {
-        console.error('❌ 收益率分布数据字段不完整:', {
-            has_bins: !!bins,
-            has_fund1_counts: !!fund1_counts,
-            has_fund2_counts: !!fund2_counts,
-            actual_keys: Object.keys(distributionData)
+    let labels = [];
+    let datasets = [];
+    
+    // 检查是否是新的多基金数据结构 (all_funds_distribution)
+    if (distributionData.funds && Array.isArray(distributionData.funds)) {
+        console.log('📊 使用多基金收益率分布数据，基金数量:', distributionData.funds.length);
+        labels = distributionData.bins || distributionData.labels;
+        
+        datasets = distributionData.funds.map((fund, index) => {
+            const color = colors[index % colors.length];
+            return {
+                label: fund.fund_name,
+                data: fund.counts,
+                backgroundColor: color.background,
+                borderColor: color.border,
+                borderWidth: 1
+            };
         });
-        return;
+        
+        console.log('📊 生成的数据集数量:', datasets.length);
+    } else {
+        // 兼容旧的双基金数据结构
+        console.log('📊 使用传统双基金收益率分布数据');
+        labels = distributionData.bins || distributionData.labels;
+        const fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
+        const fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
+        
+        if (!labels || !fund1_counts || !fund2_counts) {
+            console.error('❌ 收益率分布数据字段不完整:', {
+                has_bins: !!labels,
+                has_fund1_counts: !!fund1_counts,
+                has_fund2_counts: !!fund2_counts,
+                actual_keys: Object.keys(distributionData)
+            });
+            return;
+        }
+        
+        datasets = [
+            {
+                label: distributionData.fund1_name || '基金1',
+                data: fund1_counts,
+                backgroundColor: colors[0].background,
+                borderColor: colors[0].border,
+                borderWidth: 1
+            },
+            {
+                label: distributionData.fund2_name || '基金2',
+                data: fund2_counts,
+                backgroundColor: colors[1].background,
+                borderColor: colors[1].border,
+                borderWidth: 1
+            }
+        ];
     }
-    
-    console.log('📊 数据验证通过:');
-    console.log('- bins/labels长度:', bins.length);
-    console.log('- fund1_counts长度:', fund1_counts.length);
-    console.log('- fund2_counts长度:', fund2_counts.length);
-    console.log('- 实际数据样本:', {
-        bins_sample: bins.slice(0, 3),
-        fund1_sample: fund1_counts.slice(0, 3),
-        fund2_sample: fund2_counts.slice(0, 3)
-    });
     
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -640,23 +769,8 @@ function initDistributionChart(distributionData) {
         correlationCharts.distribution = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: bins,
-                datasets: [
-                    {
-                        label: distributionData.fund1_name || '基金1',
-                        data: fund1_counts,
-                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                        borderColor: 'rgba(59, 130, 246, 0.8)',
-                        borderWidth: 1
-                    },
-                    {
-                        label: distributionData.fund2_name || '基金2',
-                        data: fund2_counts,
-                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
-                        borderColor: 'rgba(16, 185, 129, 0.8)',
-                        borderWidth: 1
-                    }
-                ]
+                labels: labels,
+                datasets: datasets
             },
             options: {
                 responsive: true,

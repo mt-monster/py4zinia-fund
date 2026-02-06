@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投资建议分析 - 基金分析系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/heavyweight-stocks.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-data-tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis-dashboard.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            width: 100%;
+        }
+
+        /* 页面头部 */
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* 内容区域 */
+        .content-section {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e8ecf1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            color: #667eea;
+        }
+
+        /* 加载状态 */
+        .loading-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .loading-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #667eea;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* 错误状态 */
+        .error-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #e74c3c;
+        }
+
+        .error-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .error-state p {
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #bdc3c7;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .empty-state p {
+            margin-bottom: 25px;
+            color: #7f8c8d;
+        }
+
+        /* 按钮样式 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #ecf0f1;
+            color: #2c3e50;
+        }
+
+        .btn-secondary:hover {
+            background: #dde1e2;
+        }
+
+        /* 按钮容器 */
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e8ecf1;
+        }
+
+        /* 分析结果区域 */
+        #analysis-result-section {
+            display: none;
+        }
+
+        /* 投资建议卡片 */
+        .advice-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .advice-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .advice-card h4 {
+            font-size: 16px;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .advice-card p {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        /* 风险等级标签 */
+        .risk-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .risk-low {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .risk-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .risk-high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .page-header {
+                padding: 20px;
+            }
+
+            .page-header h1 {
+                font-size: 22px;
+            }
+
+            .content-section {
+                padding: 20px;
+            }
+
+            .advice-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .button-container {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* 隐藏元素 */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 页面头部 -->
+        <div class="page-header">
+            <h1><i class="bi bi-lightbulb"></i> 投资建议分析</h1>
+            <p>基于您的持仓基金，提供个性化的资产配置建议和风险评估</p>
+        </div>
+
+        <!-- 加载状态 -->
+        <div id="loading-section" class="content-section">
+            <div class="loading-state">
+                <i class="bi bi-arrow-repeat"></i>
+                <p>正在分析您的持仓基金...</p>
+            </div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div id="error-section" class="content-section hidden">
+            <div class="error-state">
+                <i class="bi bi-exclamation-triangle"></i>
+                <p id="error-message">分析失败，请稍后重试</p>
+                <button class="btn btn-primary" onclick="loadInvestmentAdvice()">
+                    <i class="bi bi-arrow-clockwise"></i> 重新分析
+                </button>
+            </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div id="empty-section" class="content-section hidden">
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <h3>暂无分析数据</h3>
+                <p>请先从持仓页面选择基金，然后查看投资建议</p>
+                <a href="/my-holdings-new" class="btn btn-primary">
+                    <i class="bi bi-wallet2"></i> 前往持仓页面
+                </a>
+            </div>
+        </div>
+
+        <!-- 分析结果 -->
+        <div id="analysis-result-section" class="content-section">
+            <h2 class="section-title"><i class="bi bi-graph-up-arrow"></i> 综合分析结果</h2>
+            
+            <!-- 投资建议概览 -->
+            <div class="advice-cards" id="advice-overview">
+                <!-- 动态生成 -->
+            </div>
+
+            <!-- 仪表盘容器 -->
+            <div id="fund-analysis-dashboard" style="min-height: 600px;"></div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="button-container">
+            <a href="/my-holdings-new" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> 返回持仓页面
+            </a>
+            <button class="btn btn-primary" onclick="loadInvestmentAdvice()">
+                <i class="bi bi-arrow-clockwise"></i> 刷新分析
+            </button>
+        </div>
+    </div>
+
+    <!-- 必要的脚本 -->
+    <script src="{{ url_for('static', filename='js/heavyweight-stocks.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/realtime-data-tables.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/fund-analysis-dashboard.js') }}"></script>
+
+    <script>
+        // 从sessionStorage获取分析数据
+        function getAnalysisData() {
+            const sessionData = sessionStorage.getItem('investmentAdviceData');
+            if (sessionData) {
+                try {
+                    return JSON.parse(sessionData);
+                } catch (error) {
+                    console.error('解析session数据失败:', error);
+                }
+            }
+            return null;
+        }
+
+        // 页面加载时自动分析
+        window.onload = function() {
+            console.log('=== 投资建议页面加载开始 ===');
+            const data = getAnalysisData();
+            
+            if (data && data.fund_codes && data.fund_codes.length > 0) {
+                console.log('检测到传递的基金代码:', data.fund_codes);
+                loadInvestmentAdvice();
+            } else {
+                console.log('未检测到传递的基金数据，显示空状态');
+                showEmptyState();
+            }
+            
+            console.log('=== 页面加载完成 ===');
+        };
+
+        // 加载投资建议数据
+        async function loadInvestmentAdvice() {
+            showLoadingState();
+            
+            const data = getAnalysisData();
+            if (!data || !data.fund_codes || data.fund_codes.length === 0) {
+                showEmptyState();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/holdings/analyze/comprehensive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fund_codes: data.fund_codes })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 延迟渲染以确保容器有正确尺寸
+                    setTimeout(() => {
+                        renderInvestmentAdvice(result.data, data.fund_codes);
+                    }, 100);
+                } else {
+                    showErrorState(result.error || '分析失败');
+                }
+            } catch (error) {
+                console.error('加载投资建议失败:', error);
+                showErrorState('网络错误，请稍后重试');
+            }
+        }
+
+        // 渲染投资建议
+        function renderInvestmentAdvice(data, fundCodes) {
+            // 保存基金代码
+            data.fund_codes = fundCodes;
+            
+            // 显示结果区域
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('error-section').classList.add('hidden');
+            document.getElementById('empty-section').classList.add('hidden');
+            document.getElementById('analysis-result-section').style.display = 'block';
+            
+            // 渲染投资建议概览
+            renderAdviceOverview(data);
+            
+            // 初始化基金分析仪表盘
+            if (typeof initFundAnalysisDashboard === 'function') {
+                initFundAnalysisDashboard('fund-analysis-dashboard', data);
+            } else {
+                console.error('initFundAnalysisDashboard 函数未定义');
+                document.getElementById('fund-analysis-dashboard').innerHTML = 
+                    '<div class="error-state"><p>仪表盘组件加载失败</p></div>';
+            }
+        }
+
+        // 渲染投资建议概览
+        function renderAdviceOverview(data) {
+            const container = document.getElementById('advice-overview');
+            const summary = data.summary || {};
+            const strategyAnalysis = data.strategy_analysis || {};
+            
+            // 确定风险等级
+            let riskLevel = 'low';
+            let riskText = '低风险';
+            let riskDesc = '您的投资组合风险较低，适合稳健型投资者。';
+            
+            if (summary.volatility > 0.2) {
+                riskLevel = 'high';
+                riskText = '高风险';
+                riskDesc = '您的投资组合波动较大，建议适当分散投资。';
+            } else if (summary.volatility > 0.12) {
+                riskLevel = 'medium';
+                riskText = '中等风险';
+                riskDesc = '您的投资组合风险适中，收益与风险相对平衡。';
+            }
+            
+            // 生成投资建议
+            let adviceText = '您的投资组合整体表现良好。';
+            if (strategyAnalysis.recommendations && strategyAnalysis.recommendations.length > 0) {
+                adviceText = strategyAnalysis.recommendations[0];
+            }
+            
+            container.innerHTML = `
+                <div class="advice-card">
+                    <h4><i class="bi bi-shield-check"></i> 风险评估</h4>
+                    <p>
+                        <span class="risk-badge risk-${riskLevel}">${riskText}</span>
+                        <br><br>
+                        ${riskDesc}
+                    </p>
+                </div>
+                <div class="advice-card">
+                    <h4><i class="bi bi-pie-chart"></i> 资产配置</h4>
+                    <p>
+                        股票占比: ${summary.total_stock_proportion?.toFixed(1) || '--'}%<br>
+                        行业集中度: ${summary.top_industry_concentration?.toFixed(1) || '--'}%<br>
+                        重仓股集中度: ${summary.top_stock_concentration?.toFixed(1) || '--'}%
+                    </p>
+                </div>
+                <div class="advice-card">
+                    <h4><i class="bi bi-stars"></i> 投资建议</h4>
+                    <p>${adviceText}</p>
+                </div>
+            `;
+        }
+
+        // 显示加载状态
+        function showLoadingState() {
+            document.getElementById('loading-section').classList.remove('hidden');
+            document.getElementById('error-section').classList.add('hidden');
+            document.getElementById('empty-section').classList.add('hidden');
+            document.getElementById('analysis-result-section').style.display = 'none';
+        }
+
+        // 显示错误状态
+        function showErrorState(message) {
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('error-section').classList.remove('hidden');
+            document.getElementById('empty-section').classList.add('hidden');
+            document.getElementById('analysis-result-section').style.display = 'none';
+            document.getElementById('error-message').textContent = message;
+        }
+
+        // 显示空状态
+        function showEmptyState() {
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('error-section').classList.add('hidden');
+            document.getElementById('empty-section').classList.remove('hidden');
+            document.getElementById('analysis-result-section').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

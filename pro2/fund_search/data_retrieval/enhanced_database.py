@@ -99,6 +99,9 @@ class EnhancedDatabaseManager:
             # 创建策略回测结果表
             self._create_strategy_backtest_results_table()
             
+            # 创建基金重仓股数据表
+            self._create_fund_heavyweight_stocks_table()
+            
             logger.info("数据库表结构初始化完成")
             
         except Exception as e:
@@ -396,6 +399,34 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
         logger.info("策略回测结果表 strategy_backtest_results 创建/检查完成")
+    
+    def _create_fund_heavyweight_stocks_table(self):
+        """
+        创建基金重仓股数据表
+        存储基金的重仓股信息，用于缓存接口数据
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS fund_heavyweight_stocks (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            fund_code VARCHAR(10) NOT NULL,
+            stock_code VARCHAR(10) NOT NULL,
+            stock_name VARCHAR(100) NOT NULL,
+            holding_ratio DECIMAL(8,4),
+            market_value DECIMAL(15,2),
+            change_percent DECIMAL(8,4),
+            report_period VARCHAR(20),
+            ranking INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_fund_stock_period (fund_code, stock_code, report_period),
+            INDEX idx_fund_code (fund_code),
+            INDEX idx_stock_code (stock_code),
+            INDEX idx_report_period (report_period),
+            INDEX idx_updated_at (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """
+        self.execute_sql(sql)
+        logger.info("基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成")
 
 
     def execute_query_raw(self, sql: str, params: Optional[Tuple] = None) -> Optional[List]:
@@ -1438,6 +1469,198 @@ class EnhancedDatabaseManager:
         except Exception as e:
             logger.error(f"删除用户策略失败: {str(e)}")
             return False
+
+    def save_heavyweight_stocks(self, fund_code: str, stocks: List[Dict], 
+                                report_period: Optional[str] = None) -> bool:
+        """
+        保存基金重仓股数据到数据库
+        
+        参数：
+            fund_code: 基金代码
+            stocks: 重仓股数据列表，每项包含stock_code, stock_name, holding_ratio等
+            report_period: 报告期（如'2024Q3'），默认为当前日期
+            
+        返回：
+            bool: 保存是否成功
+        """
+        try:
+            if not report_period:
+                # 根据当前日期生成报告期，如'2024Q3'
+                now = datetime.now()
+                quarter = (now.month - 1) // 3 + 1
+                report_period = f"{now.year}Q{quarter}"
+            
+            # 先删除该基金的旧数据（同一报告期）
+            delete_sql = """
+            DELETE FROM fund_heavyweight_stocks 
+            WHERE fund_code = :fund_code AND report_period = :report_period
+            """
+            self.execute_sql(delete_sql, {'fund_code': fund_code, 'report_period': report_period})
+            
+            # 插入新数据
+            insert_sql = """
+            INSERT INTO fund_heavyweight_stocks (
+                fund_code, stock_code, stock_name, holding_ratio, 
+                market_value, change_percent, report_period, ranking
+            ) VALUES (
+                :fund_code, :stock_code, :stock_name, :holding_ratio,
+                :market_value, :change_percent, :report_period, :ranking
+            )
+            """
+            
+            for idx, stock in enumerate(stocks):
+                params = {
+                    'fund_code': fund_code,
+                    'stock_code': str(stock.get('code', '')).strip(),
+                    'stock_name': str(stock.get('name', '')).strip(),
+                    'holding_ratio': self._parse_decimal(stock.get('holding_ratio')),
+                    'market_value': self._parse_decimal(stock.get('market_value')),
+                    'change_percent': self._parse_decimal(stock.get('change_percent')),
+                    'report_period': report_period,
+                    'ranking': idx + 1
+                }
+                self.execute_sql(insert_sql, params)
+            
+            logger.info(f"基金 {fund_code} 的重仓股数据已保存到数据库，共 {len(stocks)} 条")
+            return True
+            
+        except Exception as e:
+            logger.error(f"保存基金重仓股数据失败: {str(e)}")
+            return False
+    
+    def get_heavyweight_stocks(self, fund_code: str, 
+                               max_age_days: int = 7,
+                               report_period: Optional[str] = None) -> Optional[List[Dict]]:
+        """
+        从数据库获取基金重仓股数据
+        
+        参数：
+            fund_code: 基金代码
+            max_age_days: 数据最大年龄（天），超过则视为过期
+            report_period: 指定报告期（可选）
+            
+        返回：
+            List[Dict] 或 None: 重仓股数据列表，如果数据不存在或已过期则返回None
+        """
+        try:
+            if report_period:
+                sql = """
+                SELECT stock_code, stock_name, holding_ratio, market_value, 
+                       change_percent, report_period, updated_at
+                FROM fund_heavyweight_stocks
+                WHERE fund_code = :fund_code AND report_period = :report_period
+                ORDER BY ranking ASC
+                """
+                params = {'fund_code': fund_code, 'report_period': report_period}
+            else:
+                sql = """
+                SELECT stock_code, stock_name, holding_ratio, market_value, 
+                       change_percent, report_period, updated_at
+                FROM fund_heavyweight_stocks
+                WHERE fund_code = :fund_code
+                ORDER BY updated_at DESC, ranking ASC
+                """
+                params = {'fund_code': fund_code}
+            
+            df = self.execute_query(sql, params)
+            
+            if df.empty:
+                return None
+            
+            # 检查数据是否过期
+            latest_update = df['updated_at'].iloc[0]
+            if isinstance(latest_update, str):
+                latest_update = pd.to_datetime(latest_update)
+            
+            age = datetime.now() - latest_update
+            if age.days > max_age_days:
+                logger.info(f"基金 {fund_code} 的重仓股数据已过期（{age.days}天），需要重新获取")
+                return None
+            
+            # 转换为标准格式
+            stocks = []
+            for _, row in df.iterrows():
+                stocks.append({
+                    'code': row['stock_code'],
+                    'name': row['stock_name'],
+                    'holding_ratio': self._format_percentage(row['holding_ratio']),
+                    'market_value': self._format_market_value(row['market_value']),
+                    'change_percent': self._format_change_percent(row['change_percent']),
+                    'report_period': row['report_period']
+                })
+            
+            logger.info(f"从数据库获取基金 {fund_code} 的重仓股数据，共 {len(stocks)} 条")
+            return stocks
+            
+        except Exception as e:
+            logger.error(f"从数据库获取基金重仓股数据失败: {str(e)}")
+            return None
+    
+    def get_all_heavyweight_stocks_for_funds(self, fund_codes: List[str],
+                                              max_age_days: int = 7) -> Dict[str, List[Dict]]:
+        """
+        批量获取多个基金的重仓股数据
+        
+        参数：
+            fund_codes: 基金代码列表
+            max_age_days: 数据最大年龄（天）
+            
+        返回：
+            Dict[str, List[Dict]]: 以基金代码为key的重仓股数据字典
+        """
+        result = {}
+        missing_funds = []
+        
+        for fund_code in fund_codes:
+            stocks = self.get_heavyweight_stocks(fund_code, max_age_days)
+            if stocks:
+                result[fund_code] = stocks
+            else:
+                missing_funds.append(fund_code)
+        
+        if missing_funds:
+            logger.info(f"以下基金需要重新获取重仓股数据: {missing_funds}")
+        
+        return result, missing_funds
+    
+    def _parse_decimal(self, value) -> Optional[float]:
+        """解析数值，将字符串百分比转换为小数"""
+        if value is None or value == '--' or value == '':
+            return None
+        try:
+            if isinstance(value, str):
+                # 移除百分号和逗号
+                value = value.replace('%', '').replace(',', '').strip()
+            return float(value) if value else None
+        except (ValueError, TypeError):
+            return None
+    
+    def _format_percentage(self, value) -> str:
+        """格式化为百分比字符串"""
+        if value is None or pd.isna(value):
+            return '--'
+        try:
+            return f"{float(value):.2f}%"
+        except:
+            return '--'
+    
+    def _format_market_value(self, value) -> str:
+        """格式化为市值字符串"""
+        if value is None or pd.isna(value):
+            return '--'
+        try:
+            return f"{int(float(value)):,}"
+        except:
+            return '--'
+    
+    def _format_change_percent(self, value) -> str:
+        """格式化为涨跌幅字符串"""
+        if value is None or pd.isna(value):
+            return '--'
+        try:
+            return f"{float(value):+.2f}%"
+        except:
+            return '--'
 
     def close_connection(self):
         """关闭数据库连接"""

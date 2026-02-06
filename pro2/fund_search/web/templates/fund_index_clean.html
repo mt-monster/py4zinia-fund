@@ -117,7 +117,7 @@
             background: rgba(231, 76, 60, 0.2);
         }
         .sidebar-resize-handle::before {
-            content: '';
+            content: '\2193';
             position: absolute;
             left: 3px;
             top: 50%;
@@ -370,11 +370,11 @@
             vertical-align: middle;
         }
         .sort-indicator.asc::after {
-            content: '?;
+            content: '\2191';
             color: var(--primary-red);
         }
         .sort-indicator.desc::after {
-            content: '?;
+            content: '\2191';
             color: var(--primary-red);
         }
         /* 不可排序的列样式 */
@@ -1026,7 +1026,7 @@
         </div>
         <div class="nav-links">
             <a href="/"><i class="bi bi-house"></i> 首页</a>
-            <a href="#" onclick="refreshData()"><i class="bi bi-arrow-clockwise"></i> 数据导入</a>
+
             <a href="/strategy"><i class="bi bi-lightbulb"></i> 策略分析</a>
         </div>
         <div class="search-global">
@@ -1072,14 +1072,14 @@
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="yesterday_return">昨日盈亏?<span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="yesterday_return">昨日盈亏<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="today_profit_rate">当日盈亏?<span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="today_profit_rate">当日盈亏<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_profit">持有盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="holding_profit_rate">持有盈亏?<span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="holding_profit_rate">持有盈亏<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="total_profit">累计盈亏 <span class="sort-indicator"></span></th>
-                            <th class="sortable" data-column="total_profit_rate">累计盈亏?<span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="total_profit_rate">累计盈亏<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="sharpe_ratio">夏普比率 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="max_drawdown">最大回?<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="composite_score">综合评分 <span class="sort-indicator"></span></th>
@@ -1194,14 +1194,14 @@
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
-            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏? },
+            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏 },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
-            'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏? },
+            'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏 },
             'holding_profit': { type: 'number', sortable: true, label: '持有盈亏' },
-            'holding_profit_rate': { type: 'number', sortable: true, label: '持有盈亏? },
+            'holding_profit_rate': { type: 'number', sortable: true, label: '持有盈亏 },
             'total_profit': { type: 'number', sortable: true, label: '累计盈亏' },
-            'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏? },
+            'total_profit_rate': { type: 'number', sortable: true, label: '累计盈亏 },
             'sharpe_ratio': { type: 'number', sortable: true, label: '夏普比率' },
             'max_drawdown': { type: 'number', sortable: true, label: '最大回? },
             'composite_score': { type: 'number', sortable: true, label: '综合评分' }
@@ -2758,9 +2758,7 @@
             return str.length > len ? str.substring(0, len) + '...' : str;
         }
 
-        function refreshData() {
-            alert('数据导入功能开发中...');
-        }
+        
 
         // ==================== 侧边栏功?====================
         let currentSidebarFund = null;
@@ -2995,7 +2993,7 @@
                             </div>
                         </div>
                         <div class="holding-item">
-                            <div class="label">当日盈亏?/div>
+                            <div class="label">当日盈亏/div>
                             <div class="value ${(holdingData.today_profit_rate || 0) >= 0 ? 'text-up' : 'text-down'}">
                                 ${holdingData.today_profit_rate ? formatReturn(holdingData.today_profit_rate, '%').text : '--'}
                             </div>
@@ -3007,7 +3005,7 @@
                             </div>
                         </div>
                         <div class="holding-item">
-                            <div class="label">持有盈亏?/div>
+                            <div class="label">持有盈亏/div>
                             <div class="value ${(holdingData.holding_profit_rate || 0) >= 0 ? 'text-up' : 'text-down'}">
                                 ${holdingData.holding_profit_rate ? formatReturn(holdingData.holding_profit_rate, '%').text : '--'}
                             </div>

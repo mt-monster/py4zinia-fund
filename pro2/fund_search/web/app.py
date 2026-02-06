@@ -9,7 +9,6 @@
 import os
 import sys
 import json
-import random
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import pandas as pd
@@ -52,6 +51,10 @@ def init_components():
         unified_strategy_engine = UnifiedStrategyEngine()
         strategy_evaluator = StrategyEvaluator()
         fund_data_manager = EnhancedFundData()
+        
+        # 初始化重仓股数据获取器的数据库连接
+        from data_retrieval.heavyweight_stocks_fetcher import init_fetcher
+        init_fetcher(db_manager)
         
         logger.info("系统组件初始化完成（含统一策略引擎）")
         logger.info(f"db_manager: {db_manager is not None}")
@@ -102,6 +105,11 @@ def etf_page():
 def correlation_analysis_page():
     """基金相关性分析页面"""
     return render_template('correlation_analysis.html')
+
+@app.route('/investment-advice')
+def investment_advice_page():
+    """投资建议分析页面"""
+    return render_template('investment_advice.html')
 
 @app.route('/etf/<etf_code>')
 def etf_detail_page(etf_code):
@@ -183,7 +191,7 @@ def get_dashboard_stats():
         
         df = db_manager.execute_query(sql, {'user_id': user_id})
         
-        total_assets = 0
+        total_assets = 0  # 总资产 = 持有金额之和
         today_profit = 0
         total_cost = 0
         total_sharpe = 0
@@ -198,45 +206,52 @@ def get_dashboard_stats():
                 today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
                 sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
                 
-                current_value = holding_shares * current_nav
-                previous_value = holding_shares * previous_nav
+                # 持有金额（成本）= 持有份额 × 成本价
                 holding_amount = holding_shares * cost_price
                 
-                total_assets += current_value
+                # 当前市值 = 持有份额 × 当前净值（用于计算今日收益）
+                current_value = holding_shares * current_nav
+                previous_value = holding_shares * previous_nav
+                
+                # 总资产 = 所有持仓基金的持有金额之和
+                total_assets += holding_amount
+                
+                # 总成本（与总资产相同，用于计算收益率）
                 total_cost += holding_amount
+                
+                # 今日收益 = (当前市值 - 昨日市值)
                 today_profit += (current_value - previous_value)
                 
                 if sharpe != 0:
                     total_sharpe += sharpe
                     sharpe_count += 1
         
-        # 计算收益率
-        assets_change = ((total_assets - total_cost) / total_cost * 100) if total_cost > 0 else 0
+        # 计算收益率（总资产相对于总成本的变化）
+        # 注意：这里总资产和总成本相同，所以收益率为0
+        # 如果需要显示盈亏率，可以基于当前市值计算
+        assets_change = 0  # 持有金额没有涨跌
         profit_change = (today_profit / total_assets * 100) if total_assets > 0 else 0
         avg_sharpe = total_sharpe / sharpe_count if sharpe_count > 0 else 0
         
-        # 系统状态
+        # 获取系统状态 - 从数据库获取最新更新时间
+        try:
+            last_update_sql = "SELECT MAX(analysis_date) as last_date FROM fund_analysis_results"
+            last_update_df = db_manager.execute_query(last_update_sql)
+            last_update = last_update_df.iloc[0]['last_date'].strftime('%Y-%m-%d %H:%M') if not last_update_df.empty and last_update_df.iloc[0]['last_date'] else datetime.now().strftime('%Y-%m-%d %H:%M')
+        except:
+            last_update = datetime.now().strftime('%Y-%m-%d %H:%M')
+        
         system_status = {
-            'lastUpdate': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'lastUpdate': last_update,
             'apiResponseTime': '45',
             'load': 35
         }
         
-        # 最近活动
-        activities = [
-            {'icon': 'bi-plus-circle', 'description': '导入基金持仓数据', 'time': '10分钟前'},
-            {'icon': 'bi-graph-up', 'description': '更新基金净值数据', 'time': '30分钟前'},
-            {'icon': 'bi-check-circle', 'description': '完成策略回测分析', 'time': '1小时前'},
-            {'icon': 'bi-bell', 'description': '收到投资建议提醒', 'time': '2小时前'},
-        ]
+        # 获取最近活动 - 从数据库查询实际操作记录
+        activities = get_recent_activities(user_id)
         
-        # 持仓分布
-        distribution = [
-            {'name': '股票型基金', 'percentage': 45, 'color': 'success'},
-            {'name': '债券型基金', 'percentage': 30, 'color': 'info'},
-            {'name': '混合型基金', 'percentage': 15, 'color': 'warning'},
-            {'name': '货币型基金', 'percentage': 10, 'color': 'danger'},
-        ]
+        # 获取真实的持仓分布
+        distribution = get_real_holding_distribution(user_id)
         
         return jsonify({
             'success': True,
@@ -263,7 +278,7 @@ def get_profit_trend():
     """获取收益趋势数据（使用真实历史数据）"""
     try:
         user_id = request.args.get('user_id', 'default_user')
-        days = request.args.get('days', 30, type=int)
+        days = request.args.get('days', 90, type=int)  # 修改默认为90天（三个月）
         total_return = request.args.get('total_return', 20, type=float)  # 默认20%总收益
         fund_codes = request.args.get('fund_codes', '000001')  # 基金代码，逗号分隔
         weights = request.args.get('weights', '1.0')  # 权重，逗号分隔
@@ -272,13 +287,42 @@ def get_profit_trend():
         fund_code_list = [code.strip() for code in fund_codes.split(',')]
         weight_list = [float(w.strip()) for w in weights.split(',')]
         
-        # 确保权重和基金代码数量一致
-        if len(weight_list) == 1 and len(fund_code_list) > 1:
-            # 如果只有一个权重，平均分配
-            weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
-        elif len(weight_list) != len(fund_code_list):
-            # 如果权重数量不匹配，平均分配
-            weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
+        # 如果没有提供基金代码，则获取用户的持仓基金
+        if fund_codes == '000001' and user_id != 'default_user':
+            try:
+                # 获取用户持仓数据
+                holdings_sql = """
+                SELECT fund_code, holding_shares, cost_price
+                FROM user_holdings 
+                WHERE user_id = :user_id AND holding_shares > 0
+                """
+                holdings_df = db_manager.execute_query(holdings_sql, {'user_id': user_id})
+                
+                if not holdings_df.empty:
+                    fund_code_list = holdings_df['fund_code'].tolist()
+                    # 计算权重基于持仓金额
+                    total_amount = 0
+                    amounts = []
+                    for _, row in holdings_df.iterrows():
+                        amount = float(row['holding_shares'] or 0) * float(row['cost_price'] or 0)
+                        amounts.append(amount)
+                        total_amount += amount
+                    
+                    if total_amount > 0:
+                        weight_list = [amount/total_amount for amount in amounts]
+                    else:
+                        weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
+            except Exception as e:
+                logger.warning(f"获取用户持仓失败: {str(e)}, 使用默认基金")
+        
+        # 确保权重和基金代码数量一致（仅当不是从持仓获取时）
+        if fund_codes != '000001' or user_id == 'default_user':
+            if len(weight_list) == 1 and len(fund_code_list) > 1:
+                # 如果只有一个权重，平均分配
+                weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
+            elif len(weight_list) != len(fund_code_list):
+                # 如果权重数量不匹配，平均分配
+                weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
         
         # 归一化权重
         weight_sum = sum(weight_list)
@@ -319,17 +363,30 @@ def get_profit_trend():
             
             # 使用沪深300数据的时间范围
             csi300_sorted = csi300_data.sort_values('date')
+            base_portfolio_value = 10000  # 基准初始值
+            base_benchmark_value = 10000  # 基准初始值
+            
             for _, row in csi300_sorted.tail(days).iterrows():
                 labels.append(row['date'].strftime('%m-%d'))
-                benchmark_data.append(round(row['price'], 2))
-                # 基金数据使用最近的可用数据
+                # 基于基准值计算相对收益
+                benchmark_return = (row['price'] / csi300_sorted.iloc[0]['price'] - 1) * 100
+                benchmark_data.append(round(base_benchmark_value * (1 + benchmark_return/100), 2))
+                
+                # 基金数据使用最近的可用数据计算相对收益
                 if not portfolio_data.empty:
                     latest_portfolio = portfolio_data.iloc[-1]['portfolio_nav']
-                    profit_data.append(round(latest_portfolio, 2))
+                    first_portfolio = portfolio_data.iloc[0]['portfolio_nav']
+                    portfolio_return = (latest_portfolio / first_portfolio - 1) * 100
+                    profit_data.append(round(base_portfolio_value * (1 + portfolio_return/100), 2))
                 else:
-                    profit_data.append(10000)  # 默认值
+                    profit_data.append(base_portfolio_value)  # 默认值
         else:
             # 有共同日期的情况
+            # 使用第一个共同日期作为基准点
+            base_date = common_dates[0]
+            base_portfolio_value = None
+            base_benchmark_value = None
+            
             for date in common_dates:
                 # 格式化日期标签
                 labels.append(date.strftime('%m-%d'))
@@ -337,21 +394,32 @@ def get_profit_trend():
                 # 获取沪深300数据
                 csi300_row = csi300_data[csi300_data['date'].dt.date == date]
                 if not csi300_row.empty:
-                    benchmark_value = csi300_row.iloc[0]['price']
-                    # 标准化到10000起点
-                    if len(csi300_data) > 0:
-                        first_price = csi300_data.iloc[0]['price']
-                        normalized_benchmark = 10000 * (benchmark_value / first_price)
-                        benchmark_data.append(round(normalized_benchmark, 2))
+                    current_benchmark = csi300_row.iloc[0]['price']
+                    
+                    # 设置基准值
+                    if base_benchmark_value is None:
+                        base_benchmark_value = current_benchmark
+                        benchmark_data.append(10000)  # 基准点设为10000
                     else:
-                        benchmark_data.append(round(benchmark_value, 2))
+                        # 计算相对于基准点的收益
+                        benchmark_return = (current_benchmark / base_benchmark_value - 1) * 100
+                        benchmark_data.append(round(10000 * (1 + benchmark_return/100), 2))
                 else:
                     benchmark_data.append(benchmark_data[-1] if benchmark_data else 10000)
                 
                 # 获取基金组合数据
                 portfolio_row = portfolio_data[portfolio_data['date'].dt.date == date]
                 if not portfolio_row.empty:
-                    profit_data.append(round(portfolio_row.iloc[0]['portfolio_nav'], 2))
+                    current_portfolio = portfolio_row.iloc[0]['portfolio_nav']
+                    
+                    # 设置基准值
+                    if base_portfolio_value is None:
+                        base_portfolio_value = current_portfolio
+                        profit_data.append(10000)  # 基准点设为10000
+                    else:
+                        # 计算相对于基准点的收益
+                        portfolio_return = (current_portfolio / base_portfolio_value - 1) * 100
+                        profit_data.append(round(10000 * (1 + portfolio_return/100), 2))
                 else:
                     profit_data.append(profit_data[-1] if profit_data else 10000)
         
@@ -363,7 +431,9 @@ def get_profit_trend():
                 'benchmark': benchmark_data,
                 'fund_codes': fund_code_list,
                 'weights': weight_list,
-                'data_source': 'real_historical_data'  # 标记数据来源
+                'data_source': 'real_historical_data',  # 标记数据来源
+                'benchmark_name': '沪深300',  # 明确标识基准为沪深300
+                'benchmark_description': '以沪深300指数作为业绩比较基准'
             }
         })
         
@@ -374,54 +444,229 @@ def get_profit_trend():
 
 @app.route('/api/dashboard/allocation', methods=['GET'])
 def get_allocation():
-    """获取资产配置数据"""
+    """获取资产配置数据 - 按基金类型分布"""
     try:
         user_id = request.args.get('user_id', 'default_user')
         
-        # 获取用户持仓并按类型分组
-        sql = """
-        SELECT h.fund_code, h.holding_shares, h.cost_price,
-               fi.fund_type
+        # 获取用户持仓
+        sql_holdings = """
+        SELECT h.fund_code, h.holding_shares, h.cost_price
         FROM user_holdings h
-        LEFT JOIN fund_info fi ON h.fund_code = fi.fund_code
         WHERE h.user_id = :user_id
         """
         
-        df = db_manager.execute_query(sql, {'user_id': user_id})
+        df_holdings = db_manager.execute_query(sql_holdings, {'user_id': user_id})
         
-        allocation = {}
-        if not df.empty:
-            for _, row in df.iterrows():
-                fund_type = row['fund_type'] if pd.notna(row['fund_type']) else '其他'
-                holding_amount = float(row['holding_shares']) * float(row['cost_price'])
-                
-                if fund_type in allocation:
-                    allocation[fund_type] += holding_amount
-                else:
-                    allocation[fund_type] = holding_amount
+        if df_holdings.empty:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'distribution': [],
+                    'totalCount': 0,
+                    'totalAmount': 0
+                }
+            })
         
-        # 如果没有数据，使用默认分布
-        if not allocation:
-            allocation = {
-                '股票型': 45000,
-                '债券型': 30000,
-                '混合型': 15000,
-                '货币型': 10000
-            }
+        # 获取每个基金的类型
+        fund_type_map = {}
+        for fund_code in df_holdings['fund_code'].tolist():
+            fund_type = get_fund_type_for_allocation(fund_code)
+            fund_type_map[fund_code] = fund_type
         
-        labels = list(allocation.keys())
-        values = list(allocation.values())
+        # 按基金类型统计
+        type_amounts = {}
+        type_count = {}
+        total_amount = 0
+        
+        for _, row in df_holdings.iterrows():
+            fund_code = row['fund_code']
+            fund_type = fund_type_map.get(fund_code, '其他')
+            fund_type = normalize_fund_type(fund_type)
+            
+            holding_amount = float(row['holding_shares']) * float(row['cost_price'])
+            
+            if fund_type in type_amounts:
+                type_amounts[fund_type] += holding_amount
+                type_count[fund_type] += 1
+            else:
+                type_amounts[fund_type] = holding_amount
+                type_count[fund_type] = 1
+            
+            total_amount += holding_amount
+        
+        # 颜色映射 - 优化视觉效果
+        color_map = {
+            '股票型': '#28a745',
+            '债券型': '#17a2b8',
+            '混合型': '#ffc107',
+            '货币型': '#dc3545',
+            '指数型': '#007bff',
+            'QDII': '#6c757d',
+            'FOF': '#343a40',
+            '其他': '#3498db'  # 将原来的浅灰色改为更有活力的蓝色
+        }
+        
+        # 构建分布数据
+        distribution = []
+        for fund_type, amount in sorted(type_amounts.items(), key=lambda x: x[1], reverse=True):
+            percentage = round((amount / total_amount) * 100, 1) if total_amount > 0 else 0
+            distribution.append({
+                'name': f'{fund_type}基金',
+                'percentage': percentage,
+                'count': type_count.get(fund_type, 0),
+                'amount': round(amount, 2),
+                'color': color_map.get(fund_type, '#007bff')
+            })
         
         return jsonify({
             'success': True,
             'data': {
-                'labels': labels,
-                'values': values
+                'distribution': distribution,
+                'totalCount': len(df_holdings),
+                'totalAmount': round(total_amount, 2),
+                'labels': list(type_amounts.keys()),
+                'values': list(type_amounts.values())
             }
         })
         
     except Exception as e:
-        logger.error(f"获取资产配置数据失败: {str(e)}")
+        logger.error(f"获取资产配置数据失败: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_fund_type_for_allocation(fund_code: str) -> str:
+    """为资产配置获取基金类型"""
+    try:
+        # 尝试从 fund_info 获取
+        sql = "SELECT fund_type FROM fund_info WHERE fund_code = :fund_code LIMIT 1"
+        df = db_manager.execute_query(sql, {'fund_code': fund_code})
+        if not df.empty and pd.notna(df.iloc[0]['fund_type']):
+            return df.iloc[0]['fund_type']
+    except:
+        pass
+    
+    # 尝试从 fund_analysis_results 获取基金名称推断
+    try:
+        sql = """
+        SELECT fund_name FROM fund_analysis_results 
+        WHERE fund_code = :fund_code 
+        ORDER BY analysis_date DESC LIMIT 1
+        """
+        df = db_manager.execute_query(sql, {'fund_code': fund_code})
+        if not df.empty and pd.notna(df.iloc[0]['fund_name']):
+            return infer_fund_type_from_name(df.iloc[0]['fund_name'])
+    except:
+        pass
+    
+    return '其他'
+
+
+@app.route('/api/dashboard/holding-stocks', methods=['GET'])
+def get_holding_stocks():
+    """
+    获取用户持仓基金的重仓股票统计
+    
+    使用数据库缓存优化，当接口获取太慢时从数据库读取
+    """
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        top_n = request.args.get('top', 10, type=int)
+        
+        # 获取用户持仓的所有基金
+        sql = """
+        SELECT h.fund_code, h.fund_name, h.holding_shares, h.cost_price
+        FROM user_holdings h
+        WHERE h.user_id = :user_id
+        """
+        df_holdings = db_manager.execute_query(sql, {'user_id': user_id})
+        
+        if df_holdings.empty:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'stocks': [],
+                    'totalFunds': 0,
+                    'totalStocks': 0
+                }
+            })
+        
+        # 汇总所有基金的重仓股
+        all_stocks = {}
+        total_funds = len(df_holdings)
+        fund_codes = df_holdings['fund_code'].tolist()
+        fund_name_map = dict(zip(df_holdings['fund_code'], df_holdings['fund_name']))
+        
+        # 使用批量获取接口，优先从数据库缓存读取
+        from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks_batch
+        
+        logger.info(f"开始批量获取 {len(fund_codes)} 只基金的重仓股数据")
+        batch_results = fetch_heavyweight_stocks_batch(fund_codes)
+        
+        for fund_code in fund_codes:
+            fund_name = fund_name_map.get(fund_code, fund_code)
+            result = batch_results.get(fund_code, {})
+            
+            if not result.get('success'):
+                logger.warning(f"获取基金 {fund_code} 重仓股失败: {result.get('error', '未知错误')}")
+                continue
+            
+            stocks = result.get('data', [])
+            if not stocks:
+                continue
+            
+            # 累加重仓股数据
+            for stock in stocks:
+                stock_code = stock.get('code', '').strip()
+                stock_name = stock.get('name', '').strip()
+                # 解析持仓比例（移除%符号）
+                ratio_str = stock.get('holding_ratio', '0')
+                try:
+                    ratio = float(ratio_str.replace('%', '').strip()) if ratio_str != '--' else 0
+                except:
+                    ratio = 0
+                
+                if stock_code and stock_name and ratio > 0:
+                    if stock_code in all_stocks:
+                        all_stocks[stock_code]['count'] += 1
+                        all_stocks[stock_code]['total_ratio'] += ratio
+                        if fund_name not in all_stocks[stock_code]['funds']:
+                            all_stocks[stock_code]['funds'].append(fund_name)
+                    else:
+                        all_stocks[stock_code] = {
+                            'stock_code': stock_code,
+                            'stock_name': stock_name,
+                            'count': 1,
+                            'total_ratio': ratio,
+                            'funds': [fund_name]
+                        }
+        
+        # 转换为列表并排序（按被持仓基金数量排序）
+        stocks_list = list(all_stocks.values())
+        stocks_list.sort(key=lambda x: (x['count'], x['total_ratio']), reverse=True)
+        
+        # 取前N只
+        top_stocks = stocks_list[:top_n]
+        
+        # 计算平均持仓比例
+        for stock in top_stocks:
+            stock['avg_ratio'] = round(stock['total_ratio'] / stock['count'], 2)
+            stock['fund_count'] = stock['count']
+            del stock['count']
+            del stock['total_ratio']
+        
+        logger.info(f"重仓股统计完成：共 {total_funds} 只基金，{len(stocks_list)} 只不同股票")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'stocks': top_stocks,
+                'totalFunds': total_funds,
+                'totalStocks': len(stocks_list)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取重仓股统计失败: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -693,59 +938,125 @@ def get_fund_holdings(fund_code):
     try:
         logger.info(f"开始获取基金持仓数据 {fund_code}")
         
-        # Create mock holdings data since akshare functions are not available
-        import pandas as pd
-        
-        # Mock data for testing
-        mock_data = [
-            {'stock_code': '600519', 'stock_name': '贵州茅台', 'ratio': 8.5, 'ratio_change': 0.2},
-            {'stock_code': '300750', 'stock_name': '宁德时代', 'ratio': 6.2, 'ratio_change': -0.1},
-            {'stock_code': '600036', 'stock_name': '招商银行', 'ratio': 5.8, 'ratio_change': 0.0},
-            {'stock_code': '601318', 'stock_name': '中国平安', 'ratio': 4.5, 'ratio_change': -0.3},
-            {'stock_code': '0700', 'stock_name': '腾讯控股', 'ratio': 3.9, 'ratio_change': 0.1}
-        ]
-        
-        holdings = []
-        total_ratio = 0
-        
-        for item in mock_data:
-            stock_code = item['stock_code']
-            stock_name = item['stock_name']
-            ratio = item['ratio']
-            ratio_change = item['ratio_change']
+        # 尝试从akshare获取真实持仓数据
+        try:
+            import akshare as ak
             
-            total_ratio += ratio
+            # 获取基金持仓数据 - 使用天天基金网接口
+            holdings_df = ak.fund_portfolio_hold_em(symbol=fund_code, date="2024")
             
-            # 计算市值（模拟数据，实际需要基金规模）
-            fund_size = 100000  # 万元
-            market_value = round((ratio / 100) * fund_size, 2)
+            if holdings_df is None or holdings_df.empty:
+                # 尝试获取2023年数据
+                holdings_df = ak.fund_portfolio_hold_em(symbol=fund_code, date="2023")
             
-            # 模拟股票涨跌幅
-            stock_return = (3.14, -1.23, 0.45, -2.67, 1.89)[mock_data.index(item)]
-            
-            holdings.append({
-                'stock_code': stock_code,
-                'stock_name': stock_name,
-                'ratio': round(ratio, 2),
-                'market_value': market_value,
-                'stock_return': round(stock_return, 2),
-                'ratio_change': round(ratio_change, 2),
-                'change_direction': 'up' if ratio_change > 0 else ('down' if ratio_change < 0 else 'same')
-            })
+            if holdings_df is not None and not holdings_df.empty:
+                # 获取最新季度的数据
+                if '季度' in holdings_df.columns:
+                    latest_quarter = holdings_df['季度'].iloc[0]
+                    holdings_df = holdings_df[holdings_df['季度'] == latest_quarter]
+                
+                holdings = []
+                total_ratio = 0
+                
+                for _, row in holdings_df.head(10).iterrows():
+                    stock_code = str(row.get('股票代码', ''))
+                    stock_name = str(row.get('股票名称', ''))
+                    ratio = row.get('占净值比例', 0)
+                    ratio_change = row.get('较上期变化', None)
+                    
+                    # 清理数据
+                    if pd.notna(ratio):
+                        ratio = float(ratio)
+                        total_ratio += ratio
+                    else:
+                        ratio = None
+                    
+                    if pd.notna(ratio_change):
+                        ratio_change = float(ratio_change)
+                    else:
+                        ratio_change = None
+                    
+                    # 计算市值（基于基金规模估算）
+                    market_value = None
+                    if ratio:
+                        # 从fund_analysis_results获取基金规模估算
+                        try:
+                            fund_size_sql = """
+                            SELECT holding_amount FROM user_holdings 
+                            WHERE fund_code = :fund_code LIMIT 1
+                            """
+                            fund_size_df = db_manager.execute_query(fund_size_sql, {'fund_code': fund_code})
+                            if not fund_size_df.empty:
+                                fund_size = float(fund_size_df.iloc[0]['holding_amount']) / 10000  # 转换为万元
+                            else:
+                                fund_size = 100000  # 默认10亿元
+                        except:
+                            fund_size = 100000  # 默认10亿元
+                        
+                        market_value = round((ratio / 100) * fund_size, 2)
+                    
+                    # 尝试获取股票实时涨跌幅
+                    stock_return = None
+                    try:
+                        # 获取A股实时行情
+                        if len(stock_code) == 6 and stock_code.isdigit():
+                            stock_data = ak.stock_zh_a_spot_em()
+                            if stock_data is not None and not stock_data.empty:
+                                stock_info = stock_data[stock_data['代码'] == stock_code]
+                                if not stock_info.empty:
+                                    stock_return = stock_info.iloc[0].get('涨跌幅', None)
+                                    if pd.notna(stock_return):
+                                        stock_return = float(stock_return)
+                    except Exception as e:
+                        logger.warning(f"获取股票 {stock_code} 涨跌幅失败: {str(e)}")
+                    
+                    holdings.append({
+                        'stock_code': stock_code,
+                        'stock_name': stock_name,
+                        'ratio': round(ratio, 2) if ratio else None,
+                        'market_value': market_value,
+                        'stock_return': round(stock_return, 2) if stock_return else None,
+                        'ratio_change': round(ratio_change, 2) if ratio_change else None,
+                        'change_direction': 'up' if ratio_change and ratio_change > 0 else ('down' if ratio_change and ratio_change < 0 else 'new' if ratio_change is None else 'same')
+                    })
+                
+                # 计算其他资产占比
+                other_ratio = max(0, 100 - total_ratio)
+                
+                # 获取更新日期
+                update_date = None
+                if '季度' in holdings_df.columns:
+                    update_date = str(holdings_df['季度'].iloc[0])
+                
+                logger.info(f"获取基金持仓数据成功 {fund_code}, 持仓数量: {len(holdings)}")
+                
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'holdings': holdings,
+                        'other_ratio': round(other_ratio, 2),
+                        'total_ratio': round(total_ratio, 2),
+                        'update_date': update_date,
+                        'source': 'akshare'
+                    }
+                })
         
-        # 计算其他资产占比
-        other_ratio = 100 - total_ratio
+        except Exception as e:
+            logger.warning(f"从akshare获取基金持仓失败: {str(e)}")
         
-        logger.info(f"获取基金持仓数据成功 {fund_code}, 持仓数量: {len(holdings)}")
-        
-        # 返回与前端期望一致的数据结构
+        # 如果无法获取数据，返回空结果
+        logger.warning(f"无法获取基金 {fund_code} 的持仓数据")
         return jsonify({
             'success': True,
             'data': {
-                'holdings': holdings,
-                'other_ratio': round(other_ratio, 2)
+                'holdings': [],
+                'other_ratio': 100,
+                'total_ratio': 0,
+                'update_date': None,
+                'source': 'empty'
             }
         })
+        
     except Exception as e:
         logger.error(f"获取基金持仓失败: {str(e)}")
         import traceback
@@ -1104,7 +1415,7 @@ def search_funds():
             # 使用参数化查询避免SQL注入和格式问题
             sql = """
             SELECT fund_code, fund_name, fund_type
-            FROM fund_info
+            FROM fund_basic_info
             WHERE fund_code LIKE :keyword OR fund_name LIKE :keyword
             LIMIT 10
             """
@@ -1141,19 +1452,19 @@ def search_funds():
 def get_fund_allocation(fund_code):
     """获取基金资产配置数据"""
     try:
-        # 尝试从akshare获取资产配置数据
+        import akshare as ak
+        
+        asset_allocation = {}
+        industry_allocation = {}
+        bond_allocation = {}
+        latest_quarter = None
+        has_real_data = False
+        
+        # 1. 获取资产配置数据
         try:
-            import akshare as ak
-            
-            # 尝试获取基金资产配置
             allocation_data = ak.fund_portfolio_asset_em(symbol=fund_code)
             
             if allocation_data is not None and not allocation_data.empty:
-                # 处理资产配置数据
-                asset_allocation = {}
-                industry_allocation = {}
-                bond_allocation = {}
-                
                 # 按季度分组，取最新季度
                 if '季度' in allocation_data.columns:
                     latest_quarter = allocation_data['季度'].iloc[0]
@@ -1166,71 +1477,72 @@ def get_fund_allocation(fund_code):
                     asset_type = row.get('资产类型', '')
                     ratio = row.get('占净值比例', 0)
                     
-                    if pd.notna(ratio):
+                    if pd.notna(ratio) and asset_type:
                         ratio = float(ratio)
                         asset_allocation[asset_type] = ratio
-                
-                # 如果没有足够数据，使用默认值
-                if len(asset_allocation) == 0:
-                    asset_allocation = {
-                        '股票': 60,
-                        '债券': 20,
-                        '现金': 10,
-                        '其他': 10
-                    }
-                
-                # 提取行业分布（模拟数据，实际需要从其他接口获取）
-                industry_allocation = {
-                    '制造业': 40,
-                    '金融业': 20,
-                    '信息技术': 15,
-                    '房地产': 10,
-                    '其他': 15
-                }
-                
-                # 提取债券类型（模拟数据，实际需要从其他接口获取）
-                bond_allocation = {
-                    '国债': 40,
-                    '金融债': 30,
-                    '企业债': 20,
-                    '其他': 10
-                }
-                
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'asset_allocation': asset_allocation,
-                        'industry_allocation': industry_allocation,
-                        'bond_allocation': bond_allocation,
-                        'update_date': latest_quarter if 'latest_quarter' in locals() else None
-                    }
-                })
+                        has_real_data = True
         except Exception as e:
-            logger.warning(f"从akshare获取资产配置失败: {str(e)}")
+            logger.warning(f"获取资产配置数据失败: {str(e)}")
         
-        # 备用方案：返回默认数据
+        # 2. 获取行业分布数据
+        try:
+            industry_data = ak.fund_portfolio_industry_allocation_em(symbol=fund_code)
+            if industry_data is not None and not industry_data.empty:
+                # 获取最新季度数据
+                if '季度' in industry_data.columns:
+                    latest_q = industry_data['季度'].iloc[0]
+                    industry_data = industry_data[industry_data['季度'] == latest_q]
+                
+                for _, row in industry_data.iterrows():
+                    industry_name = row.get('行业名称', '')
+                    ratio = row.get('占净值比例', 0)
+                    if pd.notna(ratio) and industry_name:
+                        industry_allocation[industry_name] = float(ratio)
+                        has_real_data = True
+        except Exception as e:
+            logger.warning(f"获取行业分布数据失败: {str(e)}")
+        
+        # 3. 如果是债券基金，尝试获取债券类型数据
+        try:
+            # 获取基金基本信息判断是否为债券基金
+            fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            is_bond_fund = False
+            if fund_info is not None and not fund_info.empty:
+                for _, row in fund_info.iterrows():
+                    if '债券' in str(row.get('value', '')) or 'bond' in str(row.get('value', '')).lower():
+                        is_bond_fund = True
+                        break
+            
+            if is_bond_fund:
+                # 尝试获取债券类型配置（从资产配置中推断或从其他接口获取）
+                bond_detail = ak.fund_portfolio_bond_hold_em(symbol=fund_code, date="2024")
+                if bond_detail is not None and not bond_detail.empty:
+                    # 这里可以进一步处理债券详情数据
+                    pass
+        except Exception as e:
+            logger.warning(f"获取债券类型数据失败: {str(e)}")
+        
+        # 如果没有获取到任何真实数据，返回空结果
+        if not has_real_data:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'asset_allocation': {},
+                    'industry_allocation': {},
+                    'bond_allocation': {},
+                    'update_date': None,
+                    'source': 'empty'
+                }
+            })
+        
         return jsonify({
             'success': True,
             'data': {
-                'asset_allocation': {
-                    '股票': 60,
-                    '债券': 20,
-                    '现金': 10,
-                    '其他': 10
-                },
-                'industry_allocation': {
-                    '制造业': 40,
-                    '金融业': 20,
-                    '信息技术': 15,
-                    '房地产': 10,
-                    '其他': 15
-                },
-                'bond_allocation': {
-                    '国债': 40,
-                    '金融债': 30,
-                    '企业债': 20,
-                    '其他': 10
-                }
+                'asset_allocation': asset_allocation,
+                'industry_allocation': industry_allocation,
+                'bond_allocation': bond_allocation,
+                'update_date': latest_quarter,
+                'source': 'akshare'
             }
         })
         
@@ -2842,8 +3154,34 @@ def analyze_fund_correlation_interactive():
         # 获取基金名称映射
         fund_names = {}
         for code in fund_codes:
-            fund_info = db_manager.get_fund_detail(code)
-            fund_names[code] = fund_info['fund_name'] if fund_info else code
+            fund_name = None
+            
+            # 首先尝试从 fund_basic_info 表获取
+            try:
+                fund_info = db_manager.get_fund_detail(code)
+                if fund_info and 'fund_name' in fund_info:
+                    fund_name = fund_info['fund_name']
+            except Exception as e:
+                logger.warning(f"从fund_basic_info获取基金 {code} 信息失败: {e}")
+            
+            # 如果fund_basic_info中没有，尝试从fund_analysis_results表获取
+            if not fund_name:
+                try:
+                    sql = """
+                    SELECT fund_name FROM fund_analysis_results 
+                    WHERE fund_code = %(fund_code)s 
+                    LIMIT 1
+                    """
+                    df = pd.read_sql(sql, db_manager.engine, params={'fund_code': code})
+                    if not df.empty and pd.notna(df.iloc[0]['fund_name']):
+                        fund_name = df.iloc[0]['fund_name']
+                except Exception as e:
+                    logger.warning(f"从fund_analysis_results获取基金 {code} 名称失败: {e}")
+            
+            # 如果都没有找到，使用基金代码作为名称
+            fund_names[code] = fund_name if fund_name else code
+            
+            logger.info(f"基金 {code} 的名称: {fund_names[code]}")
         
         # 获取基金历史数据
         fund_data_dict = {}
@@ -2879,9 +3217,9 @@ def analyze_fund_correlation_interactive():
                 continue
         
         if len(fund_data_dict) < 2:
-            # 如果没有足够的真实数据，使用模拟数据进行演示
-            logger.warning("真实数据不足，使用模拟数据进行演示")
-            fund_data_dict = _generate_mock_fund_data(fund_codes, fund_names)
+            # 如果没有足够的真实数据，尝试从akshare获取
+            logger.warning("数据库数据不足，尝试从akshare获取")
+            fund_data_dict = _fetch_fund_data_from_akshare(fund_codes, fund_names)
         
         if len(fund_data_dict) < 2:
             return jsonify({'success': False, 'error': '数据不足，无法进行相关性分析'})
@@ -2909,60 +3247,357 @@ def analyze_fund_correlation_interactive():
         logger.error(f"交互式相关性分析失败: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-def _generate_mock_fund_data(fund_codes: list, fund_names: dict) -> dict:
-    """生成模拟基金数据用于演示"""
-    import numpy as np
+def _fetch_fund_data_from_akshare(fund_codes: list, fund_names: dict) -> dict:
+    """
+    从akshare获取基金历史净值数据
+    用于相关性分析时数据库数据不足的情况
+    """
+    import akshare as ak
     from datetime import datetime, timedelta
-    import pandas as pd
     
     fund_data_dict = {}
     
-    # 生成365天的历史数据
-    dates = []
-    current_date = datetime.now().date()
-    for i in range(365):
-        dates.append(current_date - timedelta(days=365-i))
-    
-    # 为每只基金生成模拟数据
-    for i, code in enumerate(fund_codes[:2]):  # 最多处理两只基金
-        # 模拟净值数据（带有一定相关性）
-        np.random.seed(42 + i)  # 设置种子确保可重现
-        
-        # 基础净值序列
-        base_nav = 1.0
-        nav_series = [base_nav]
-        
-        # 生成每日收益率（带有一定的相关性模式）
-        for day in range(1, 365):
-            if i == 0:
-                # 第一只基金：相对稳定的增长模式
-                daily_return = np.random.normal(0.0005, 0.02)  # 均值0.05%，标准差2%
-            else:
-                # 第二只基金：与第一只基金有一定相关性
-                # 从前一天的第一只基金收益率中获取一些信息
-                correlation_factor = 0.6  # 60%相关性
-                first_fund_return = np.random.normal(0.0005, 0.02)
-                daily_return = correlation_factor * first_fund_return + \
-                             (1 - correlation_factor) * np.random.normal(0.0003, 0.015)
+    for code in fund_codes:
+        try:
+            # 获取基金历史净值
+            nav_df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
             
-            new_nav = nav_series[-1] * (1 + daily_return)
-            nav_series.append(new_nav)
+            if nav_df is not None and not nav_df.empty and len(nav_df) >= 30:
+                # 处理数据
+                nav_df = nav_df.rename(columns={
+                    '净值日期': 'date',
+                    '单位净值': 'nav'
+                })
+                
+                # 确保日期格式正确
+                nav_df['date'] = pd.to_datetime(nav_df['date'])
+                
+                # 按日期排序
+                nav_df = nav_df.sort_values('date')
+                
+                # 只取最近一年的数据
+                one_year_ago = datetime.now() - timedelta(days=365)
+                nav_df = nav_df[nav_df['date'] >= one_year_ago]
+                
+                # 确保净值为数值类型
+                nav_df['nav'] = pd.to_numeric(nav_df['nav'], errors='coerce')
+                nav_df = nav_df.dropna(subset=['nav'])
+                
+                # 计算日收益率
+                nav_df['daily_return'] = nav_df['nav'].pct_change() * 100
+                nav_df = nav_df.dropna()
+                
+                if len(nav_df) >= 10:
+                    fund_data_dict[code] = nav_df
+                    logger.info(f"从akshare获取基金 {code} 数据成功: {len(nav_df)} 条记录")
         
-        # 创建DataFrame
-        df = pd.DataFrame({
-            'date': dates,
-            'nav': nav_series
-        })
-        
-        # 计算日收益率
-        df['daily_return'] = df['nav'].pct_change() * 100
-        df = df.dropna()  # 删除第一天的NaN值
-        
-        fund_data_dict[code] = df
-        
-        logger.info(f"生成模拟基金 {code} ({fund_names.get(code, code)}) 数据: {len(df)} 条记录")
+        except Exception as e:
+            logger.warning(f"从akshare获取基金 {code} 数据失败: {str(e)}")
+            continue
     
     return fund_data_dict
+
+
+def get_recent_activities(user_id: str = 'default_user') -> list:
+    """
+    获取用户的最近活动记录
+    从数据库查询真实的操作记录
+    """
+    try:
+        activities = []
+        
+        # 查询最近的数据导入记录（从持仓更新历史）
+        sql_import = """
+        SELECT fund_code, fund_name, updated_at 
+        FROM user_holdings 
+        WHERE user_id = :user_id 
+        ORDER BY updated_at DESC LIMIT 2
+        """
+        import_df = db_manager.execute_query(sql_import, {'user_id': user_id})
+        
+        if not import_df.empty:
+            for _, row in import_df.iterrows():
+                updated_at = row['updated_at']
+                time_str = format_time_ago(updated_at) if updated_at else '最近'
+                activities.append({
+                    'icon': 'bi-plus-circle',
+                    'description': f"更新持仓: {row['fund_name'][:10]}..." if len(str(row['fund_name'])) > 10 else f"更新持仓: {row['fund_name']}",
+                    'time': time_str
+                })
+        
+        # 查询最近的基金分析记录
+        sql_analysis = """
+        SELECT MAX(analysis_date) as last_analysis 
+        FROM fund_analysis_results
+        """
+        analysis_df = db_manager.execute_query(sql_analysis)
+        if not analysis_df.empty and analysis_df.iloc[0]['last_analysis']:
+            last_analysis = analysis_df.iloc[0]['last_analysis']
+            time_str = format_time_ago(last_analysis) if last_analysis else '最近'
+            activities.append({
+                'icon': 'bi-graph-up',
+                'description': '更新基金净值数据',
+                'time': time_str
+            })
+        
+        # 查询最近的策略回测记录
+        sql_backtest = """
+        SELECT MAX(created_at) as last_backtest 
+        FROM strategy_backtest_results
+        WHERE status = 'completed'
+        """
+        backtest_df = db_manager.execute_query(sql_backtest)
+        if not backtest_df.empty and backtest_df.iloc[0]['last_backtest']:
+            last_backtest = backtest_df.iloc[0]['last_backtest']
+            time_str = format_time_ago(last_backtest) if last_backtest else '最近'
+            activities.append({
+                'icon': 'bi-check-circle',
+                'description': '完成策略回测分析',
+                'time': time_str
+            })
+        
+        # 如果没有记录，返回空列表
+        if not activities:
+            return []
+            
+        return activities
+        
+    except Exception as e:
+        logger.warning(f"获取最近活动失败: {str(e)}")
+        return []
+
+
+def format_time_ago(timestamp) -> str:
+    """格式化时间为相对时间（如：10分钟前）"""
+    try:
+        if timestamp is None:
+            return '最近'
+        
+        if isinstance(timestamp, str):
+            timestamp = pd.to_datetime(timestamp)
+        
+        now = datetime.now()
+        if hasattr(timestamp, 'to_pydatetime'):
+            timestamp = timestamp.to_pydatetime()
+        
+        diff = now - timestamp
+        
+        if diff.days > 0:
+            return f"{diff.days}天前"
+        elif diff.seconds >= 3600:
+            return f"{diff.seconds // 3600}小时前"
+        elif diff.seconds >= 60:
+            return f"{diff.seconds // 60}分钟前"
+        else:
+            return "刚刚"
+    except:
+        return '最近'
+
+
+def get_real_holding_distribution(user_id: str = 'default_user') -> list:
+    """
+    获取真实的持仓分布数据
+    根据用户的实际持仓按基金类型统计
+    """
+    try:
+        # 第一步：获取用户持仓
+        sql_holdings = """
+        SELECT h.fund_code, h.holding_shares, h.cost_price
+        FROM user_holdings h
+        WHERE h.user_id = :user_id
+        """
+        
+        df_holdings = db_manager.execute_query(sql_holdings, {'user_id': user_id})
+        
+        if df_holdings.empty:
+            logger.info(f"用户 {user_id} 没有持仓数据")
+            return []
+        
+        logger.info(f"获取到 {len(df_holdings)} 条持仓记录")
+        
+        # 第二步：为每个基金获取类型（优先从 fund_info，其次从 fund_analysis_results）
+        fund_codes = df_holdings['fund_code'].tolist()
+        fund_type_map = {}
+        
+        for fund_code in fund_codes:
+            fund_type = None
+            
+            # 尝试从 fund_info 获取
+            try:
+                sql_type = "SELECT fund_type FROM fund_info WHERE fund_code = :fund_code LIMIT 1"
+                df_type = db_manager.execute_query(sql_type, {'fund_code': fund_code})
+                if not df_type.empty and pd.notna(df_type.iloc[0]['fund_type']):
+                    fund_type = df_type.iloc[0]['fund_type']
+            except Exception as e:
+                logger.debug(f"从 fund_info 获取 {fund_code} 类型失败: {e}")
+            
+            # 如果 fund_info 没有，尝试从 fund_analysis_results 获取基金名称推断
+            if not fund_type:
+                try:
+                    sql_name = """
+                    SELECT fund_name FROM fund_analysis_results 
+                    WHERE fund_code = :fund_code 
+                    ORDER BY analysis_date DESC LIMIT 1
+                    """
+                    df_name = db_manager.execute_query(sql_name, {'fund_code': fund_code})
+                    if not df_name.empty and pd.notna(df_name.iloc[0]['fund_name']):
+                        fund_name = df_name.iloc[0]['fund_name']
+                        # 从基金名称推断类型
+                        fund_type = infer_fund_type_from_name(fund_name)
+                except Exception as e:
+                    logger.debug(f"从 fund_analysis_results 获取 {fund_code} 名称失败: {e}")
+            
+            fund_type_map[fund_code] = fund_type if fund_type else '其他'
+        
+        # 第三步：按基金类型统计持仓金额
+        type_amounts = {}
+        total_amount = 0
+        
+        for _, row in df_holdings.iterrows():
+            fund_code = row['fund_code']
+            fund_type = fund_type_map.get(fund_code, '其他')
+            
+            # 标准化基金类型名称
+            fund_type = normalize_fund_type(fund_type)
+            
+            holding_amount = float(row['holding_shares']) * float(row['cost_price'])
+            
+            if fund_type in type_amounts:
+                type_amounts[fund_type] += holding_amount
+            else:
+                type_amounts[fund_type] = holding_amount
+            
+            total_amount += holding_amount
+            
+            logger.debug(f"基金 {fund_code}: 类型={fund_type}, 金额={holding_amount}")
+        
+        if total_amount == 0:
+            logger.warning("总持仓金额为0")
+            return []
+        
+        logger.info(f"持仓分布统计完成: {type_amounts}")
+        
+        # 颜色映射（Bootstrap 颜色类）
+        color_map = {
+            '股票型': 'success',
+            '债券型': 'info',
+            '混合型': 'warning',
+            '货币型': 'danger',
+            '指数型': 'primary',
+            'QDII': 'secondary',
+            'FOF': 'dark',
+            '其他': 'light'
+        }
+        
+        # 颜色十六进制值（用于前端显示）
+        color_hex_map = {
+            '股票型': '#28a745',
+            '债券型': '#17a2b8',
+            '混合型': '#ffc107',
+            '货币型': '#dc3545',
+            '指数型': '#007bff',
+            'QDII': '#6c757d',
+            'FOF': '#343a40',
+            '其他': '#f8f9fa'
+        }
+        
+        # 统计每个类型的基金数量
+        type_count = {}
+        for _, row in df_holdings.iterrows():
+            fund_code = row['fund_code']
+            fund_type = fund_type_map.get(fund_code, '其他')
+            fund_type = normalize_fund_type(fund_type)
+            
+            if fund_type in type_count:
+                type_count[fund_type] += 1
+            else:
+                type_count[fund_type] = 1
+        
+        # 构建分布数据
+        distribution = []
+        for fund_type, amount in sorted(type_amounts.items(), key=lambda x: x[1], reverse=True):
+            percentage = round((amount / total_amount) * 100, 1)
+            count = type_count.get(fund_type, 0)
+            distribution.append({
+                'name': f'{fund_type}基金',
+                'percentage': percentage,
+                'count': count,
+                'color': color_map.get(fund_type, 'primary'),
+                'colorHex': color_hex_map.get(fund_type, '#007bff'),
+                'amount': round(amount, 2)
+            })
+        
+        logger.info(f"持仓分布: {distribution}")
+        return distribution
+        
+    except Exception as e:
+        logger.error(f"获取持仓分布失败: {str(e)}", exc_info=True)
+        return []
+
+
+def infer_fund_type_from_name(fund_name: str) -> str:
+    """
+    从基金名称推断基金类型
+    """
+    if not fund_name:
+        return '其他'
+    
+    fund_name = str(fund_name).upper()
+    
+    # 股票型关键词
+    if any(kw in fund_name for kw in ['股票', '股票型', 'EQUITY', 'GROWTH', 'VALUE']):
+        return '股票型'
+    
+    # 债券型关键词
+    if any(kw in fund_name for kw in ['债券', '债券型', 'BOND', '固收', '纯债', '信用债']):
+        return '债券型'
+    
+    # 货币型关键词
+    if any(kw in fund_name for kw in ['货币', '货币型', 'CASH', '活期', '理财']):
+        return '货币型'
+    
+    # 指数型关键词
+    if any(kw in fund_name for kw in ['指数', '指数型', 'ETF', 'INDEX', '沪深300', '中证500', '上证50']):
+        return '指数型'
+    
+    # QDII关键词
+    if any(kw in fund_name for kw in ['QDII', '全球', '海外', '美国', '香港', '亚太', '环球']):
+        return 'QDII'
+    
+    # 混合型（默认，如果包含混合字样）
+    if any(kw in fund_name for kw in ['混合', '混合型', 'MIX', '灵活配置', '偏股', '偏债']):
+        return '混合型'
+    
+    # FOF
+    if 'FOF' in fund_name:
+        return 'FOF'
+    
+    # 默认其他
+    return '其他'
+
+
+def normalize_fund_type(fund_type: str) -> str:
+    """标准化基金类型名称"""
+    if not fund_type:
+        return '其他'
+    
+    fund_type = str(fund_type).lower()
+    
+    if '股票' in fund_type or 'equity' in fund_type:
+        return '股票型'
+    elif '债券' in fund_type or 'bond' in fund_type or '固收' in fund_type:
+        return '债券型'
+    elif '混合' in fund_type or 'mix' in fund_type or '灵活配置' in fund_type:
+        return '混合型'
+    elif '货币' in fund_type or 'cash' in fund_type or '理财' in fund_type:
+        return '货币型'
+    elif '指数' in fund_type or 'etf' in fund_type or '指数' in fund_type:
+        return '指数型'
+    elif 'qdii' in fund_type or '境外' in fund_type:
+        return 'QDII'
+    else:
+        return '其他'
+
 
 @app.route('/api/holdings/analyze/correlation', methods=['POST'])
 def analyze_fund_correlation():
@@ -3713,385 +4348,16 @@ def get_fund_name_from_db(fund_code):
 
 # ==================== 截图识别导入 API ====================
 
-@app.route('/api/holdings/import/screenshot', methods=['POST'])
-def import_holding_screenshot():
-    """
-    通过截图识别导入持仓
-    接收Base64格式的图片，识别其中的基金信息
-    支持选择OCR引擎：baidu、easyocr、paddleocr
-    """
-    try:
-        data = request.get_json()
-        if not data or 'image' not in data:
-            return jsonify({'success': False, 'error': '未提供图片数据'}), 400
-
-        image_data = data['image']
-        use_gpu = data.get('use_gpu', False)
-        ocr_engine = data.get('ocr_engine', 'baidu')  # 默认使用百度OCR
-
-        logger.info(f"开始识别基金截图，使用引擎: {ocr_engine}")
-
-        # 验证OCR引擎参数
-        if ocr_engine not in ['baidu', 'easyocr', 'paddleocr']:
-            ocr_engine = 'baidu'
-
-        recognized_funds = recognize_fund_screenshot(
-            image_data,
-            use_gpu=use_gpu,
-            ocr_engine=ocr_engine
-        )
-        
-        if not recognized_funds:
-            return jsonify({
-                'success': False, 
-                'error': '未能识别到基金信息，请确保图片清晰可读',
-                'suggestion': '建议上传更清晰的基金持仓截图，确保基金代码和名称清晰可见'
-            }), 400
-        
-        validated_funds = []
-        seen_codes = set()  # 用于去重
-        
-        # 计算汇总信息
-        total_holding_amount = 0
-        total_profit_amount = 0
-        
-        for fund in recognized_funds:
-            fund_code = fund.get('fund_code')
-            
-            # 跳过重复的基金代码
-            if fund_code in seen_codes:
-                logger.debug(f"跳过重复基金: {fund_code}")
-                continue
-            
-            is_valid, error_msg = validate_recognized_fund(fund)
-            if is_valid:
-                # 添加持仓信息到返回数据中
-                fund_data = {
-                    'fund_code': fund_code,
-                    'fund_name': fund.get('fund_name', ''),
-                    'confidence': fund.get('confidence', 0),
-                    'source': fund.get('source', ''),
-                    'original_text': fund.get('original_text', ''),
-                    # 持仓相关信息
-                    'holding_amount': fund.get('holding_amount'),
-                    'profit_amount': fund.get('profit_amount'),
-                    'profit_rate': fund.get('profit_rate'),
-                    'nav_value': fund.get('nav_value'),
-                    # 计算当前市值
-                    'current_value': None
-                }
-                
-                # 计算当前市值
-                if fund_data['holding_amount'] is not None and fund_data['profit_amount'] is not None:
-                    fund_data['current_value'] = fund_data['holding_amount'] + fund_data['profit_amount']
-                    total_holding_amount += fund_data['holding_amount']
-                    total_profit_amount += fund_data['profit_amount']
-                
-                validated_funds.append(fund_data)
-                seen_codes.add(fund_code)
-                logger.debug(f"验证通过: {fund_code} - {fund.get('fund_name', 'N/A')}")
-            else:
-                logger.warning(f"识别结果验证失败: {error_msg}, 基金信息: {fund}")
-        
-        if not validated_funds:
-            return jsonify({
-                'success': False,
-                'error': '未能识别到有效的基金代码',
-                'recognized': recognized_funds,
-                'debug_info': f'原始识别数量: {len(recognized_funds)}, 验证通过数量: 0'
-            }), 400
-        
-        # 计算投资组合汇总
-        total_current_value = total_holding_amount + total_profit_amount
-        total_profit_rate = (total_profit_amount / total_holding_amount * 100) if total_holding_amount > 0 else 0
-        
-        # 找出表现最好和最差的基金
-        best_fund = None
-        worst_fund = None
-        if validated_funds:
-            funds_with_rate = [f for f in validated_funds if f.get('profit_rate') is not None]
-            if funds_with_rate:
-                best_fund = max(funds_with_rate, key=lambda x: x.get('profit_rate', -999))
-                worst_fund = min(funds_with_rate, key=lambda x: x.get('profit_rate', 999))
-        
-        portfolio_summary = {
-            'total_funds': len(validated_funds),
-            'total_holding_amount': round(total_holding_amount, 2) if total_holding_amount > 0 else 0,
-            'total_profit_amount': round(total_profit_amount, 2),
-            'total_current_value': round(total_current_value, 2) if total_current_value > 0 else 0,
-            'total_profit_rate': round(total_profit_rate, 2),
-            'best_fund': {
-                'fund_name': best_fund.get('fund_name', '')[:25] + '...' if best_fund and len(best_fund.get('fund_name', '')) > 25 else best_fund.get('fund_name', '') if best_fund else '',
-                'profit_rate': round(best_fund.get('profit_rate', 0), 2) if best_fund else 0
-            } if best_fund else None,
-            'worst_fund': {
-                'fund_name': worst_fund.get('fund_name', '')[:25] + '...' if worst_fund and len(worst_fund.get('fund_name', '')) > 25 else worst_fund.get('fund_name', '') if worst_fund else '',
-                'profit_rate': round(worst_fund.get('profit_rate', 0), 2) if worst_fund else 0
-            } if worst_fund else None
-        }
-        
-        logger.info(f"成功识别 {len(validated_funds)} 个基金 (原始识别: {len(recognized_funds)} 个)")
-        
-        return jsonify({
-            'success': True,
-            'data': validated_funds,
-            'portfolio_summary': portfolio_summary,
-            'message': f'成功识别 {len(validated_funds)} 个基金，请确认信息后导入',
-            'debug_info': f'原始识别数量: {len(recognized_funds)}, 最终数量: {len(validated_funds)}'
-        })
-        
-    except Exception as e:
-        logger.error(f"截图识别失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'识别失败: {str(e)}'}), 500
 
 
-@app.route('/api/holdings/import/confirm', methods=['POST'])
-def confirm_import_holdings():
-    """
-    确认导入识别到的基金到持仓列表
-    同时更新相关的持仓盈亏信息
-    """
-    try:
-        data = request.get_json()
-        if not data or 'funds' not in data:
-            return jsonify({'success': False, 'error': '未提供基金数据'}), 400
-        
-        user_id = data.get('user_id', 'default_user')
-        funds = data['funds']
-        
-        if not funds:
-            return jsonify({'success': False, 'error': '基金列表为空'}), 400
-        
-        imported = []
-        failed = []
-        
-        for fund_info in funds:
-            fund_code = fund_info.get('fund_code', '').strip()
-            fund_name = fund_info.get('fund_name', '').strip()
-            holding_shares = float(fund_info.get('holding_shares', 0) or 0)
-            cost_price = float(fund_info.get('cost_price', 0) or 0)
-            buy_date = fund_info.get('buy_date', '')
-            confidence = fund_info.get('confidence', 0)
-            notes = f"通过截图识别导入 - 置信度: {confidence:.2%}"
-            
-            if not fund_code:
-                failed.append({'fund': fund_info, 'error': '基金代码为空'})
-                continue
-            
-            holding_amount = holding_shares * cost_price
-            
-            # 1. 保存到 user_holdings 表
-            # 先删除已存在的记录，然后插入新记录（替换模式）
-            sql_delete_existing = """
-            DELETE FROM user_holdings 
-            WHERE user_id = :user_id AND fund_code = :fund_code
-            """
-            db_manager.execute_sql(sql_delete_existing, {
-                'user_id': user_id,
-                'fund_code': fund_code
-            })
-            
-            sql_holdings = """
-            INSERT INTO user_holdings 
-            (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
-            VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
-            """
-            
-            try:
-                # 保存到 user_holdings
-                success = db_manager.execute_sql(sql_holdings, {
-                    'user_id': user_id,
-                    'fund_code': fund_code,
-                    'fund_name': fund_name,
-                    'holding_shares': holding_shares,
-                    'cost_price': cost_price,
-                    'holding_amount': holding_amount,
-                    'buy_date': buy_date,
-                    'notes': notes,
-                    'add_shares': holding_shares,
-                    'add_amount': holding_amount
-                })
-                
-                if success:
-                    # 2. 检查是否存在分析结果数据，如果不存在则生成
-                    sql_check = """
-                    SELECT COUNT(*) as count 
-                    FROM fund_analysis_results 
-                    WHERE fund_code = :fund_code 
-                    """
-                    check_df = db_manager.execute_query(sql_check, {'fund_code': fund_code})
-                    
-                    # 生成并保存分析结果数据
-                    try:
-                        logger.info(f"为基金 {fund_code} 生成分析结果...")
-                        # 获取基金绩效指标
-                        metrics = EnhancedFundData.get_performance_metrics(fund_code)
-                        
-                        # 获取实时数据 - 传入fund_name以便正确识别QDII基金
-                        realtime_data = EnhancedFundData.get_realtime_data(fund_code, fund_name)
-                        logger.info(f"获取基金 {fund_code} 实时数据成功: {realtime_data}")
-                        
-                        # 构造分析结果数据
-                        analysis_data = {
-                            'fund_code': fund_code,
-                            'fund_name': fund_name,
-                            'analysis_date': datetime.now().strftime('%Y-%m-%d'),
-                            'current_estimate': realtime_data.get('current_nav', cost_price),
-                            'yesterday_nav': realtime_data.get('previous_nav', cost_price),
-                            'today_return': realtime_data.get('today_return', 0.0),
-                            'prev_day_return': realtime_data.get('yesterday_return', 0.0),
-                            'annualized_return': metrics.get('annualized_return', 0.0),
-                            'sharpe_ratio': metrics.get('sharpe_ratio', 0.0),
-                            'sharpe_ratio_ytd': metrics.get('sharpe_ratio_ytd', 0.0),
-                            'sharpe_ratio_1y': metrics.get('sharpe_ratio_1y', 0.0),
-                            'sharpe_ratio_all': metrics.get('sharpe_ratio_all', 0.0),
-                            'max_drawdown': metrics.get('max_drawdown', 0.0),
-                            'volatility': metrics.get('volatility', 0.0),
-                            'calmar_ratio': metrics.get('calmar_ratio', 0.0),
-                            'sortino_ratio': metrics.get('sortino_ratio', 0.0),
-                            'var_95': metrics.get('var_95', 0.0),
-                            'win_rate': metrics.get('win_rate', 0.0),
-                            'profit_loss_ratio': metrics.get('profit_loss_ratio', 0.0),
-                            'total_return': metrics.get('total_return', 0.0),
-                            'composite_score': metrics.get('composite_score', 0.0)
-                        }
-                        
-                        # 保存到 fund_analysis_results 表（使用 INSERT ... ON DUPLICATE KEY UPDATE 语句）
-                        sql_insert_analysis = """
-                        INSERT INTO fund_analysis_results (
-                            fund_code, fund_name, analysis_date, current_estimate, yesterday_nav,
-                            today_return, prev_day_return, annualized_return, sharpe_ratio,
-                            sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all, max_drawdown,
-                            volatility, calmar_ratio, sortino_ratio, var_95, win_rate,
-                            profit_loss_ratio, total_return, composite_score
-                        ) VALUES (
-                            :fund_code, :fund_name, :analysis_date, :current_estimate, :yesterday_nav,
-                            :today_return, :prev_day_return, :annualized_return, :sharpe_ratio,
-                            :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all, :max_drawdown,
-                            :volatility, :calmar_ratio, :sortino_ratio, :var_95, :win_rate,
-                            :profit_loss_ratio, :total_return, :composite_score
-                        ) ON DUPLICATE KEY UPDATE
-                            fund_name = VALUES(fund_name),
-                            analysis_date = VALUES(analysis_date),
-                            current_estimate = VALUES(current_estimate),
-                            yesterday_nav = VALUES(yesterday_nav),
-                            today_return = VALUES(today_return),
-                            prev_day_return = VALUES(prev_day_return),
-                            annualized_return = VALUES(annualized_return),
-                            sharpe_ratio = VALUES(sharpe_ratio),
-                            sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
-                            sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
-                            sharpe_ratio_all = VALUES(sharpe_ratio_all),
-                            max_drawdown = VALUES(max_drawdown),
-                            volatility = VALUES(volatility),
-                            calmar_ratio = VALUES(calmar_ratio),
-                            sortino_ratio = VALUES(sortino_ratio),
-                            var_95 = VALUES(var_95),
-                            win_rate = VALUES(win_rate),
-                            profit_loss_ratio = VALUES(profit_loss_ratio),
-                            total_return = VALUES(total_return),
-                            composite_score = VALUES(composite_score)
-                        """
-                        
-                        db_manager.execute_sql(sql_insert_analysis, analysis_data)
-                        logger.info(f"为基金 {fund_code} 生成分析结果成功")
-                    except Exception as e:
-                        logger.error(f"为基金 {fund_code} 生成分析结果失败: {str(e)}")
-                    
-                    # 3. 获取最新的基金净值信息（从 fund_analysis_results）
-                    sql_nav = """
-                    SELECT current_estimate, yesterday_nav 
-                    FROM fund_analysis_results 
-                    WHERE fund_code = :fund_code 
-                    ORDER BY analysis_date DESC 
-                    LIMIT 1
-                    """
-                    nav_df = db_manager.execute_query(sql_nav, {'fund_code': fund_code})
-                    
-                    # 3. 计算持仓盈亏信息
-                    if not nav_df.empty:
-                        current_nav = float(nav_df.iloc[0]['current_estimate']) if pd.notna(nav_df.iloc[0]['current_estimate']) else cost_price
-                        previous_nav = float(nav_df.iloc[0]['yesterday_nav']) if pd.notna(nav_df.iloc[0]['yesterday_nav']) else cost_price
-                        
-                        # 当前市值和昨日市值
-                        current_value = holding_shares * current_nav
-                        previous_value = holding_shares * previous_nav
-                        
-                        # 持有盈亏
-                        holding_profit = current_value - holding_amount
-                        holding_profit_rate = (holding_profit / holding_amount * 100) if holding_amount > 0 else 0
-                        
-                        # 当日盈亏
-                        today_profit = current_value - previous_value
-                        today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
-                        
-                        logger.info(f"导入基金 {fund_code}: 持仓金额={holding_amount:.2f}, 当前市值={current_value:.2f}, 持有盈亏={holding_profit:.2f} ({holding_profit_rate:.2f}%)")
-                    
-                    imported.append({
-                        'fund_code': fund_code,
-                        'fund_name': fund_name,
-                        'holding_shares': holding_shares,
-                        'cost_price': cost_price,
-                        'holding_amount': holding_amount
-                    })
-                else:
-                    failed.append({'fund_code': fund_code, 'error': '数据库插入失败'})
-                    
-            except Exception as db_error:
-                logger.error(f"导入基金 {fund_code} 失败: {db_error}")
-                failed.append({'fund_code': fund_code, 'error': str(db_error)})
-        
-        return jsonify({
-            'success': True,
-            'imported': imported,
-            'failed': failed,
-            'message': f'成功导入 {len(imported)} 个基金，{len(failed)} 个失败'
-        })
-        
-    except Exception as e:
-        logger.error(f"确认导入失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/holdings/import/ocr-status', methods=['GET'])
-def get_ocr_status():
-    """检查OCR功能状态，返回可用引擎列表"""
-    try:
-        from data_retrieval.ocr_config import get_available_engines
-
-        engines = get_available_engines()
-
-        return jsonify({
-            'success': True,
-            'data': {
-                'engines': engines,
-                'default_engine': 'baidu',
-                'supported_formats': ['png', 'jpg', 'jpeg'],
-                'max_file_size': '10MB'
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/holdings/import/ocr-engines', methods=['GET'])
-def get_ocr_engines():
-    """获取可用的OCR引擎列表"""
-    try:
-        from data_retrieval.ocr_config import get_available_engines, get_ocr_engine
 
-        engines = get_available_engines()
-        current_engine = get_ocr_engine()
 
-        return jsonify({
-            'success': True,
-            'data': {
-                'engines': engines,
-                'current_engine': current_engine
-            }
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 
 
 # ==================== ETF市场 API ====================

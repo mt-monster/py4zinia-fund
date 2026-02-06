@@ -93,54 +93,15 @@ class RealDataFetcher:
                     logger.warning(f"ETF {etf_code} 数据获取失败: {str(e)}")
                     continue
             
-            # 如果都失败了，生成合理的模拟数据（但仍基于真实市场特征）
-            logger.warning("无法获取真实沪深300数据，生成基于市场特征的模拟数据")
-            return RealDataFetcher._generate_realistic_csi300_data(days)
+            # 如果都失败了，返回空DataFrame，不再生成模拟数据
+            logger.error("无法获取沪深300数据，返回空结果")
+            return pd.DataFrame()
             
         except Exception as e:
             logger.error(f"备用方案也失败: {str(e)}")
             return pd.DataFrame()
     
-    @staticmethod
-    def _generate_realistic_csi300_data(days: int) -> pd.DataFrame:
-        """
-        生成基于真实市场特征的沪深300数据
-        注意：这只是在无法获取真实数据时的最后备选方案
-        """
-        dates = []
-        prices = []
-        
-        # 基准价格（使用合理的沪深300当前水平）
-        base_price = 3500  # 沪深300典型水平
-        current_price = base_price
-        
-        for i in range(days):
-            date = datetime.now() - timedelta(days=days-i)
-            dates.append(date)
-            
-            # 基于真实市场波动特征生成价格
-            # 沪深300日波动率通常在1-2%之间
-            daily_return = np.random.normal(0, 0.012)  # 平均0，标准差1.2%
-            
-            # 添加一些趋势性（避免完全随机）
-            if i > 0:
-                # 如果前几天上涨，今天有一定概率继续上涨
-                recent_returns = [(prices[j]/prices[j-1]-1) for j in range(max(1, len(prices)-5), len(prices))]
-                if len(recent_returns) > 0:
-                    avg_recent = np.mean(recent_returns)
-                    if avg_recent > 0:
-                        daily_return += 0.003  # 正趋势加成
-                    elif avg_recent < 0:
-                        daily_return -= 0.003  # 负趋势加成
-            
-            current_price = current_price * (1 + daily_return)
-            prices.append(round(current_price, 2))
-        
-        return pd.DataFrame({
-            'date': dates,
-            'price': prices
-        })
-    
+
     @staticmethod
     def get_fund_nav_history(fund_code: str, days: int = 365) -> pd.DataFrame:
         """

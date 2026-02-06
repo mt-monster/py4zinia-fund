@@ -272,6 +272,20 @@ const FundTable = {
         const count = FundState.selectedFunds.size;
         btn.disabled = count < 2;
         btn.innerHTML = `<i class="bi bi-chart-line"></i> 相关性分析 (${count})`;
+        
+        // 同时更新投资建议按钮
+        const adviceBtn = document.getElementById('investment-advice-btn');
+        if (adviceBtn) {
+            adviceBtn.disabled = count === 0;
+            adviceBtn.innerHTML = `<i class="bi bi-lightbulb"></i> 投资建议 (${count})`;
+        }
+    },
+
+    /**
+     * 获取选中的基金代码列表
+     */
+    getSelectedFundCodes() {
+        return Array.from(FundState.selectedFunds);
     },
 
     /**
