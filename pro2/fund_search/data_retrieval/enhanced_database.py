@@ -1596,24 +1596,35 @@ class EnhancedDatabaseManager:
             logger.error(f"从数据库获取基金重仓股数据失败: {str(e)}")
             return None
     
-    def get_all_heavyweight_stocks_for_funds(self, fund_codes: List[str],
+    def get_all_heavyweight_stocks_for_funds(self, fund_codes: List[str], 
                                               max_age_days: int = 7) -> Dict[str, List[Dict]]:
         """
         批量获取多个基金的重仓股数据（优化版，单次SQL查询）
-        
+            
         参数：
             fund_codes: 基金代码列表
             max_age_days: 数据最大年龄（天）
-            
+                
         返回：
             Dict[str, List[Dict]]: 以基金代码为key的重仓股数据字典
         """
+        # 添加调试信息
+        logger.debug(f"get_all_heavyweight_stocks_for_funds called with fund_codes={fund_codes}, max_age_days={max_age_days}")
+            
+        # 验证参数
+        if max_age_days is None:
+            logger.warning("max_age_days is None, using default value 7")
+            max_age_days = 7
+        elif not isinstance(max_age_days, int) or max_age_days <= 0:
+            logger.warning(f"Invalid max_age_days: {max_age_days}, using default value 7")
+            max_age_days = 7
+                
         result = {}
         missing_funds = list(fund_codes)  # 默认所有基金都需要重新获取
-        
+            
         if not fund_codes:
             return result, missing_funds
-        
+            
         try:
             # 计算过期时间
             cutoff_date = datetime.now() - timedelta(days=max_age_days)

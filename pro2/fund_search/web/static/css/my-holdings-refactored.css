@@ -350,6 +350,7 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-size: var(--text-sm);
+    table-layout: auto; /* 允许表格自动调整列宽 */
 }
 
 .fund-table thead {
@@ -367,6 +368,55 @@ body {
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
     user-select: none;
+}
+
+/* 基金名称列特殊处理 - 自适应宽度 */
+.fund-table th[data-column="fund_name"] {
+    width: auto;
+    min-width: 120px; /* 最小宽度保证基本显示 */
+    max-width: 300px; /* 最大宽度防止过度扩张 */
+}
+
+.fund-table td[data-column="fund_name"] {
+    width: auto;
+    min-width: 120px;
+    max-width: 300px;
+}
+
+/* 基金名称单元格特殊样式 */
+.fund-name-cell {
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4; /* 增加行高改善可读性 */
+    padding: var(--space-3) var(--space-4);
+}
+
+/* 基金名称悬停提示 */
+.fund-table td[data-column="fund_name"]:hover {
+    background-color: var(--bg-secondary);
+    cursor: help;
+}
+
+/* 响应式处理 */
+@media (max-width: 768px) {
+    .fund-table th[data-column="fund_name"],
+    .fund-table td[data-column="fund_name"] {
+        min-width: 100px;
+        max-width: 200px;
+    }
+}
+
+/* 长基金名称的滚动处理 */
+.fund-table td[data-column="fund_name"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 在小屏幕上的特殊处理 */
+@media (max-width: 480px) {
+    .fund-table td[data-column="fund_name"] {
+        font-size: var(--text-xs); /* 更小的字体适配小屏幕 */
+    }
 }
 
 .fund-table th.sortable {
@@ -915,7 +965,91 @@ body {
 }
 
 /* ============================================
-   17. 复选框列
+   17. 基金类型视觉标识
+   ============================================ */
+
+/* 基金类型标签基础样式 */
+.fund-type-tag {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 4px;
+    vertical-align: middle;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+/* 指数型基金 - 蓝色 */
+.fund-type-index {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+}
+
+/* 股票型基金 - 绿色 */
+.fund-type-stock {
+    background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+}
+
+/* 混合型基金 - 黄色/橙色 */
+.fund-type-hybrid {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
+/* QDII基金 - 紫色 */
+.fund-type-qdii {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(155, 89, 182, 0.3);
+}
+
+/* 其他基金 - 灰色 */
+.fund-type-other {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+}
+
+/* 基金名称文本样式 */
+.fund-name-text {
+    display: inline;
+}
+
+/* 详情面板头部样式 - 根据基金类型 */
+.detail-panel-header.fund-type-index {
+    background: linear-gradient(135deg, rgba(0, 123, 255, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #007bff;
+}
+
+.detail-panel-header.fund-type-stock {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #28a745;
+}
+
+.detail-panel-header.fund-type-hybrid {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #ffc107;
+}
+
+.detail-panel-header.fund-type-qdii {
+    background: linear-gradient(135deg, rgba(155, 89, 182, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #9b59b6;
+}
+
+.detail-panel-header.fund-type-other {
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #6c757d;
+}
+
+/* ============================================
+   18. 复选框列
    ============================================ */
 .checkbox-cell {
     width: 40px;
@@ -929,7 +1063,7 @@ body {
 }
 
 /* ============================================
-   18. 基金代码链接
+   19. 基金代码链接
    ============================================ */
 .fund-code-link {
     color: var(--info);
@@ -952,7 +1086,7 @@ body {
 }
 
 /* ============================================
-   19. 操作按钮
+   20. 操作按钮
    ============================================ */
 .action-cell {
     white-space: nowrap;
@@ -978,7 +1112,7 @@ body {
 }
 
 /* ============================================
-   20. 详情侧边面板（重新设计版）
+   21. 详情侧边面板（重新设计版）
    ============================================ */
 .detail-panel {
     position: fixed;
@@ -1490,7 +1624,7 @@ body {
 }
 
 /* ============================================
-   21. 编辑表单样式
+   22. 编辑表单样式
    ============================================ */
 .form-control.readonly {
     background: var(--bg-secondary);
@@ -1521,7 +1655,7 @@ textarea:focus-visible {
 
 
 /* ============================================
-   22. 投资建议模态框样式
+   23. 投资建议模态框样式
    ============================================ */
 
 /* 大型模态框 */
