@@ -2829,6 +2829,41 @@ def get_holdings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/holdings/import/screenshot', methods=['POST'])
+def import_holding_screenshot():
+    """通过截图导入基金持仓"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+        use_gpu = data.get('use_gpu', False)
+        ocr_engine = data.get('ocr_engine', 'baidu')
+        user_id = data.get('user_id', 'default_user')
+        
+        if not image_data:
+            return jsonify({'success': False, 'error': '未提供图片数据'}), 400
+            
+        # 调用OCR识别函数
+        from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot
+        
+        recognized_funds = recognize_fund_screenshot(
+            image_data=image_data,
+            use_gpu=use_gpu,
+            import_to_portfolio=False,  # 先识别，不直接导入
+            user_id=user_id,
+            ocr_engine=ocr_engine
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': recognized_funds,
+            'message': f'成功识别到 {len(recognized_funds)} 只基金'
+        })
+        
+    except Exception as e:
+        logger.error(f"截图导入失败: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/holdings/import/confirm', methods=['POST'])
 def import_holding_confirm():
     """手工导入基金持仓确认"""
@@ -2861,6 +2896,7 @@ def import_holding_confirm():
                 VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
                 """
                 
+                logger.info(f"准备插入基金数据: {fund_code} - {fund_name}")
                 success = db_manager.execute_sql(sql, {
                     'user_id': user_id,
                     'fund_code': fund_code,
@@ -2871,6 +2907,7 @@ def import_holding_confirm():
                     'buy_date': buy_date,
                     'notes': notes
                 })
+                logger.info(f"数据库操作结果: {success}")
                 
                 if success:
                     imported_count += 1
@@ -2878,7 +2915,9 @@ def import_holding_confirm():
                     errors.append(f"基金 {fund_code} 导入失败")
                     
             except Exception as e:
-                errors.append(f"基金 {fund_data.get('fund_code', 'unknown')} 处理异常: {str(e)}")
+                error_msg = f"基金 {fund_data.get('fund_code', 'unknown')} 处理异常: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
         
         if imported_count > 0:
             message = f"成功导入 {imported_count} 只基金"

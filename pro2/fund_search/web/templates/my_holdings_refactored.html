@@ -559,5 +559,20 @@
             }
         });
     </script>
+    
+    <!-- 应用初始化 -->
+    <script>
+        // 页面加载完成后初始化应用
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                await FundApp.init();
+                // 添加调试信息
+                console.log('FundScreenshot object:', window.FundScreenshot);
+                console.log('FundScreenshot.recognizedFunds:', window.FundScreenshot ? window.FundScreenshot.recognizedFunds : 'FundScreenshot not available');
+            } catch (error) {
+                console.error('应用初始化失败:', error);
+            }
+        });
+    </script>
 </body>
 </html>
