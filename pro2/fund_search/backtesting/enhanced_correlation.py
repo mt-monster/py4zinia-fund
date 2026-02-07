@@ -32,7 +32,7 @@ def setup_chinese_font():
     # 尝试查找可用的中文字体
     chinese_fonts = []
     if system == 'Windows':
-        chinese_fonts = ['Microsoft YaHei', 'SimHei', 'SimSun', 'NSimSun', 'FangSong', 'KaiTi']
+        chinese_fonts = ['Microsoft YaHei', 'SimHei', 'SimSun', 'NSimSun', 'FangSong', 'KaiTi', '微软雅黑', '黑体', '宋体']
     elif system == 'Darwin':  # macOS
         chinese_fonts = ['Arial Unicode MS', 'Heiti TC', 'Heiti SC', 'PingFang SC', 'STHeiti']
     else:  # Linux
@@ -49,11 +49,24 @@ def setup_chinese_font():
             logger.info(f"选择中文字体: {font}")
             break
     
+    # 如果找不到预定义的中文字体，尝试查找包含中文字符的任意字体
+    if not selected_font:
+        for font_prop in font_manager.fontManager.ttflist:
+            # 检查字体名称是否包含中文相关关键词
+            font_name = font_prop.name.lower()
+            if any(keyword in font_name for keyword in ['yahei', 'hei', 'song', 'fang', 'pingfang', 'wenquan', 'noto']):
+                selected_font = font_prop.name
+                logger.info(f"选择备选中文字体: {selected_font}")
+                break
+    
     if selected_font:
         plt.rcParams['font.sans-serif'] = [selected_font] + plt.rcParams['font.sans-serif']
+        logger.info(f"已设置中文字体: {selected_font}")
     else:
         # 如果没有找到中文字体，使用默认字体并记录警告
         logger.warning("未找到合适的中文字体，图表中文可能显示为方块")
+        # 设置fallback字体以尽量减少乱码
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'sans-serif']
     
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
@@ -578,9 +591,14 @@ class EnhancedCorrelationAnalyzer:
                 # 计算分布
                 hist, _ = np.histogram(returns, bins=bins)
                 
+                fund_display_name = fund_names.get(fund_col, fund_col)
+                # 如果基金名称为空或与代码相同，使用代码作为显示名称
+                if not fund_display_name or fund_display_name == fund_col:
+                    fund_display_name = fund_col
+                
                 funds_distribution.append({
                     'fund_code': fund_col,
-                    'fund_name': fund_names.get(fund_col, fund_col),
+                    'fund_name': fund_display_name,
                     'counts': hist.tolist()
                 })
             

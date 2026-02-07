@@ -388,8 +388,8 @@ function formatFundName(fund) {
     let name = fund.fund_name || fund.name;
     const code = fund.fund_code || fund.code;
     
-    // 如果名称无效（为空或与代码相同），则显示代码
-    if (!name || name === code) {
+    // 如果名称无效（为空、与代码相同或包含代码），则显示代码
+    if (!name || name === code || (code && name.includes(code))) {
         return code || '未知基金';
     }
     
