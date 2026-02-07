@@ -311,6 +311,7 @@ const FundScreenshot = {
             }
 
             // 调用导入API
+            console.log('准备导入的数据:', fundsToImport);
             const response = await fetch('/api/holdings/import/confirm', {
                 method: 'POST',
                 headers: {
@@ -321,11 +322,13 @@ const FundScreenshot = {
                     funds: fundsToImport
                 })
             });
-
+            
+            console.log('API响应状态:', response.status);
             const data = await response.json();
+            console.log('API响应数据:', data);
 
             if (data.success) {
-                FundUtils.showNotification(`成功导入 ${data.imported.length} 只基金`, 'success');
+                FundUtils.showNotification(`成功导入 ${data.imported_count} 只基金`, 'success');
 
                 // 关闭模态框
                 this.closeModal();
@@ -355,26 +358,74 @@ const FundScreenshot = {
      * 删除基金
      */
     deleteFund(index) {
+        console.log('=== deleteFund 调用开始 ===');
+        console.log('传入索引:', index);
+        console.log('FundScreenshot 对象:', this);
+        console.log('当前 recognizedFunds:', this.recognizedFunds);
+        console.log('recognizedFunds 长度:', this.recognizedFunds ? this.recognizedFunds.length : 'undefined');
+        
+        // 检查 FundScreenshot 对象是否存在
+        if (!this || !this.recognizedFunds) {
+            console.error('FundScreenshot 对象或 recognizedFunds 未定义');
+            alert('删除功能暂时不可用，请刷新页面后重试');
+            return;
+        }
+        
+        // 检查索引是否有效
+        if (index < 0 || index >= this.recognizedFunds.length) {
+            console.error('无效索引:', index, '数组长度:', this.recognizedFunds.length);
+            alert(`删除失败：无效的基金索引 ${index}，有效范围: 0-${this.recognizedFunds.length - 1}`);
+            return;
+        }
+        
         // 获取要删除的基金信息
         const fundToDelete = this.recognizedFunds[index];
-        const fundName = fundToDelete ? fundToDelete.fund_name : '该基金';
+        console.log('要删除的基金:', fundToDelete);
         
-        // 显示确认对话框，包含详细的警告信息
-        if (confirm(`警告：此操作不可撤销！\n\n确定要删除基金「${fundName}」吗？\n\n删除后，该基金将从识别结果中移除，且无法恢复。`)) {
+        if (!fundToDelete) {
+            console.error('索引位置没有基金数据:', index);
+            alert('删除失败：该位置没有基金数据');
+            return;
+        }
+        
+        const fundName = fundToDelete.fund_name || '未知基金';
+        
+        // 显示确认对话框
+        const confirmMsg = `警告：此操作不可撤销！\n\n确定要删除基金「${fundName}」吗？\n\n删除后，该基金将从识别结果中移除，且无法恢复。`;
+        
+        if (confirm(confirmMsg)) {
             try {
+                console.log('开始删除操作...');
+                
                 // 从识别结果中移除基金
                 const deletedFund = this.recognizedFunds.splice(index, 1)[0];
+                console.log('已删除基金:', deletedFund);
+                console.log('删除后 recognizedFunds:', this.recognizedFunds);
                 
                 // 重新渲染识别结果
                 this.renderRecognitionResult({ data: this.recognizedFunds });
                 
                 // 显示成功通知
-                FundUtils.showNotification(`成功删除基金: ${deletedFund.fund_name}`, 'success');
+                if (FundUtils && typeof FundUtils.showNotification === 'function') {
+                    FundUtils.showNotification(`成功删除基金: ${deletedFund.fund_name}`, 'success');
+                } else {
+                    alert(`成功删除基金: ${deletedFund.fund_name}`);
+                }
+                
+                console.log('删除操作完成');
             } catch (error) {
                 console.error('删除基金失败:', error);
-                FundUtils.showNotification('删除失败，请重试', 'error');
+                if (FundUtils && typeof FundUtils.showNotification === 'function') {
+                    FundUtils.showNotification('删除失败，请重试', 'error');
+                } else {
+                    alert('删除失败，请重试');
+                }
             }
+        } else {
+            console.log('用户取消删除操作');
         }
+        
+        console.log('=== deleteFund 调用结束 ===');
     },
 
     /**
