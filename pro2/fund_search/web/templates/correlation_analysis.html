@@ -7,998 +7,216 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/heavyweight-stocks.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/realtime-data-tables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis-dashboard.css') }}">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        /* 加载动画 */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .loading-spinner {
-            display: inline-block;
-        }
-        
-        .loading-spinner i {
-            color: #007bff;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f7fa;
-            color: #333;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            width: 100%;
-        }
-
-        .analysis-section {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-            width: 100%;
-        }
-
-        /* 合并后的统一样式 */
-        .unified-section {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-            width: 100%;
-        }
-
-        .unified-section .header-content {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .unified-section .header-content p {
-            color: #7f8c8d;
-            font-size: 14px;
-            margin: 0;
-        }
-
-        .analysis-section h2 {
-            color: #2c3e50;
-            font-size: 20px;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .analysis-section h3 {
-            color: #34495e;
-            font-size: 16px;
-            margin-bottom: 15px;
-            margin-top: 25px;
-        }
-
-        .matrix-container {
-            overflow-x: auto;
-            margin: 20px 0;
-        }
-
-        .correlation-matrix {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .correlation-matrix th,
-        .correlation-matrix td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-        }
-
-        .correlation-matrix th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-
-        .correlation-matrix td {
-            font-family: monospace;
-        }
-
-        .correlation-matrix tr:first-child th:first-child {
-            background-color: transparent;
-            border: none;
-        }
-
-        .correlation-1 {
-            background-color: #e3f2fd;
-        }
-
-        .correlation-high {
-            background-color: #ffebee;
-        }
-
-        .correlation-medium {
-            background-color: #fff3e0;
-        }
-
-        .correlation-low {
-            background-color: #e8f5e8;
-        }
-
-
-        .button-container {
-            margin-top: 30px;
-            display: flex;
-            justify-content: flex-start;
-        }
-
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .btn-primary {
-            background-color: #3498db;
-            color: white;
-            border: none;
-        }
-
-        .btn-primary:hover {
-            background-color: #2980b9;
-        }
-
-        .btn-secondary {
-            background-color: #95a5a6;
-            color: white;
-            border: none;
-            margin-left: 10px;
-        }
-
-        .btn-secondary:hover {
-            background-color: #7f8c8d;
-        }
-
-        .error-message {
-            background-color: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 4px;
-            margin: 20px 0;
-        }
-
-        /* Top Correlated Pairs Styles */
-        .top-correlations {
-            margin-bottom: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .top-correlations h3 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 18px;
-        }
-
-        .pairs-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .pair-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            border-radius: 6px;
-            background-color: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .pair-rank {
-            width: 30px;
-            font-weight: bold;
-            color: #666;
-            text-align: center;
-        }
-
-        .pair-funds {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .pair-funds div {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .pair-funds div:nth-child(2) {
-            color: #999;
-            font-size: 14px;
-        }
-
-        .pair-correlation {
-            width: 200px;
-        }
-
-        .correlation-value {
-            font-family: monospace;
-            font-weight: bold;
-            text-align: right;
-            margin-bottom: 5px;
-        }
-
-        .correlation-bar-container {
-            height: 8px;
-            background-color: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .correlation-bar {
-            height: 100%;
-            background-color: #3498db;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        .pair-item.correlation-high .correlation-bar {
-            background-color: #e74c3c;
-        }
-
-        .pair-item.correlation-medium .correlation-bar {
-            background-color: #f39c12;
-        }
-
-        .pair-item.correlation-low .correlation-bar {
-            background-color: #27ae60;
-        }
-
-        .no-pairs {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-
-        /* 基金详细分析样式 */
-        .fund-detail-section {
-            margin-top: 40px;
-        }
-
-        .fund-detail-card {
-            background-color: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
-        }
-
-        .fund-detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .fund-detail-title {
-            font-size: 20px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        .fund-detail-code {
-            font-size: 14px;
-            color: #7f8c8d;
-            font-family: monospace;
-        }
-
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        .analysis-module {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-        }
-
-        .module-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #34495e;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .module-title i {
-            color: #3498db;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 250px;
-            margin-bottom: 15px;
-        }
-
-        .data-list-compact {
-            list-style: none;
-            padding: 0;
-        }
-
-        .data-list-compact li {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #e0e0e0;
-            font-size: 13px;
-        }
-
-        .data-list-compact li:last-child {
-            border-bottom: none;
-        }
-
-        .data-list-compact .label {
-            color: #666;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .data-list-compact .value {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .color-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .holdings-table-compact {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            margin-top: 10px;
-        }
-
-        .holdings-table-compact th {
-            background-color: #e9ecef;
-            padding: 8px 6px;
-            text-align: left;
-            font-weight: 600;
-            color: #666;
-            border-bottom: 2px solid #dee2e6;
-        }
-
-        .holdings-table-compact td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .holdings-table-compact tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .positive-change {
-            color: #e74c3c;
-        }
-
-        .negative-change {
-            color: #27ae60;
-        }
-
-        .loading-spinner {
-            text-align: center;
-            padding: 30px;
-            color: #999;
-        }
-
-        .loading-spinner i {
-            font-size: 24px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .empty-data {
-            text-align: center;
-            padding: 20px;
-            color: #999;
-            font-size: 13px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-
-            .analysis-section {
-                padding: 20px;
-            }
-
-            .header h1 {
-                font-size: 20px;
-            }
-
-            .analysis-section h2 {
-                font-size: 18px;
-            }
-
-            .pair-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .pair-rank {
-                align-self: center;
-            }
-
-            .pair-funds {
-                width: 100%;
-                justify-content: space-between;
-            }
-
-            .pair-correlation {
-                width: 100%;
-            }
-
-            .analysis-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .fund-detail-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-        }
-
-        /* 相关性图表样式 */
-        .chart-container {
-            background: linear-gradient(145deg, #ffffff, #f8fafc);
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-            margin-bottom: 25px;
-            text-align: center;
-            border: 1px solid #e8ecf1;
-            transition: box-shadow 0.3s ease, transform 0.2s ease;
-        }
-
-        .chart-container:hover {
-            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12), 0 3px 10px rgba(0, 0, 0, 0.06);
-            transform: translateY(-2px);
-        }
-
-        .chart-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #1a365d;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .chart-title::before {
-            content: "📊";
-            font-size: 24px;
-        }
-
-        .chart-image {
-            max-width: 100%;
-            height: auto;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-            background-color: #fafafa;
-            transition: transform 0.2s ease;
-        }
-
-        .chart-image:hover {
-            transform: scale(1.01);
-        }
-
-        .chart-info {
-            margin-top: 20px;
-            padding: 18px 20px;
-            font-size: 14px;
-            color: #4a5568;
-            line-height: 1.7;
-            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-            border-radius: 10px;
-            border-left: 4px solid #3b82f6;
-            text-align: left;
-        }
-
-        .chart-info p {
-            margin: 8px 0;
-        }
-
-        .chart-info p:first-child {
-            margin-top: 0;
-        }
-
-        .chart-info p:last-child {
-            margin-bottom: 0;
-        }
-
-        .chart-info strong {
-            color: #1e40af;
-            font-weight: 600;
-        }
-
-        /* 图表说明图标 */
-        .chart-info p::before {
-            margin-right: 8px;
-        }
-
-        .chart-info p:first-child::before {
-            content: "🎯";
-        }
-
-        .chart-info p:last-child::before {
-            content: "💡";
-        }
-
-        /* 响应式图表容器 */
-        @media (max-width: 768px) {
-            .chart-container {
-                padding: 15px;
-                border-radius: 10px;
-            }
-            
-            .chart-title {
-                font-size: 16px;
-                padding-bottom: 12px;
-            }
-
-            .chart-info {
-                padding: 12px 15px;
-                font-size: 13px;
-            }
-        }
-
-        /* 增强相关性分析样式 */
-        .analysis-module {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .module-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #34495e;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .module-title i {
-            color: #3498db;
-        }
-
-        /* 相关系数表格样式 */
-        .correlation-methods-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-        }
-
-        .correlation-methods-table th,
-        .correlation-methods-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: center;
-        }
-
-        .correlation-methods-table th {
-            background-color: #e9ecef;
-            font-weight: 600;
-        }
-
-        .correlation-value {
-            font-weight: bold;
-            font-family: monospace;
-        }
-
-        .corr-very-high { color: #e74c3c; }
-        .corr-high { color: #f39c12; }
-        .corr-medium { color: #3498db; }
-        .corr-low { color: #27ae60; }
-        .corr-very-low { color: #95a5a6; }
-
-        /* 高相关性基金组合样式 */
-        .high-correlation-pairs {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .pair-item {
-            display: flex;
-            align-items: center;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .pair-item.very-high { border-left: 4px solid #e74c3c; }
-        .pair-item.high { border-left: 4px solid #f39c12; }
-        .pair-item.medium { border-left: 4px solid #3498db; }
-        .pair-item.low { border-left: 4px solid #27ae60; }
-        .pair-item.very-low { border-left: 4px solid #95a5a6; }
-
-        .pair-rank {
-            width: 30px;
-            font-weight: bold;
-            color: #666;
-            text-align: center;
-            margin-right: 15px;
-        }
-
-        .pair-funds {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .fund-name {
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .correlation-symbol {
-            color: #999;
-            font-size: 18px;
-        }
-
-        .pair-details {
-            text-align: right;
-        }
-
-        .pair-details .correlation-value {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .strength-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 3px;
-        }
-
-        .direction-label {
-            font-size: 12px;
-            color: #999;
-        }
-
-        /* 周期相关性网格 */
-        .period-correlation-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
-        }
-
-        .period-item {
-            background-color: white;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .period-name {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 8px;
-        }
-
-        .period-value {
-            font-size: 18px;
-            font-weight: bold;
-            font-family: monospace;
-            margin-bottom: 5px;
-        }
-
-        .period-strength {
-            font-size: 11px;
-            color: #999;
-        }
-
-        /* 解读内容 */
-        .interpretation-content {
-            background-color: white;
-            padding: 20px;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .interpretation-content p {
-            margin: 0;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #555;
-        }
-
-        /* 移动端适配 */
-        @media (max-width: 768px) {
-            .high-correlation-pairs {
-                gap: 10px;
-            }
-
-            .pair-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }
-
-            .pair-funds {
-                width: 100%;
-                justify-content: space-between;
-            }
-
-            .pair-details {
-                text-align: left;
-                width: 100%;
-            }
-
-            .period-correlation-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-            .correlation-matrix {
-                font-size: 12px;
-            }
-
-            .correlation-matrix th,
-            .correlation-matrix td {
-                padding: 8px;
-            }
-        
-        /* 交互式相关性图表样式 */
-        .interactive-charts-container {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 35px;
-            margin: 30px 0;
-            padding: 30px;
-            background: linear-gradient(145deg, #ffffff, #f8fafc);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            width: 100%;
-        }
-
-        .chart-wrapper {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            min-height: 500px;
-            width: 100%;
-        }
-
-        .chart-wrapper:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .chart-wrapper > * {
-            max-width: 100%;
-        }
-
-        .chart-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d3748;
-            margin-bottom: 15px;
-            text-align: center;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .chart-canvas {
-            width: 100%;
-            height: 500px;
-        }
-
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .interactive-charts-container {
-                gap: 25px;
-                padding: 20px;
-            }
-            
-            .chart-wrapper {
-                padding: 20px;
-                min-height: 400px;
-            }
-            
-            .chart-canvas {
-                height: 400px;
-            }
-        }
-        
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/correlation_analysis.css') }}">
 </head>
 <body>
-    <div class="container">
-        <div class="unified-section">
+    <div class="page-wrapper">
+        <!-- 页面头部 -->
+        <header class="page-header">
             <div class="header-content">
-                <p>分析基金之间的相关性，帮助您分散投资风险</p>
-            </div>
-                
-
-                
-            <div id="analysis-content">
-                <div class="error-message">
-                    <p>请选择两只基金开始相关性分析</p>
+                <div class="header-title">
+                    <i class="bi bi-diagram-3-fill"></i>
+                    <h1>基金相关性分析</h1>
                 </div>
+                <p class="header-desc">分析基金之间的相关性，帮助您分散投资风险，优化投资组合配置</p>
             </div>
-        </div>
+        </header>
 
-        <!-- 增强分析区域 -->
-        <div id="enhanced-analysis-section" class="analysis-section" style="display: none;">
-            <h2>增强相关性分析</h2>
-            <div id="enhanced-content">
-                <div class="loading-spinner">
-                    <i class="bi bi-arrow-repeat"></i> 加载中...
+        <main class="main-container">
+            <!-- 基金选择状态栏 -->
+            <section class="status-bar" id="fund-status-bar">
+                <div class="status-content">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span id="status-text">请选择至少2只基金进行分析</span>
                 </div>
-            </div>
-        </div>
+                <a href="/my-holdings-new" class="btn btn-outline">
+                    <i class="bi bi-arrow-left"></i>
+                    返回持仓页面
+                </a>
+            </section>
 
-        <!-- 交互式相关性分析图表区域 -->
-        <div id="interactive-correlation-charts-section" class="analysis-section" style="display: none;">
-            <h2>相关性分析图表</h2>
-            <div id="interactive-correlation-charts" class="interactive-charts-container">
-                <!-- 交互式图表将在这里动态生成 -->
-            </div>
-        </div>
-
-        <!-- 综合分析区域 -->
-        <div id="comprehensive-analysis-section" class="analysis-section" style="display: none;">
-            <h2>综合分析结果</h2>
-            <div id="comprehensive-content">
-                <div class="loading-spinner">
-                    <i class="bi bi-arrow-repeat"></i> 加载中...
+            <!-- 相关性概览卡片 -->
+            <section class="cards-grid" id="overview-cards" style="display: none;">
+                <div class="info-card">
+                    <div class="card-icon blue">
+                        <i class="bi bi-grid-3x3"></i>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">分析基金数量</span>
+                        <span class="card-value" id="fund-count">-</span>
+                    </div>
                 </div>
-            </div>
-        </div>
+                <div class="info-card">
+                    <div class="card-icon orange">
+                        <i class="bi bi-lightning-fill"></i>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">高相关性组合</span>
+                        <span class="card-value" id="high-correlation-count">-</span>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="card-icon green">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <div class="card-content">
+                        <span class="card-label">分散度评分</span>
+                        <span class="card-value" id="diversification-score">-</span>
+                    </div>
+                </div>
+            </section>
 
+            <!-- 高相关性基金组合 -->
+            <section class="content-section" id="top-pairs-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="bi bi-lightning-charge"></i>
+                        <h2>高相关性基金组合</h2>
+                    </div>
+                    <span class="section-badge">需关注</span>
+                </div>
+                <div class="section-body">
+                    <div id="top-pairs-content">
+                        <div class="loading-state">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
+            <!-- 相关性矩阵 -->
+            <section class="content-section" id="matrix-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="bi bi-table"></i>
+                        <h2>相关性矩阵</h2>
+                    </div>
+                    <div class="section-actions">
+                        <button class="btn btn-sm btn-ghost" onclick="toggleMatrixFullscreen()">
+                            <i class="bi bi-fullscreen"></i>
+                            全屏查看
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div class="matrix-wrapper" id="matrix-wrapper">
+                        <div id="matrix-content">
+                            <div class="loading-state">
+                                <i class="bi bi-arrow-repeat"></i>
+                                <span>加载中...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="matrix-legend">
+                    <div class="legend-item">
+                        <span class="legend-color high"></span>
+                        <span class="legend-label">高相关 (>0.7)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color medium"></span>
+                        <span class="legend-label">中等相关 (0.3-0.7)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color low"></span>
+                        <span class="legend-label">低相关 (<0.3)</span>
+                    </div>
+                </div>
+            </section>
 
-        <div class="button-container">
-            <a href="/my-holdings-new" class="btn btn-primary">返回持仓页面</a>
-            <button id="test-charts-btn" class="btn btn-secondary" style="margin-left: 10px;" onclick="testCharts()">测试图表渲染</button>
-        </div>
-        
-        <script>
-            // 测试图表渲染功能
-            function testCharts() {
-                console.log('🧪 开始测试图表渲染...');
-                
-                // 从sessionStorage获取数据
-                const sessionData = sessionStorage.getItem('correlationAnalysisData');
-                if (!sessionData) {
-                    alert('请先从持仓页面选择至少2只基金进行分析');
-                    return;
-                }
-                
-                try {
-                    const data = JSON.parse(sessionData);
-                    const fundCodes = data.fund_codes;
-                    
-                    if (!fundCodes || fundCodes.length < 2) {
-                        alert('请先从持仓页面选择至少2只基金进行分析');
-                        return;
-                    }
-                    
-                    // 调用API获取图表数据
-                    fetch('/api/holdings/analyze/correlation-interactive', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ 
-                            fund_codes: fundCodes
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(result => {
-                        console.log('📊 API响应:', result);
-                        
-                        if (result.success && result.data) {
-                            console.log('✅ API调用成功，开始渲染图表');
-                            renderInteractiveCorrelationCharts(result.data);
-                        } else {
-                            console.error('❌ API调用失败:', result.error);
-                            showChartError(result.error || 'API调用失败');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('❌ 测试过程中出错:', error);
-                        showChartError('测试过程中出错: ' + error.message);
-                    });
-                } catch (error) {
-                    console.error('❌ 解析session数据失败:', error);
-                    alert('数据解析失败，请重新从持仓页面进入');
-                }
-            }
-            
-            // 页面加载时自动分析sessionStorage中的基金数据
-            window.onload = function() {
-                console.log('=== 相关性分析页面加载开始 ===');
-                const data = getAnalysisData();
-                console.log('从sessionStorage获取的数据:', data);
-                
-                if (data && data.fund_codes && data.fund_codes.length > 0) {
-                    console.log('检测到传递的基金代码:', data.fund_codes);
-                    // 自动加载分析结果
-                    renderAnalysisResult(data);
-                    loadComprehensiveAnalysis(data.fund_codes);
-                    loadEnhancedCorrelationAnalysis(data.fund_codes);
-                    loadCorrelationCharts(data.fund_codes);
-                } else {
-                    console.log('未检测到传递的基金数据，显示默认界面');
-                    renderAnalysisResult(data);
-                }
-                
-                console.log('=== 页面加载完成 ===');
-            };
-        </script>
+            <!-- 增强相关性分析 -->
+            <section class="content-section" id="enhanced-analysis-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="bi bi-graph-up-arrow"></i>
+                        <h2>深度相关性分析</h2>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="enhanced-content">
+                        <div class="loading-state">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 交互式相关性图表 -->
+            <section class="content-section" id="interactive-charts-section" style="display: none;">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="bi bi-bar-chart-line"></i>
+                        <h2>可视化分析图表</h2>
+                    </div>
+                </div>
+                <div class="section-body">
+                    <div id="interactive-charts-content" class="charts-container">
+                        <div class="loading-state">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 空状态提示 -->
+            <section class="empty-state" id="empty-state">
+                <div class="empty-icon">
+                    <i class="bi bi-diagram-3"></i>
+                </div>
+                <h3>暂无分析数据</h3>
+                <p>请从基金持仓页面选择至少2只基金进行相关性分析</p>
+                <a href="/my-holdings-new" class="btn btn-primary">
+                    <i class="bi bi-arrow-left"></i>
+                    前往持仓页面
+                </a>
+            </section>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="page-footer">
+            <p>基金相关性分析 &copy; 2024</p>
+        </footer>
     </div>
 
     <script>
-        // 从URL参数或sessionStorage获取分析数据
+        // ==================== 全局变量 ====================
+        let analysisData = null;
+        let currentFundCodes = [];
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== 相关性分析页面加载开始 ===');
+            initializePage();
+        });
+
+        function initializePage() {
+            const data = getAnalysisData();
+            console.log('从sessionStorage获取的数据:', data);
+            
+            if (data && data.fund_codes && data.fund_codes.length >= 2) {
+                console.log('检测到传递的基金代码:', data.fund_codes);
+                analysisData = data;
+                currentFundCodes = data.fund_codes;
+                
+                // 显示分析内容
+                showAnalysisContent();
+                
+                // 加载各个模块
+                renderAnalysisResult(data);
+                loadEnhancedCorrelationAnalysis(data.fund_codes);
+                loadCorrelationCharts(data.fund_codes);
+            } else {
+                console.log('未检测到有效的基金数据，显示空状态');
+                showEmptyState();
+            }
+            
+            console.log('=== 页面加载完成 ===');
+        }
+
+        // ==================== 数据获取 ====================
         function getAnalysisData() {
             // 首先尝试从 sessionStorage 获取
             const sessionData = sessionStorage.getItem('correlationAnalysisData');
@@ -1029,14 +247,483 @@
             return null;
         }
 
-        // 提取相关性大于0.8的基金组合
-        function getTopCorrelatedPairs(matrix, fundNames, topN = 5) {
+        // ==================== 页面状态控制 ====================
+        function showEmptyState() {
+            document.getElementById('empty-state').style.display = 'flex';
+            document.getElementById('fund-status-bar').style.display = 'none';
+            document.getElementById('overview-cards').style.display = 'none';
+            document.getElementById('top-pairs-section').style.display = 'none';
+            document.getElementById('matrix-section').style.display = 'none';
+            document.getElementById('enhanced-analysis-section').style.display = 'none';
+            document.getElementById('interactive-charts-section').style.display = 'none';
+        }
+
+        function showAnalysisContent() {
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('fund-status-bar').style.display = 'flex';
+            document.getElementById('overview-cards').style.display = 'grid';
+            document.getElementById('top-pairs-section').style.display = 'block';
+            document.getElementById('matrix-section').style.display = 'block';
+            document.getElementById('enhanced-analysis-section').style.display = 'block';
+            document.getElementById('interactive-charts-section').style.display = 'block';
+            
+            // 更新状态栏
+            updateStatusBar();
+        }
+
+        function updateStatusBar() {
+            const statusText = document.getElementById('status-text');
+            if (currentFundCodes.length > 0) {
+                statusText.textContent = `正在分析 ${currentFundCodes.length} 只基金的相关性`;
+            }
+        }
+
+        // ==================== 核心分析功能 ====================
+        function renderAnalysisResult(data) {
+            // 更新概览卡片（使用已有的数据）
+            updateOverviewCards(data);
+            
+            // 渲染高相关性组合（如果有矩阵数据）
+            if (data.correlation_matrix && data.fund_names) {
+                renderTopPairs(data);
+                renderCorrelationMatrix(data);
+            } else {
+                // 显示加载中状态
+                document.getElementById('top-pairs-content').innerHTML = `
+                    <div class="loading-state">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>正在计算相关性...</span>
+                    </div>
+                `;
+                document.getElementById('matrix-content').innerHTML = `
+                    <div class="loading-state">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>正在计算相关性矩阵...</span>
+                    </div>
+                `;
+            }
+        }
+
+        function updateOverviewCards(data) {
+            if (!data) return;
+            
+            // 更新基金数量（优先使用 fund_codes，其次使用 fund_names）
+            const fundCount = data.fund_codes ? data.fund_codes.length : 
+                             (data.fund_names ? data.fund_names.length : 0);
+            document.getElementById('fund-count').textContent = fundCount;
+            
+            // 计算高相关性组合数量
+            let highCorrCount = 0;
+            if (data.correlation_matrix) {
+                for (let i = 0; i < data.correlation_matrix.length; i++) {
+                    for (let j = i + 1; j < data.correlation_matrix[i].length; j++) {
+                        if (data.correlation_matrix[i][j] > 0.7) {
+                            highCorrCount++;
+                        }
+                    }
+                }
+            }
+            document.getElementById('high-correlation-count').textContent = highCorrCount;
+            
+            // 计算分散度评分 (简单的算法)
+            let diversificationScore = '优秀';
+            const totalPairs = fundCount * (fundCount - 1) / 2;
+            if (totalPairs > 0) {
+                const ratio = highCorrCount / totalPairs;
+                if (ratio > 0.5) diversificationScore = '较差';
+                else if (ratio > 0.3) diversificationScore = '一般';
+                else if (ratio > 0.1) diversificationScore = '良好';
+            }
+            document.getElementById('diversification-score').textContent = diversificationScore;
+        }
+
+        // 在获取增强分析数据后更新所有组件
+        function updateAnalysisFromEnhanced(data) {
+            if (!data) return;
+            
+            console.log('📊 updateAnalysisFromEnhanced 接收数据:', data);
+            
+            // 从增强分析数据中提取基金信息
+            // 处理两种可能的数据结构
+            const fundCodes = data.fund_codes || data.basic_correlation?.fund_codes;
+            const correlationMatrix = data.correlation_matrix || data.basic_correlation?.correlation_matrix;
+            const fundNames = data.fund_names || data.basic_correlation?.fund_names || fundCodes;
+            
+            console.log('📊 提取的数据:', { fundCodes, fundNames, hasMatrix: !!correlationMatrix });
+            
+            if (fundCodes && fundCodes.length > 0) {
+                const fundCount = fundCodes.length;
+                document.getElementById('fund-count').textContent = fundCount;
+                
+                // 计算高相关性组合数量（从矩阵数据）
+                let highCorrCount = 0;
+                if (correlationMatrix) {
+                    for (let i = 0; i < correlationMatrix.length; i++) {
+                        for (let j = i + 1; j < correlationMatrix[i].length; j++) {
+                            if (correlationMatrix[i][j] > 0.7) {
+                                highCorrCount++;
+                            }
+                        }
+                    }
+                }
+                document.getElementById('high-correlation-count').textContent = highCorrCount;
+                
+                // 计算分散度评分
+                let diversificationScore = '优秀';
+                const totalPairs = fundCount * (fundCount - 1) / 2;
+                if (totalPairs > 0) {
+                    const ratio = highCorrCount / totalPairs;
+                    if (ratio > 0.5) diversificationScore = '较差';
+                    else if (ratio > 0.3) diversificationScore = '一般';
+                    else if (ratio > 0.1) diversificationScore = '良好';
+                }
+                document.getElementById('diversification-score').textContent = diversificationScore;
+                
+                // 更新高相关性组合和相关性矩阵（使用增强分析的数据）
+                if (correlationMatrix && fundNames) {
+                    const renderData = {
+                        correlation_matrix: correlationMatrix,
+                        fund_names: fundNames
+                    };
+                    console.log('📊 渲染高相关性组合和矩阵:', renderData);
+                    renderTopPairs(renderData);
+                    renderCorrelationMatrix(renderData);
+                } else {
+                    console.warn('⚠️ 缺少矩阵或基金名称数据，无法渲染');
+                    document.getElementById('top-pairs-content').innerHTML = `
+                        <div class="error-message">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>无法获取相关性数据，请稍后刷新重试</span>
+                        </div>
+                    `;
+                    document.getElementById('matrix-content').innerHTML = `
+                        <div class="error-message">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <span>无法获取相关性矩阵数据</span>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function renderTopPairs(data) {
+            const container = document.getElementById('top-pairs-content');
+            
+            if (!data.correlation_matrix || !data.fund_names || data.fund_names.length < 2) {
+                container.innerHTML = '<div class="empty-data">无法提取相关基金组合</div>';
+                return;
+            }
+            
+            const topPairs = getTopCorrelatedPairs(data.correlation_matrix, data.fund_names);
+            
+            if (topPairs.length === 0) {
+                container.innerHTML = `
+                    <div class="success-state">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <p>未发现高相关性基金组合，您的投资组合分散度良好</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="pairs-list">';
+            topPairs.forEach((pair, index) => {
+                const correlationClass = getCorrelationClass(pair.correlation);
+                const strengthLabel = getCorrelationStrength(pair.correlation);
+                const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
+                
+                html += `
+                    <div class="pair-item ${correlationClass}">
+                        <div class="pair-rank">${index + 1}</div>
+                        <div class="pair-funds">
+                            <span class="fund-name">${escapeHtml(pair.fund1)}</span>
+                            <span class="pair-arrow">↔</span>
+                            <span class="fund-name">${escapeHtml(pair.fund2)}</span>
+                        </div>
+                        <div class="pair-info">
+                            <div class="pair-value">${pair.correlation.toFixed(4)}</div>
+                            <div class="pair-strength">${strengthLabel}</div>
+                        </div>
+                        <div class="pair-bar">
+                            <div class="correlation-bar" style="width: ${barWidth}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        function renderCorrelationMatrix(data) {
+            const container = document.getElementById('matrix-content');
+            
+            if (!data.correlation_matrix || !data.fund_names) {
+                container.innerHTML = '<div class="empty-data">暂无相关性矩阵数据</div>';
+                return;
+            }
+            
+            let html = `
+                <table class="correlation-matrix">
+                    <thead>
+                        <tr>
+                            <th class="corner-cell"></th>
+            `;
+            
+            // 表头
+            data.fund_names.forEach(fundName => {
+                html += `<th>${escapeHtml(fundName)}</th>`;
+            });
+            
+            html += '</tr></thead><tbody>';
+            
+            // 表格内容
+            data.correlation_matrix.forEach((row, rowIndex) => {
+                html += `<tr>
+                    <th>${escapeHtml(data.fund_names[rowIndex])}</th>`;
+                
+                row.forEach(value => {
+                    let className = 'corr-cell ';
+                    if (value === 1) {
+                        className += 'correlation-1';
+                    } else if (value > 0.7) {
+                        className += 'correlation-high';
+                    } else if (value > 0.3) {
+                        className += 'correlation-medium';
+                    } else {
+                        className += 'correlation-low';
+                    }
+                    
+                    html += `<td class="${className}">${value.toFixed(4)}</td>`;
+                });
+                
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // ==================== 增强分析功能 ====================
+        async function loadEnhancedCorrelationAnalysis(fundCodes) {
+            try {
+                const response = await fetch('/api/holdings/analyze/correlation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        fund_codes: fundCodes,
+                        enhanced_analysis: true
+                    })
+                });
+                
+                const result = await response.json();
+                console.log('📊 API /api/holdings/analyze/correlation 返回:', result);
+                if (result.success) {
+                    renderEnhancedAnalysis(result.data);
+                    // 使用增强分析数据更新所有组件
+                    updateAnalysisFromEnhanced(result.data);
+                } else {
+                    showEnhancedError(result.error || '加载失败');
+                }
+            } catch (error) {
+                console.error('加载增强分析失败:', error);
+                showEnhancedError('网络错误');
+            }
+        }
+
+        function renderEnhancedAnalysis(data) {
+            const container = document.getElementById('enhanced-content');
+            
+            if (!data.enhanced_analysis) {
+                container.innerHTML = '<div class="empty-data">暂无增强分析数据</div>';
+                return;
+            }
+            
+            const enhancedData = data.enhanced_analysis;
+            let html = '<div class="enhanced-grid">';
+            
+            // 1. 多种相关系数对比
+            if (enhancedData.enhanced_analysis?.correlation_methods) {
+                html += `
+                    <div class="enhanced-card">
+                        <div class="enhanced-card-header">
+                            <i class="bi bi-graph-up"></i>
+                            <h4>多种相关系数对比</h4>
+                        </div>
+                        <div class="enhanced-card-body">
+                            ${renderCorrelationMethodsTable(enhancedData.enhanced_analysis.correlation_methods)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 2. 不同周期相关性
+            if (enhancedData.enhanced_analysis?.period_correlation) {
+                html += `
+                    <div class="enhanced-card">
+                        <div class="enhanced-card-header">
+                            <i class="bi bi-clock-history"></i>
+                            <h4>不同周期相关性</h4>
+                        </div>
+                        <div class="enhanced-card-body">
+                            ${renderPeriodCorrelation(enhancedData.enhanced_analysis.period_correlation)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // 3. 分析结论
+            if (enhancedData.enhanced_analysis?.interpretation) {
+                html += `
+                    <div class="enhanced-card full-width">
+                        <div class="enhanced-card-header">
+                            <i class="bi bi-chat-square-text"></i>
+                            <h4>分析结论</h4>
+                        </div>
+                        <div class="enhanced-card-body">
+                            <div class="interpretation-text">
+                                ${escapeHtml(enhancedData.enhanced_analysis.interpretation)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderCorrelationMethodsTable(correlationMethods) {
+            const pairs = Object.keys(correlationMethods);
+            if (pairs.length === 0) return '<div class="empty-data">暂无相关系数数据</div>';
+            
+            const firstPair = correlationMethods[pairs[0]];
+            const methods = Object.keys(firstPair);
+            
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>类型</th><th>系数</th><th>P值</th><th>解读</th></tr></thead><tbody>';
+            
+            methods.forEach(method => {
+                const methodName = method === 'pearson' ? '皮尔逊' :
+                                 method === 'spearman' ? '斯皮尔曼' : '肯德尔';
+                const methodData = firstPair[method];
+                const strength = getCorrelationStrength(methodData.corr);
+                
+                html += `
+                    <tr>
+                        <td>${methodName}</td>
+                        <td class="value ${getMethodColorClass(methodData.corr)}">${methodData.corr.toFixed(4)}</td>
+                        <td>${methodData.p_value.toExponential(2)}</td>
+                        <td>${strength}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderPeriodCorrelation(periodCorrelation) {
+            const periods = [
+                { key: 'weekly', name: '周收益', days: '5日' },
+                { key: 'biweekly', name: '双周收益', days: '10日' },
+                { key: 'monthly', name: '月收益', days: '20日' },
+                { key: 'quarterly', name: '季度收益', days: '60日' }
+            ];
+            
+            let html = '<div class="period-grid">';
+            periods.forEach(period => {
+                const value = periodCorrelation[period.key] || 0;
+                const strength = getCorrelationStrength(value);
+                
+                html += `
+                    <div class="period-item">
+                        <div class="period-name">${period.name}</div>
+                        <div class="period-days">${period.days}</div>
+                        <div class="period-value ${getMethodColorClass(value)}">${value.toFixed(4)}</div>
+                        <div class="period-strength">${strength}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function showEnhancedError(message) {
+            document.getElementById('enhanced-content').innerHTML = `
+                <div class="error-message">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>加载失败: ${message}</span>
+                </div>
+            `;
+        }
+
+        // ==================== 图表功能 ====================
+        async function loadCorrelationCharts(fundCodes) {
+            try {
+                const response = await fetch('/api/holdings/analyze/correlation-interactive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fund_codes: fundCodes })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    renderInteractiveCharts(result.data);
+                } else {
+                    showChartsError(result.error || '加载失败');
+                }
+            } catch (error) {
+                console.error('加载图表失败:', error);
+                showChartsError('网络错误');
+            }
+        }
+
+        function renderInteractiveCharts(chartData) {
+            const container = document.getElementById('interactive-charts-content');
+            
+            console.log('📊 渲染交互式图表，数据:', chartData);
+            
+            // 检查数据结构并记录基金名称信息
+            if (chartData.primary_combination) {
+                const pc = chartData.primary_combination;
+                console.log('📊 主组合基金:', pc.fund1_name, 'vs', pc.fund2_name);
+            }
+            if (chartData.all_funds_nav_comparison && chartData.all_funds_nav_comparison.funds) {
+                console.log('📊 净值对比基金列表:', chartData.all_funds_nav_comparison.funds.map(f => f.fund_name || f.fund_code));
+            }
+            
+            const hasValidData = chartData.scatter_data || 
+                               (chartData.primary_combination && chartData.primary_combination.scatter_data);
+            
+            if (window.initCorrelationCharts && hasValidData) {
+                window.initCorrelationCharts(container, chartData);
+            } else {
+                showChartsError('图表模块未加载或数据格式不正确');
+            }
+        }
+
+        function showChartsError(message) {
+            document.getElementById('interactive-charts-content').innerHTML = `
+                <div class="error-message">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>图表加载失败: ${message}</span>
+                </div>
+            `;
+        }
+
+        // ==================== 工具函数 ====================
+        function getTopCorrelatedPairs(matrix, fundNames, topN = 10) {
             if (!matrix || !fundNames || matrix.length < 2) {
                 return [];
             }
-
+            
             const pairs = [];
-
+            
             // 遍历相关性矩阵，只考虑上三角（避免重复）
             for (let i = 0; i < matrix.length; i++) {
                 for (let j = i + 1; j < matrix[i].length; j++) {
@@ -1051,460 +738,20 @@
                     }
                 }
             }
-
+            
             // 按相关性降序排序
             pairs.sort((a, b) => b.correlation - a.correlation);
-
-            // 返回所有符合条件的组合（不再限制数量）
-            return pairs;
+            
+            // 返回前N个
+            return pairs.slice(0, topN);
         }
 
-        // 获取相关性强度类别
         function getCorrelationClass(correlation) {
-            if (correlation > 0.7) {
-                return 'correlation-high';
-            } else if (correlation > 0.3) {
-                return 'correlation-medium';
-            } else {
-                return 'correlation-low';
-            }
+            if (correlation > 0.7) return 'corr-high';
+            if (correlation > 0.3) return 'corr-medium';
+            return 'corr-low';
         }
 
-        // 渲染分析结果
-        function renderAnalysisResult(data) {
-            const contentDiv = document.getElementById('analysis-content');
-            
-            if (!data) {
-                contentDiv.innerHTML = `
-                    <div class="error-message">
-                        <p>没有分析数据，请从基金持仓页面选择基金进行相关性分析</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-
-            // 渲染顶部相关性组合
-            if (data.correlation_matrix && data.fund_names && data.fund_names.length >= 2) {
-                const topPairs = getTopCorrelatedPairs(data.correlation_matrix, data.fund_names);
-                
-                html += `<div class="top-correlations">
-                    <h3>相关性最高的基金组合</h3>
-                    <div class="pairs-list">`;
-                
-                if (topPairs.length > 0) {
-                    topPairs.forEach((pair, index) => {
-                        const correlationClass = getCorrelationClass(pair.correlation);
-                        const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
-                        
-                        html += `
-                            <div class="pair-item ${correlationClass}">
-                                <div class="pair-rank">${index + 1}</div>
-                                <div class="pair-funds">
-                                    <div>${pair.fund1}</div>
-                                    <div>↔</div>
-                                    <div>${pair.fund2}</div>
-                                </div>
-                                <div class="pair-correlation">
-                                    <div class="correlation-value">${pair.correlation.toFixed(4)}</div>
-                                    <div class="correlation-bar-container">
-                                        <div class="correlation-bar" style="width: ${barWidth}"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `<div class="no-pairs">
-                        <p>无法提取相关基金组合</p>
-                    </div>`;
-                }
-                
-                html += `</div></div>`;
-            }
-
-            // 渲染相关性矩阵
-            if (data.correlation_matrix && data.fund_names) {
-                html += `
-                    <h3>相关性矩阵</h3>
-                    <div class="matrix-container">
-                        <table class="correlation-matrix">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                `;
-
-                // 表头
-                data.fund_names.forEach(fundName => {
-                    html += `<th>${fundName}</th>`;
-                });
-
-                html += `
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                // 表格内容
-                data.correlation_matrix.forEach((row, rowIndex) => {
-                    html += `<tr>
-                        <th>${data.fund_names[rowIndex]}</th>`;
-
-                    row.forEach(value => {
-                        let className = '';
-                        if (value === 1) {
-                            className = 'correlation-1';
-                        } else if (value > 0.7) {
-                            className = 'correlation-high';
-                        } else if (value > 0.3) {
-                            className = 'correlation-medium';
-                        } else {
-                            className = 'correlation-low';
-                        }
-
-                        html += `<td class="${className}">${value.toFixed(4)}</td>`;
-                    });
-
-                    html += `</tr>`;
-                });
-
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-            }
-
-            contentDiv.innerHTML = html;
-        }
-
-        // 页面加载时只渲染基本界面
-        window.onload = function() {
-            console.log('=== 相关性分析页面加载开始 ===');
-            const data = getAnalysisData();
-            console.log('从sessionStorage获取的数据:', data);
-            
-            if (data && data.fund_codes && data.fund_codes.length > 0) {
-                console.log('检测到传递的基金代码:', data.fund_codes);
-                // 自动加载分析结果
-                renderAnalysisResult(data);
-                loadComprehensiveAnalysis(data.fund_codes);
-                loadEnhancedCorrelationAnalysis(data.fund_codes);
-                loadCorrelationCharts(data.fund_codes);
-            } else {
-                console.log('未检测到传递的基金数据，显示默认界面');
-                renderAnalysisResult(data);
-            }
-            
-            console.log('=== 页面加载完成 ===');
-        };
-
-        // 加载相关性图表
-        async function loadCorrelationCharts(fundCodes) {
-            try {
-                const response = await fetch('/api/holdings/analyze/correlation-interactive', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        fund_codes: fundCodes
-                    })
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    renderInteractiveCorrelationCharts(result.data);
-                } else {
-                    showChartError(result.error || '暂无图表数据');
-                }
-            } catch (error) {
-                console.error('加载相关性图表失败:', error);
-                showChartError('网络错误');
-            }
-        }
-
-        // 显示图表错误信息
-        function showChartError(errorMessage) {
-            const section = document.getElementById('interactive-correlation-charts-section');
-            const container = document.getElementById('interactive-correlation-charts');
-            
-            section.style.display = 'block';
-            container.innerHTML = `
-                <div class="error-message">
-                    <p>图表加载失败: ${errorMessage}</p>
-                </div>
-            `;
-        }
-
-        // 渲染交互式相关性图表
-        function renderInteractiveCorrelationCharts(chartData) {
-            const section = document.getElementById('interactive-correlation-charts-section');
-            const container = document.getElementById('interactive-correlation-charts');
-            
-            console.log('🚀 开始渲染交互式图表:', chartData);
-            
-            section.style.display = 'block';
-            
-            // 确保FundCorrelationCharts模块已加载
-            // 检查新的多基金数据结构或传统的双基金数据结构
-            const hasValidData = chartData.scatter_data || 
-                               (chartData.primary_combination && chartData.primary_combination.scatter_data);
-            
-            if (window.initCorrelationCharts && hasValidData) {
-                console.log('✅ 使用全局initCorrelationCharts函数初始化图表');
-                // 使用全局函数初始化交互式图表
-                window.initCorrelationCharts(container, chartData);
-                
-                console.log('✅ 交互式相关性图表初始化成功');
-            } else {
-                console.error('❌ 图表模块未加载或数据格式不正确');
-                console.log('initCorrelationCharts:', window.initCorrelationCharts);
-                console.log('数据结构检查:', {
-                    has_scatter_data: !!chartData.scatter_data,
-                    has_primary_combination: !!(chartData.primary_combination),
-                    has_primary_scatter: !!(chartData.primary_combination && chartData.primary_combination.scatter_data),
-                    all_keys: Object.keys(chartData)
-                });
-                // 回退到错误显示
-                showChartError('图表模块未加载或数据格式不正确');
-            }
-        }
-
-
-
-        // 加载综合分析数据
-        async function loadComprehensiveAnalysis(fundCodes) {
-            try {
-                const response = await fetch('/api/holdings/analyze/comprehensive', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ fund_codes: fundCodes })
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    renderComprehensiveAnalysis(result.data, fundCodes);
-                } else {
-                    document.getElementById('comprehensive-content').innerHTML = `
-                        <div class="error-message">
-                            <p>综合分析失败: ${result.error || '未知错误'}</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('加载综合分析失败:', error);
-                document.getElementById('comprehensive-content').innerHTML = `
-                    <div class="error-message">
-                        <p>加载综合分析失败: 网络错误</p>
-                    </div>
-                `;
-            }
-        }
-
-        // 加载增强相关性分析数据
-        async function loadEnhancedCorrelationAnalysis(fundCodes) {
-            try {
-                const response = await fetch('/api/holdings/analyze/correlation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ 
-                        fund_codes: fundCodes,
-                        enhanced_analysis: true
-                    })
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    renderEnhancedCorrelationAnalysis(result.data);
-                } else {
-                    document.getElementById('enhanced-content').innerHTML = `
-                        <div class="error-message">
-                            <p>增强相关性分析失败: ${result.error || '未知错误'}</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('加载增强相关性分析失败:', error);
-                document.getElementById('enhanced-content').innerHTML = `
-                    <div class="error-message">
-                        <p>加载增强相关性分析失败: 网络错误</p>
-                    </div>
-                `;
-            }
-        }
-
-        // 渲染增强相关性分析结果
-        function renderEnhancedCorrelationAnalysis(data) {
-            const section = document.getElementById('enhanced-analysis-section');
-            const contentDiv = document.getElementById('enhanced-content');
-            
-            section.style.display = 'block';
-            
-            if (!data.enhanced_analysis) {
-                contentDiv.innerHTML = `
-                    <div class="error-message">
-                        <p>无增强相关性分析数据</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const enhancedData = data.enhanced_analysis;
-            let html = '';
-            
-            // 1. 相关性系数对比
-            if (enhancedData.enhanced_analysis?.correlation_methods) {
-                html += `
-                    <div class="analysis-module">
-                        <h3 class="module-title"><i class="bi bi-graph-up"></i> 多种相关系数对比</h3>
-                        ${renderCorrelationMethods(enhancedData.enhanced_analysis.correlation_methods)}
-                    </div>
-                `;
-            }
-            
-            // 2. 高相关性基金组合
-            if (enhancedData.high_correlation_pairs && enhancedData.high_correlation_pairs.length > 0) {
-                html += `
-                    <div class="analysis-module">
-                        <h3 class="module-title"><i class="bi bi-lightning"></i> 高相关性基金组合</h3>
-                        ${renderHighCorrelationPairs(enhancedData.high_correlation_pairs)}
-                    </div>
-                `;
-            }
-            
-            // 3. 不同周期相关性
-            if (enhancedData.enhanced_analysis?.period_correlation) {
-                html += `
-                    <div class="analysis-module">
-                        <h3 class="module-title"><i class="bi bi-clock-history"></i> 不同周期相关性</h3>
-                        ${renderPeriodCorrelation(enhancedData.enhanced_analysis.period_correlation)}
-                    </div>
-                `;
-            }
-            
-            // 4. 相关性解读
-            if (enhancedData.enhanced_analysis?.interpretation) {
-                html += `
-                    <div class="analysis-module">
-                        <h3 class="module-title"><i class="bi bi-chat-square-text"></i> 分析结论</h3>
-                        <div class="interpretation-content">
-                            <p>${enhancedData.enhanced_analysis.interpretation}</p>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            contentDiv.innerHTML = html || '<div class="empty-data">暂无增强分析数据</div>';
-        }
-
-        // 渲染相关系数对比表格
-        function renderCorrelationMethods(correlationMethods) {
-            const pairs = Object.keys(correlationMethods);
-            if (pairs.length === 0) return '<div class="empty-data">暂无相关系数数据</div>';
-            
-            const firstPair = correlationMethods[pairs[0]];
-            const methods = Object.keys(firstPair);
-            
-            let html = `
-                <table class="correlation-methods-table">
-                    <thead>
-                        <tr>
-                            <th>相关系数类型</th>
-                            <th>相关系数值</th>
-                            <th>P值</th>
-                            <th>解读</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            methods.forEach(method => {
-                const methodName = method === 'pearson' ? '皮尔逊相关系数' :
-                                 method === 'spearman' ? '斯皮尔曼相关系数' : '肯德尔相关系数';
-                const methodData = firstPair[method];
-                const strength = getCorrelationStrength(methodData.corr);
-                
-                html += `
-                    <tr>
-                        <td>${methodName}</td>
-                        <td class="correlation-value ${getMethodColorClass(methodData.corr)}">
-                            ${methodData.corr.toFixed(4)}
-                        </td>
-                        <td>${methodData.p_value.toExponential(2)}</td>
-                        <td>${strength}</td>
-                    </tr>
-                `;
-            });
-            
-            html += `
-                    </tbody>
-                </table>
-            `;
-            return html;
-        }
-
-        // 渲染高相关性基金组合
-        function renderHighCorrelationPairs(pairs) {
-            if (pairs.length === 0) return '<div class="empty-data">暂无高相关性基金组合</div>';
-            
-            let html = `
-                <div class="high-correlation-pairs">
-                    ${pairs.map((pair, index) => `
-                        <div class="pair-item ${getCorrelationStrengthClass(pair.correlation)}">
-                            <div class="pair-rank">#${index + 1}</div>
-                            <div class="pair-funds">
-                                <div class="fund-name">${pair.fund1_name}</div>
-                                <div class="correlation-symbol">⟷</div>
-                                <div class="fund-name">${pair.fund2_name}</div>
-                            </div>
-                            <div class="pair-details">
-                                <div class="correlation-value">${pair.correlation.toFixed(4)}</div>
-                                <div class="strength-label">${pair.strength}</div>
-                                <div class="direction-label">${pair.direction}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            return html;
-        }
-
-        // 渲染不同周期相关性
-        function renderPeriodCorrelation(periodCorrelation) {
-            const periods = [
-                { key: 'weekly', name: '周收益(5日)' },
-                { key: 'biweekly', name: '双周收益(10日)' },
-                { key: 'monthly', name: '月收益(20日)' },
-                { key: 'quarterly', name: '季度收益(60日)' }
-            ];
-            
-            let html = `
-                <div class="period-correlation-grid">
-                    ${periods.map(period => {
-                        const value = periodCorrelation[period.key] || 0;
-                        const strength = getCorrelationStrength(value);
-                        return `
-                            <div class="period-item">
-                                <div class="period-name">${period.name}</div>
-                                <div class="period-value ${getMethodColorClass(value)}">
-                                    ${value.toFixed(4)}
-                                </div>
-                                <div class="period-strength">${strength}</div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            return html;
-        }
-
-        // 获取相关性强度描述
         function getCorrelationStrength(corr) {
             const absCorr = Math.abs(corr);
             if (absCorr >= 0.8) return '极强相关';
@@ -1514,67 +761,28 @@
             return '极弱相关';
         }
 
-        // 获取相关性强度CSS类
-        function getCorrelationStrengthClass(corr) {
-            const absCorr = Math.abs(corr);
-            if (absCorr >= 0.8) return 'very-high';
-            if (absCorr >= 0.6) return 'high';
-            if (absCorr >= 0.4) return 'medium';
-            if (absCorr >= 0.2) return 'low';
-            return 'very-low';
-        }
-
-        // 获取方法颜色类
         function getMethodColorClass(corr) {
             const absCorr = Math.abs(corr);
-            if (absCorr >= 0.8) return 'corr-very-high';
-            if (absCorr >= 0.6) return 'corr-high';
-            if (absCorr >= 0.4) return 'corr-medium';
-            if (absCorr >= 0.2) return 'corr-low';
-            return 'corr-very-low';
+            if (absCorr >= 0.8) return 'value-high';
+            if (absCorr >= 0.6) return 'value-medium-high';
+            if (absCorr >= 0.4) return 'value-medium';
+            if (absCorr >= 0.2) return 'value-low';
+            return 'value-very-low';
         }
 
-        // 渲染综合分析结果
-        function renderComprehensiveAnalysis(data, fundCodes) {
-            const section = document.getElementById('comprehensive-analysis-section');
-            const contentDiv = document.getElementById('comprehensive-content');
-            
-            section.style.display = 'block';
-            
-            // 保存基金代码列表供后续使用
-            data.fund_codes = fundCodes;
-            
-            if (!data) {
-                contentDiv.innerHTML = `
-                    <div class="error-message">
-                        <p>没有综合分析数据</p>
-                    </div>
-                `;
-                return;
-            }
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-            // 使用新的仪表盘组件渲染综合分析结果
-            contentDiv.innerHTML = `<div id="fund-analysis-dashboard"></div>`;
-            
-            // 初始化基金分析仪表盘
-            initFundAnalysisDashboard('fund-analysis-dashboard', data);
+        function toggleMatrixFullscreen() {
+            const wrapper = document.getElementById('matrix-wrapper');
+            wrapper.classList.toggle('fullscreen');
         }
     </script>
-    <script src="{{ url_for('static', filename='js/heavyweight-stocks.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/realtime-data-tables.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/fund-analysis-dashboard.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/fund-correlation-charts.js') }}"></script>
     
-    <script>
-        // 页面加载完成后检查图表模块是否正确加载
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== 页面加载完成 ===');
-            console.log('FundCorrelationCharts模块状态:', window.FundCorrelationCharts);
-            console.log('initCorrelationCharts函数状态:', window.initCorrelationCharts);
-            
-            // 图表模块加载检查
-            console.log('图表模块加载状态检查完成');
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/fund-correlation-charts.js') }}"></script>
 </body>
 </html>

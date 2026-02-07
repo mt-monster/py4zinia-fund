@@ -375,12 +375,10 @@
                     
                     <!-- 分析结果内容 -->
                     <div id="advice-content" style="display: none;">
-                        <!-- 综合分析结果区域 -->
-                        <div id="comprehensive-analysis-section" class="analysis-section">
-                            <h2><i class="bi bi-graph-up-arrow"></i> 综合分析结果</h2>
-                            <div id="comprehensive-content">
-                                <div id="fund-analysis-dashboard"></div>
-                            </div>
+                        <!-- 综合分析结果已移除 -->
+                        <div class="empty-state">
+                            <i class="bi bi-info-circle" style="font-size: 48px; color: #6c757d;"></i>
+                            <p>综合分析功能已调整，请查看其他投资建议</p>
                         </div>
                     </div>
                 </div>
@@ -408,9 +406,6 @@
     <!-- 投资建议功能所需的外部脚本 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-    <script src="{{ url_for('static', filename='js/heavyweight-stocks.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/realtime-data-tables.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/fund-analysis-dashboard.js') }}"></script>
     
     <script src="{{ url_for('static', filename='js/my-holdings/main.js') }}"></script>
     
@@ -498,24 +493,23 @@
         
         // 渲染投资建议
         function renderInvestmentAdvice(data, fundCodes) {
-            const contentDiv = document.getElementById('comprehensive-content');
+            const contentDiv = document.getElementById('advice-content');
             
             // 保存基金代码列表供后续使用
             data.fund_codes = fundCodes;
             
-            // 清空并重新创建仪表盘容器（添加最小高度避免负半径错误）
-            contentDiv.innerHTML = '<div id="fund-analysis-dashboard" style="min-height: 500px;"></div>';
-            
-            // 延迟初始化，确保模态框已完全显示并且容器有正确尺寸
-            setTimeout(() => {
-                // 初始化基金分析仪表盘
-                if (typeof initFundAnalysisDashboard === 'function') {
-                    initFundAnalysisDashboard('fund-analysis-dashboard', data);
-                } else {
-                    console.error('initFundAnalysisDashboard 函数未定义');
-                    contentDiv.innerHTML = '<div class="error-message"><p>仪表盘组件加载失败</p></div>';
-                }
-            }, 100);
+            // 综合分析结果区域已移除，显示简化信息
+            contentDiv.innerHTML = `
+                <div class="investment-advice-summary" style="padding: 20px;">
+                    <h3><i class="bi bi-lightbulb"></i> 投资建议</h3>
+                    <p>已分析 <strong>${fundCodes.length}</strong> 只基金</p>
+                    <div class="advice-actions" style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="refreshInvestmentAdvice()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新分析
+                        </button>
+                    </div>
+                </div>
+            `;
         }
         
         // 获取选中的基金代码

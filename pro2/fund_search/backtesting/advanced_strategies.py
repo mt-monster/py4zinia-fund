@@ -20,6 +20,7 @@ class StrategySignal:
     amount_multiplier: float = 1.0  # 基础金额的倍数
     reason: str = ""
     description: str = ""
+    suggestion: str = ""
 
 class BaseStrategy(ABC):
     """策略基类"""
@@ -134,6 +135,19 @@ class MeanReversionStrategy(BaseStrategy):
         # 计算偏离度
         deviation = (current_price - ma) / ma
         
+        # 新增：趋势过滤器 - 避免在强趋势中错误操作
+        if current_index >= 60:
+            ma_short = nav.iloc[current_index-20:current_index+1].mean()
+            ma_long = nav.iloc[current_index-60:current_index+1].mean()
+            
+            # 强上涨趋势中，暂停均值回归卖出（让利润奔跑）
+            if ma_short > ma_long * 1.05 and deviation > 0:
+                return StrategySignal('hold', 0.0, "强上涨趋势", "趋势强劲，暂停止盈，让利润奔跑")
+            
+            # 强下跌趋势中，暂停均值回归买入（避免接飞刀）
+            if ma_short < ma_long * 0.95 and deviation < -self.threshold:
+                return StrategySignal('hold', 0.0, "强下跌趋势", "下跌趋势未止，暂停抄底")
+        
         if deviation < -self.threshold * 2:
             # 极度低估 (例如低于均线10%)
             return StrategySignal('buy', 2.0, "极度低估", f"当前价格低于均线 {abs(deviation)*100:.1f}%")
@@ -141,11 +155,11 @@ class MeanReversionStrategy(BaseStrategy):
             # 低估
             return StrategySignal('buy', 1.5, "低估区域", f"当前价格低于均线 {abs(deviation)*100:.1f}%")
         elif deviation > self.threshold * 2:
-            # 极度高估
-            return StrategySignal('sell', 0.5, "极度高估", f"当前价格高于均线 {deviation*100:.1f}%")
+            # 极度高估 - 修正：从0.5改为1.0（清仓）
+            return StrategySignal('sell', 1.0, "极度高估", f"当前价格高于均线 {deviation*100:.1f}%", "建议全部止盈")
         elif deviation > self.threshold:
-            # 高估
-            return StrategySignal('buy', 0.5, "高估区域", f"当前价格高于均线 {deviation*100:.1f}%")
+            # 高估 - 修正：从买入改为卖出
+            return StrategySignal('sell', 0.5, "高估区域", f"当前价格高于均线 {deviation*100:.1f}%", "建议部分止盈")
         else:
             # 正常区域
             return StrategySignal('buy', 1.0, "正常区域", "价格在均线附近波动")
@@ -329,16 +343,20 @@ class EnhancedRuleBasedStrategy(BaseStrategy):
                 'multiplier': 2.5,
                 'description': '基金首次大跌，建议积极买入（抄底良机）'
             },
-            # 8. 持续下跌 - 买入补仓
+            # 8. 持续下跌 - 买入补仓（优化：更严格的条件）
             {
                 'name': 'bear_continuation',
                 'label': '🟣 持续下跌',
                 'conditions': [
-                    {'today_min': float('-inf'), 'today_max': -0.5, 'prev_min': float('-inf'), 'prev_max': -0.5}
+                    # 原条件：连续2日下跌各超过0.5%
+                    # 新条件A：连续2日且累计跌幅>2%
+                    # 新条件B：单日大跌超过2%
+                    {'today_min': float('-inf'), 'today_max': -1.0, 'prev_min': float('-inf'), 'prev_max': -1.0},  # 两日各跌1%+
+                    {'today_min': float('-inf'), 'today_max': -2.0, 'prev_min': float('-inf'), 'prev_max': float('inf')}  # 单日大跌2%+
                 ],
                 'action': 'buy',
                 'multiplier': 1.5,
-                'description': '基金持续下跌，建议逢低买入（摊低成本）'
+                'description': '基金持续下跌（两日累计跌2%+ 或 单日大跌2%+），建议逢低买入（摊低成本）'
             },
             # 9. 跌速放缓 - 积极买入
             {
@@ -378,6 +396,24 @@ class EnhancedRuleBasedStrategy(BaseStrategy):
             prev_day_return = 0.0
         
         today_return = (current_nav - prev_nav) / prev_nav * 100
+        
+        # 新增：计算累计跌幅用于持续下跌判定
+        cumulative_decline = today_return + prev_day_return
+        
+        # 优化：更严格的持续下跌判定
+        # 如果累计跌幅超过2%，标记为急跌
+        if cumulative_decline < -2.0 and today_return < -0.5:
+            # 优先匹配"持续下跌"规则（需要检查是否在规则列表中）
+            for rule in self.rules:
+                if rule['name'] == 'bear_continuation':
+                    # 检查是否符合单日大跌条件
+                    if today_return <= -2.0 or (today_return <= -1.0 and prev_day_return <= -1.0):
+                        return StrategySignal(
+                            rule['action'], 
+                            rule['multiplier'],
+                            rule['label'],
+                            f"累计跌幅{cumulative_decline:.1f}%，{rule['description']}"
+                        )
         
         # 检查止损
         if current_holdings > 0:

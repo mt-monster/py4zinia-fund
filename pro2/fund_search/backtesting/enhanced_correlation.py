@@ -17,10 +17,48 @@ import matplotlib
 matplotlib.use('Agg')  # 设置matplotlib后端为非GUI模式
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+from matplotlib import font_manager
 import base64
 from io import BytesIO
+import platform
 
 logger = logging.getLogger(__name__)
+
+# 全局配置matplotlib中文字体
+def setup_chinese_font():
+    """配置matplotlib支持中文显示"""
+    system = platform.system()
+    
+    # 尝试查找可用的中文字体
+    chinese_fonts = []
+    if system == 'Windows':
+        chinese_fonts = ['Microsoft YaHei', 'SimHei', 'SimSun', 'NSimSun', 'FangSong', 'KaiTi']
+    elif system == 'Darwin':  # macOS
+        chinese_fonts = ['Arial Unicode MS', 'Heiti TC', 'Heiti SC', 'PingFang SC', 'STHeiti']
+    else:  # Linux
+        chinese_fonts = ['WenQuanYi Micro Hei', 'WenQuanYi Zen Hei', 'Noto Sans CJK SC', 'SimHei']
+    
+    # 获取系统中所有可用字体
+    available_fonts = set([f.name for f in font_manager.fontManager.ttflist])
+    
+    # 找到第一个可用的中文字体
+    selected_font = None
+    for font in chinese_fonts:
+        if font in available_fonts:
+            selected_font = font
+            logger.info(f"选择中文字体: {font}")
+            break
+    
+    if selected_font:
+        plt.rcParams['font.sans-serif'] = [selected_font] + plt.rcParams['font.sans-serif']
+    else:
+        # 如果没有找到中文字体，使用默认字体并记录警告
+        logger.warning("未找到合适的中文字体，图表中文可能显示为方块")
+    
+    plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
+# 初始化字体配置
+setup_chinese_font()
 
 class EnhancedCorrelationAnalyzer:
     """
@@ -30,9 +68,7 @@ class EnhancedCorrelationAnalyzer:
     def __init__(self):
         """初始化分析器"""
         self.rolling_window = 60  # 默认滚动窗口天数
-        # 设置matplotlib中文字体支持（Windows优先使用微软雅黑）
-        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
-        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+        # 字体配置已在模块级别全局设置
     
     def analyze_enhanced_correlation(self, fund_data_dict: Dict[str, pd.DataFrame], 
                                    fund_names: Dict[str, str]) -> Dict:

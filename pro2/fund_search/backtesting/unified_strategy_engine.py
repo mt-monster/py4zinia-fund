@@ -41,17 +41,27 @@ class UnifiedStrategyResult:
     # 趋势分析
     trend: str
     trend_adjustment: float
+    adx: float = 0.0
+    adx_trend_strength: str = "unknown"
     
     # 波动率调整
-    volatility: float
-    volatility_level: str
-    volatility_adjustment: float
+    volatility: float = 0.0
+    volatility_level: str = "unknown"
+    volatility_adjustment: float = 1.0
+    
+    # 市场Beta调整
+    market_beta_adjusted: bool = False
+    market_condition: str = "neutral"
+    
+    # 成交量确认
+    volume_confirmed: bool = False
+    volume_ratio: float = 1.0
     
     # 风险调整标志
-    risk_adjusted: bool
+    risk_adjusted: bool = False
     
     # 综合建议
-    final_suggestion: str
+    final_suggestion: str = ""
 
 
 class UnifiedStrategyEngine:
@@ -89,7 +99,9 @@ class UnifiedStrategyEngine:
         returns_history: Optional[List[float]] = None,
         cumulative_pnl: Optional[float] = None,
         performance_metrics: Optional[Dict] = None,
-        strategy_id: Optional[str] = None
+        strategy_id: Optional[str] = None,
+        market_data: Optional[Dict] = None,
+        volume_data: Optional[Dict] = None
     ) -> UnifiedStrategyResult:
         """
         综合策略分析
@@ -101,6 +113,8 @@ class UnifiedStrategyEngine:
             cumulative_pnl: 累计盈亏率（用于止损检查）
             performance_metrics: 绩效指标（可选增强分析）
             strategy_id: 特定策略ID（可选），如果指定则只应用该策略
+            market_data: 市场数据（可选），包含大盘指数收益等
+            volume_data: 成交量数据（可选），包含近期成交量等
             
         Returns:
             UnifiedStrategyResult: 综合策略分析结果
@@ -128,13 +142,23 @@ class UnifiedStrategyEngine:
                 performance_metrics
             )
             
-            # 6. 综合结果
+            # 6. 新增：市场Beta调整
+            beta_adjusted_result = self._apply_market_beta_adjustment(
+                base_result, enhanced_multiplier, market_data
+            )
+            
+            # 7. 新增：成交量确认
+            volume_confirmed_result = self._apply_volume_confirmation(
+                beta_adjusted_result, volume_data, today_return
+            )
+            
+            # 8. 综合结果
             return self._create_unified_result(
-                base_result,
+                volume_confirmed_result,
                 stop_loss_result,
                 trend_result,
                 position_adjustment,
-                enhanced_multiplier
+                volume_confirmed_result.get('final_multiplier', enhanced_multiplier)
             )
             
         except Exception as e:
@@ -316,6 +340,114 @@ class UnifiedStrategyEngine:
         
         return self.position_manager.adjust_from_returns(base_multiplier, returns_history)
     
+    def _apply_market_beta_adjustment(
+        self,
+        base_result: Dict,
+        current_multiplier: float,
+        market_data: Optional[Dict]
+    ) -> Dict:
+        """
+        应用市场Beta调整
+        
+        Args:
+            base_result: 基础策略结果
+            current_multiplier: 当前买入倍数
+            market_data: 市场数据
+            
+        Returns:
+            调整后的结果字典
+        """
+        result = base_result.copy()
+        result['final_multiplier'] = current_multiplier
+        
+        if market_data is None:
+            return result
+        
+        market_return = market_data.get('index_return', 0.0)
+        market_sentiment = market_data.get('sentiment', 'neutral')
+        
+        # 熊市中降低买入倍数
+        if market_return < -0.02:  # 大盘跌2%以上
+            result['final_multiplier'] = current_multiplier * 0.7
+            result['status_label'] += " 📉大盘弱势"
+            result['operation_suggestion'] += "（大盘走弱，降低仓位）"
+            logger.debug(f"市场Beta调整: 大盘跌{market_return:.2%}, 倍数 {current_multiplier} -> {result['final_multiplier']}")
+        
+        # 牛市中提高止盈阈值
+        elif market_return > 0.02:  # 大盘涨2%以上
+            if base_result['action'] == 'sell':
+                result['action'] = 'hold'
+                result['final_multiplier'] = 0.0
+                result['status_label'] += " 📈大盘强势"
+                result['operation_suggestion'] = "牛市中暂停止盈，让利润奔跑"
+                logger.debug("市场Beta调整: 大盘强势，暂停卖出")
+        
+        # 极端情绪调整
+        if market_sentiment == 'extreme_fear':
+            # 极度恐慌可能是买入机会（ contrarian）
+            if base_result['action'] in ['buy', 'strong_buy']:
+                result['final_multiplier'] = min(3.0, result['final_multiplier'] * 1.3)
+                result['status_label'] += " 😰极端恐慌"
+        elif market_sentiment == 'extreme_greed':
+            # 极度贪婪，降低买入
+            result['final_multiplier'] = result['final_multiplier'] * 0.6
+            result['status_label'] += " 🤪极端贪婪"
+        
+        return result
+    
+    def _apply_volume_confirmation(
+        self,
+        base_result: Dict,
+        volume_data: Optional[Dict],
+        today_return: float
+    ) -> Dict:
+        """
+        应用成交量确认
+        
+        Args:
+            base_result: 基础策略结果
+            volume_data: 成交量数据
+            today_return: 当日收益率
+            
+        Returns:
+            调整后的结果字典
+        """
+        result = base_result.copy()
+        
+        if volume_data is None:
+            return result
+        
+        recent_volume = volume_data.get('recent_volume', 0)
+        avg_volume = volume_data.get('avg_volume', 1)
+        volume_ratio = recent_volume / avg_volume if avg_volume > 0 else 1.0
+        
+        # 放量下跌 - 可能是真下跌，降低买入倍数
+        if today_return < -1.0 and volume_ratio > 1.5:
+            result['final_multiplier'] = base_result.get('final_multiplier', base_result['buy_multiplier']) * 0.5
+            result['status_label'] += " 📊放量下跌"
+            result['operation_suggestion'] += "（放量下跌，谨慎买入）"
+            logger.debug(f"成交量调整: 放量下跌，倍数降低50%")
+        
+        # 缩量下跌 - 可能是洗盘，保持或略微增加买入
+        elif today_return < -0.5 and volume_ratio < 0.8:
+            result['final_multiplier'] = base_result.get('final_multiplier', base_result['buy_multiplier']) * 1.1
+            result['status_label'] += " 📊缩量下跌"
+            result['operation_suggestion'] += "（缩量下跌，可能是洗盘）"
+        
+        # 放量上涨 - 确认上涨趋势
+        elif today_return > 1.0 and volume_ratio > 1.3:
+            result['status_label'] += " 📊放量上涨"
+            result['operation_suggestion'] += "（放量上涨，趋势确认）"
+        
+        # 缩量上涨 - 可能是假突破
+        elif today_return > 1.0 and volume_ratio < 0.7:
+            if base_result['action'] == 'buy':
+                result['final_multiplier'] = base_result.get('final_multiplier', base_result['buy_multiplier']) * 0.8
+                result['status_label'] += " 📊缩量上涨"
+                result['operation_suggestion'] += "（缩量上涨，谨慎追高）"
+        
+        return result
+    
     def _apply_performance_enhancement(
         self,
         current_multiplier: float,
@@ -376,9 +508,15 @@ class UnifiedStrategyEngine:
             stop_loss_label=stop_loss_result.label,
             trend='unknown',
             trend_adjustment=1.0,
+            adx=0.0,
+            adx_trend_strength='unknown',
             volatility=0.0,
             volatility_level='unknown',
             volatility_adjustment=1.0,
+            market_beta_adjusted=False,
+            market_condition='neutral',
+            volume_confirmed=False,
+            volume_ratio=1.0,
             risk_adjusted=True,
             final_suggestion=f"⚠️ 止损触发！累计亏损 {stop_loss_result.cumulative_loss:.1%}，建议全部赎回止损。"
         )
@@ -432,9 +570,15 @@ class UnifiedStrategyEngine:
             stop_loss_label=stop_loss_result.label if stop_loss_result.level != StopLossLevel.NONE else '',
             trend=trend_result.trend.value,
             trend_adjustment=trend_result.multiplier_adjustment,
+            adx=trend_result.adx,
+            adx_trend_strength=trend_result.adx_trend_strength,
             volatility=position_adjustment.volatility,
             volatility_level=position_adjustment.volatility_level.value,
             volatility_adjustment=position_adjustment.adjustment_factor,
+            market_beta_adjusted=base_result.get('market_beta_adjusted', False),
+            market_condition=base_result.get('market_condition', 'neutral'),
+            volume_confirmed=base_result.get('volume_confirmed', False),
+            volume_ratio=base_result.get('volume_ratio', 1.0),
             risk_adjusted=risk_adjusted,
             final_suggestion=final_suggestion
         )
@@ -455,9 +599,15 @@ class UnifiedStrategyEngine:
             stop_loss_label='',
             trend='sideways',
             trend_adjustment=1.0,
+            adx=0.0,
+            adx_trend_strength='unknown',
             volatility=0.0,
             volatility_level='normal',
             volatility_adjustment=1.0,
+            market_beta_adjusted=False,
+            market_condition='neutral',
+            volume_confirmed=False,
+            volume_ratio=1.0,
             risk_adjusted=False,
             final_suggestion='数据不足，建议持有观望'
         )
@@ -528,9 +678,15 @@ class UnifiedStrategyEngine:
             'stop_loss_label': result.stop_loss_label,
             'trend': result.trend,
             'trend_adjustment': result.trend_adjustment,
+            'adx': result.adx,
+            'adx_trend_strength': result.adx_trend_strength,
             'volatility': result.volatility,
             'volatility_level': result.volatility_level,
             'volatility_adjustment': result.volatility_adjustment,
+            'market_beta_adjusted': result.market_beta_adjusted,
+            'market_condition': result.market_condition,
+            'volume_confirmed': result.volume_confirmed,
+            'volume_ratio': result.volume_ratio,
             'risk_adjusted': result.risk_adjusted,
             'final_suggestion': result.final_suggestion
         }
