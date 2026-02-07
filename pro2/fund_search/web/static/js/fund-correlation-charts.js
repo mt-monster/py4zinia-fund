@@ -290,7 +290,9 @@ function initScatterChart(scatterData) {
             plugins: {
                 title: {
                     display: true,
-                    text: `日收益率散点图 (相关系数: ${scatterData.correlation.toFixed(4)})`,
+                    text: scatterData.fund1_name && scatterData.fund2_name
+                        ? `${formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code})} vs ${formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code})} 日收益率散点图 (r=${scatterData.correlation.toFixed(4)})`
+                        : `日收益率散点图 (相关系数: ${scatterData.correlation.toFixed(4)})`,
                     font: {
                         size: 18,
                         weight: 'bold'
@@ -312,7 +314,12 @@ function initScatterChart(scatterData) {
                     },
                     callbacks: {
                         label: function(context) {
-                            return `基金1: ${(context.parsed.x * 100).toFixed(2)}%, 基金2: ${(context.parsed.y * 100).toFixed(2)}%`;
+                            const fund1Name = formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code});
+                            const fund2Name = formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code});
+                            return [
+                                `${fund1Name}: ${(context.parsed.x * 100).toFixed(2)}%`,
+                                `${fund2Name}: ${(context.parsed.y * 100).toFixed(2)}%`
+                            ];
                         }
                     }
                 }
@@ -322,7 +329,7 @@ function initScatterChart(scatterData) {
                     type: 'linear',
                     title: {
                         display: true,
-                        text: scatterData.fund1_name + ' 日收益率 (%)',
+                        text: formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code}) + ' 日收益率 (%)',
                         font: {
                             size: 15,
                             weight: 'bold'
@@ -344,7 +351,7 @@ function initScatterChart(scatterData) {
                     type: 'linear',
                     title: {
                         display: true,
-                        text: scatterData.fund2_name + ' 日收益率 (%)',
+                        text: formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code}) + ' 日收益率 (%)',
                         font: {
                             size: 15,
                             weight: 'bold'
@@ -365,6 +372,29 @@ function initScatterChart(scatterData) {
             }
         }
     });
+}
+
+/**
+ * 格式化基金名称显示
+ * 优先使用基金名称，如果名称无效则使用代码
+ */
+function formatFundName(fund) {
+    if (!fund) return '未知基金';
+    
+    // 如果传入的是字符串，直接返回
+    if (typeof fund === 'string') return fund;
+    
+    // 优先使用 fund_name，如果不存在或与 fund_code 相同，则使用 fund_code
+    let name = fund.fund_name || fund.name;
+    const code = fund.fund_code || fund.code;
+    
+    // 如果名称无效（为空或与代码相同），则显示代码
+    if (!name || name === code) {
+        return code || '未知基金';
+    }
+    
+    // 返回基金名称（过长时截断）
+    return name.length > 15 ? name.substring(0, 15) + '...' : name;
 }
 
 /**
@@ -407,8 +437,11 @@ function initLineChart(lineData) {
         
         datasets = lineData.funds.map((fund, index) => {
             const color = colors[index % colors.length];
+            const displayName = formatFundName(fund);
+            console.log(`📊 基金 ${index + 1} 显示名称:`, displayName);
+            
             return {
-                label: fund.fund_name,
+                label: displayName,
                 data: fund.values,
                 borderColor: color.border,
                 backgroundColor: color.background,
@@ -424,7 +457,7 @@ function initLineChart(lineData) {
         labels = lineData.dates;
         datasets = [
             {
-                label: lineData.fund1_name,
+                label: formatFundName({fund_name: lineData.fund1_name, fund_code: lineData.fund1_code}),
                 data: lineData.fund1_values,
                 borderColor: colors[0].border,
                 backgroundColor: colors[0].background,
@@ -434,7 +467,7 @@ function initLineChart(lineData) {
                 tension: 0.1
             },
             {
-                label: lineData.fund2_name,
+                label: formatFundName({fund_name: lineData.fund2_name, fund_code: lineData.fund2_code}),
                 data: lineData.fund2_values,
                 borderColor: colors[1].border,
                 backgroundColor: colors[1].background,
@@ -468,7 +501,11 @@ function initLineChart(lineData) {
             plugins: {
                 title: {
                     display: true,
-                    text: '净值走势对比图',
+                    text: lineData.funds && lineData.funds.length > 2 
+                        ? `${lineData.funds.length}只基金净值走势对比`
+                        : (lineData.funds && lineData.funds.length === 2 
+                            ? `${formatFundName(lineData.funds[0])} vs ${formatFundName(lineData.funds[1])} 净值走势`
+                            : '净值走势对比图'),
                     font: {
                         size: 18,
                         weight: 'bold'
@@ -595,7 +632,9 @@ function initRollingChart(rollingData) {
             plugins: {
                 title: {
                     display: true,
-                    text: `滚动相关性变化图 (窗口: ${rollingData.window}天)`,
+                    text: rollingData.fund1_name && rollingData.fund2_name 
+                        ? `${formatFundName({fund_name: rollingData.fund1_name, fund_code: rollingData.fund1_code})} vs ${formatFundName({fund_name: rollingData.fund2_name, fund_code: rollingData.fund2_code})} 滚动相关性 (窗口: ${rollingData.window}天)`
+                        : `滚动相关性变化图 (窗口: ${rollingData.window}天)`,
                     font: {
                         size: 18,
                         weight: 'bold'
@@ -708,8 +747,11 @@ function initDistributionChart(distributionData) {
         
         datasets = distributionData.funds.map((fund, index) => {
             const color = colors[index % colors.length];
+            const displayName = formatFundName(fund);
+            console.log(`📊 收益率分布 - 基金 ${index + 1} 显示名称:`, displayName);
+            
             return {
-                label: fund.fund_name,
+                label: displayName,
                 data: fund.counts,
                 backgroundColor: color.background,
                 borderColor: color.border,
@@ -737,14 +779,14 @@ function initDistributionChart(distributionData) {
         
         datasets = [
             {
-                label: distributionData.fund1_name || '基金1',
+                label: formatFundName({fund_name: distributionData.fund1_name, fund_code: distributionData.fund1_code}) || '基金1',
                 data: fund1_counts,
                 backgroundColor: colors[0].background,
                 borderColor: colors[0].border,
                 borderWidth: 1
             },
             {
-                label: distributionData.fund2_name || '基金2',
+                label: formatFundName({fund_name: distributionData.fund2_name, fund_code: distributionData.fund2_code}) || '基金2',
                 data: fund2_counts,
                 backgroundColor: colors[1].background,
                 borderColor: colors[1].border,
@@ -786,7 +828,11 @@ function initDistributionChart(distributionData) {
                 plugins: {
                     title: {
                         display: true,
-                        text: '收益率分布对比图',
+                        text: distributionData.funds && distributionData.funds.length > 2
+                            ? `${distributionData.funds.length}只基金收益率分布对比`
+                            : (distributionData.funds && distributionData.funds.length === 2
+                                ? `${formatFundName(distributionData.funds[0])} vs ${formatFundName(distributionData.funds[1])} 收益率分布`
+                                : '收益率分布对比图'),
                         font: {
                             size: 18,
                             weight: 'bold'

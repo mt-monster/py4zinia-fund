@@ -201,17 +201,15 @@ def get_dashboard_stats():
             for _, row in df.iterrows():
                 holding_shares = float(row['holding_shares']) if pd.notna(row['holding_shares']) else 0
                 cost_price = float(row['cost_price']) if pd.notna(row['cost_price']) else 0
-                current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else cost_price
-                previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else cost_price
-                today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
-                sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
+                
+                # 分析数据可能缺失
+                current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
+                previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
+                today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
+                sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
                 
                 # 持有金额（成本）= 持有份额 × 成本价
                 holding_amount = holding_shares * cost_price
-                
-                # 当前市值 = 持有份额 × 当前净值（用于计算今日收益）
-                current_value = holding_shares * current_nav
-                previous_value = holding_shares * previous_nav
                 
                 # 总资产 = 所有持仓基金的持有金额之和
                 total_assets += holding_amount
@@ -219,10 +217,16 @@ def get_dashboard_stats():
                 # 总成本（与总资产相同，用于计算收益率）
                 total_cost += holding_amount
                 
-                # 今日收益 = (当前市值 - 昨日市值)
-                today_profit += (current_value - previous_value)
+                # 只有当有分析数据时才计算今日收益
+                if current_nav is not None and previous_nav is not None:
+                    # 当前市值 = 持有份额 × 当前净值（用于计算今日收益）
+                    current_value = holding_shares * current_nav
+                    previous_value = holding_shares * previous_nav
+                    
+                    # 今日收益 = (当前市值 - 昨日市值)
+                    today_profit += (current_value - previous_value)
                 
-                if sharpe != 0:
+                if sharpe is not None and sharpe != 0:
                     total_sharpe += sharpe
                     sharpe_count += 1
         
@@ -2744,46 +2748,67 @@ def get_holdings():
         
         holdings = []
         for _, row in df.iterrows():
-            # 计算盈亏指标
+            # 基础持仓数据（必须有的）
             holding_shares = float(row['holding_shares']) if pd.notna(row['holding_shares']) else 0
             cost_price = float(row['cost_price']) if pd.notna(row['cost_price']) else 0
             holding_amount = float(row['holding_amount']) if pd.notna(row['holding_amount']) else 0
-            current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else cost_price
-            previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else cost_price
-            today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
-            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0
-            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
-            sharpe_ratio_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else 0
-            sharpe_ratio_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else 0
-            sharpe_ratio_all = float(row['sharpe_ratio_all']) if pd.notna(row['sharpe_ratio_all']) else 0
-            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
-            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
-            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
-            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
-            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
-            composite_score = float(row['composite_score']) if pd.notna(row['composite_score']) else 0
             
-            # 当前市值
-            current_value = holding_shares * current_nav
-            # 昨日市值
-            previous_value = holding_shares * previous_nav
+            # 分析数据（可能缺失）- 缺失时返回 None 而不是 0
+            has_analysis_data = pd.notna(row['current_nav'])  # 用 current_nav 判断是否有分析数据
             
-            # 持有盈亏
-            holding_profit = current_value - holding_amount
-            holding_profit_rate = (holding_profit / holding_amount * 100) if holding_amount > 0 else 0
+            current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
+            previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
+            today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
+            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else None
+            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
+            sharpe_ratio_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else None
+            sharpe_ratio_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else None
+            sharpe_ratio_all = float(row['sharpe_ratio_all']) if pd.notna(row['sharpe_ratio_all']) else None
+            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else None
+            volatility = float(row['volatility']) if pd.notna(row['volatility']) else None
+            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else None
+            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else None
+            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else None
+            composite_score = float(row['composite_score']) if pd.notna(row['composite_score']) else None
             
-            # 当日盈亏
-            today_profit = current_value - previous_value
-            today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
-            
-            # 昨日盈亏 - 基于昨日市值和基金昨日涨跌幅计算
-            # yesterday_return 是基金的prev_day_return（日涨跌幅）
-            yesterday_profit = previous_value * (yesterday_return / 100) if yesterday_return else 0
-            yesterday_profit_rate = yesterday_return if yesterday_return else 0
-            
-            # 累计盈亏（与持有盈亏相同）
-            total_profit = holding_profit
-            total_profit_rate = holding_profit_rate
+            # 只有当有分析数据时才计算相关指标
+            if has_analysis_data:
+                # 当前市值
+                current_value = holding_shares * current_nav
+                # 昨日市值
+                previous_value = holding_shares * (previous_nav if previous_nav else current_nav)
+                
+                # 持有盈亏
+                holding_profit = current_value - holding_amount
+                holding_profit_rate = (holding_profit / holding_amount * 100) if holding_amount > 0 else 0
+                
+                # 当日盈亏
+                today_profit = current_value - previous_value
+                today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
+                
+                # 昨日盈亏 - 基于昨日市值和基金昨日涨跌幅计算
+                if yesterday_return is not None:
+                    yesterday_profit = previous_value * (yesterday_return / 100)
+                    yesterday_profit_rate = yesterday_return
+                else:
+                    yesterday_profit = 0
+                    yesterday_profit_rate = None
+                
+                # 累计盈亏（与持有盈亏相同）
+                total_profit = holding_profit
+                total_profit_rate = holding_profit_rate
+            else:
+                # 没有分析数据时，相关字段为 None
+                current_value = None
+                previous_value = None
+                holding_profit = None
+                holding_profit_rate = None
+                today_profit = None
+                today_profit_rate = None
+                yesterday_profit = None
+                yesterday_profit_rate = None
+                total_profit = None
+                total_profit_rate = None
             
             holding = {
                 'id': int(row['id']),
@@ -2792,33 +2817,33 @@ def get_holdings():
                 'holding_shares': round(holding_shares, 4),
                 'cost_price': round(cost_price, 4),
                 'holding_amount': round(holding_amount, 2),
-                'current_nav': round(current_nav, 4),
-                'current_value': round(current_value, 2),
+                'current_nav': round(current_nav, 4) if current_nav is not None else None,
+                'current_value': round(current_value, 2) if current_value is not None else None,
                 'buy_date': str(row['buy_date']),
                 'notes': row['notes'] if pd.notna(row['notes']) else '',
                 # 盈亏指标
-                'today_profit': round(today_profit, 2),
-                'today_profit_rate': round(today_profit_rate, 2),
-                'holding_profit': round(holding_profit, 2),
-                'holding_profit_rate': round(holding_profit_rate, 2),
-                'total_profit': round(total_profit, 2),
-                'total_profit_rate': round(total_profit_rate, 2),
-                'today_return': round(today_return, 2),
-                'yesterday_return': round(yesterday_return, 2),
-                'yesterday_profit': round(yesterday_profit, 2),
-                'yesterday_profit_rate': round(yesterday_profit_rate, 2),
-                'prev_day_return': round(yesterday_profit_rate, 2),  # 兼容前端字段名
+                'today_profit': round(today_profit, 2) if today_profit is not None else None,
+                'today_profit_rate': round(today_profit_rate, 2) if today_profit_rate is not None else None,
+                'holding_profit': round(holding_profit, 2) if holding_profit is not None else None,
+                'holding_profit_rate': round(holding_profit_rate, 2) if holding_profit_rate is not None else None,
+                'total_profit': round(total_profit, 2) if total_profit is not None else None,
+                'total_profit_rate': round(total_profit_rate, 2) if total_profit_rate is not None else None,
+                'today_return': round(today_return, 2) if today_return is not None else None,
+                'yesterday_return': round(yesterday_return, 2) if yesterday_return is not None else None,
+                'yesterday_profit': round(yesterday_profit, 2) if yesterday_profit is not None else None,
+                'yesterday_profit_rate': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,
+                'prev_day_return': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,  # 兼容前端字段名
                 # 绩效指标
-                'sharpe_ratio': round(sharpe_ratio, 4),
-                'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4),
-                'sharpe_ratio_1y': round(sharpe_ratio_1y, 4),
-                'sharpe_ratio_all': round(sharpe_ratio_all, 4),
-                'max_drawdown': round(max_drawdown * 100, 2),
-                'volatility': round(volatility * 100, 2),
-                'annualized_return': round(annualized_return * 100, 2),
-                'calmar_ratio': round(calmar_ratio, 4),
-                'sortino_ratio': round(sortino_ratio, 4),
-                'composite_score': round(composite_score, 4)
+                'sharpe_ratio': round(sharpe_ratio, 4) if sharpe_ratio is not None else None,
+                'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4) if sharpe_ratio_ytd is not None else None,
+                'sharpe_ratio_1y': round(sharpe_ratio_1y, 4) if sharpe_ratio_1y is not None else None,
+                'sharpe_ratio_all': round(sharpe_ratio_all, 4) if sharpe_ratio_all is not None else None,
+                'max_drawdown': round(max_drawdown * 100, 2) if max_drawdown is not None else None,
+                'volatility': round(volatility * 100, 2) if volatility is not None else None,
+                'annualized_return': round(annualized_return * 100, 2) if annualized_return is not None else None,
+                'calmar_ratio': round(calmar_ratio, 4) if calmar_ratio is not None else None,
+                'sortino_ratio': round(sortino_ratio, 4) if sortino_ratio is not None else None,
+                'composite_score': round(composite_score, 4) if composite_score is not None else None
             }
             holdings.append(holding)
         
@@ -2890,24 +2915,55 @@ def import_holding_confirm():
                 # 计算持有金额
                 holding_amount = holding_shares * cost_price
                 
-                sql = """
-                INSERT INTO user_holdings 
-                (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
-                VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
-                """
-                
-                logger.info(f"准备插入基金数据: {fund_code} - {fund_name}")
-                success = db_manager.execute_sql(sql, {
+                # 检查基金是否已存在
+                check_sql = "SELECT COUNT(*) FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
+                existing_result = db_manager.fetch_one(check_sql, {
                     'user_id': user_id,
-                    'fund_code': fund_code,
-                    'fund_name': fund_name,
-                    'holding_shares': holding_shares,
-                    'cost_price': cost_price,
-                    'holding_amount': holding_amount,
-                    'buy_date': buy_date,
-                    'notes': notes
+                    'fund_code': fund_code
                 })
-                logger.info(f"数据库操作结果: {success}")
+                
+                existing_count = existing_result[0] if existing_result else 0
+                
+                if existing_count > 0:
+                    # 基金已存在，更新持仓
+                    update_sql = """
+                    UPDATE user_holdings 
+                    SET holding_shares = :holding_shares, 
+                        cost_price = :cost_price, 
+                        holding_amount = :holding_amount,
+                        buy_date = :buy_date,
+                        notes = :notes
+                    WHERE user_id = :user_id AND fund_code = :fund_code
+                    """
+                    success = db_manager.execute_sql(update_sql, {
+                        'user_id': user_id,
+                        'fund_code': fund_code,
+                        'holding_shares': holding_shares,
+                        'cost_price': cost_price,
+                        'holding_amount': holding_amount,
+                        'buy_date': buy_date,
+                        'notes': notes
+                    })
+                    logger.info(f"更新基金 {fund_code} 持仓成功")
+                else:
+                    # 基金不存在，插入新记录
+                    sql = """
+                    INSERT INTO user_holdings 
+                    (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
+                    VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
+                    """
+                    
+                    success = db_manager.execute_sql(sql, {
+                        'user_id': user_id,
+                        'fund_code': fund_code,
+                        'fund_name': fund_name,
+                        'holding_shares': holding_shares,
+                        'cost_price': cost_price,
+                        'holding_amount': holding_amount,
+                        'buy_date': buy_date,
+                        'notes': notes
+                    })
+                    logger.info(f"插入基金 {fund_code} 持仓成功")
                 
                 if success:
                     imported_count += 1

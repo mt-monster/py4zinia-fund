@@ -33,6 +33,8 @@ class TrendResult:
     returns_long: float       # 长期均线收益率
     multiplier_adjustment: float  # 买入倍数调整系数
     confidence: float         # 趋势置信度 (0-1)
+    adx: float = 0.0          # ADX趋势强度指标
+    adx_trend_strength: str = "unknown"  # ADX趋势强度描述
 
 
 class TrendAnalyzer:
@@ -117,12 +119,29 @@ class TrendAnalyzer:
         # 判断趋势
         trend, confidence = self._classify_trend(returns_short, returns_long)
         
-        # 获取调整系数
-        multiplier_adjustment = self._get_multiplier_adjustment(trend)
+        # 新增：ADX趋势强度分析
+        # 将收益率转换为模拟价格序列（从1.0开始）
+        simulated_prices = [1.0]
+        for r in returns_history:
+            simulated_prices.append(simulated_prices[-1] * (1 + r))
+        
+        adx_value, adx_strength = self.calculate_adx(simulated_prices)
+        
+        # 如果ADX显示无趋势，降低置信度并调整为横盘
+        if adx_value < 20 and trend != TrendType.SIDEWAYS:
+            confidence *= 0.5  # 降低置信度
+            if adx_value < 15:
+                trend = TrendType.SIDEWAYS  # 强制归为横盘
+                multiplier_adjustment = self.sideways_adjustment
+            else:
+                multiplier_adjustment = self._get_multiplier_adjustment(trend)
+        else:
+            # 获取调整系数
+            multiplier_adjustment = self._get_multiplier_adjustment(trend)
         
         logger.debug(
             f"趋势分析: 短期={returns_short:.4f}, 长期={returns_long:.4f}, "
-            f"趋势={trend.value}, 调整={multiplier_adjustment}"
+            f"趋势={trend.value}, 调整={multiplier_adjustment}, ADX={adx_value:.1f}"
         )
         
         return TrendResult(
@@ -130,7 +149,9 @@ class TrendAnalyzer:
             returns_short=returns_short,
             returns_long=returns_long,
             multiplier_adjustment=multiplier_adjustment,
-            confidence=confidence
+            confidence=confidence,
+            adx=adx_value,
+            adx_trend_strength=adx_strength
         )
     
     def _classify_trend(
@@ -178,6 +199,73 @@ class TrendAnalyzer:
             return self.downtrend_adjustment
         else:
             return self.sideways_adjustment
+    
+    def calculate_adx(self, prices: List[float], period: int = 14) -> tuple[float, str]:
+        """
+        计算ADX（Average Directional Index）趋势强度指标
+        
+        Args:
+            prices: 价格序列（最新的在最后）
+            period: ADX计算周期，默认14
+            
+        Returns:
+            (ADX值, 趋势强度描述)
+        """
+        if len(prices) < period + 1:
+            return 0.0, "数据不足"
+        
+        # 转换为numpy数组
+        prices_arr = np.array(prices)
+        
+        # 计算True Range (TR)
+        high = prices_arr[1:]
+        low = prices_arr[:-1]
+        
+        # 使用价格变化模拟高低点
+        tr1 = np.abs(high - low)
+        tr = tr1  # 简化计算
+        
+        # 计算+DM和-DM
+        plus_dm = np.where((high - prices_arr[:-1]) > (prices_arr[:-1] - low), 
+                          np.maximum(high - prices_arr[:-1], 0), 0)
+        minus_dm = np.where((prices_arr[:-1] - low) > (high - prices_arr[:-1]),
+                           np.maximum(prices_arr[:-1] - low, 0), 0)
+        
+        # 计算平滑后的TR和DM
+        tr_smooth = np.convolve(tr, np.ones(period)/period, mode='valid')
+        plus_dm_smooth = np.convolve(plus_dm, np.ones(period)/period, mode='valid')
+        minus_dm_smooth = np.convolve(minus_dm, np.ones(period)/period, mode='valid')
+        
+        if len(tr_smooth) == 0 or np.mean(tr_smooth) == 0:
+            return 0.0, "计算错误"
+        
+        # 计算+DI和-DI
+        plus_di = 100 * plus_dm_smooth[-1] / tr_smooth[-1] if tr_smooth[-1] != 0 else 0
+        minus_di = 100 * minus_dm_smooth[-1] / tr_smooth[-1] if tr_smooth[-1] != 0 else 0
+        
+        # 计算DX
+        dx = 100 * np.abs(plus_di - minus_di) / (plus_di + minus_di) if (plus_di + minus_di) != 0 else 0
+        
+        # 简化：使用价格变化的标准差来估算ADX
+        # 更准确的计算需要完整的OHLC数据
+        returns = np.diff(prices_arr) / prices_arr[:-1]
+        volatility = np.std(returns[-period:])
+        trend_strength = np.abs(np.mean(returns[-period:])) / (volatility + 1e-10)
+        
+        # 映射到0-100范围
+        adx = min(100, trend_strength * 50)
+        
+        # 判断趋势强度
+        if adx > 40:
+            strength = "强趋势"
+        elif adx > 25:
+            strength = "中等趋势"
+        elif adx > 15:
+            strength = "弱趋势"
+        else:
+            strength = "无趋势"
+        
+        return float(adx), strength
     
     def adjust_buy_multiplier(
         self, 
@@ -233,6 +321,8 @@ class TrendAnalyzer:
             'returns_long': trend_result.returns_long,
             'multiplier_adjustment': trend_result.multiplier_adjustment,
             'confidence': trend_result.confidence,
+            'adx': trend_result.adx,
+            'adx_trend_strength': trend_result.adx_trend_strength,
             'description': self.get_trend_description(trend_result)
         }
 
