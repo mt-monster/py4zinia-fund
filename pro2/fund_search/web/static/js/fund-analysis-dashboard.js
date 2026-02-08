@@ -653,6 +653,11 @@ class FundAnalysisDashboard {
      * 渲染环形图
      */
     renderDonutChart(canvas, data) {
+        if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+            console.warn('⚠️ 环形图 canvas 不存在或不支持 getBoundingClientRect，跳过渲染');
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
         

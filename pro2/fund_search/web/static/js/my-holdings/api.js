@@ -128,15 +128,20 @@ const FundAPI = {
      */
     async getMarketIndex() {
         try {
-            // 模拟数据，实际应该调用真实API
+            const response = await fetch(FundConfig.api.marketIndex);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.error || '获取指数失败');
+            }
+
             return {
                 success: true,
-                data: {
-                    name: '沪深300',
-                    value: '3,456.78',
-                    change: '+12.34',
-                    changePercent: '+0.36%'
-                }
+                data: data.data
             };
         } catch (error) {
             console.error('API Error - getMarketIndex:', error);

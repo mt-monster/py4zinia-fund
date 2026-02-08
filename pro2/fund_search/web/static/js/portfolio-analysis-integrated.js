@@ -23,86 +23,41 @@ const PortfolioAnalysis = {
     bindEvents() {
         console.log('🔍 PortfolioAnalysis.bindEvents() 开始执行');
         
-        // 添加分析按钮事件
-        const analyzeBtn = document.getElementById('portfolio-analyze-btn');
-        console.log('🔍 查找按钮元素:', analyzeBtn);
+        // 注意：不再需要绑定"分析"按钮，因为分析现在自动内联显示
+        // 回测完成后会自动调用 prepareAnalysisForDisplay() 和 displayMultiFundResults()
+        console.log('💡 投资组合分析采用自动内联模式，无需手动触发');
         
-        if (analyzeBtn) {
-            // 先移除可能存在的旧事件监听器
-            const newAnalyzeBtn = analyzeBtn.cloneNode(true);
-            analyzeBtn.parentNode.replaceChild(newAnalyzeBtn, analyzeBtn);
-            
-            console.log('✅ 找到分析按钮，添加点击事件监听器');
-            newAnalyzeBtn.addEventListener('click', (event) => {
-                console.log('🖱️ 按钮被点击');
-                event.preventDefault(); // 防止默认行为
-                event.stopPropagation(); // 阻止事件冒泡
-                this.showAnalysis().catch(error => {
-                    console.error('❌ 分析过程中出错:', error);
-                    alert('分析失败: ' + error.message);
-                });
-            });
-            
-            // 同时添加键盘事件支持
-            newAnalyzeBtn.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    newAnalyzeBtn.click();
-                }
-            });
-        } else {
-            console.warn('⚠️ 未找到分析按钮元素');
-        }
-        
-        // 监听回测周期变化
-        const periodSelect = document.getElementById('backtest-period');
-        if (periodSelect) {
-            periodSelect.addEventListener('change', () => {
-                // 如果已经显示了分析结果，则自动更新
-                if (document.getElementById('portfolio-analysis-result')) {
-                    this.showAnalysis().catch(error => {
-                        console.error('自动更新分析失败:', error);
-                    });
-                }
-            });
-        }
-        
-        // 监听回测结果更新
+        // 监听回测结果更新（保留，用于检测回测结果DOM变化）
         this.observeBacktestResults();
         console.log('✅ PortfolioAnalysis.bindEvents() 执行完成');
     },
     
     /**
      * 监听回测结果区域的变化
+     * 注意：现在只用于日志记录和调试，不再自动触发重新分析
      */
     observeBacktestResults() {
         const resultBox = document.getElementById('backtest-result');
-        if (!resultBox) return;
+        if (!resultBox) {
+            console.log('💡 backtest-result 容器未找到，跳过监听');
+            return;
+        }
+        
+        console.log('👀 开始监听回测结果区域的DOM变化（仅日志）');
         
         // 创建MutationObserver来监听DOM变化
         const observer = new MutationObserver((mutations) => {
             for (let mutation of mutations) {
-                if (mutation.type === 'childList' || mutation.type === 'attributes') {
-                    // 如果分析结果已显示且回测结果发生变化，重新计算分析
-                    if (document.getElementById('portfolio-analysis-result')) {
-                        // 稍微延迟以确保DOM完全更新
-                        setTimeout(() => {
-                            this.showAnalysis().catch(error => {
-                                console.error('DOM变化触发的分析更新失败:', error);
-                            });
-                        }, 100);
-                        break;
-                    }
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    console.log('🔍 检测到回测结果区域DOM变化:', mutation);
                 }
             }
         });
         
-        // 开始观察
+        // 开始监听（简化配置）
         observer.observe(resultBox, {
             childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['style']
+            subtree: false
         });
     },
 
@@ -117,19 +72,13 @@ const PortfolioAnalysis = {
             return;
         }
 
-        // 【重要】先获取净值数据，再计算绩效指标
-        // 确保绩效指标和净值曲线使用同一数据源
-        const navData = await this.generateNavData(backtestData);
-        
-        // 将净值数据附加到回测数据中，用于计算真实绩效指标
-        backtestData.navData = navData;
-        
-        // 基于真实净值数据计算绩效指标
+        // 直接基于回测数据计算绩效指标
         const metrics = this.calculateMetrics(backtestData);
         
-        // 渲染分析结果
-        this.renderAnalysis(metrics, navData);
+        // 渲染分析结果（不包含净值曲线）
+        this.renderAnalysis(metrics, null);
     },
+
 
     /**
      * 自动分析 - 回测完成后自动执行
@@ -146,17 +95,11 @@ const PortfolioAnalysis = {
         }
 
         try {
-            // 获取净值数据
-            const navData = await this.generateNavData(backtestData);
-            
-            // 将净值数据附加到回测数据中
-            backtestData.navData = navData;
-            
-            // 基于真实净值数据计算绩效指标
+            // 直接基于回测数据计算绩效指标
             const metrics = this.calculateMetrics(backtestData);
             
-            // 内联渲染分析结果（不使用弹窗）
-            this.renderInlineAnalysis(metrics, navData);
+            // 内联渲染分析结果（不包含净值曲线）
+            this.renderInlineAnalysis(metrics, null);
             
             console.log('✅ 自动分析完成');
         } catch (error) {
@@ -239,8 +182,9 @@ const PortfolioAnalysis = {
                 });
             }
         });
-
-        return {
+        
+        // 尝试从全局变量获取完整的回测数据（包含equity_curve和trades）
+        const backtestData = {
             initialAmount: initialAmount,
             finalValue: finalValue,
             totalReturn: totalReturn,
@@ -248,13 +192,26 @@ const PortfolioAnalysis = {
             totalDays: totalDays,
             funds: funds
         };
+        
+        // 如果存在全局回测结果数据，合并进来
+        if (window.lastBacktestResult && window.lastBacktestResult.funds) {
+            backtestData.fundsWithDetails = window.lastBacktestResult.funds;
+            backtestData.portfolio_equity_curve = window.lastBacktestResult.portfolio_equity_curve;
+        }
+        
+        return backtestData;
     },
 
     /**
-     * 计算关键绩效指标（基于真实净值时间序列）
+     * 计算关键绩效指标（基于回测equity_curve数据）
+     * 
+     * 重要说明：
+     * - "组合表现"和"关键绩效指标"现在使用相同的回测模拟数据源
+     * - 两处数据应该完全一致，都基于回测引擎的equity_curve
+     * - 如果仍有差异，可能是计算方法或精度问题，需要进一步检查
      */
     calculateMetrics(data) {
-        // 使用真实的净值数据进行计算
+        // 使用回测的净值曲线数据进行计算
         const navData = data.navData || [];
         
         if (navData.length === 0) {
@@ -262,42 +219,35 @@ const PortfolioAnalysis = {
             return this.calculateBasicMetrics(data);
         }
         
-        console.log('📊 基于真实净值数据计算绩效指标');
+        const dataSource = navData.dataSource?.data_source || 'unknown';
+        console.log(`📊 基于${dataSource === 'backtest_simulation' ? '回测模拟' : '真实历史'}数据计算绩效指标`);
+        console.log('💡 组合表现和关键绩效指标现在使用相同数据源，应完全一致');
         
         // 从净值数据获取起始值和终值（用于计算其他指标）
         const initialValue = navData[0].portfolio;
         const finalValue = navData[navData.length - 1].portfolio;
         
-        // 1. 总收益率 - 优先使用回测数据中的总收益率，保持与回测结果一致
-        let totalReturn;
+        // 1. 总收益率 - 从equity_curve计算
+        const totalReturn = ((finalValue - initialValue) / initialValue) * 100;
+        console.log(`📌 从equity_curve计算总收益率: ${totalReturn.toFixed(2)}%`);
+        
+        // 对比组合表现区域的收益率（应该一致）
         if (data.totalReturn !== undefined) {
-            // 使用回测数据中的总收益率
-            totalReturn = data.totalReturn;
-            console.log(`📌 使用回测数据中的总收益率: ${totalReturn.toFixed(2)}%`);
-        } else {
-            // 从净值数据计算（可能与回测结果不一致，因为净值基准不同）
-            totalReturn = ((finalValue - initialValue) / initialValue) * 100;
-            console.log(`⚠️ 从净值计算总收益率: ${totalReturn.toFixed(2)}%（可能与回测结果不一致）`);
+            console.log(`📌 组合表现区域显示的收益率: ${data.totalReturn.toFixed(2)}%`);
+            const diff = Math.abs(totalReturn - data.totalReturn);
+            if (diff > 0.01) {
+                console.warn(`⚠️ 收益率不一致，差异: ${diff.toFixed(2)}% - 需要检查计算逻辑`);
+            } else {
+                console.log(`✅ 收益率一致性验证通过`);
+            }
         }
         
-        // 2. 年化收益率 - 优先从回测数据中获取，否则基于净值数据计算
-        let annualizedReturn;
+        // 2. 年化收益率 - 从equity_curve计算
         const totalDays = navData.length - 1;
-        const years = totalDays / 365.25;
-        
-        if (data.annualizedReturn !== undefined) {
-            // 使用回测数据中的年化收益率
-            annualizedReturn = data.annualizedReturn;
-            console.log(`📌 使用回测数据中的年化收益率: ${annualizedReturn.toFixed(2)}%`);
-        } else if (data.annualized_return !== undefined) {
-            // 使用回测数据中的年化收益率（下划线命名）
-            annualizedReturn = data.annualized_return;
-            console.log(`📌 使用回测数据中的年化收益率: ${annualizedReturn.toFixed(2)}%`);
-        } else {
-            // 从净值数据计算
-            annualizedReturn = (Math.pow(finalValue / initialValue, 1 / years) - 1) * 100;
-            console.log(`⚠️ 从净值计算年化收益率: ${annualizedReturn.toFixed(2)}%`);
-        }
+        const years = totalDays / 252;
+        const annualizedReturn = (Math.pow(finalValue / initialValue, 1 / years) - 1) * 100;
+        console.log(`📌 从equity_curve计算年化收益率: ${annualizedReturn.toFixed(2)}%`);
+
         
         // 3. 计算日收益率序列
         const dailyReturns = [];
@@ -356,8 +306,10 @@ const PortfolioAnalysis = {
             console.log(`📌 使用回测数据中的夏普比率: ${sharpeRatio.toFixed(2)}`);
         } else {
             // 计算夏普比率（假设无风险利率2%）
-            const riskFreeRate = 2.0;
-            sharpeRatio = (annualizedReturn - riskFreeRate) / annualizedVolatility;
+            const riskFreeRate = 0.02;
+            sharpeRatio = annualizedVolatility !== 0
+                ? ((annualizedReturn / 100) - riskFreeRate) / (annualizedVolatility / 100)
+                : 0;
             console.log(`⚠️ 计算夏普比率: ${sharpeRatio.toFixed(2)}`);
         }
         
@@ -376,7 +328,13 @@ const PortfolioAnalysis = {
         const avgExcessReturn = excessReturns.reduce((sum, r) => sum + r, 0) / excessReturns.length;
         const trackingVariance = excessReturns.reduce((sum, r) => sum + Math.pow(r - avgExcessReturn, 2), 0) / (excessReturns.length - 1);
         const trackingError = Math.sqrt(trackingVariance) * Math.sqrt(252) * 100; // 年化跟踪误差
-        const informationRatio = (avgExcessReturn * 252 * 100) / trackingError; // 年化超额收益 / 年化跟踪误差
+        let informationRatio = 0;
+        if (trackingError && isFinite(trackingError)) {
+            informationRatio = (avgExcessReturn * 252 * 100) / trackingError; // 年化超额收益 / 年化跟踪误差
+        } else {
+            console.warn('⚠️ 跟踪误差为0或无效，信息比率设为0');
+        }
+
         
         // 8. 卡玛比率
         const calmarRatio = annualizedReturn / Math.abs(maxDrawdown);
@@ -408,7 +366,7 @@ const PortfolioAnalysis = {
      * 基础指标计算（当缺少净值数据时使用）
      */
     calculateBasicMetrics(data) {
-        const years = data.totalDays / 365.25;
+        const years = data.totalDays / 252;
         const annualizedReturn = (Math.pow(data.finalValue / data.initialAmount, 1 / years) - 1) * 100;
         
         // 基于经验值估算波动率（更合理的范围）
@@ -418,8 +376,10 @@ const PortfolioAnalysis = {
         const estimatedDrawdown = Math.min(Math.abs(annualizedReturn) * 0.6 + 10, 50); // 不超过50%
         
         // 夏普比率
-        const riskFreeRate = 2.0;
-        const sharpeRatio = (annualizedReturn - riskFreeRate) / estimatedVolatility;
+        const riskFreeRate = 0.02;
+        const sharpeRatio = estimatedVolatility !== 0
+            ? ((annualizedReturn / 100) - riskFreeRate) / (estimatedVolatility / 100)
+            : 0;
         
         // 信息比率（保守估计）
         const informationRatio = (annualizedReturn + 5) / 15; // 假设基准-5%，跟踪误差15%
@@ -444,60 +404,12 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 生成净值数据（使用真实历史数据）
+     * 生成净值数据（优先使用回测引擎数据）
      */
-    generateNavData(data) {
-        // 优先尝试从后端API获取真实数据
-        return this.fetchRealNavData(data);
-    },
     
     /**
      * 从后端获取真实净值数据
      */
-    async fetchRealNavData(data) {
-        try {
-            // 获取当前页面选择的基金信息
-            const fundCodes = this.getSelectedFundCodes();
-            const weights = this.calculateWeights(fundCodes.length);
-            
-            if (fundCodes.length === 0) {
-                console.warn('未选择基金，使用模拟数据');
-                return this.generateFallbackNavData(data);
-            }
-            
-            const response = await fetch(`/api/dashboard/profit-trend?days=${data.totalDays}&fund_codes=${fundCodes.join(',')}&weights=${weights.join(',')}`);
-            
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success && result.data) {
-                    console.log('✅ 成功获取真实历史净值数据');
-                    
-                    // 转换为所需格式
-                    const navData = [];
-                    const labels = result.data.labels;
-                    const profitData = result.data.profit;
-                    const benchmarkData = result.data.benchmark;
-                    
-                    for (let i = 0; i < labels.length; i++) {
-                        navData.push({
-                            date: labels[i],
-                            portfolio: profitData[i] || 10000,
-                            benchmark: benchmarkData[i] || 10000
-                        });
-                    }
-                    
-                    return navData;
-                }
-            }
-            
-            console.warn('获取真实数据失败，使用备用方案');
-            return this.generateFallbackNavData(data);
-            
-        } catch (error) {
-            console.error('获取真实净值数据时出错:', error);
-            return this.generateFallbackNavData(data);
-        }
-    },
     
     /**
      * 获取页面上选择的基金代码
@@ -526,45 +438,45 @@ const PortfolioAnalysis = {
     },
     
     /**
-     * 备用的净值数据生成方案
+     * 已禁用模拟净值数据
      */
-    generateFallbackNavData(data) {
-        console.warn('⚠️ 使用备用净值数据生成方案');
-        
-        const navData = [];
-        const totalReturnDecimal = data.totalReturn / 100;
-        
-        for (let i = 0; i <= data.totalDays; i++) {
-            const date = new Date();
-            date.setDate(date.getDate() - (data.totalDays - i));
-            
-            // 组合净值：基于实际收益率，但使用更保守的波动
-            const daysProgress = i / data.totalDays;
-            const expectedReturn = totalReturnDecimal * daysProgress;
-            
-            // 更小的波动（±0.2%日波动）
-            const strategyVolatility = (Math.random() - 0.5) * 0.004;
-            const strategyReturnToday = expectedReturn + strategyVolatility;
-            const portfolioNav = data.initialAmount * (1 + strategyReturnToday);
-            
-            // 沪深300基准：使用更保守的市场模型
-            const yearsElapsed = i / 365.25;
-            const benchmarkAnnualReturn = -0.03; // 更保守的年化收益假设
-            const benchmarkExpectedReturn = benchmarkAnnualReturn * yearsElapsed;
-            
-            // 更小的基准波动（±0.1%日波动）
-            const benchmarkVolatility = (Math.random() - 0.5) * 0.002;
-            const benchmarkReturnToday = benchmarkExpectedReturn + benchmarkVolatility;
-            const benchmarkNav = data.initialAmount * (1 + benchmarkReturnToday);
-            
-            navData.push({
-                date: date.toISOString().split('T')[0],
-                portfolio: Math.max(portfolioNav, data.initialAmount * 0.7), // 更严格的下限
-                benchmark: Math.max(benchmarkNav, data.initialAmount * 0.7)
-            });
+    generateFallbackNavData() {
+        console.error('❌ 已禁用模拟净值数据生成');
+        return [];
+    },
+
+    buildDataSourceHTML(navData, inline = false) {
+        if (!navData || !navData.dataSource) {
+            return '';
         }
-        
-        return navData;
+
+        const source = navData.dataSource || {};
+        const portfolioSource = source.portfolio_nav || source.portfolio || source.portfolio_source || '真实数据';
+        const benchmarkSource = source.benchmark || source.benchmark_source || '真实数据';
+        const asOf = source.as_of || source.asOf || '';
+        const benchmarkName = source.benchmark_name || '沪深300';
+
+        const header = inline
+            ? '<h5 class="section-title" style="color: #2c3e50; margin-bottom: 12px; font-size: 16px;"><i class="bi bi-database" style="color: #4361ee;"></i> 数据来源</h5>'
+            : '<h5 class="section-title"><i class="bi bi-database"></i>数据来源</h5>';
+        const containerStyle = inline
+            ? 'style="margin-top: 20px; background: #fff; padding: 16px; border-radius: 12px; border: 1px solid #e9ecef;"'
+            : '';
+        const itemStyle = inline
+            ? 'style="color: #6c757d; font-size: 13px;"'
+            : '';
+        const asOfHtml = asOf ? `<div class="data-source-item" ${itemStyle}>更新至：${asOf}</div>` : '';
+
+        return `
+            <div class="data-source-section" ${containerStyle}>
+                ${header}
+                <div class="data-source-list">
+                    <div class="data-source-item" ${itemStyle}>组合净值：${portfolioSource}</div>
+                    <div class="data-source-item" ${itemStyle}>基准指数（${benchmarkName}）：${benchmarkSource}</div>
+                    ${asOfHtml}
+                </div>
+            </div>
+        `;
     },
 
     /**
@@ -577,26 +489,24 @@ const PortfolioAnalysis = {
             existingAnalysis.remove();
         }
 
-        // 计算超额收益
-        const excessReturn = navData && navData.length > 1 
-            ? ((navData[navData.length - 1].portfolio - navData[0].portfolio) / navData[0].portfolio * 100) - 
-              ((navData[navData.length - 1].benchmark - navData[0].benchmark) / navData[0].benchmark * 100)
-            : 0;
+
 
         const analysisHTML = `
             <div id="portfolio-analysis-result" class="portfolio-analysis-container">
-                <div class="analysis-header">
-                    <div class="header-content">
-                        <h4><i class="bi bi-graph-up-arrow"></i>投资组合深度分析</h4>
-                        <div class="header-subtitle">基于历史数据的专业绩效评估与风险分析</div>
-                    </div>
-                    <button type="button" class="btn-close-analysis" onclick="PortfolioAnalysis.closeAnalysis()" title="关闭分析">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                
+
                 <div class="metrics-section">
-                    <h5 class="section-title"><i class="bi bi-speedometer2"></i>关键绩效指标</h5>
+                    <h5 class="section-title"><i class="bi bi-speedometer2"></i>关键绩效指标 
+                        <small style="color: #6c757d; font-size: 12px; font-weight: normal; margin-left: 8px;">
+                            <i class="bi bi-info-circle" title="基于回测模拟数据计算"></i> 
+                            基于回测模拟数据
+                        </small>
+                    </h5>
+                    <div class="alert alert-info" style="margin-bottom: 15px; padding: 10px 15px; font-size: 13px;">
+                        <i class="bi bi-lightbulb"></i>
+                        <strong>数据说明：</strong>
+                        上方"组合表现"和下方"关键绩效指标"现在使用<strong>相同的回测模拟数据源</strong>，
+                        两处的总收益率应该完全一致。如有差异，请检查计算逻辑或刷新页面。
+                    </div>
                     <div class="metrics-grid">
                         <div class="metric-card">
                             <div class="metric-icon"><i class="bi bi-cash-stack"></i></div>
@@ -639,11 +549,6 @@ const PortfolioAnalysis = {
                     </div>
                 </div>
 
-                <div class="chart-section">
-                    <h5 class="section-title"><i class="bi bi-graph-up-arrow"></i>净值曲线对比</h5>
-                    <div class="chart-container">
-                        <canvas id="portfolio-nav-chart"></canvas>
-                    </div>
                     <div class="chart-legend">
                         <span class="legend-item portfolio"><i class="bi bi-circle-fill me-2"></i>组合净值</span>
                         <span class="legend-item benchmark"><i class="bi bi-circle-fill me-2"></i>沪深300基准</span>
@@ -666,15 +571,9 @@ const PortfolioAnalysis = {
                             </span>
                         </div>
                         <div class="summary-item">
-                            <strong>超额收益</strong>
-                            <span class="${excessReturn >= 0 ? 'positive' : 'negative'}">
-                                ${excessReturn >= 0 ? '跑赢基准' : '跑输基准'} ${Math.abs(excessReturn).toFixed(2)}%
-                            </span>
-                        </div>
-                        <div class="summary-item">
                             <strong>风险水平</strong>
                             <span class="${metrics.volatility > 20 ? 'negative' : metrics.volatility > 15 ? 'warning' : 'positive'}">
-                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(1)}%）
+                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(2)}%）
                             </span>
                         </div>
                         <div class="summary-item">
@@ -709,6 +608,7 @@ const PortfolioAnalysis = {
                         </div>
                     </div>
                 </div>
+                ${this.buildDataSourceHTML(navData)}
             </div>
         `;
 
@@ -717,12 +617,10 @@ const PortfolioAnalysis = {
         if (backtestResult) {
             backtestResult.insertAdjacentHTML('afterend', analysisHTML);
             
-            // 绘制图表
-            setTimeout(() => {
-                this.drawNavChart(navData);
-            }, 100);
+            console.log('✅ 投资组合分析已内联显示（不包含净值曲线）');
         }
     },
+
 
     /**
      * 准备分析数据供显示（不立即渲染）
@@ -730,6 +628,28 @@ const PortfolioAnalysis = {
      * @param {Object} backtestData - 回测结果数据
      * @returns {Object} 包含 html 和 navData 的对象
      */
+    renderDataUnavailable(message) {
+        const existingAnalysis = document.getElementById('portfolio-analysis-result');
+        if (existingAnalysis) {
+            existingAnalysis.remove();
+        }
+
+        const backtestResult = document.getElementById('backtest-result');
+        if (!backtestResult) {
+            return;
+        }
+
+        const analysisHTML = `
+            <div id="portfolio-analysis-result" class="portfolio-analysis-container">
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>${message}
+                </div>
+            </div>
+        `;
+
+        backtestResult.insertAdjacentHTML('afterend', analysisHTML);
+    },
+
     async prepareAnalysisForDisplay(backtestData) {
         console.log('🚀 准备投资组合分析数据...');
         
@@ -782,7 +702,6 @@ const PortfolioAnalysis = {
             console.log(`📌 年化收益率: ${finalAnnualizedReturn.toFixed(2)}% (基于总收益率计算)`);
             
             // 获取净值数据（使用回测数据中的基金代码）
-            const navData = await this.generateNavDataForBacktest(backtestData, fundCodes);
             
             // 将净值数据和所有回测指标附加到回测数据中
             backtestData.navData = navData;
@@ -971,48 +890,6 @@ const PortfolioAnalysis = {
      * @param {Array} fundCodes - 基金代码数组
      * @returns {Array} 净值数据数组
      */
-    async generateNavDataForBacktest(data, fundCodes) {
-        try {
-            const weights = this.calculateWeights(fundCodes.length);
-            
-            if (fundCodes.length === 0) {
-                console.warn('未提供基金代码，使用模拟数据');
-                return this.generateFallbackNavData(data);
-            }
-            
-            const response = await fetch(`/api/dashboard/profit-trend?days=${data.totalDays || 1095}&fund_codes=${fundCodes.join(',')}&weights=${weights.join(',')}`);
-            
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success && result.data) {
-                    console.log('✅ 成功获取真实历史净值数据');
-                    
-                    // 转换为所需格式
-                    const navData = [];
-                    const labels = result.data.labels;
-                    const profitData = result.data.profit;
-                    const benchmarkData = result.data.benchmark;
-                    
-                    for (let i = 0; i < labels.length; i++) {
-                        navData.push({
-                            date: labels[i],
-                            portfolio: profitData[i] || 10000,
-                            benchmark: benchmarkData[i] || 10000
-                        });
-                    }
-                    
-                    return navData;
-                }
-            }
-            
-            console.warn('获取真实数据失败，使用备用方案');
-            return this.generateFallbackNavData(data);
-            
-        } catch (error) {
-            console.error('获取真实净值数据时出错:', error);
-            return this.generateFallbackNavData(data);
-        }
-    },
 
     /**
      * 生成分析结果 HTML（不渲染到页面）
@@ -1021,27 +898,22 @@ const PortfolioAnalysis = {
      * @returns {string} HTML 字符串
      */
     generateAnalysisHTML(metrics, navData) {
-        // 计算超额收益
-        const excessReturn = navData && navData.length > 1 
-            ? ((navData[navData.length - 1].portfolio - navData[0].portfolio) / navData[0].portfolio * 100) - 
-              ((navData[navData.length - 1].benchmark - navData[0].benchmark) / navData[0].benchmark * 100)
-            : 0;
-
         return `
             <div id="portfolio-analysis-result" class="portfolio-analysis-container portfolio-analysis-inline">
-                <div class="analysis-header" style="border-bottom: 2px solid #e9ecef; padding-bottom: 15px; margin-bottom: 20px;">
-                    <div class="header-content">
-                        <h4 style="color: #2c3e50; margin: 0;"><i class="bi bi-graph-up-arrow" style="color: #4361ee;"></i> 投资组合深度分析</h4>
-                        <div class="header-subtitle" style="color: #6c757d; font-size: 14px; margin-top: 5px;">
-                            基于历史数据的专业绩效评估与风险分析
-                        </div>
-                    </div>
-                </div>
-                
+
                 <div class="metrics-section" style="margin-bottom: 30px;">
-                    <h5 class="section-title" style="color: #2c3e50; margin-bottom: 15px; font-size: 16px;">
+                    <h5 class="section-title" style="color: #2c3e50; margin-bottom: 12px; font-size: 16px;">
                         <i class="bi bi-speedometer2" style="color: #4361ee;"></i> 关键绩效指标
+                        <small style="color: #6c757d; font-size: 11px; font-weight: normal; margin-left: 8px;">
+                            <i class="bi bi-info-circle"></i> 基于回测模拟数据
+                        </small>
                     </h5>
+                    <div class="alert alert-info" style="margin-bottom: 15px; padding: 8px 12px; font-size: 12px; border-radius: 8px; background-color: #e7f3ff; border: 1px solid #b8daff; color: #004085;">
+                        <i class="bi bi-lightbulb"></i>
+                        <strong>数据说明：</strong>
+                        上方"组合表现"和下方"关键绩效指标"使用<strong>相同的回测模拟数据源</strong>，
+                        两处的总收益率应该完全一致。
+                    </div>
                     <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
                         <div class="metric-card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div class="metric-icon" style="font-size: 24px; margin-bottom: 10px; color: #4361ee;"><i class="bi bi-cash-stack"></i></div>
@@ -1084,13 +956,6 @@ const PortfolioAnalysis = {
                     </div>
                 </div>
 
-                <div class="chart-section" style="margin-bottom: 30px; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e9ecef;">
-                    <h5 class="section-title" style="color: #2c3e50; margin-bottom: 15px; font-size: 16px;">
-                        <i class="bi bi-graph-up-arrow" style="color: #4361ee;"></i> 净值曲线对比
-                    </h5>
-                    <div class="chart-container" style="position: relative; height: 350px; width: 100%;">
-                        <canvas id="portfolio-nav-chart" style="width: 100%; height: 100%;"></canvas>
-                    </div>
                     <div class="chart-legend" style="text-align: center; margin-top: 15px; font-size: 13px;">
                         <span class="legend-item portfolio" style="display: inline-block; margin: 0 15px; color: #4361ee; font-weight: 500;">
                             <i class="bi bi-circle-fill" style="margin-right: 5px;"></i>组合净值
@@ -1119,15 +984,9 @@ const PortfolioAnalysis = {
                             </span>
                         </div>
                         <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
-                            <strong style="color: #495057;">超额收益</strong>
-                            <span class="${excessReturn >= 0 ? 'positive' : 'negative'}" style="font-weight: 500; color: ${excessReturn >= 0 ? '#06d6a0' : '#ef476f'};">
-                                ${excessReturn >= 0 ? '跑赢基准' : '跑输基准'} ${Math.abs(excessReturn).toFixed(2)}%
-                            </span>
-                        </div>
-                        <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
                             <strong style="color: #495057;">风险水平</strong>
                             <span class="${metrics.volatility > 20 ? 'negative' : metrics.volatility > 15 ? 'warning' : 'positive'}" style="font-weight: 500; color: ${metrics.volatility > 20 ? '#ef476f' : metrics.volatility > 15 ? '#ffd166' : '#06d6a0'};">
-                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(1)}%）
+                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(2)}%）
                             </span>
                         </div>
                         <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
@@ -1164,6 +1023,7 @@ const PortfolioAnalysis = {
                         </div>
                     </div>
                 </div>
+                ${this.buildDataSourceHTML(navData, true)}
             </div>
         `;
     },
@@ -1179,23 +1039,11 @@ const PortfolioAnalysis = {
             existingAnalysis.remove();
         }
 
-        // 计算超额收益
-        const excessReturn = navData && navData.length > 1 
-            ? ((navData[navData.length - 1].portfolio - navData[0].portfolio) / navData[0].portfolio * 100) - 
-              ((navData[navData.length - 1].benchmark - navData[0].benchmark) / navData[0].benchmark * 100)
-            : 0;
+
 
         const analysisHTML = `
             <div id="portfolio-analysis-result" class="portfolio-analysis-container portfolio-analysis-inline">
-                <div class="analysis-header" style="border-bottom: 2px solid #e9ecef; padding-bottom: 15px; margin-bottom: 20px;">
-                    <div class="header-content">
-                        <h4 style="color: #2c3e50; margin: 0;"><i class="bi bi-graph-up-arrow" style="color: #4361ee;"></i> 投资组合深度分析</h4>
-                        <div class="header-subtitle" style="color: #6c757d; font-size: 14px; margin-top: 5px;">
-                            基于历史数据的专业绩效评估与风险分析
-                        </div>
-                    </div>
-                </div>
-                
+
                 <div class="metrics-section" style="margin-bottom: 30px;">
                     <h5 class="section-title" style="color: #2c3e50; margin-bottom: 15px; font-size: 16px;">
                         <i class="bi bi-speedometer2" style="color: #4361ee;"></i> 关键绩效指标
@@ -1242,13 +1090,6 @@ const PortfolioAnalysis = {
                     </div>
                 </div>
 
-                <div class="chart-section" style="margin-bottom: 30px; background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e9ecef;">
-                    <h5 class="section-title" style="color: #2c3e50; margin-bottom: 15px; font-size: 16px;">
-                        <i class="bi bi-graph-up-arrow" style="color: #4361ee;"></i> 净值曲线对比
-                    </h5>
-                    <div class="chart-container" style="position: relative; height: 350px; width: 100%;">
-                        <canvas id="portfolio-nav-chart" style="width: 100%; height: 100%;"></canvas>
-                    </div>
                     <div class="chart-legend" style="text-align: center; margin-top: 15px; font-size: 13px;">
                         <span class="legend-item portfolio" style="display: inline-block; margin: 0 15px; color: #4361ee; font-weight: 500;">
                             <i class="bi bi-circle-fill" style="margin-right: 5px;"></i>组合净值
@@ -1277,15 +1118,9 @@ const PortfolioAnalysis = {
                             </span>
                         </div>
                         <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
-                            <strong style="color: #495057;">超额收益</strong>
-                            <span class="${excessReturn >= 0 ? 'positive' : 'negative'}" style="font-weight: 500; color: ${excessReturn >= 0 ? '#06d6a0' : '#ef476f'};">
-                                ${excessReturn >= 0 ? '跑赢基准' : '跑输基准'} ${Math.abs(excessReturn).toFixed(2)}%
-                            </span>
-                        </div>
-                        <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
                             <strong style="color: #495057;">风险水平</strong>
                             <span class="${metrics.volatility > 20 ? 'negative' : metrics.volatility > 15 ? 'warning' : 'positive'}" style="font-weight: 500; color: ${metrics.volatility > 20 ? '#ef476f' : metrics.volatility > 15 ? '#ffd166' : '#06d6a0'};">
-                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(1)}%）
+                                ${metrics.volatility > 20 ? '高风险' : metrics.volatility > 15 ? '中等风险' : '低风险'}（波动率 ${metrics.volatility.toFixed(2)}%）
                             </span>
                         </div>
                         <div class="summary-item" style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
@@ -1322,8 +1157,10 @@ const PortfolioAnalysis = {
                         </div>
                     </div>
                 </div>
+                ${this.buildDataSourceHTML(navData, true)}
             </div>
         `;
+
 
         // 插入到回测结果容器内（不是后面，而是作为同一区块的一部分）
         const backtestResultContent = document.getElementById('backtest-result-content');
@@ -1333,58 +1170,90 @@ const PortfolioAnalysis = {
             analysisDiv.innerHTML = analysisHTML;
             backtestResultContent.appendChild(analysisDiv);
             
-            // 绘制图表
-            setTimeout(() => {
-                this.drawNavChart(navData);
-            }, 100);
-            
-            console.log('✅ 投资组合分析已内联显示');
+            console.log('✅ 投资组合分析已内联显示（不包含净值曲线）');
         } else {
             console.error('❌ 找不到 backtest-result-content 容器');
         }
     },
 
     /**
-     * 绘制净值曲线
+     * 关闭分析
      */
-    drawNavChart(data) {
-        const canvas = document.getElementById('portfolio-nav-chart');
-        if (!canvas) {
-            console.error('❌ 找不到 portfolio-nav-chart canvas 元素');
-            return;
+    closeAnalysis() {
+        const analysis = document.getElementById('portfolio-analysis-result');
+        if (analysis) {
+            analysis.remove();
         }
+    },
 
-        console.log('📊 开始绘制净值曲线，数据点数量:', data ? data.length : 0);
-        
-        if (!data || data.length === 0) {
-            console.error('❌ 净值数据为空');
-            return;
-        }
+    /**
+     * 添加样式 - 与网站首页保持一致的设计风格
+     */
+    addStyles() {
+        if (document.getElementById('portfolio-analysis-styles')) return;
 
-        const ctx = canvas.getContext('2d');
-        
-        // 处理高清屏
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        
-        // 设置 canvas 实际尺寸
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        
-        // 缩放上下文以匹配 CSS 尺寸
-        ctx.scale(dpr, dpr);
-        
-        const width = rect.width;
-        const height = rect.height;
-        const margin = { top: 30, right: 30, bottom: 60, left: 70 };
-        const chartWidth = width - margin.left - margin.right;
-        const chartHeight = height - margin.top - margin.bottom;
+        const style = document.createElement('style');
+        style.id = 'portfolio-analysis-styles';
+        style.textContent = `
+            
+            if (typeof canvas.getBoundingClientRect !== 'function') {
+                console.error('❌ canvas 不支持 getBoundingClientRect');
+                return;
+            }
 
-        // 清除画布
-        ctx.clearRect(0, 0, width, height);
+            console.log('📊 开始绘制净值曲线，数据点数量:', data ? data.length : 0);
+            
+            if (!data || data.length === 0) {
+                console.error('❌ 净值数据为空');
+                return;
+            }
 
-        // 计算数据范围
-        const allValues = [...data.map(d => d.portfolio), ...data.map(d => d.benchmark)];
+            const ctx = canvas.getContext('2d');
+            
+            // 处理高清屏
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            if (!rect || rect.width === 0 || rect.height === 0) {
+                console.warn('⚠️ canvas 尺寸无效，跳过绘制');
+                return;
+            }
+            
+            // 设置 canvas 实际尺寸
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            
+            // 缩放上下文以匹配 CSS 尺寸
+            ctx.scale(dpr, dpr);
+            
+            const width = rect.width;
+            const height = rect.height;
+            const margin = { top: 30, right: 30, bottom: 60, left: 70 };
+            const chartWidth = width - margin.left - margin.right;
+            const chartHeight = height - margin.top - margin.bottom;
+
+            // 清除画布
+            ctx.clearRect(0, 0, width, height);
+
+            // 获取基金详细数据（包含equity_curve和trades）
+            const fundsWithDetails = window.lastBacktestResult?.funds || [];
+            console.log('📊 基金详细数据:', fundsWithDetails.length, '个基金');
+            
+            // 如果没有基金详细数据，输出警告
+            if (fundsWithDetails.length === 0) {
+                console.warn('⚠️ window.lastBacktestResult.funds 为空，无法显示单个基金曲线');
+                console.warn('提示：可能回测结果未包含单个基金的详细数据');
+            }
+
+        // 计算数据范围 - 包含所有曲线
+        let allValues = [...data.map(d => d.portfolio), ...data.map(d => d.benchmark)];
+        
+        // 添加各基金净值曲线的值
+        fundsWithDetails.forEach(fund => {
+            if (fund.equity_curve && fund.equity_curve.length > 0) {
+                allValues = allValues.concat(fund.equity_curve.map(p => p.value));
+            }
+        });
+        
         const minValue = Math.min(...allValues);
         const maxValue = Math.max(...allValues);
         const valueRange = maxValue - minValue;
@@ -1393,6 +1262,7 @@ const PortfolioAnalysis = {
         // 保存图表状态以供鼠标事件使用
         this.chartState = {
             data: data,
+            fundsWithDetails: fundsWithDetails,
             margin: margin,
             chartWidth: chartWidth,
             chartHeight: chartHeight,
@@ -1410,463 +1280,97 @@ const PortfolioAnalysis = {
         // 绘制坐标轴
         this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue - padding, maxValue + padding, data);
 
-        // 绘制净值曲线 - 使用与首页一致的主题色
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#4361ee');
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#ef476f');
 
-        // 绘制图例
-        this.drawLegend(ctx, margin, chartWidth);
+        // 绘制基金净值曲线（使用鲜明颜色，清晰可见）
+        // 优化配色方案：选择对比度高、视觉区分度强的颜色
+        const fundColors = [
+            '#9C27B0',  // 紫色 - 鲜明醒目
+            '#FF6B6B',  // 橙红色 - 温暖明亮
+            '#4ECDC4',  // 青绿色 - 清新活泼  
+            '#FFD93D',  // 金黄色 - 显眼明快
+            '#6BCF7F',  // 翠绿色 - 生机盎然
+            '#FF8C42',  // 橙色 - 活力四射
+            '#95E1D3',  // 薄荷绿 - 柔和清晰
+            '#F38181'   // 粉红色 - 柔美醒目
+        ];
+        
+        console.log(`📊 准备绘制 ${fundsWithDetails.length} 个基金的净值曲线`);
+        fundsWithDetails.forEach((fund, index) => {
+            if (fund.equity_curve && fund.equity_curve.length > 0) {
+                const color = fundColors[index % fundColors.length];
+                console.log(`  - 基金 ${fund.fund_code || index + 1}: ${color}, 数据点: ${fund.equity_curve.length}`);
+                console.warn(`  ⚠️ 基金 ${fund.fund_code || index + 1} 没有equity_curve数据`);
+            }
+        });
+
+        // 绘制买卖点标记
+        fundsWithDetails.forEach((fund, index) => {
+            if (fund.trades && fund.trades.length > 0) {
+                const color = fundColors[index % fundColors.length];
+                this.drawTradeMarkers(ctx, margin, chartWidth, chartHeight, fund, minValue - padding, maxValue + padding, color);
+            }
+        });
+
+        // 绘制组合净值曲线和基准线（在最上层，粗线突出）
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue - padding, maxValue + padding, '#4361ee', 3.5);
+        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue - padding, maxValue + padding, '#ef476f', 3.5);
+
+        // 绘制图例（包含基金）
+        this.drawLegendWithFunds(ctx, margin, chartWidth, fundsWithDetails, fundColors);
 
         // 添加鼠标悬停事件
         this.bindChartEvents(canvas, ctx);
         
-        console.log('✅ 净值曲线绘制完成');
+        console.log('✅ 净值曲线绘制完成（含基金曲线和买卖点）');
+        
+        } finally {
+            // 重置绘制标记
+            this.isDrawing = false;
+        }
     },
 
     /**
-     * 绘制图例 - 使用主题色
+     * 绘制图例 - 旧版本（兼容）
      */
-    drawLegend(ctx, margin, chartWidth) {
-        const legendX = margin.left + chartWidth - 180;
-        const legendY = margin.top + 10;
-        
-        ctx.font = '12px Arial';
-        
-        // 组合净值图例 - 主题色
-        ctx.fillStyle = '#4361ee';
-        ctx.fillRect(legendX, legendY, 20, 3);
-        ctx.fillStyle = '#333';
-        ctx.textAlign = 'left';
-        ctx.fillText('组合净值', legendX + 25, legendY + 5);
-        
-        // 沪深300基准图例 - 危险色
-        ctx.fillStyle = '#ef476f';
-        ctx.fillRect(legendX + 90, legendY, 20, 3);
-        ctx.fillStyle = '#333';
-        ctx.fillText('沪深300', legendX + 115, legendY + 5);
-    },
 
     /**
      * 绑定图表鼠标事件
      */
-    bindChartEvents(canvas, ctx) {
-        console.log('🔗 绑定图表鼠标事件');
-        
-        // 移除旧事件
-        if (this.chartMouseMoveHandler) {
-            canvas.removeEventListener('mousemove', this.chartMouseMoveHandler);
-        }
-        if (this.chartMouseLeaveHandler) {
-            canvas.removeEventListener('mouseleave', this.chartMouseLeaveHandler);
-        }
-
-        // 创建或获取tooltip元素
-        let tooltip = document.getElementById('chart-tooltip');
-        if (tooltip) {
-            tooltip.remove(); // 移除旧的tooltip
-        }
-        
-        tooltip = document.createElement('div');
-        tooltip.id = 'chart-tooltip';
-        tooltip.style.cssText = `
-            position: fixed;
-            background: linear-gradient(135deg, rgba(67, 97, 238, 0.95) 0%, rgba(58, 12, 163, 0.95) 100%);
-            color: white;
-            padding: 14px 18px;
-            border-radius: 12px;
-            font-size: 13px;
-            pointer-events: none;
-            z-index: 99999;
-            display: none;
-            box-shadow: 0 8px 32px rgba(67, 97, 238, 0.3);
-            min-width: 220px;
-            line-height: 1.8;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        `;
-        document.body.appendChild(tooltip);
-        
-        // 设置 canvas 样式以显示手形光标
-        canvas.style.cursor = 'crosshair';
-
-        // 鼠标移动事件处理
-        this.chartMouseMoveHandler = (event) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            
-            const state = this.chartState;
-            if (!state) {
-                console.warn('⚠️ chartState 未定义');
-                return;
-            }
-            
-            const { data, margin, chartWidth, chartHeight, minValue, maxValue } = state;
-            
-            // 检查是否在图表区域内
-            if (x < margin.left || x > margin.left + chartWidth ||
-                y < margin.top || y > margin.top + chartHeight) {
-                tooltip.style.display = 'none';
-                return;
-            }
-            
-            // 计算最近的数据点
-            const dataIndex = Math.round((x - margin.left) / chartWidth * (data.length - 1));
-            const clampedIndex = Math.max(0, Math.min(data.length - 1, dataIndex));
-            const point = data[clampedIndex];
-            
-            if (!point) {
-                tooltip.style.display = 'none';
-                return;
-            }
-            
-            // 计算当日收益率
-            let dailyReturn = 0;
-            let benchmarkDailyReturn = 0;
-            if (clampedIndex > 0) {
-                const prevPoint = data[clampedIndex - 1];
-                dailyReturn = ((point.portfolio - prevPoint.portfolio) / prevPoint.portfolio * 100);
-                benchmarkDailyReturn = ((point.benchmark - prevPoint.benchmark) / prevPoint.benchmark * 100);
-            }
-            
-            // 计算累计收益率
-            const totalReturn = ((point.portfolio - data[0].portfolio) / data[0].portfolio * 100);
-            const benchmarkReturn = ((point.benchmark - data[0].benchmark) / data[0].benchmark * 100);
-            const excessReturn = totalReturn - benchmarkReturn;
-            
-            // 颜色
-            const dailyColor = dailyReturn >= 0 ? '#4ade80' : '#f87171';
-            const totalColor = totalReturn >= 0 ? '#4ade80' : '#f87171';
-            const excessColor = excessReturn >= 0 ? '#4ade80' : '#f87171';
-            
-            // 构建tooltip内容 - 使用与首页一致的配色
-            tooltip.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.3); font-size: 14px;">
-                    📅 ${point.date || '未知日期'}
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>💼 组合净值:</span>
-                        <span style="color: #818cf8; font-weight: bold;">¥${point.portfolio.toFixed(2)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>📊 沪深300:</span>
-                        <span style="color: #fb7185; font-weight: bold;">¥${point.benchmark.toFixed(2)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>📈 当日收益:</span>
-                        <span style="color: ${dailyColor}; font-weight: bold;">${dailyReturn >= 0 ? '+' : ''}${dailyReturn.toFixed(3)}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>📉 累计收益:</span>
-                        <span style="color: ${totalColor}; font-weight: bold;">${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>🎯 超额收益:</span>
-                        <span style="color: ${excessColor}; font-weight: bold;">${excessReturn >= 0 ? '+' : ''}${excessReturn.toFixed(2)}%</span>
-                    </div>
-                </div>
-            `;
-            
-            // 定位tooltip - 使用 fixed 定位
-            let tooltipX = event.clientX + 15;
-            let tooltipY = event.clientY - 10;
-            
-            // 确保tooltip不超出视口
-            const tooltipWidth = 240;
-            const tooltipHeight = 200;
-            
-            if (tooltipX + tooltipWidth > window.innerWidth) {
-                tooltipX = event.clientX - tooltipWidth - 15;
-            }
-            if (tooltipY + tooltipHeight > window.innerHeight) {
-                tooltipY = event.clientY - tooltipHeight - 10;
-            }
-            if (tooltipY < 10) {
-                tooltipY = 10;
-            }
-            
-            tooltip.style.left = tooltipX + 'px';
-            tooltip.style.top = tooltipY + 'px';
-            tooltip.style.display = 'block';
-            
-            // 绘制高亮点
-            this.drawHighlightPoint(canvas, clampedIndex, point);
-        };
-
-        // 鼠标离开事件处理
-        this.chartMouseLeaveHandler = () => {
-            tooltip.style.display = 'none';
-            this.redrawChart();
-        };
-
-        canvas.addEventListener('mousemove', this.chartMouseMoveHandler);
-        canvas.addEventListener('mouseleave', this.chartMouseLeaveHandler);
-        
-        console.log('✅ 图表鼠标事件绑定完成');
-    },
 
     /**
      * 绘制高亮数据点
      */
-    drawHighlightPoint(canvas, index, point) {
-        // 重新绘制图表
-        this.redrawChart();
-        
-        const state = this.chartState;
-        if (!state) return;
-        
-        const ctx = canvas.getContext('2d');
-        const { data, margin, chartWidth, chartHeight, minValue, maxValue } = state;
-        
-        // 计算点坐标
-        const x = margin.left + (chartWidth / (data.length - 1)) * index;
-        const yPortfolio = margin.top + chartHeight - ((point.portfolio - minValue) / (maxValue - minValue)) * chartHeight;
-        const yBenchmark = margin.top + chartHeight - ((point.benchmark - minValue) / (maxValue - minValue)) * chartHeight;
-        
-        // 绘制垂直参考线
-        ctx.strokeStyle = 'rgba(100, 100, 100, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(x, margin.top);
-        ctx.lineTo(x, margin.top + chartHeight);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // 绘制高亮圆点 - 组合净值（主题色）
-        ctx.fillStyle = '#4361ee';
-        ctx.beginPath();
-        ctx.arc(x, yPortfolio, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // 绘制高亮圆点 - 基准（危险色）
-        ctx.fillStyle = '#ef476f';
-        ctx.beginPath();
-        ctx.arc(x, yBenchmark, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    },
 
     /**
      * 重新绘制图表（不触发事件绑定）
      */
-    redrawChart() {
-        const state = this.chartState;
-        if (!state) return;
-        
-        const canvas = state.canvas;
-        const ctx = canvas.getContext('2d');
-        const { data, margin, chartWidth, chartHeight, minValue, maxValue, width, height } = state;
-        
-        // 处理高清屏
-        const dpr = window.devicePixelRatio || 1;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.scale(dpr, dpr);
-        
-        // 清除画布
-        ctx.clearRect(0, 0, width, height);
-        
-        // 绘制背景
-        ctx.fillStyle = '#fafafa';
-        ctx.fillRect(margin.left, margin.top, chartWidth, chartHeight);
-        
-        // 重新绘制坐标轴和曲线
-        this.drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue, data);
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'portfolio', minValue, maxValue, '#4361ee');
-        this.drawLine(ctx, margin, chartWidth, chartHeight, data, 'benchmark', minValue, maxValue, '#ef476f');
-        this.drawLegend(ctx, margin, chartWidth);
-    },
 
     /**
      * 绘制坐标轴
      */
-    drawChartAxes(ctx, margin, chartWidth, chartHeight, minValue, maxValue, data) {
-        // 绘制坐标轴线
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 1;
-
-        // X轴
-        ctx.beginPath();
-        ctx.moveTo(margin.left, margin.top + chartHeight);
-        ctx.lineTo(margin.left + chartWidth, margin.top + chartHeight);
-        ctx.stroke();
-
-        // Y轴
-        ctx.beginPath();
-        ctx.moveTo(margin.left, margin.top);
-        ctx.lineTo(margin.left, margin.top + chartHeight);
-        ctx.stroke();
-
-        // Y轴网格线和标签
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.fillStyle = '#666';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        
-        for (let i = 0; i <= 5; i++) {
-            const y = margin.top + (chartHeight / 5) * i;
-            
-            // 网格线
-            ctx.strokeStyle = '#e8e8e8';
-            ctx.beginPath();
-            ctx.moveTo(margin.left, y);
-            ctx.lineTo(margin.left + chartWidth, y);
-            ctx.stroke();
-
-            // Y轴标签
-            const value = maxValue - (maxValue - minValue) * (i / 5);
-            ctx.fillStyle = '#666';
-            ctx.fillText('¥' + value.toFixed(0), margin.left - 8, y);
-        }
-
-        // X轴日期标签
-        if (data && data.length > 0) {
-            console.log('📅 绘制X轴日期标签，数据长度:', data.length);
-            
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            
-            // 根据数据量动态计算显示间隔
-            const totalPoints = data.length;
-            let labelCount = 6; // 目标显示的标签数量
-            
-            if (totalPoints <= 30) {
-                labelCount = Math.min(totalPoints, 6);
-            } else if (totalPoints <= 90) {
-                labelCount = 6;
-            } else if (totalPoints <= 365) {
-                labelCount = 8;
-            } else {
-                labelCount = 10;
-            }
-            
-            const labelInterval = Math.max(1, Math.floor((totalPoints - 1) / (labelCount - 1)));
-            
-            // 绘制X轴刻度和标签
-            for (let i = 0; i < totalPoints; i += labelInterval) {
-                const x = margin.left + (chartWidth / (totalPoints - 1)) * i;
-                const point = data[i];
-                
-                if (point && point.date) {
-                    // 绘制刻度线
-                    ctx.strokeStyle = '#999';
-                    ctx.beginPath();
-                    ctx.moveTo(x, margin.top + chartHeight);
-                    ctx.lineTo(x, margin.top + chartHeight + 6);
-                    ctx.stroke();
-                    
-                    // 格式化日期显示
-                    const dateStr = this.formatDateLabel(point.date);
-                    ctx.fillStyle = '#555';
-                    ctx.font = '10px Arial';
-                    
-                    // 旋转绘制日期标签
-                    ctx.save();
-                    ctx.translate(x, margin.top + chartHeight + 12);
-                    ctx.rotate(-Math.PI / 5);  // 旋转36度
-                    ctx.textAlign = 'right';
-                    ctx.fillText(dateStr, 0, 0);
-                    ctx.restore();
-                }
-            }
-            
-            // 确保最后一个日期显示
-            const lastIndex = totalPoints - 1;
-            const lastX = margin.left + chartWidth;
-            const lastPoint = data[lastIndex];
-            
-            if (lastPoint && lastPoint.date && lastIndex % labelInterval !== 0) {
-                ctx.strokeStyle = '#999';
-                ctx.beginPath();
-                ctx.moveTo(lastX, margin.top + chartHeight);
-                ctx.lineTo(lastX, margin.top + chartHeight + 6);
-                ctx.stroke();
-                
-                const dateStr = this.formatDateLabel(lastPoint.date);
-                ctx.fillStyle = '#555';
-                ctx.font = '10px Arial';
-                ctx.save();
-                ctx.translate(lastX, margin.top + chartHeight + 12);
-                ctx.rotate(-Math.PI / 5);
-                ctx.textAlign = 'right';
-                ctx.fillText(dateStr, 0, 0);
-                ctx.restore();
-            }
-            
-            console.log('✅ X轴日期标签绘制完成');
-        } else {
-            console.warn('⚠️ 没有数据用于绘制X轴标签');
-        }
-    },
 
     /**
      * 格式化日期标签
      */
-    formatDateLabel(dateStr) {
-        if (!dateStr) {
-            console.warn('⚠️ 日期字符串为空');
-            return '';
-        }
-        
-        try {
-            // 处理不同的日期格式
-            let formattedDate = '';
-            
-            if (dateStr.includes('-')) {
-                // 格式: "YYYY-MM-DD" 或 "YYYY-M-D"
-                const parts = dateStr.split('-');
-                if (parts.length >= 3) {
-                    const month = parts[1].padStart(2, '0');
-                    const day = parts[2].padStart(2, '0');
-                    formattedDate = `${month}/${day}`;
-                }
-            } else if (dateStr.includes('/')) {
-                // 格式: "YYYY/MM/DD" 或 "MM/DD/YYYY"
-                const parts = dateStr.split('/');
-                if (parts.length >= 2) {
-                    formattedDate = `${parts[0]}/${parts[1]}`;
-                }
-            } else {
-                // 其他格式，尝试截取
-                formattedDate = dateStr.length > 5 ? dateStr.substring(5) : dateStr;
-            }
-            
-            return formattedDate || dateStr;
-        } catch (e) {
-            console.error('日期格式化错误:', e);
-            return dateStr;
-        }
-    },
 
     /**
      * 绘制线条
      */
-    drawLine(ctx, margin, chartWidth, chartHeight, data, field, minValue, maxValue, color) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
 
-        data.forEach((point, index) => {
-            const x = margin.left + (chartWidth / (data.length - 1)) * index;
-            const y = margin.top + chartHeight - ((point[field] - minValue) / (maxValue - minValue)) * chartHeight;
+    /**
+     * 绘制基金净值曲线
+     */
+    /**
+     * 绘制单个基金净值曲线（优化版 - 更清晰可见）
+     */
 
-            if (index === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        });
+    /**
+     * 绘制买卖点标记
+     */
 
-        ctx.stroke();
-    },
+    /**
+     * 绘制图例（包含基金）- 优化版，更清晰醒目
+     */
 
     /**
      * 关闭分析

@@ -14,35 +14,8 @@ class PortfolioAnalyzer {
      * 分析回测结果数据
      */
     analyzeBacktestResults(backtestData) {
-        // 提取组合基础数据
-        const portfolioReturn = -3.27; // 总收益率
-        const initialAmount = 10000;
-        const finalValue = 9672.7;
-        const totalDays = 90; // 假设回测期为90天
-        
-        // 提取各基金数据
-        const fundData = this.extractFundData(backtestData);
-        
-        // 计算关键绩效指标
-        this.analysisResults = this.calculatePerformanceMetrics(
-            portfolioReturn, initialAmount, finalValue, totalDays, fundData
-        );
-        
-        // 生成模拟净值曲线数据
-        this.portfolioData = this.generatePortfolioNavData(
-            initialAmount, portfolioReturn, totalDays, fundData
-        );
-        
-        // 生成基准数据（假设沪深300指数）
-        this.benchmarkData = this.generateBenchmarkData(
-            initialAmount, totalDays
-        );
-        
-        return {
-            metrics: this.analysisResults,
-            portfolioNav: this.portfolioData,
-            benchmarkNav: this.benchmarkData
-        };
+        console.error('❌ 已停用模拟数据分析，请改用真实数据分析模块');
+        return null;
     }
 
     /**
