@@ -2881,9 +2881,9 @@
              */
             formatAmount(amount) {
                 if (amount >= 10000) {
-                    return (amount / 10000).toFixed(1) + '万';
+                    return (amount / 10000).toFixed(2) + '万';
                 }
-                return amount.toLocaleString();
+                return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             
             /**
@@ -3584,13 +3584,13 @@
                     <div class="row text-center mb-4">
                         <div class="col-md-3">
                             <div class="metric-card">
-                                <div class="metric-value">¥${data.initial_amount.toLocaleString()}</div>
+                                <div class="metric-value">¥${data.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <div class="metric-label">初始金额</div>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="metric-card">
-                                <div class="metric-value">¥${(data.final_value || data.total_value || 0).toLocaleString()}</div>
+                                <div class="metric-value">¥${(data.final_value || data.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <div class="metric-label">最终价值</div>
                             </div>
                         </div>
@@ -3651,7 +3651,7 @@
                     ${(() => {
                         // 生成策略评估指标的HTML，只包含有数据的指标项
                         const evalMetrics = [
-                            { key: 'hit_rate', label: '命中率', format: (value) => `${(value * 100).toFixed(1)}%` },
+                            { key: 'hit_rate', label: '命中率', format: (value) => `${(value * 100).toFixed(2)}%` },
                             { key: 'profit_factor', label: '盈亏比', format: (value) => value.toFixed(2) },
                             { key: 'max_consecutive_losses', label: '最大连亏', format: (value) => value },
                             { key: 'max_consecutive_wins', label: '最大连赢', format: (value) => value },
@@ -3713,7 +3713,7 @@
                             <div class="optimization-metrics-grid">
                                 <div class="optimization-metric">
                                     <div class="optimization-metric-value">
-                                        <span class="badge ${adxClass}">${avgAdx.toFixed(1)}</span>
+                                        <span class="badge ${adxClass}">${avgAdx.toFixed(2)}</span>
                                     </div>
                                     <div class="optimization-metric-label">ADX均值 (${adxText})</div>
                                 </div>
@@ -3760,7 +3760,7 @@
                     let optimizationIcons = '';
                     if (trade.adx_value !== undefined) {
                         const adxIcon = trade.adx_value > 40 ? '🔴' : trade.adx_value > 25 ? '🟡' : trade.adx_value > 15 ? '🔵' : '⚪';
-                        optimizationIcons += `<span title="ADX: ${trade.adx_value.toFixed(1)}">${adxIcon}</span>`;
+                        optimizationIcons += `<span title="ADX: ${trade.adx_value.toFixed(2)}">${adxIcon}</span>`;
                     }
                     if (trade.market_adjusted) {
                         optimizationIcons += ` <span title="市场Beta调整">📊</span>`;
@@ -3779,7 +3779,7 @@
                             <td>¥${trade.amount.toFixed(2)}</td>
                             <td>¥${trade.balance.toFixed(2)}</td>
                             <td>¥${trade.holdings.toFixed(2)}</td>
-                            <td>${trade.multiplier ? trade.multiplier.toFixed(1) + '×' : '-'}</td>
+                            <td>${trade.multiplier ? trade.multiplier.toFixed(2) + '×' : '-'}</td>
                             <td>${trendIcon}</td>
                             <td class="text-center">${optimizationIcons || '-'}</td>
                         </tr>
@@ -4107,13 +4107,13 @@
                         <tbody>
                             <tr>
                                 <td><strong>初始金额</strong></td>
-                                ${strategies.map(s => `<td>¥${s.initial_amount.toLocaleString()}</td>`).join('')}
+                                ${strategies.map(s => `<td>¥${s.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`).join('')}
                             </tr>
                             <tr>
                                 <td><strong>最终价值</strong></td>
                                 ${strategies.map(s => {
                                     const isBest = s.strategy_id === bestStrategyId;
-                                    return `<td class="${isBest ? 'best-strategy' : ''}">¥${(s.final_value || s.total_value || 0).toLocaleString()}</td>`;
+                                    return `<td class="${isBest ? 'best-strategy' : ''}">¥${(s.final_value || s.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                                 }).join('')}
                             </tr>
                             <tr>
@@ -4159,7 +4159,7 @@
                                 <td><strong>命中率</strong></td>
                                 ${strategies.map(s => {
                                     const hitRate = s.evaluation && s.evaluation.hit_rate !== null ? s.evaluation.hit_rate * 100 : 0;
-                                    return `<td>${hitRate.toFixed(1)}%</td>`;
+                                    return `<td>${hitRate.toFixed(2)}%</td>`;
                                 }).join('')}
                             </tr>
                             <tr>
@@ -4500,7 +4500,7 @@
                                     ticks: { 
                                         callback: value => {
                                             const sign = value >= 0 ? '+' : '';
-                                            return `${sign}${value.toFixed(1)}%`;
+                                            return `${sign}${value.toFixed(2)}%`;
                                         }
                                     },
                                     grid: { color: 'rgba(0,0,0,0.05)' }
@@ -4591,7 +4591,7 @@
                             y: {
                                 position: 'left',
                                 title: { display: true, text: '百分比 (%)' },
-                                ticks: { callback: value => `${value.toFixed(1)}%` },
+                                ticks: { callback: value => `${value.toFixed(2)}%` },
                                 grid: { color: 'rgba(0,0,0,0.05)' }
                             },
                             y1: {
@@ -5061,7 +5061,7 @@
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <div class="metric-card">
-                                    <div class="metric-value ${d.action.includes('buy') ? 'text-success' : d.action.includes('sell') ? 'text-danger' : ''}">${d.final_buy_multiplier.toFixed(1)}×</div>
+                                    <div class="metric-value ${d.action.includes('buy') ? 'text-success' : d.action.includes('sell') ? 'text-danger' : ''}">${d.final_buy_multiplier.toFixed(2)}×</div>
                                     <div class="metric-label">最终买入倍数</div>
                                 </div>
                             </div>
@@ -5073,7 +5073,7 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="metric-card">
-                                    <div class="metric-value ${volClass}">${(d.volatility * 100).toFixed(1)}%</div>
+                                    <div class="metric-value ${volClass}">${(d.volatility * 100).toFixed(2)}%</div>
                                     <div class="metric-label">波动率 (${d.volatility_level})</div>
                                 </div>
                             </div>
@@ -5082,11 +5082,11 @@
                             <tr><td width="30%">策略名称</td><td><strong>${d.strategy_name}</strong></td></tr>
                             <tr><td>状态标签</td><td>${d.status_label}</td></tr>
                             <tr><td>操作建议</td><td>${d.operation_suggestion}</td></tr>
-                            <tr><td>基础倍数</td><td>${d.base_buy_multiplier}×</td></tr>
+                            <tr><td>基础倍数</td><td>${Number(d.base_buy_multiplier || 0).toFixed(2)}×</td></tr>
                             <tr><td>趋势调整</td><td>×${d.trend_adjustment.toFixed(2)}</td></tr>
                             <tr><td>波动率调整</td><td>×${d.volatility_adjustment.toFixed(2)}</td></tr>
-                            <tr><td>赎回金额</td><td>¥${d.redeem_amount}</td></tr>
-                            <tr><td>执行金额</td><td>${d.execution_amount}</td></tr>
+                            <tr><td>赎回金额</td><td>¥${Number(d.redeem_amount || 0).toFixed(2)}</td></tr>
+                            <tr><td>执行金额</td><td>¥${Number(d.execution_amount || 0).toFixed(2)}</td></tr>
                         </table>
                         <div class="strategy-suggestion mb-3">
                             <i class="bi bi-lightbulb me-2 text-muted"></i><strong>综合建议：</strong>${d.final_suggestion}
@@ -5171,6 +5171,9 @@
                 
                 // ==================== DISPLAY RESULTS ====================
                 if (result.success && result.data) {
+                    // 保存回测结果到全局变量，供组合分析模块使用
+                    window.lastBacktestResult = result.data;
+                    
                     // Show success message
                     showSuccessMessage('回测完成！正在生成投资组合分析...');
                     
@@ -5597,23 +5600,29 @@
             const annualizedClass = portfolioAnnualized >= 0 ? 'positive' : 'negative';
             const annualizedSign = portfolioAnnualized >= 0 ? '+' : '';
             
+            const aggregatedFundCodes = Array.isArray(data.aggregated_fund_codes) ? data.aggregated_fund_codes : funds.map(f => f.fund_code);
+            const displayFunds = funds.filter(fund => aggregatedFundCodes.includes(fund.fund_code));
+            const excludedFunds = (data.failed_funds || []).filter(code => !aggregatedFundCodes.includes(code));
+            const fundCountText = excludedFunds.length > 0 ? `${displayFunds.length}只基金（${excludedFunds.length}只剔除）` : `${displayFunds.length}只基金`;
+            
             let html = `
                 <div class="alert alert-success mb-3">
                     <i class="bi bi-check-circle me-2"></i>
-                    <strong>多基金回测完成</strong> - 共${funds.length}只基金, 回测周期: ${data.period}年
+                    <strong>多基金回测完成</strong> - 共${fundCountText}, 回测周期: ${data.period}年
                 </div>
+
                 
                 <h6 class="mb-3"><i class="bi bi-pie-chart me-2"></i>组合表现</h6>
                 <div class="row text-center mb-4">
                     <div class="col-md-3">
                         <div class="metric-card">
-                            <div class="metric-value">¥${portfolio.initial_amount.toLocaleString()}</div>
+                            <div class="metric-value">¥${portfolio.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div class="metric-label">初始金额</div>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="metric-card">
-                            <div class="metric-value">¥${(portfolio.final_value || portfolio.total_value || 0).toLocaleString()}</div>
+                            <div class="metric-value">¥${(portfolio.final_value || portfolio.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div class="metric-label">最终价值</div>
                         </div>
                     </div>
@@ -5648,7 +5657,8 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${funds.map(fund => {
+                            ${displayFunds.map(fund => {
+
                                 // 修复：使用基金代码进行比较
                                 const bestFundCode = typeof bestFund === 'object' ? bestFund.fund_code || bestFund.code : bestFund;
                                 const worstFundCode = typeof worstFund === 'object' ? worstFund.fund_code || worstFund.code : worstFund;
@@ -5674,8 +5684,8 @@
                                             ${isWorst ? '<span class="badge bg-secondary">最差</span>' : ''}
                                         </td>
                                         <td>${fundName || '-'}</td>
-                                        <td>¥${fund.initial_amount.toLocaleString()}</td>
-                                        <td>¥${(fund.final_value || fund.total_value || 0).toLocaleString()}</td>
+                                        <td>¥${fund.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td>¥${(fund.final_value || fund.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         <td class="${returnClass}">${returnSign}${fund.total_return.toFixed(2)}%</td>
                                         <td>${returnSign}${fundAnnualized.toFixed(2)}%</td>
                                         <td class="metric-negative">${fund.max_drawdown.toFixed(2)}%</td>

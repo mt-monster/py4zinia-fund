@@ -111,8 +111,15 @@ const FundApp = {
             const response = await FundAPI.getMarketIndex();
             if (response.success) {
                 const indexElement = document.getElementById('index-value');
-                indexElement.textContent = `${response.data.value} ${response.data.changePercent}`;
-                indexElement.className = response.data.change > 0 ? 'cell-positive' : 'cell-negative';
+                const value = Number(response.data.value);
+                const change = Number(response.data.change);
+                const changePercent = Number(response.data.changePercent);
+                const formattedValue = Number.isNaN(value) ? '--' : value.toFixed(2);
+                const formattedChangePercent = Number.isNaN(changePercent)
+                    ? '--'
+                    : `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+                indexElement.textContent = `${formattedValue} ${formattedChangePercent}`;
+                indexElement.className = change >= 0 ? 'cell-positive' : 'cell-negative';
             }
         } catch (error) {
             console.error('Update market index error:', error);

@@ -103,6 +103,90 @@ class RealDataFetcher:
     
 
     @staticmethod
+    def get_index_latest(symbol: str = "sh000300") -> Dict[str, Optional[float]]:
+        """
+        获取指数最新行情（实时）
+        
+        参数:
+            symbol: 指数代码，例如 sh000300
+            
+        返回:
+            dict: {name, price, change, change_percent, date}
+        """
+        try:
+            logger.info(f"正在获取指数最新行情: {symbol}")
+            spot_fetchers = [
+                ("stock_zh_index_spot_em", {}),
+                ("stock_zh_index_spot", {}),
+                ("stock_zh_index_spot_sina", {})
+            ]
+
+            df = None
+            used_source = None
+            for fetcher_name, kwargs in spot_fetchers:
+                if hasattr(ak, fetcher_name):
+                    try:
+                        df = getattr(ak, fetcher_name)(**kwargs)
+                        if df is not None and len(df) > 0:
+                            used_source = fetcher_name
+                            break
+                    except Exception as e:
+                        logger.warning(f"{fetcher_name} 获取失败: {str(e)}")
+                        continue
+
+            if df is None or df.empty:
+                logger.error("指数最新行情获取失败，返回空结果")
+                return {}
+
+            def pick_col(candidates):
+                for c in candidates:
+                    if c in df.columns:
+                        return c
+                return None
+
+            code_col = pick_col(['代码', '指数代码', 'symbol', 'code'])
+            name_col = pick_col(['名称', '指数名称', 'name'])
+            price_col = pick_col(['最新价', '最新', 'price', '最新值', 'close'])
+            change_col = pick_col(['涨跌额', '涨跌', 'change', '涨跌值'])
+            change_pct_col = pick_col(['涨跌幅', 'change_percent', '涨跌幅%'])
+            date_col = pick_col(['日期', '时间', 'date', 'datetime'])
+
+            symbol_norm = symbol.lower().replace('.', '').replace('sh', '').replace('sz', '')
+            row = None
+
+            if code_col:
+                df[code_col] = df[code_col].astype(str)
+                row = df[df[code_col].str.contains(symbol_norm, na=False)]
+            if (row is None or row.empty) and name_col:
+                row = df[df[name_col].astype(str).str.contains('沪深300', na=False)]
+            if row is None or row.empty:
+                row = df.head(1)
+
+            row = row.iloc[0]
+            name = row[name_col] if name_col and name_col in row else '沪深300'
+            price = float(row[price_col]) if price_col and pd.notna(row[price_col]) else None
+            change = float(row[change_col]) if change_col and pd.notna(row[change_col]) else None
+            change_percent = None
+            if change_pct_col and pd.notna(row[change_pct_col]):
+                change_percent = float(str(row[change_pct_col]).replace('%', '').strip())
+
+            date_value = None
+            if date_col and pd.notna(row[date_col]):
+                date_value = str(row[date_col])
+
+            return {
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'date': date_value,
+                'source': used_source
+            }
+        except Exception as e:
+            logger.error(f"获取指数最新行情失败: {str(e)}")
+            return {}
+
+    @staticmethod
     def get_fund_nav_history(fund_code: str, days: int = 365) -> pd.DataFrame:
         """
         获取基金历史净值数据

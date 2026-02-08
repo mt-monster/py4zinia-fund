@@ -29,7 +29,9 @@ from .custom_strategy_backtest import (
     run_custom_backtest
 )
 from .performance_metrics import (
-    PerformanceMetrics, PerformanceCalculator, calculate_performance_metrics
+    PerformanceMetrics, PerformanceCalculator, calculate_performance_metrics,
+    MetricsInput, MetricRuleSet, MetricValue, MetricBundle, MetricReport, MetricEngine,
+    calculate_metrics_report
 )
 from .backtest_api import (
     BacktestAPIHandler, BacktestTaskManager, BacktestTask, BacktestStatus,
@@ -82,6 +84,13 @@ __all__ = [
     'PerformanceMetrics',
     'PerformanceCalculator',
     'calculate_performance_metrics',
+    'MetricsInput',
+    'MetricRuleSet',
+    'MetricValue',
+    'MetricBundle',
+    'MetricReport',
+    'MetricEngine',
+    'calculate_metrics_report',
     
     # 回测API
     'BacktestAPIHandler',

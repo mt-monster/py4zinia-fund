@@ -268,7 +268,12 @@ def get_dashboard_stats():
                 'sharpeRatio': avg_sharpe,
                 'system': system_status,
                 'activities': activities,
-                'distribution': distribution
+                'distribution': distribution,
+                'data_source': {
+                    'holdings': 'database:user_holdings',
+                    'analysis': 'database:fund_analysis_results',
+                    'as_of': system_status.get('lastUpdate')
+                }
             }
         })
         
@@ -436,6 +441,11 @@ def get_profit_trend():
                 'fund_codes': fund_code_list,
                 'weights': weight_list,
                 'data_source': 'real_historical_data',  # 标记数据来源
+                'data_source_detail': {
+                    'portfolio_nav': 'akshare:fund_open_fund_info_em',
+                    'benchmark': 'akshare:stock_zh_index_daily',
+                    'as_of': datetime.now().strftime('%Y-%m-%d %H:%M')
+                },
                 'benchmark_name': '沪深300',  # 明确标识基准为沪深300
                 'benchmark_description': '以沪深300指数作为业绩比较基准'
             }
@@ -443,6 +453,35 @@ def get_profit_trend():
         
     except Exception as e:
         logger.error(f"获取收益趋势数据失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/market/index', methods=['GET'])
+def get_market_index():
+    """获取市场指数实时数据（沪深300）"""
+    try:
+        symbol = request.args.get('symbol', 'sh000300')
+        from web.real_data_fetcher import data_fetcher
+        index_data = data_fetcher.get_index_latest(symbol)
+        if not index_data:
+            return jsonify({'success': False, 'error': '无法获取指数实时数据'}), 500
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'name': index_data.get('name', '沪深300'),
+                'value': index_data.get('price'),
+                'change': index_data.get('change'),
+                'changePercent': index_data.get('change_percent'),
+                'date': index_data.get('date')
+            },
+            'data_source': {
+                'index': 'akshare',
+                'detail': index_data.get('source')
+            }
+        })
+    except Exception as e:
+        logger.error(f"获取市场指数失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -2130,7 +2169,7 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
         best_fund = max(individual_results, key=lambda x: x['total_return'])
         worst_fund = min(individual_results, key=lambda x: x['total_return'])
         
-        # Prepare individual fund summary (without full trade history for brevity)
+        # Prepare individual fund summary (including equity_curve and trades for visualization)
         fund_summaries = []
         for result in individual_results:
             fund_summaries.append({
@@ -2141,11 +2180,44 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
                 'annualized_return': result['annualized_return'],
                 'max_drawdown': result['max_drawdown'],
                 'sharpe_ratio': result['sharpe_ratio'],
-                'trades_count': result['trades_count']
+                'trades_count': result['trades_count'],
+                'equity_curve': result.get('equity_curve', []),  # 添加净值曲线数据
+                'trades': result.get('trades', [])  # 添加交易记录（买卖点）
             })
+        
+        # 组合净值曲线（使用回测引擎的 equity_curve 聚合）
+        portfolio_equity_curve = []
+        try:
+            equity_curves = [r.get('equity_curve') for r in individual_results if r.get('equity_curve')]
+            if equity_curves:
+                date_sets = [set([p['date'] for p in curve]) for curve in equity_curves]
+                common_dates = set.intersection(*date_sets) if date_sets else set()
+                if not common_dates:
+                    common_dates = set.union(*date_sets)
+                sorted_dates = sorted(list(common_dates))
+                curve_maps = [{p['date']: p['value'] for p in curve} for curve in equity_curves]
+                for date in sorted_dates:
+                    total_value = 0
+                    valid_count = 0
+                    for curve_map in curve_maps:
+                        if date in curve_map:
+                            total_value += curve_map[date]
+                            valid_count += 1
+                    if valid_count > 0:
+                        if valid_count < len(curve_maps):
+                            total_value = total_value * (len(curve_maps) / valid_count)
+                        portfolio_equity_curve.append({
+                            'date': date,
+                            'value': round(total_value, 2)
+                        })
+            else:
+                logger.warning("未找到有效的 equity_curve，无法生成组合净值曲线")
+        except Exception as e:
+            logger.warning(f"生成组合净值曲线失败: {str(e)}")
         
         # Return both individual and aggregated results (Requirement 6.4, 6.5)
         response_data = {
+
             'mode': 'multi_fund',
             'strategy_id': strategy_id,
             'total_funds': len(individual_results),
@@ -2178,10 +2250,16 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
             # Individual fund results (Requirement 6.4)
             'individual_funds': fund_summaries,
             'funds': fund_summaries,  # 添加funds键以兼容前端
+            'aggregated_fund_codes': [r['fund_code'] for r in individual_results],
+            
+            # 组合净值曲线（基于回测引擎）
+            'portfolio_equity_curve': portfolio_equity_curve,
+
             
             # Full details for first fund (for UI display)
             'sample_fund_details': individual_results[0] if individual_results else None
         }
+
         
         # Add period information if provided
         if period is not None:

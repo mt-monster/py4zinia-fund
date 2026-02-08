@@ -29,7 +29,8 @@ const FundConfig = {
         funds: '/api/holdings',  // 使用持仓接口而非基金分析接口
         fundDetail: '/api/fund/',
         importScreenshot: '/api/holdings/import/screenshot',
-        analysis: '/api/analysis'
+        analysis: '/api/analysis',
+        marketIndex: '/api/market/index'
     },
 
     // 本地存储键
