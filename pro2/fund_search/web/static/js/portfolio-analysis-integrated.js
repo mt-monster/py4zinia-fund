@@ -31,6 +31,53 @@ const PortfolioAnalysis = {
     },
 
     /**
+     * 重置所有回测结果和状态
+     * 在开始新的回测前调用，清除之前的所有数据和图表
+     */
+    reset() {
+        console.log('🔄 PortfolioAnalysis.reset() 开始清除之前的结果...');
+        
+        // 1. 清除全局回测结果
+        if (window.lastBacktestResult) {
+            window.lastBacktestResult = null;
+            console.log('  ✅ 已清除 window.lastBacktestResult');
+        }
+        
+        // 2. 重置图表状态
+        this.chartState = null;
+        this.isDrawing = false;
+        
+        // 3. 重置视图状态
+        this.resetViewState();
+        
+        // 4. 移除图表容器（如果存在）
+        const chartContainer = document.getElementById('nav-chart-container');
+        if (chartContainer) {
+            chartContainer.remove();
+            console.log('  ✅ 已移除图表容器 nav-chart-container');
+        }
+        
+        // 5. 移除投资组合分析结果（如果存在）
+        const analysisResult = document.getElementById('portfolio-analysis-result');
+        if (analysisResult) {
+            analysisResult.remove();
+            console.log('  ✅ 已移除投资组合分析结果 portfolio-analysis-result');
+        }
+        
+        // 6. 移除 tooltip（如果存在）
+        const tooltip = document.getElementById('nav-chart-tooltip');
+        if (tooltip) {
+            tooltip.remove();
+            console.log('  ✅ 已移除图表 tooltip');
+        }
+        
+        // 7. 重置事件绑定标志
+        this.eventsBound = false;
+        
+        console.log('✅ PortfolioAnalysis.reset() 完成，所有状态已重置');
+    },
+
+    /**
      * 绑定事件
      */
     bindEvents() {
@@ -121,6 +168,10 @@ const PortfolioAnalysis = {
         const years = backtestData.period || 3;
         const annualizedReturn = ((Math.pow(1 + totalReturn / 100, 1 / years) - 1) * 100);
         
+        // 提取组合表现指标（初始金额、最终价值）
+        const initialAmount = portfolio.initial_amount || 0;
+        const finalValue = portfolio.final_value || portfolio.total_value || 0;
+        
         return {
             totalReturn: totalReturn,
             annualizedReturn: annualizedReturn,
@@ -130,7 +181,9 @@ const PortfolioAnalysis = {
             informationRatio: 0,
             calmarRatio: annualizedReturn / (portfolio.max_drawdown || 1),
             period: years,
-            totalDays: years * 252
+            totalDays: years * 252,
+            initialAmount: initialAmount,
+            finalValue: finalValue
         };
     },
 
@@ -237,6 +290,12 @@ const PortfolioAnalysis = {
      * 生成分析结果 HTML
      */
     generateAnalysisHTML(metrics) {
+        // 格式化金额显示
+        const formatCurrency = (value) => {
+            if (value === undefined || value === null) return '¥0.00';
+            return '¥' + value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+        
         return `
             <div id="portfolio-analysis-result" class="portfolio-analysis-container">
                 <div class="metrics-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 12px;">
@@ -244,26 +303,45 @@ const PortfolioAnalysis = {
                         <i class="bi bi-speedometer2" style="color: #4361ee;"></i> 关键绩效指标
                     </h5>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <!-- 组合表现指标：初始金额 -->
+                        <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
+                            <div style="font-size: 20px; font-weight: 700; color: #2c3e50;">
+                                ${formatCurrency(metrics.initialAmount)}
+                            </div>
+                            <div style="color: #6c757d; font-size: 13px;">初始金额</div>
+                        </div>
+                        <!-- 组合表现指标：最终价值 -->
+                        <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
+                            <div style="font-size: 20px; font-weight: 700; color: ${metrics.finalValue >= metrics.initialAmount ? '#06d6a0' : '#ef476f'};">
+                                ${formatCurrency(metrics.finalValue)}
+                            </div>
+                            <div style="color: #6c757d; font-size: 13px;">最终价值</div>
+                        </div>
+                        <!-- 关键绩效指标：总收益率 -->
                         <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div style="font-size: 24px; font-weight: 700; color: ${metrics.totalReturn >= 0 ? '#06d6a0' : '#ef476f'};">
                                 ${metrics.totalReturn >= 0 ? '+' : ''}${metrics.totalReturn.toFixed(2)}%
                             </div>
                             <div style="color: #6c757d; font-size: 13px;">总收益率</div>
                         </div>
+                        <!-- 关键绩效指标：年化收益率 -->
                         <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div style="font-size: 24px; font-weight: 700; color: ${metrics.annualizedReturn >= 0 ? '#06d6a0' : '#ef476f'};">
                                 ${metrics.annualizedReturn >= 0 ? '+' : ''}${metrics.annualizedReturn.toFixed(2)}%
                             </div>
                             <div style="color: #6c757d; font-size: 13px;">年化收益率</div>
                         </div>
+                        <!-- 关键绩效指标：年化波动率 -->
                         <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div style="font-size: 24px; font-weight: 700; color: #2c3e50;">${metrics.volatility.toFixed(2)}%</div>
                             <div style="color: #6c757d; font-size: 13px;">年化波动率</div>
                         </div>
+                        <!-- 关键绩效指标：最大回撤 -->
                         <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div style="font-size: 24px; font-weight: 700; color: #ef476f;">${metrics.maxDrawdown.toFixed(2)}%</div>
                             <div style="color: #6c757d; font-size: 13px;">最大回撤</div>
                         </div>
+                        <!-- 关键绩效指标：夏普比率 -->
                         <div style="background: white; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #dee2e6;">
                             <div style="font-size: 24px; font-weight: 700; color: ${metrics.sharpeRatio >= 0 ? '#06d6a0' : '#ef476f'};">
                                 ${metrics.sharpeRatio.toFixed(2)}
@@ -767,88 +845,126 @@ const PortfolioAnalysis = {
     },
 
     /**
-     * 绘制图例
+     * 绘制图例 - 支持多行布局和自动换行
      */
     drawLegendWithFunds(ctx, margin, chartWidth, fundsWithDetails, fundColors) {
-        const legendY = 15;
-        let legendX = margin.left;
+        const lineHeight = 22;  // 行高
+        const itemSpacing = 15; // 图例项之间的间距
+        const markerWidth = 20; // 颜色标记宽度
+        const markerTextGap = 8; // 标记与文字之间的间距
+        const maxTextWidth = 120; // 最大文字宽度（超过则截断）
         
-        // 组合净值
-        ctx.fillStyle = '#4361ee';
-        ctx.fillRect(legendX, legendY - 3, 20, 3);
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        ctx.fillText('组合净值', legendX + 25, legendY + 2);
+        let currentX = margin.left;
+        let currentY = 15;
         
-        legendX += 90;
-        
-        // 基准（虚线样式）
-        ctx.strokeStyle = '#ef476f';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 4]);
-        ctx.beginPath();
-        ctx.moveTo(legendX, legendY);
-        ctx.lineTo(legendX + 20, legendY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#333';
-        ctx.fillText('沪深300基准', legendX + 25, legendY + 2);
-        
-        // 基金
-        legendX += 110;
-        fundsWithDetails.forEach((fund, index) => {
-            if (legendX > margin.left + chartWidth - 80) return;
+        // 辅助函数：截断过长的文本
+        const truncateText = (text, maxWidth) => {
+            if (!text) return '';
+            let width = ctx.measureText(text).width;
+            if (width <= maxWidth) return text;
             
-            ctx.fillStyle = fundColors[index % fundColors.length];
-            ctx.fillRect(legendX, legendY - 3, 20, 3);
-            ctx.fillStyle = '#333';
+            let truncated = text;
+            while (width > maxWidth && truncated.length > 0) {
+                truncated = truncated.slice(0, -1);
+                width = ctx.measureText(truncated + '...').width;
+            }
+            return truncated + '...';
+        };
+        
+        // 辅助函数：检查是否需要换行
+        const checkWrap = (itemWidth) => {
+            if (currentX + itemWidth > margin.left + chartWidth) {
+                currentX = margin.left;
+                currentY += lineHeight;
+            }
+        };
+        
+        // 绘制单个图例项（带颜色标记的文本）
+        const drawLegendItem = (color, text, isLine = true, isDashed = false) => {
             ctx.font = '11px Arial';
-            const displayName = fund.fund_name || fund.fund_code || `基金${index + 1}`;
-            ctx.fillText(displayName, legendX + 25, legendY + 2);
+            const displayText = truncateText(text, maxTextWidth);
+            const textWidth = ctx.measureText(displayText).width;
+            const itemWidth = markerWidth + markerTextGap + textWidth + itemSpacing;
             
-            legendX += 80;
+            checkWrap(itemWidth);
+            
+            // 绘制颜色标记
+            if (isLine) {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                if (isDashed) {
+                    ctx.setLineDash([8, 4]);
+                } else {
+                    ctx.setLineDash([]);
+                }
+                ctx.beginPath();
+                ctx.moveTo(currentX, currentY);
+                ctx.lineTo(currentX + markerWidth, currentY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else {
+                ctx.fillStyle = color;
+                ctx.fillRect(currentX, currentY - 3, markerWidth, 6);
+            }
+            
+            // 绘制文字
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.fillText(displayText, currentX + markerWidth + markerTextGap, currentY + 4);
+            
+            currentX += itemWidth;
+        };
+        
+        // 绘制三角形标记（买入/卖出）
+        const drawTriangleMarker = (color, isUp, text) => {
+            const markerSize = 6;
+            const textWidth = ctx.measureText(truncateText(text, 40)).width;
+            const itemWidth = markerSize * 2 + markerTextGap + textWidth + itemSpacing;
+            
+            checkWrap(itemWidth);
+            
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            if (isUp) {
+                // 向上三角形（买入）
+                ctx.moveTo(currentX + markerSize, currentY - markerSize + 2);
+                ctx.lineTo(currentX, currentY + markerSize / 2);
+                ctx.lineTo(currentX + markerSize * 2, currentY + markerSize / 2);
+            } else {
+                // 向下三角形（卖出）
+                ctx.moveTo(currentX + markerSize, currentY + markerSize - 2);
+                ctx.lineTo(currentX, currentY - markerSize / 2);
+                ctx.lineTo(currentX + markerSize * 2, currentY - markerSize / 2);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#333';
+            ctx.fillText(text, currentX + markerSize * 2 + markerTextGap, currentY + 4);
+            
+            currentX += itemWidth;
+        };
+        
+        // 1. 绘制组合净值
+        drawLegendItem('#4361ee', '组合净值', true, false);
+        
+        // 2. 绘制基准（虚线样式）
+        drawLegendItem('#ef476f', '沪深300基准', true, true);
+        
+        // 3. 绘制各基金
+        fundsWithDetails.forEach((fund, index) => {
+            const color = fundColors[index % fundColors.length];
+            const displayName = fund.fund_name || fund.fund_code || `基金${index + 1}`;
+            drawLegendItem(color, displayName, true, false);
         });
         
-        // 买卖点标记图例
+        // 4. 绘制买卖点标记图例（如果有交易数据）
         if (fundsWithDetails.some(f => f.trades && f.trades.length > 0)) {
-            if (legendX <= margin.left + chartWidth - 150) {
-                legendX += 20;
-                
-                // 买入标记
-                ctx.fillStyle = '#06d6a0';
-                ctx.beginPath();
-                ctx.moveTo(legendX, legendY - 5);
-                ctx.lineTo(legendX - 5, legendY + 3);
-                ctx.lineTo(legendX + 5, legendY + 3);
-                ctx.closePath();
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                
-                ctx.fillStyle = '#333';
-                ctx.font = '11px Arial';
-                ctx.fillText('买入', legendX + 12, legendY + 2);
-                
-                legendX += 45;
-                
-                // 卖出标记
-                ctx.fillStyle = '#ef476f';
-                ctx.beginPath();
-                ctx.moveTo(legendX, legendY + 3);
-                ctx.lineTo(legendX - 5, legendY - 5);
-                ctx.lineTo(legendX + 5, legendY - 5);
-                ctx.closePath();
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                
-                ctx.fillStyle = '#333';
-                ctx.font = '11px Arial';
-                ctx.fillText('卖出', legendX + 12, legendY + 2);
-            }
+            drawTriangleMarker('#06d6a0', true, '买入');
+            drawTriangleMarker('#ef476f', false, '卖出');
         }
     },
 
