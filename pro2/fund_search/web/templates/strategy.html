@@ -4086,6 +4086,37 @@
          * Run strategy comparison
          */
         async function runStrategyComparison() {
+            console.log('=== 开始策略对比 ===');
+            
+            // ==================== 清除之前的回测结果 ====================
+            // 清除 PortfolioAnalysis 模块中的所有状态和图表
+            if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.reset) {
+                PortfolioAnalysis.reset();
+            }
+            
+            // 清除回测结果区域显示
+            const backtestResult = document.getElementById('backtest-result');
+            const backtestResultContent = document.getElementById('backtest-result-content');
+            if (backtestResult) {
+                backtestResult.style.display = 'none';
+            }
+            if (backtestResultContent) {
+                backtestResultContent.innerHTML = '';
+            }
+            
+            // 清除回测状态区域
+            const backtestStatus = document.getElementById('backtest-status');
+            if (backtestStatus) {
+                backtestStatus.style.display = 'none';
+            }
+            
+            // 清除全局回测结果变量
+            if (window.lastBacktestResult) {
+                window.lastBacktestResult = null;
+            }
+            
+            console.log('✅ 已清除之前的所有回测结果和状态');
+            
             const selectedFunds = fundSelector.getSelectedFunds();
             const selectedStrategies = strategySelector.getSelectedStrategies();
             const initialAmount = parseFloat(document.getElementById('initial-amount').value);
@@ -5190,6 +5221,35 @@
         async function runBacktest() {
             console.log('=== 开始回测 ===');
             
+            // ==================== 清除之前的回测结果 ====================
+            // 清除 PortfolioAnalysis 模块中的所有状态和图表
+            if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.reset) {
+                PortfolioAnalysis.reset();
+            }
+            
+            // 清除回测结果区域显示
+            const backtestResult = document.getElementById('backtest-result');
+            const backtestResultContent = document.getElementById('backtest-result-content');
+            if (backtestResult) {
+                backtestResult.style.display = 'none';
+            }
+            if (backtestResultContent) {
+                backtestResultContent.innerHTML = '';
+            }
+            
+            // 清除回测状态区域
+            const backtestStatus = document.getElementById('backtest-status');
+            if (backtestStatus) {
+                backtestStatus.style.display = 'none';
+            }
+            
+            // 清除全局回测结果变量
+            if (window.lastBacktestResult) {
+                window.lastBacktestResult = null;
+            }
+            
+            console.log('✅ 已清除之前的所有回测结果和状态');
+            
             // Check if we're in comparison mode
             const comparisonCheckbox = document.getElementById('comparison-mode-checkbox');
             const comparisonMode = comparisonCheckbox ? comparisonCheckbox.checked : false;
@@ -6025,33 +6085,7 @@
                 </div>
 
                 
-                <h6 class="mb-3"><i class="bi bi-pie-chart me-2"></i>组合表现</h6>
-                <div class="row text-center mb-4">
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">¥${portfolio.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div class="metric-label">初始金额</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">¥${(portfolio.final_value || portfolio.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div class="metric-label">最终价值</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value ${portfolioReturnClass}">${portfolioReturnSign}${portfolio.total_return.toFixed(2)}%</div>
-                            <div class="metric-label">总收益率</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value ${portfolioAnnualized !== null ? annualizedClass : ''}">${portfolioAnnualized !== null ? annualizedSign + portfolioAnnualized.toFixed(2) + '%' : 'N/A'}</div>
-                            <div class="metric-label">年化收益率</div>
-                        </div>
-                    </div>
-                </div>
+                <!-- 组合表现指标已整合到下方的"关键绩效指标"区域 -->
                 
                 <h6 class="mb-3"><i class="bi bi-list-check me-2"></i>各基金表现</h6>
                 <div class="table-responsive mb-3">
