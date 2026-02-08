@@ -91,6 +91,11 @@ def strategy_page():
     """策略分析页"""
     return render_template('strategy.html')
 
+@app.route('/trade-detail-test')
+def trade_detail_test():
+    """交易详情功能测试页"""
+    return render_template('trade_detail_test.html')
+
 @app.route('/strategy-editor')
 def strategy_editor_page():
     """策略编辑器页"""
