@@ -3111,10 +3111,15 @@
                                             <div class="strategy-metric-label">夏普比率</div>
                                         </div>
                                     </div>
+                                    <button class="btn btn-outline-primary btn-sm strategy-detail-btn" 
+                                            data-strategy-id="${strategy.strategy_id}"
+                                            onclick="event.stopPropagation(); showStrategyDetail('${strategy.strategy_id}')">
+                                        <i class="bi bi-info-circle"></i> 详情
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `;}, {
                 }).join('');
 
                 container.innerHTML = html;
@@ -6161,6 +6166,668 @@
                 // Fallback to scrolling to results div if section not found
                 resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+        }
+        
+        // ==================== 策略详情模态框 ====================
+        
+        /**
+         * 策略详细算法数据
+         */
+        const strategyAlgorithmDetails = {
+            'dual_ma': {
+                name: '双均线策略',
+                type: '趋势跟踪',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>双均线策略是最经典的趋势跟踪策略之一。它通过比较不同周期的移动平均线来判断市场趋势的改变，从而产生交易信号。</p>
+                        <ul>
+                            <li><strong>黄金交叉（Golden Cross）</strong>：短期均线上穿长期均线，产生买入信号</li>
+                            <li><strong>死亡交叉（Death Cross）</strong>：短期均线下穿长期均线，产生卖出信号</li>
+                        </ul>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>短期均线周期</td><td>5日 / 10日</td><td>捕捉短期价格变动</td></tr>
+                            <tr><td>长期均线周期</td><td>20日 / 60日</td><td>过滤短期噪音</td></tr>
+                            <tr><td>ADX强趋势阈值</td><td>40</td><td>确认趋势强度</td></tr>
+                            <tr><td>ADX中等趋势阈值</td><td>25</td><td>识别趋势形成</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入条件</h6>
+                            <ol>
+                                <li>短期均线 > 长期均线（多头排列）</li>
+                                <li>ADX > 25（存在趋势）</li>
+                                <li>价格突破短期均线上方</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出/止损条件</h6>
+                            <ol>
+                                <li>短期均线 < 长期均线（空头排列）</li>
+                                <li>价格下跌超过预设比例</li>
+                                <li>趋势反转确认（ADX下降）</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>避免在无趋势市场中频繁交易</li>
+                            <li><span class="badge bg-info me-2">市场Beta调整</span>根据大盘走势调整买入倍数</li>
+                            <li><span class="badge bg-info me-2">熊市保护</span>大盘大跌时降低买入频率</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'mean_reversion': {
+                name: '均值回归策略',
+                type: '均值回归',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>均值回归策略基于统计学原理：价格总是倾向于回归到其历史均值附近。当价格明显偏离均值时，建立反向头寸，预期价格将回归。</p>
+                        <div class="formula-box">
+                            <strong>偏离度公式：</strong><br>
+                            <code>偏离度 = (P - MA) / MA × 100%</code><br>
+                            <small class="text-muted">P = 当前价格，MA = 移动平均价</small>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>均值窗口周期</td><td>60/120/250日</td><td>计算均值的历史长度</td></tr>
+                            <tr><td>买入偏离阈值</td><td>-5% / -8%</td><td>价格低于均值多少时买入</td></tr>
+                            <tr><td>卖出偏离阈值</td><td>+5% / +8%</td><td>价格高于均值多少时卖出</td></tr>
+                            <tr><td>趋势过滤器</td><td>启用/禁用</td><td>避免强趋势中错误交易</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入条件</h6>
+                            <ol>
+                                <li>当前价格 < 均值 × (1 - 买入偏离阈值)</li>
+                                <li>ADX < 40（非强趋势市场）</li>
+                                <li>连续下跌日数 < 阈值（避底）</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出条件</h6>
+                            <ol>
+                                <li>当前价格 > 均值 × (1 + 卖出偏离阈值)</li>
+                                <li>持仓盈利达到预期目标</li>
+                                <li>均值上移且价格跟随（趋势转化）</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-success me-2">高估卖出修正</span>修复了超贫卖出逻辑缺陷</li>
+                            <li><span class="badge bg-success me-2">趋势过滤器</span>强趋势中暂停均值回归操作</li>
+                            <li><span class="badge bg-success me-2">ADX确认</span>趋势强度确认避免趋势市场损失</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'target_value': {
+                name: '目标市值策略',
+                type: '价值投资',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>目标市值策略是一种被动型投资策略，通过设定目标持仓市值，定期调整实际持仓使其接近目标值，实现"低买高卖"的效果。</p>
+                        <ul>
+                            <li>价格下跌 → 市值低于目标 → 自动加仓</li>
+                            <li>价格上涨 → 市值高于目标 → 自动减仓</li>
+                        </ul>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>目标市值</td><td>可配置</td><td>期望的持仓市值目标</td></tr>
+                            <tr><td>调整周期</td><td>每日/每周</td><td>检查并调整的频率</td></tr>
+                            <tr><td>最小调整金额</td><td>100元</td><td>避免过于频繁的小额交易</td></tr>
+                            <tr><td>最大偏离比例</td><td>20%</td><td>触发调整的阈值</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>加仓条件</h6>
+                            <ol>
+                                <li>当前市值 < 目标市值 × (1 - 触发阈值)</li>
+                                <li>偏离金额 >= 最小调整金额</li>
+                                <li>账户余额充足</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>减仓条件</h6>
+                            <ol>
+                                <li>当前市值 > 目标市值 × (1 + 触发阈值)</li>
+                                <li>持仓盈利为正</li>
+                                <li>可卖出份额 >= 最小调整金额</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>在强趋势中动态调整目标市值</li>
+                            <li><span class="badge bg-info me-2">波动率适配</span>根据历史波动率调整调整幅度</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'grid': {
+                name: '网格交易策略',
+                type: '量化网格',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>网格交易策略在预设的价格区间内设置多个买卖网格。价格每触及一个网格线，就执行对应的交易操作，赚取网格区间内的波动收益。</p>
+                        <div class="diagram-box">
+                            <pre>
+    价格上限 ──────────────────── ← 卖出网格
+      │    ↓ 价格上涨 → 减仓
+      │    ↑ 价格下跌 → 加仓
+    中心价 ──────────────────── ─ 基准价格
+      │    ↓ 价格下跌 → 加仓
+      │    ↑ 价格上涨 → 减仓
+    价格下限 ──────────────────── ← 买入网格
+                            </pre>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>价格上限</td><td>可配置</td><td>网格区间的最高价</td></tr>
+                            <tr><td>价格下限</td><td>可配置</td><td>网格区间的最低价</td></tr>
+                            <tr><td>网格数量</td><td>5-20个</td><td>区间内的网格划分</td></tr>
+                            <tr><td>每格投入</td><td>固定金额</td><td>每个网格的交易金额</td></tr>
+                            <tr><td>止损网格</td><td>价格下限以下</td><td>突破时全部止损</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入触发</h6>
+                            <ol>
+                                <li>价格下跌触及某个买入网格线</li>
+                                <li>该网格尚未建仓或已清仓</li>
+                                <li>价格仍在网格区间内</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出触发</h6>
+                            <ol>
+                                <li>价格上涨触及某个卖出网格线</li>
+                                <li>该网格已建仓</li>
+                                <li>持仓盈利为正</li>
+                            </ol>
+                        </div>
+                        <div class="alert alert-warning mt-2">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>止损规则：</strong>价格突破下限时，立即清仓止损，网格失效。
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>检测突破行情，及时暂停网格</li>
+                            <li><span class="badge bg-info me-2">动态网格</span>根据波动率自适应调整网格密度</li>
+                            <li><span class="badge bg-info me-2">金额分配</span>低位重仓，高位轻仓的金字塔分配</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'enhanced_rule_based': {
+                name: '增强型规则策略',
+                type: '多因子',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>增强型规则策略是一个复合式策略，综合多种技术指标和市场因子，通过规则引擎动态调整仓位和交易时机。</p>
+                        <div class="factor-box">
+                            <h6><i class="bi bi-diagram-3 me-2"></i>综合因子</h6>
+                            <ul>
+                                <li><strong>趋势因子：</strong>ADX趋势强度、移动均线排列</li>
+                                <li><strong>动量因子：</strong>RSI超买超卖、MACD柱状线</li>
+                                <li><strong>成交量因子：</strong>成交量放大确认突破</li>
+                                <li><strong>市场因子：</strong>大盘Beta、行情阶段</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>趋势确认周期</td><td>14日</td><td>ADX计算周期</td></tr>
+                            <tr><td>强趋势阈值</td><td>ADX > 40</td><td>确认强趋势形成</td></tr>
+                            <tr><td>持续下跌判定</td><td>5日</td><td>连续下跌触发加大买入</td></tr>
+                            <tr><td>熊市买入倍数</td><td>0.7x</td><td>大盘大跌时降低买入</td></tr>
+                            <tr><td>止盈比例</td><td>5% / 8%</td><td>目标止盈水平</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>多因子买入</h6>
+                            <ol>
+                                <li>价格突破短期支撑且ADX确认</li>
+                                <li>或：连续下跌8%以上触发加大买入</li>
+                                <li>成交量放大确认（可选）</li>
+                                <li>熊市降低买入倍数防茎护盘</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>多因子卖出</h6>
+                            <ol>
+                                <li>达到目标止盈水平且ADX确认趋势未强</li>
+                                <li>或：RSI进入超买区域且量价背离</li>
+                                <li>或：趋势反转信号出现（多空分岐）</li>
+                                <li>牛市中可暂停止盈让利润奔跑</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-primary me-2">持续下跌优化</span>修复连续下跌判定逻辑</li>
+                            <li><span class="badge bg-primary me-2">ADX趋势确认</span>趋势强度确认避免早期退出</li>
+                            <li><span class="badge bg-primary me-2">市场Beta调整</span>根据大盘走势调整交易策略</li>
+                            <li><span class="badge bg-primary me-2">成交量确认</span>成交量放大确认突破有效性</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'mean_reversion_optimized': {
+                name: '均值回归-优化版',
+                type: '均值回归',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>在标准均值回归策略基础上，应用了完整的优化套件，是目前推荐的均值回归策略。</p>
+                        <div class="highlight-box">
+                            <strong>优化亮点：</strong>
+                            <ul>
+                                <li>修复高估卖出逻辑缺陷，确保正确判定超贫状态</li>
+                                <li>添加趋势过滤器，避免强趋势中的错误交易</li>
+                                <li>ADX趋势强度确认，提高交易成功率</li>
+                                <li>市场Beta调整，适配不同市场环境</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>均值窗口</td><td>250日</td><td>长期均值更稳健</td></tr>
+                            <tr><td>买入偏离</td><td>-5%</td><td>中等敏感度</td></tr>
+                            <tr><td>卖出偏离</td><td>+5%</td><td>对称止盈</td></tr>
+                            <tr><td>趋势过滤</td><td>强制开启</td><td>ADX > 40时暂停</td></tr>
+                            <tr><td>熊市倍数</td><td>0.7x</td><td>大盘跌2%+时降低</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>与标准均值回归策略相比，优化版有以下改进：</strong>
+                        </div>
+                        <ul>
+                            <li>高估判定使用市值与成本比较，更准确</li>
+                            <li>趋势过滤器强制检查，禁止在ADX > 40时开仓</li>
+                            <li>连续下跌判定加入成交量确认</li>
+                            <li>熊市中自动降低买入倍数保护资金</li>
+                        </ul>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>完整优化特性</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-success">高估卖出修正</h6>
+                                    <p class="small mb-0">修复了按份额判断超贫的逻辑错误，改用市值/成本比较</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-primary">趋势过滤器</h6>
+                                    <p class="small mb-0">强趋势市场中暂停均值回归操作，避免趋势贯穿损失</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-info">ADX趋势确认</h6>
+                                    <p class="small mb-0">趋势强度确认后才执行交易，提高成功率</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-warning">市场Beta调整</h6>
+                                    <p class="small mb-0">根据大盘走势调整买入策略，适配市场环境</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            'enhanced_rule_based_optimized': {
+                name: '增强规则-优化版',
+                type: '多因子',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>基于增强型规则策略的全面优化版本，集成了所有优化特性，是目前最推荐的复合策略。</p>
+                        <div class="highlight-box bg-primary-light">
+                            <strong>全面优化：</strong>
+                            <ul>
+                                <li>持续下跌判定优化：更精确地识别真实的持续下跌</li>
+                                <li>ADX趋势确认：确保趋势有效性后才交易</li>
+                                <li>市场Beta调整：根据大盘走势调整策略参数</li>
+                                <li>成交量确认：确认突破信号的有效性</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>持续下跌判定日数</td><td>5日</td><td>连续下跌触发加大买入</td></tr>
+                            <tr><td>下跌累计幅度</td><td>8%</td><td>5日内累计跌幅触发</td></tr>
+                            <tr><td>ADX强趋势阈值</td><td>40</td><td>确认趋势强度</td></tr>
+                            <tr><td>成交量确认倍数</td><td>1.5x</td><td>均量的1.5倍确认放大</td></tr>
+                            <tr><td>熊市买入倍数</td><td>0.7x</td><td>大盘跌2%+时降低</td></tr>
+                            <tr><td>牛市暂停止盈</td><td>开启</td><td>让利润奔跑</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>优化买入</h6>
+                            <ol>
+                                <li>基础买入：价格突破 + ADX确认</li>
+                                <li>加大买入：连续5日下跌8%以上</li>
+                                <li>成交量确认：当日成交量 > 1.5×均量</li>
+                                <li>熊市保护：大盘跌2%+时降低买入倍数</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>优化卖出</h6>
+                            <ol>
+                                <li>达标卖出：目标止盈 + 趋势未强</li>
+                                <li>趋势反转：多空因子分岖信号</li>
+                                <li>牛市保护：大盘涨2%+时可暂停止盈</li>
+                                <li>成交量确认：放量下跌时执行</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>完整优化特性</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded border-primary">
+                                    <h6 class="text-primary"><i class="bi bi-check-circle me-1"></i>持续下跌优化</h6>
+                                    <p class="small mb-0">更精确的持续下跌判定逻辑，避免震荡中的误判</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded border-info">
+                                    <h6 class="text-info"><i class="bi bi-check-circle me-1"></i>ADX趋势确认</h6>
+                                    <p class="small mb-0">趋势强度确认后才执行交易</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded border-warning">
+                                    <h6 class="text-warning"><i class="bi bi-check-circle me-1"></i>市场Beta调整</h6>
+                                    <p class="small mb-0">根据大盘走势动态调整策略参数</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded border-success">
+                                    <h6 class="text-success"><i class="bi bi-check-circle me-1"></i>成交量确认</h6>
+                                    <p class="small mb-0">成交量放大确认突破的真实性</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        };
+        
+        /**
+         * 显示策略详情模态框
+         * @param {string} strategyId - 策略ID
+         */
+        function showStrategyDetail(strategyId) {
+            const details = strategyAlgorithmDetails[strategyId];
+            if (!details) {
+                alert('暂无该策略的详细信息');
+                return;
+            }
+            
+            const detailHtml = `
+                <div class="modal fade" id="strategyDetailModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);">
+                                <h5 class="modal-title text-white">
+                                    <i class="bi bi-cpu me-2"></i>${details.name} - 算法实现详情
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-0">
+                                <div class="strategy-detail-tabs">
+                                    <ul class="nav nav-tabs nav-fill" id="strategyDetailTabs" role="tablist" style="background: #f8f9fa;">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="logic-tab" data-bs-toggle="tab" data-bs-target="#logic" type="button" role="tab">
+                                                <i class="bi bi-lightbulb me-1"></i>核心逻辑
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab">
+                                                <i class="bi bi-sliders me-1"></i>参数设置
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules" type="button" role="tab">
+                                                <i class="bi bi-list-check me-1"></i>交易规则
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="optimize-tab" data-bs-toggle="tab" data-bs-target="#optimize" type="button" role="tab">
+                                                <i class="bi bi-magic me-1"></i>优化特性
+                                            </button>
+                                        </li>
+                                    </ul>
+                                    <div class="tab-content p-4" id="strategyDetailContent">
+                                        <div class="tab-pane fade show active" id="logic" role="tabpanel">
+                                            ${details.coreLogic}
+                                        </div>
+                                        <div class="tab-pane fade" id="params" role="tabpanel">
+                                            ${details.parameters}
+                                        </div>
+                                        <div class="tab-pane fade" id="rules" role="tabpanel">
+                                            ${details.tradingRules}
+                                        </div>
+                                        <div class="tab-pane fade" id="optimize" role="tabpanel">
+                                            ${details.optimization}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <span class="badge bg-primary me-2">${details.type}</span>
+                                <span class="text-muted small">查看完整策略代码请访问策略编辑器</span>
+                                <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <style>
+                    .strategy-detail-tabs .nav-link {
+                        color: #666;
+                        font-weight: 500;
+                        padding: 12px 16px;
+                        border: none;
+                        border-bottom: 3px solid transparent;
+                    }
+                    .strategy-detail-tabs .nav-link:hover {
+                        color: #4361ee;
+                        background: rgba(67, 97, 238, 0.05);
+                    }
+                    .strategy-detail-tabs .nav-link.active {
+                        color: #4361ee;
+                        background: white;
+                        border-bottom-color: #4361ee;
+                    }
+                    .detail-section {
+                        margin-bottom: 24px;
+                    }
+                    .detail-section h6 {
+                        color: #333;
+                        font-weight: 600;
+                        margin-bottom: 12px;
+                        padding-bottom: 8px;
+                        border-bottom: 2px solid #e9ecef;
+                    }
+                    .rule-box {
+                        background: #f8f9fa;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                        border-left: 4px solid #dee2e6;
+                    }
+                    .rule-box.buy-rule {
+                        border-left-color: #06d6a0;
+                        background: linear-gradient(135deg, #e8fcf3 0%, #f8f9fa 100%);
+                    }
+                    .rule-box.sell-rule {
+                        border-left-color: #ef476f;
+                        background: linear-gradient(135deg, #fceced 0%, #f8f9fa 100%);
+                    }
+                    .rule-box h6 {
+                        border-bottom: none;
+                        margin-bottom: 12px;
+                    }
+                    .formula-box {
+                        background: #e3f2fd;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #2196f3;
+                    }
+                    .diagram-box {
+                        background: #f5f5f5;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        overflow-x: auto;
+                    }
+                    .diagram-box pre {
+                        margin: 0;
+                        font-family: 'SF Mono', Monaco, monospace;
+                        font-size: 13px;
+                        line-height: 1.6;
+                    }
+                    .highlight-box {
+                        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #4caf50;
+                    }
+                    .highlight-box.bg-primary-light {
+                        background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
+                        border-left-color: #2196f3;
+                    }
+                    .factor-box {
+                        background: #fff3e0;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #ff9800;
+                    }
+                    .feature-list {
+                        list-style: none;
+                        padding: 0;
+                    }
+                    .feature-list li {
+                        padding: 8px 0;
+                        border-bottom: 1px dashed #e0e0e0;
+                    }
+                    .feature-list li:last-child {
+                        border-bottom: none;
+                    }
+                    .feature-card {
+                        background: white;
+                        transition: all 0.2s;
+                    }
+                    .feature-card:hover {
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                        transform: translateY(-2px);
+                    }
+                </style>
+            `;
+            
+            // 移除已存在的模态框
+            const existingModal = document.getElementById('strategyDetailModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', detailHtml);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyDetailModal'));
+            modal.show();
         }
     </script>
     
