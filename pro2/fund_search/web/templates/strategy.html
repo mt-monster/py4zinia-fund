@@ -1493,9 +1493,78 @@
             gap: 12px;
         }
         
-        /* 基金选择器优化样式 */
-        #fund-selector-card {
-            overflow: hidden;
+        /* 交易详情按钮样式 */
+        .trade-detail-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .trade-detail-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* 交易详情模态框样式 */
+        .detail-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #0d6efd;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            color: #6c757d;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #212529;
+        }
+        
+        /* 优化指标图例样式 */
+        .optimization-legend {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 16px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 16px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .legend-item i {
+            margin-right: 4px;
         }
         
         #fund-selector-card .card-header {
@@ -3782,6 +3851,13 @@
                             <td>${trade.multiplier ? trade.multiplier.toFixed(2) + '×' : '-'}</td>
                             <td>${trendIcon}</td>
                             <td class="text-center">${optimizationIcons || '-'}</td>
+                            <td class="text-center">
+                                <button class="btn btn-outline-primary btn-sm trade-detail-btn" 
+                                        data-trade='${JSON.stringify(trade)}'
+                                        onclick="showTradeDetail(this)">
+                                    <i class="bi bi-eye"></i> 详情
+                                </button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
@@ -3802,6 +3878,7 @@
                                     <th>倍数</th>
                                     <th>趋势</th>
                                     <th>优化指标</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -5482,6 +5559,331 @@
         }
         
         /**
+         * 显示交易详情弹窗
+         * @param {HTMLElement} button - 触发按钮元素
+         */
+        function showTradeDetail(button) {
+            // 获取交易数据
+            const tradeData = JSON.parse(button.getAttribute('data-trade'));
+            
+            // 构建详情HTML
+            const detailHtml = `
+                <div class="modal fade" id="tradeDetailModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-receipt me-2"></i>交易详情
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-calendar me-2"></i>基本信息</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易日期:</span>
+                                                <span class="detail-value">${tradeData.date}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易类型:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${tradeData.action === 'buy' ? 'bg-success' : 'bg-danger'}">
+                                                        ${tradeData.action === 'buy' ? '买入' : tradeData.action === 'stop_loss' ? '止损' : '卖出'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易金额:</span>
+                                                <span class="detail-value">¥${tradeData.amount.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-wallet2 me-2"></i>账户状态</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易后余额:</span>
+                                                <span class="detail-value">¥${tradeData.balance.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">持仓价值:</span>
+                                                <span class="detail-value">¥${tradeData.holdings.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">杠杆倍数:</span>
+                                                <span class="detail-value">${tradeData.multiplier ? tradeData.multiplier.toFixed(2) + '×' : '无'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${(tradeData.trend || tradeData.adx_value !== undefined || tradeData.market_adjusted || tradeData.volume_confirmed || tradeData.trend_filtered) ? `
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-gear me-2"></i>策略指标</h6>
+                                            ${tradeData.trend ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场趋势:</span>
+                                                <span class="detail-value">
+                                                    ${tradeData.trend === 'uptrend' ? '📈 上升趋势' : 
+                                                      tradeData.trend === 'downtrend' ? '📉 下降趋势' : 
+                                                      '➡️ 震荡趋势'}
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.adx_value !== undefined ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">ADX值:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${tradeData.adx_value > 40 ? 'bg-danger' : tradeData.adx_value > 25 ? 'bg-warning text-dark' : tradeData.adx_value > 15 ? 'bg-info' : 'bg-secondary'}">
+                                                        ${tradeData.adx_value.toFixed(2)}
+                                                        ${tradeData.adx_value > 40 ? '(强趋势)' : 
+                                                          tradeData.adx_value > 25 ? '(中等趋势)' : 
+                                                          tradeData.adx_value > 15 ? '(弱趋势)' : '(无趋势)'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.market_adjusted ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场调整:</span>
+                                                <span class="detail-value text-success">已应用</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.volume_confirmed ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">成交量确认:</span>
+                                                <span class="detail-value text-success">已确认</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.trend_filtered ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">趋势过滤:</span>
+                                                <span class="detail-value text-warning">已触发</span>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <div class="mt-4">
+                                    <div class="alert alert-info">
+                                        <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>交易说明</h6>
+                                        <p class="mb-0">
+                                            ${tradeData.action === 'buy' ? '本次买入操作基于策略信号执行，增加了相应持仓。' : 
+                                              tradeData.action === 'stop_loss' ? '本次止损操作旨在控制风险，及时止损。' : 
+                                              '本次卖出操作基于策略信号执行，减少了相应持仓。'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <button type="button" class="btn btn-primary" onclick="exportTradeDetail(${JSON.stringify(tradeData).replace(/"/g, '&quot;')})">
+                                    <i class="bi bi-download me-2"></i>导出详情
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            const existingDetailModal = document.getElementById('tradeDetailModal');
+            if (existingDetailModal) {
+                existingDetailModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', detailHtml);
+            
+            // 显示模态框
+            const detailModal = new bootstrap.Modal(document.getElementById('tradeDetailModal'));
+            detailModal.show();
+        }
+        
+        /**
+         * 导出交易详情
+         * @param {Object} tradeData - 交易数据
+         */
+        function exportTradeDetail(tradeData) {
+            // 创建CSV内容
+            const csvContent = [
+                ['字段', '值'],
+                ['交易日期', tradeData.date],
+                ['交易类型', tradeData.action === 'buy' ? '买入' : tradeData.action === 'stop_loss' ? '止损' : '卖出'],
+                ['交易金额', `¥${tradeData.amount.toFixed(2)}`],
+                ['交易后余额', `¥${tradeData.balance.toFixed(2)}`],
+                ['持仓价值', `¥${tradeData.holdings.toFixed(2)}`],
+                ['杠杆倍数', tradeData.multiplier ? `${tradeData.multiplier.toFixed(2)}×` : '无'],
+                ['市场趋势', tradeData.trend || '未记录'],
+                ['ADX值', tradeData.adx_value !== undefined ? tradeData.adx_value.toFixed(2) : '未记录'],
+                ['市场调整', tradeData.market_adjusted ? '是' : '否'],
+                ['成交量确认', tradeData.volume_confirmed ? '是' : '否'],
+                ['趋势过滤', tradeData.trend_filtered ? '是' : '否']
+            ].map(row => row.join(',')).join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `交易详情_${tradeData.date}_${tradeData.action}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示提示
+            showToast('交易详情已导出', 'success');
+        }
+        
+        /**
+         * 显示基金交易记录弹窗
+         * @param {string} fundCode - 基金代码
+         * @param {string} fundName - 基金名称
+         */
+        function showFundTrades(fundCode, fundName) {
+            // 从 lastBacktestResult 中获取基金的交易记录
+            const fundData = window.lastBacktestResult?.funds?.find(f => f.fund_code === fundCode);
+            const trades = fundData?.trades || [];
+            
+            // 构建交易记录表格
+            const tradesHtml = trades.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>操作</th>
+                                <th>金额</th>
+                                <th>余额</th>
+                                <th>持仓</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trades.map(trade => {
+                                const isBuy = trade.type === 'buy' || trade.action === 'buy';
+                                const isSell = trade.type === 'sell' || trade.action === 'sell' || trade.action === 'stop_loss';
+                                const actionClass = isBuy ? 'text-success' : isSell ? 'text-danger' : '';
+                                const actionText = isBuy ? '买入' : trade.action === 'stop_loss' ? '止损' : '卖出';
+                                const badgeClass = isBuy ? 'bg-success' : 'bg-danger';
+                                return `
+                                    <tr>
+                                        <td>${trade.date}</td>
+                                        <td><span class="badge ${badgeClass}">${actionText}</span></td>
+                                        <td>¥${(trade.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td>¥${(trade.balance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td>¥${(trade.holdings || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td><small class="text-muted">${trade.reason || ''}</small></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-end">
+                    <span class="badge bg-success">买入: ${trades.filter(t => t.type === 'buy' || t.action === 'buy').length} 次</span>
+                    <span class="badge bg-danger ms-2">卖出: ${trades.filter(t => t.type === 'sell' || t.action === 'sell' || t.action === 'stop_loss').length} 次</span>
+                    <span class="badge bg-secondary ms-2">总计: ${trades.length} 次</span>
+                </div>
+            ` : '<div class="alert alert-info">暂无交易记录</div>';
+            
+            const modalHtml = `
+                <div class="modal fade" id="fundTradesModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-list-check me-2"></i>${fundName} (${fundCode}) - 交易记录
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                ${tradesHtml}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                ${trades.length > 0 ? `
+                                    <button type="button" class="btn btn-primary" onclick="exportFundTrades('${fundCode}', '${fundName}')">
+                                        <i class="bi bi-download me-2"></i>导出CSV
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            const existingModal = document.getElementById('fundTradesModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('fundTradesModal'));
+            modal.show();
+        }
+        
+        /**
+         * 导出基金交易记录为CSV
+         * @param {string} fundCode - 基金代码
+         * @param {string} fundName - 基金名称
+         */
+        function exportFundTrades(fundCode, fundName) {
+            const fundData = window.lastBacktestResult?.funds?.find(f => f.fund_code === fundCode);
+            const trades = fundData?.trades || [];
+            
+            if (trades.length === 0) {
+                showToast('暂无交易记录可导出', 'warning');
+                return;
+            }
+            
+            // 创建CSV内容
+            const csvContent = [
+                ['基金代码', '基金名称', '交易日期', '操作类型', '交易金额', '交易后余额', '持仓价值', '杠杆倍数', '操作原因'],
+                ...trades.map(trade => {
+                    const isBuy = trade.type === 'buy' || trade.action === 'buy';
+                    const actionText = isBuy ? '买入' : trade.action === 'stop_loss' ? '止损' : '卖出';
+                    return [
+                        fundCode,
+                        fundName,
+                        trade.date,
+                        actionText,
+                        trade.amount || 0,
+                        trade.balance || 0,
+                        trade.holdings || 0,
+                        trade.multiplier || 1,
+                        trade.reason || ''
+                    ];
+                })
+            ].map(row => row.join(',')).join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `交易记录_${fundCode}_${fundName}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示提示
+            showToast('交易记录已导出', 'success');
+        }
+        
+        /**
          * 从标签切换对比模式
          */
         function toggleComparisonModeFromTag() {
@@ -5654,6 +6056,7 @@
                                 <th>最大回撤</th>
                                 <th>夏普比率</th>
                                 <th>交易次数</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -5678,6 +6081,10 @@
                                 const fundTotalReturnDecimal = fund.total_return / 100;
                                 const fundAnnualized = ((Math.pow(1 + fundTotalReturnDecimal, 1 / fundYears) - 1) * 100);
                                 
+                                // 统计买卖次数
+                                const buyCount = fund.trades?.filter(t => t.type === 'buy' || t.action === 'buy').length || 0;
+                                const sellCount = fund.trades?.filter(t => t.type === 'sell' || t.action === 'sell' || t.action === 'stop_loss').length || 0;
+                                
                                 return `
                                     <tr class="${rowClass}">
                                         <td>
@@ -5693,6 +6100,15 @@
                                         <td class="metric-negative">${fund.max_drawdown.toFixed(2)}%</td>
                                         <td>${fund.sharpe_ratio.toFixed(2)}</td>
                                         <td>${fund.trades_count || 0}</td>
+                                        <td>
+                                            ${fund.trades && fund.trades.length > 0 ? `
+                                                <button class="btn btn-sm btn-outline-primary" onclick="showFundTrades('${fund.fund_code}', '${fundName || fund.fund_code}')">
+                                                    <i class="bi bi-list-ul me-1"></i>查看交易
+                                                    <span class="badge bg-success ms-1">${buyCount}买</span>
+                                                    <span class="badge bg-danger ms-1">${sellCount}卖</span>
+                                                </button>
+                                            ` : '<span class="text-muted">-</span>'}
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
