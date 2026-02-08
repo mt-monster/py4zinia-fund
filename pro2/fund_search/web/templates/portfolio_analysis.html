@@ -254,6 +254,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/portfolio-analysis-integrated.js') }}"></script>
     <script>
         let navChartInstance = null;
 
@@ -545,6 +546,32 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             setReportDate();
+            
+            // 调试信息
+            console.log('🚀 页面DOM加载完成');
+            console.log('Chart.js存在:', typeof Chart !== 'undefined');
+            console.log('PortfolioAnalysis存在:', typeof PortfolioAnalysis !== 'undefined');
+            
+            // 初始化完整的投资组合分析功能
+            if (typeof PortfolioAnalysis !== 'undefined') {
+                console.log('🚀 初始化PortfolioAnalysis模块');
+                PortfolioAnalysis.init();
+                
+                // 延迟执行自动分析，确保DOM完全加载
+                setTimeout(() => {
+                    PortfolioAnalysis.autoAnalyze()
+                        .then(() => {
+                            console.log('✅ PortfolioAnalysis自动分析完成');
+                        })
+                        .catch(error => {
+                            console.error('❌ PortfolioAnalysis自动分析失败:', error);
+                        });
+                }, 1000);
+            } else {
+                console.log('⚠️ PortfolioAnalysis模块未加载');
+            }
+            
+            // 同时执行原有的数据加载逻辑
             loadReportData();
         });
     </script>

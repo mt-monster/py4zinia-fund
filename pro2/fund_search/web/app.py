@@ -2170,10 +2170,65 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
         worst_fund = min(individual_results, key=lambda x: x['total_return'])
         
         # Prepare individual fund summary (including equity_curve and trades for visualization)
+        # 获取基金名称映射
+        fund_name_map = {}
+        for result in individual_results:
+            fund_code = result['fund_code']
+            fund_name = fund_code  # 默认使用基金代码作为名称
+            
+            # 尝试从数据库获取基金名称
+            name_found = False
+            try:
+                sql = """
+                SELECT fund_name FROM fund_analysis_results 
+                WHERE fund_code = :fund_code 
+                ORDER BY analysis_date DESC LIMIT 1
+                """
+                df_name = db_manager.execute_query(sql, {'fund_code': fund_code})
+                if not df_name.empty and pd.notna(df_name.iloc[0]['fund_name']):
+                    fund_name = df_name.iloc[0]['fund_name']
+                    logger.info(f"从 fund_analysis_results 获取基金 {fund_code} 名称: {fund_name}")
+                    name_found = True
+                else:
+                    # 尝试从 fund_basic_info 表获取
+                    try:
+                        fund_info = db_manager.get_fund_detail(fund_code)
+                        if fund_info and 'fund_name' in fund_info and fund_info['fund_name']:
+                            fund_name = fund_info['fund_name']
+                            logger.info(f"从 fund_basic_info 获取基金 {fund_code} 名称: {fund_name}")
+                            name_found = True
+                    except Exception as e2:
+                        logger.warning(f"从 fund_basic_info 获取基金 {fund_code} 名称失败: {str(e2)}")
+            except Exception as e:
+                logger.warning(f"从数据库获取基金 {fund_code} 名称失败: {str(e)}")
+            
+            # 如果数据库中没有，尝试从 akshare 获取
+            if not name_found:
+                try:
+                    import akshare as ak
+                    # 使用 fund_name_em 接口获取基金列表
+                    fund_list = ak.fund_name_em()
+                    if fund_list is not None and not fund_list.empty:
+                        # 使用列位置而不是列名（避免编码问题）
+                        # 假设：第0列是基金代码，第3列是基金名称
+                        fund_list.columns = ['code', 'pinyin_short', 'name', 'type', 'pinyin_full']
+                        fund_row = fund_list[fund_list['code'] == fund_code]
+                        if not fund_row.empty:
+                            fund_name = fund_row.iloc[0]['name']
+                            logger.info(f"从 akshare 获取基金 {fund_code} 名称: {fund_name}")
+                            name_found = True
+                except Exception as e3:
+                    logger.warning(f"从 akshare 获取基金 {fund_code} 名称失败: {str(e3)}")
+            
+            fund_name_map[fund_code] = fund_name
+            logger.info(f"基金 {fund_code} 最终名称: {fund_name} (来源: {'数据库' if name_found else '默认' })")
+        
         fund_summaries = []
         for result in individual_results:
+            fund_code = result['fund_code']
             fund_summaries.append({
-                'fund_code': result['fund_code'],
+                'fund_code': fund_code,
+                'fund_name': fund_name_map.get(fund_code, fund_code),  # 添加基金名称
                 'initial_amount': result['initial_amount'],
                 'final_value': result['final_value'],
                 'total_return': result['total_return'],
@@ -2196,6 +2251,73 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
                     common_dates = set.union(*date_sets)
                 sorted_dates = sorted(list(common_dates))
                 curve_maps = [{p['date']: p['value'] for p in curve} for curve in equity_curves]
+                
+                # 获取沪深300数据作为基准
+                try:
+                    from web.real_data_fetcher import data_fetcher
+                    from datetime import datetime
+                    
+                    # 根据回测的实际日期范围计算需要获取的数据天数
+                    if sorted_dates:
+                        first_trade_date = datetime.strptime(sorted_dates[0], '%Y-%m-%d')
+                        last_trade_date = datetime.strptime(sorted_dates[-1], '%Y-%m-%d')
+                        # 计算从回测开始到今天的总天数，再加一些缓冲
+                        days_needed = (datetime.now() - first_trade_date).days + 60
+                        logger.info(f"回测日期范围: {sorted_dates[0]} 至 {sorted_dates[-1]}, 需要获取 {days_needed} 天的沪深300数据")
+                    else:
+                        days_needed = days + 60
+                    
+                    csi300_data = data_fetcher.get_csi300_history(days_needed)
+                    logger.info(f"沪深300数据获取结果: 行数={len(csi300_data) if csi300_data is not None else 0}")
+                    if csi300_data is not None and not csi300_data.empty:
+                        csi300_data = csi300_data.sort_values('date')
+                        csi300_data['date_str'] = csi300_data['date'].dt.strftime('%Y-%m-%d')
+                        price_map = dict(zip(csi300_data['date_str'], csi300_data['price']))
+                        all_csi300_dates = sorted(csi300_data['date_str'].tolist())
+                        
+                        logger.info(f"沪深300数据日期范围: {all_csi300_dates[0] if all_csi300_dates else 'N/A'} 至 {all_csi300_dates[-1] if all_csi300_dates else 'N/A'}")
+                        
+                        # 找到第一个共同日期对应的沪深300价格作为基准
+                        first_date = sorted_dates[0] if sorted_dates else None
+                        first_price = None
+                        if first_date:
+                            logger.info(f"寻找基准价格，基金首日期: {first_date}")
+                            if first_date in price_map:
+                                first_price = price_map[first_date]
+                                logger.info(f"在沪深300数据中找到精确匹配: {first_date} = {first_price}")
+                            else:
+                                # 查找之前最近的价格
+                                earlier_dates = [d for d in all_csi300_dates if d <= first_date]
+                                if earlier_dates:
+                                    first_price = price_map[earlier_dates[-1]]
+                                    logger.info(f"使用基金首日期之前的最近价格: {earlier_dates[-1]} = {first_price}")
+                                elif all_csi300_dates:
+                                    first_price = price_map[all_csi300_dates[0]]
+                                    logger.warning(f"基金首日期 {first_date} 早于所有沪深300数据，使用最早可用价格: {all_csi300_dates[0]} = {first_price}")
+                        
+                        # 使用组合的初始金额作为基准初始值
+                        base_initial_value = total_initial_amount
+                        
+                        if first_price is None:
+                            logger.error("无法找到基准价格，基准值将保持为初始值")
+                    else:
+                        csi300_data = None
+                        first_price = None
+                        logger.warning("沪深300数据为空，基准值将保持为初始值")
+                except Exception as e:
+                    logger.warning(f"获取沪深300数据失败: {str(e)}")
+                    csi300_data = None
+                    first_price = None
+                
+                # 添加调试日志
+                logger.info(f"开始生成组合净值曲线，基金日期数: {len(sorted_dates)}, 沪深300日期数: {len(all_csi300_dates)}")
+                logger.info(f"基金首日期: {sorted_dates[0] if sorted_dates else 'N/A'}, 末日期: {sorted_dates[-1] if sorted_dates else 'N/A'}")
+                logger.info(f"沪深300首日期: {all_csi300_dates[0] if all_csi300_dates else 'N/A'}, 末日期: {all_csi300_dates[-1] if all_csi300_dates else 'N/A'}")
+                
+                # 统计匹配情况
+                matched_dates = 0
+                fallback_dates = 0
+                
                 for date in sorted_dates:
                     total_value = 0
                     valid_count = 0
@@ -2206,10 +2328,33 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
                     if valid_count > 0:
                         if valid_count < len(curve_maps):
                             total_value = total_value * (len(curve_maps) / valid_count)
+                        
+                        # 计算基准值
+                        benchmark_value = base_initial_value  # 默认使用初始值
+                        if csi300_data is not None and first_price is not None:
+                            current_price = None
+                            if date in price_map:
+                                current_price = price_map[date]
+                                matched_dates += 1
+                            else:
+                                # 查找之前最近的价格
+                                earlier_dates = [d for d in all_csi300_dates if d <= date]
+                                if earlier_dates:
+                                    current_price = price_map[earlier_dates[-1]]
+                                    fallback_dates += 1
+                            
+                            if current_price is not None and first_price > 0:
+                                # 计算累计收益率并应用到初始值
+                                cumulative_return = (current_price / first_price - 1)
+                                benchmark_value = base_initial_value * (1 + cumulative_return)
+                        
                         portfolio_equity_curve.append({
                             'date': date,
-                            'value': round(total_value, 2)
+                            'value': round(total_value, 2),
+                            'benchmark_value': round(benchmark_value, 2)  # 添加基准值
                         })
+                
+                logger.info(f"组合净值曲线生成完成，总数据点: {len(portfolio_equity_curve)}, 精确匹配: {matched_dates}, 使用前一日数据: {fallback_dates}")
             else:
                 logger.warning("未找到有效的 equity_curve，无法生成组合净值曲线")
         except Exception as e:

@@ -5658,6 +5658,8 @@
                         </thead>
                         <tbody>
                             ${displayFunds.map(fund => {
+                                // 调试：打印基金对象
+                                console.log('基金对象:', fund.fund_code, 'name:', fund.name, 'fund_name:', fund.fund_name);
 
                                 // 修复：使用基金代码进行比较
                                 const bestFundCode = typeof bestFund === 'object' ? bestFund.fund_code || bestFund.code : bestFund;
@@ -5668,8 +5670,8 @@
                                 const returnSign = fund.total_return >= 0 ? '+' : '';
                                 const rowClass = isBest ? 'best-strategy' : '';
                                 
-                                // 获取基金名称
-                                const fundName = fund.name || fund.fund_name || '';
+                                // 获取基金名称（优先使用 fund_name 字段）
+                                const fundName = fund.fund_name || fund.name || '';
                                 
                                 // 基于总收益率计算年化收益率（确保一致性）
                                 const fundYears = data.period || 3;
@@ -5713,11 +5715,17 @@
             
             // 如果有分析数据，绘制净值图表
             if (analysisData && analysisData.navData) {
+                console.log('📊 准备绘制净值曲线，数据点:', analysisData.navData.length);
                 setTimeout(() => {
                     if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.drawNavChart) {
+                        console.log('🎨 调用 PortfolioAnalysis.drawNavChart');
                         PortfolioAnalysis.drawNavChart(analysisData.navData);
+                    } else {
+                        console.error('❌ PortfolioAnalysis.drawNavChart 不可用');
                     }
-                }, 100);
+                }, 300);
+            } else {
+                console.log('ℹ️ 没有净值数据可供绘制', { hasAnalysisData: !!analysisData, hasNavData: !!(analysisData && analysisData.navData) });
             }
             
             // Add animation class
