@@ -47,20 +47,36 @@ class RealDataFetcher:
             # 确保日期列格式正确
             df['date'] = pd.to_datetime(df['date'])
             
-            # 过滤日期范围
+            # 过滤日期范围 - 修复：不应该使用 .tail(days) 限制，因为我们已经按日期过滤了
             df = df[df['date'] >= start_date]
-            df = df.sort_values('date', ascending=True).tail(days).reset_index(drop=True)
+            df = df.sort_values('date', ascending=True).reset_index(drop=True)
             
-            # 重命名列
-            df = df.rename(columns={
-                'date': 'date',
-                'close': 'price'
-            })
+            # 检查并处理列名（akshare不同版本可能返回中英文列名）
+            logger.info(f"沪深300原始数据列名: {list(df.columns)}")
+            
+            # 重命名列 - 处理中英文列名
+            column_mapping = {}
+            if 'close' in df.columns:
+                column_mapping['close'] = 'price'
+            elif '收盘' in df.columns:
+                column_mapping['收盘'] = 'price'
+            
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
             
             # 只保留需要的列
-            df = df[['date', 'price']]
+            if 'price' in df.columns:
+                df = df[['date', 'price']]
+            else:
+                logger.error(f"无法找到价格列，可用列名: {list(df.columns)}")
+                return pd.DataFrame()
             
-            logger.info(f"成功获取沪深300指数 {len(df)} 条历史数据")
+            # 检查数据有效性
+            if df['price'].isna().all():
+                logger.error("沪深300价格数据全为NaN")
+                return pd.DataFrame()
+            
+            logger.info(f"成功获取沪深300指数 {len(df)} 条历史数据，日期范围: {df['date'].min()} 至 {df['date'].max()}")
             return df
             
         except Exception as e:
