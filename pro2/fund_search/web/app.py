@@ -305,8 +305,39 @@ def get_profit_trend():
         fund_code_list = [code.strip() for code in fund_codes.split(',')]
         weight_list = [float(w.strip()) for w in weights.split(',')]
         
-        # 如果没有提供基金代码，则获取用户的持仓基金
-        if fund_codes == '000001' and user_id != 'default_user':
+        # 检查用户是否有持仓数据
+        has_holdings = False
+        try:
+            holdings_sql = """
+            SELECT fund_code, holding_shares, cost_price
+            FROM user_holdings 
+            WHERE user_id = :user_id AND holding_shares > 0
+            """
+            holdings_df = db_manager.execute_query(holdings_sql, {'user_id': user_id})
+            has_holdings = not holdings_df.empty
+        except Exception as e:
+            logger.warning(f"检查用户持仓失败: {str(e)}")
+            has_holdings = False
+        
+        # 如果没有持仓数据，返回空数据提示
+        if not has_holdings:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'labels': [],
+                    'profit': [],
+                    'benchmark': [],
+                    'fund_codes': [],
+                    'weights': [],
+                    'data_source': 'no_holdings',
+                    'message': '暂无持仓数据，请先添加基金持仓',
+                    'benchmark_name': '沪深300',
+                    'benchmark_description': '以沪深300指数作为业绩比较基准'
+                }
+            })
+        
+        # 如果没有提供基金代码且有持仓，则获取用户的持仓基金
+        if fund_codes == '000001':
             try:
                 # 获取用户持仓数据
                 holdings_sql = """
@@ -3075,31 +3106,20 @@ def get_holdings():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
             yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else None
             
-            # 对QDII基金应用向前追溯逻辑
+            # 使用实时数据校正昨日收益率（修复数据库中可能存在的错误数据）
             fund_code = row['fund_code']
             fund_name = row['fund_name']
-            if EnhancedFundData.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
-                try:
-                    # 获取实时数据并应用向前追溯
-                    realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
-                    if realtime_data and realtime_data.get('yesterday_return') != 0.0:
-                        yesterday_return = float(realtime_data['yesterday_return'])
-                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，昨日收益率: {yesterday_return}%")
-                except Exception as e:
-                    logger.warning(f"QDII基金 {fund_code} 向前追溯失败: {str(e)}")
-            
-            # 对QDII基金应用向前追溯逻辑
-            fund_code = row['fund_code']
-            fund_name = row['fund_name']
-            if EnhancedFundData.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
-                try:
-                    # 获取实时数据并应用向前追溯
-                    realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
-                    if realtime_data and realtime_data.get('yesterday_return') != 0.0:
-                        yesterday_return = float(realtime_data['yesterday_return'])
-                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，昨日收益率: {yesterday_return}%")
-                except Exception as e:
-                    logger.warning(f"QDII基金 {fund_code} 向前追溯失败: {str(e)}")
+            try:
+                # 获取实时数据
+                realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+                if realtime_data and realtime_data.get('yesterday_return') is not None:
+                    realtime_yesterday_return = float(realtime_data['yesterday_return'])
+                    # 如果数据库中的数据与实时数据差异较大，使用实时数据
+                    if yesterday_return is None or abs(yesterday_return - realtime_yesterday_return) > 0.5:
+                        yesterday_return = realtime_yesterday_return
+                        logger.info(f"基金 {fund_code} 使用实时数据校正昨日收益率: {yesterday_return}%")
+            except Exception as e:
+                logger.debug(f"基金 {fund_code} 实时数据校正失败: {str(e)}")
             sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
             sharpe_ratio_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else None
             sharpe_ratio_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else None

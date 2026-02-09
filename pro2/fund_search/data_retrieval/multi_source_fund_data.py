@@ -77,12 +77,25 @@ class DataSourceHealth:
         return 0.0
     
     def get_recommend_source(self) -> str:
-        """获取推荐的数据源"""
+        """
+        获取推荐的数据源
+        
+        数据源优先级:
+        1. PRIMARY: Tushare (推荐默认数据源)
+        2. BACKUP_1: Akshare (当Tushare成功率低时降级)
+        
+        降级条件:
+        - Tushare成功率 < 0.7
+        - Akshare成功率 > Tushare成功率 + 0.2
+        """
         ak_rate = self.get_success_rate('akshare')
         ts_rate = self.get_success_rate('tushare')
         
-        if ak_rate >= 0.8 or ts_rate < 0.5:
+        # 降级条件: Tushare成功率低 或 Akshare明显更好
+        if ts_rate < 0.7 or (ak_rate - ts_rate) > 0.2:
+            logger.warning(f"Tushare成功率({ts_rate:.2%})低，降级到Akshare({ak_rate:.2%})")
             return 'akshare'
+        
         return 'tushare'
 
 
@@ -179,6 +192,11 @@ class MultiSourceFundData:
         """
         获取基金历史净值
         
+        数据源优先级 (当 source='auto'):
+        1. PRIMARY: Tushare (稳定性高)
+        2. BACKUP_1: Akshare (数据全面)
+        3. 抛出异常 (如果都失败)
+        
         Args:
             fund_code: 基金代码
             source: 数据源 ('akshare', 'tushare', 'auto')
@@ -193,14 +211,53 @@ class MultiSourceFundData:
                 - daily_return: 日增长率(%)
                 - source: 数据来源
         """
-        if source == 'auto':
-            # 根据健康状态选择数据源
-            source = self.health.get_recommend_source()
+        errors = []
         
+        if source == 'auto':
+            # 新的数据源优先级: Tushare > Akshare
+            # 尝试 Tushare (PRIMARY)
+            if self.tushare_pro:
+                try:
+                    tushare_code = self._convert_to_tushare_format(fund_code)
+                    df = self._get_nav_from_tushare(tushare_code)
+                    logger.info(f"使用 PRIMARY 数据源 Tushare 获取 {fund_code}")
+                    
+                    # 日期过滤
+                    if start_date:
+                        df = df[df['date'] >= start_date]
+                    if end_date:
+                        df = df[df['date'] <= end_date]
+                    return df
+                except Exception as e:
+                    error_msg = f"Tushare获取 {fund_code} 失败: {e}"
+                    logger.warning(error_msg)
+                    errors.append(error_msg)
+            
+            # 尝试 Akshare (BACKUP_1)
+            try:
+                df = self._get_nav_from_akshare(fund_code)
+                logger.info(f"使用 BACKUP_1 数据源 Akshare 获取 {fund_code}")
+                
+                # 日期过滤
+                if start_date:
+                    df = df[df['date'] >= start_date]
+                if end_date:
+                    df = df[df['date'] <= end_date]
+                return df
+            except Exception as e:
+                error_msg = f"Akshare获取 {fund_code} 失败: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+            
+            # 都失败了
+            raise ValueError(f"所有数据源获取 {fund_code} 失败: {'; '.join(errors)}")
+        
+        # 指定数据源
         if source == 'akshare':
             df = self._get_nav_from_akshare(fund_code)
         elif source == 'tushare':
-            df = self._get_nav_from_tushare(fund_code)
+            tushare_code = self._convert_to_tushare_format(fund_code)
+            df = self._get_nav_from_tushare(tushare_code)
         else:
             raise ValueError(f"未知数据源: {source}")
         
@@ -291,30 +348,127 @@ class MultiSourceFundData:
         """
         获取基金最新净值（带自动降级）
         
+        数据源优先级:
+        1. PRIMARY: Tushare (稳定性高, 支持 .OF 格式)
+        2. BACKUP_1: Akshare (数据全面, 格式兼容性好)
+        3. BACKUP_2: Sina/Eastmoney (实时性好, 但不支持所有基金)
+        
         Args:
             fund_code: 基金代码
         
         Returns:
             dict: 最新净值数据，失败返回None
         """
-        # 尝试主数据源
+        # 记录所有失败的错误信息
+        errors = []
+        
+        # 尝试 PRIMARY 数据源: Tushare
+        if self.tushare_pro:
+            try:
+                # Tushare需要 .OF 后缀格式
+                tushare_code = self._convert_to_tushare_format(fund_code)
+                df = self._get_nav_from_tushare(tushare_code)
+                if not df.empty:
+                    latest = df.iloc[-1]
+                    result = self._standardize_nav_data(latest, 'tushare')
+                    # 转换回原始code格式
+                    result['fund_code'] = fund_code
+                    logger.info(f"从 Tushare 成功获取 {fund_code} 最新净值")
+                    return result
+            except Exception as e:
+                error_msg = f"Tushare获取 {fund_code} 失败: {e}"
+                logger.warning(error_msg)
+                errors.append(error_msg)
+        else:
+            logger.warning("Tushare 未初始化，跳过 PRIMARY 数据源")
+        
+        # 尝试 BACKUP_1 数据源: Akshare
         try:
             df = self._get_nav_from_akshare(fund_code)
             if not df.empty:
                 latest = df.iloc[-1]
-                return self._standardize_nav_data(latest, 'akshare')
+                result = self._standardize_nav_data(latest, 'akshare')
+                result['fund_code'] = fund_code
+                logger.info(f"从 Akshare 成功获取 {fund_code} 最新净值 (BACKUP_1)")
+                return result
         except Exception as e:
-            logger.warning(f"Akshare获取 {fund_code} 最新净值失败: {e}")
+            error_msg = f"Akshare获取 {fund_code} 失败: {e}"
+            logger.warning(error_msg)
+            errors.append(error_msg)
         
-        # 尝试备用数据源
-        if self.tushare_pro:
-            try:
-                df = self._get_nav_from_tushare(fund_code)
-                if not df.empty:
-                    latest = df.iloc[-1]
-                    return self._standardize_nav_data(latest, 'tushare')
-            except Exception as e:
-                logger.warning(f"Tushare获取 {fund_code} 最新净值失败: {e}")
+        # 尝试 BACKUP_2 数据源: Sina/Eastmoney
+        result = self._get_nav_from_fallback(fund_code)
+        if result:
+            logger.info(f"从 Fallback 成功获取 {fund_code} 最新净值 (BACKUP_2)")
+            return result
+        
+        # 所有数据源都失败
+        logger.error(f"所有数据源获取 {fund_code} 失败: {'; '.join(errors)}")
+        return None
+    
+    def _convert_to_tushare_format(self, fund_code: str) -> str:
+        """
+        将基金代码转换为 Tushare 格式 (.OF 后缀)
+        
+        Args:
+            fund_code: 原始基金代码, 如 '021539'
+        
+        Returns:
+            str: Tushare格式代码, 如 '021539.OF'
+        """
+        if not fund_code.endswith('.OF'):
+            return f"{fund_code}.OF"
+        return fund_code
+    
+    def _get_nav_from_fallback(self, fund_code: str) -> Optional[Dict]:
+        """
+        从备用数据源获取净值 (Sina/Eastmoney)
+        
+        Args:
+            fund_code: 基金代码
+        
+        Returns:
+            dict: 标准化净值数据，失败返回None
+        """
+        # 尝试 Sina
+        try:
+            import requests
+            # Sina API
+            url = f"https://hq.sinajs.cn/list=f_{fund_code}"
+            headers = {'Referer': 'https://finance.sina.com.cn'}
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.text
+                if f"f_{fund_code}=\"" in data:
+                    parts = data.split('"')[1].split(',')
+                    if len(parts) >= 5:
+                        return {
+                            'fund_code': fund_code,
+                            'date': parts[0] if len(parts) > 0 else '',
+                            'nav': float(parts[1]) if len(parts) > 1 else 0.0,
+                            'accum_nav': float(parts[2]) if len(parts) > 2 else 0.0,
+                            'daily_return': float(parts[3]) if len(parts) > 3 else 0.0,
+                            'source': 'sina'
+                        }
+        except Exception as e:
+            logger.warning(f"Sina获取 {fund_code} 失败: {e}")
+        
+        # 尝试 Eastmoney
+        try:
+            import akshare as ak
+            df = ak.fund_open_fund_daily_em(symbol=fund_code)
+            if not df.empty:
+                latest = df.iloc[0]  # EM数据通常是最新在前
+                return {
+                    'fund_code': fund_code,
+                    'date': latest.get('净值日期', ''),
+                    'nav': float(latest.get('单位净值', 0)),
+                    'accum_nav': float(latest.get('累计净值', 0)),
+                    'daily_return': float(latest.get('日增长率', 0)),
+                    'source': 'eastmoney'
+                }
+        except Exception as e:
+            logger.warning(f"Eastmoney获取 {fund_code} 失败: {e}")
         
         return None
     
@@ -347,10 +501,31 @@ class MultiSourceFundData:
         logger.info(f"获取QDII基金 {fund_code} 数据")
         
         try:
-            # 获取历史数据
-            nav_history = self.get_fund_nav_history(fund_code)
+            # QDII基金使用新的数据源优先级获取历史数据
+            # 尝试顺序: Tushare > Akshare > Fallback
+            nav_history = None
+            source_used = None
             
-            if nav_history.empty:
+            # 尝试 Tushare (PRIMARY)
+            if self.tushare_pro:
+                try:
+                    tushare_code = self._convert_to_tushare_format(fund_code)
+                    nav_history = self._get_nav_from_tushare(tushare_code)
+                    source_used = 'tushare'
+                    logger.info(f"QDII基金 {fund_code} 使用 Tushare 数据")
+                except Exception as e:
+                    logger.warning(f"QDII基金 {fund_code} Tushare获取失败: {e}")
+            
+            # 尝试 Akshare (BACKUP_1)
+            if nav_history is None or nav_history.empty:
+                try:
+                    nav_history = self._get_nav_from_akshare(fund_code)
+                    source_used = 'akshare'
+                    logger.info(f"QDII基金 {fund_code} 使用 Akshare 数据 (BACKUP_1)")
+                except Exception as e:
+                    logger.warning(f"QDII基金 {fund_code} Akshare获取失败: {e}")
+            
+            if nav_history is None or nav_history.empty:
                 logger.warning(f"QDII基金 {fund_code} 无历史数据")
                 return None
             
@@ -377,7 +552,7 @@ class MultiSourceFundData:
                 'daily_return': returns['latest'],
                 'nav_date': latest.get('date', ''),
                 'returns': returns,
-                'data_source': latest.get('source', 'unknown'),
+                'data_source': source_used or latest.get('source', 'unknown'),
                 'is_qdii': True,
                 'update_delay': 'T+2',
                 'note': 'QDII基金净值T+2更新，受汇率影响'

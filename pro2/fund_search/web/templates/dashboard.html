@@ -881,6 +881,56 @@
             }, 100);
         }
 
+        // 显示无持仓数据提示
+        function showNoHoldingsMessage() {
+            const chartContainer = document.getElementById('profitChart').parentElement;
+            
+            // 清空现有内容
+            chartContainer.innerHTML = `
+                <div style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 300px;
+                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                    border-radius: 12px;
+                    border: 2px dashed #ced4da;
+                    text-align: center;
+                    padding: 20px;
+                ">
+                    <div style="
+                        width: 80px;
+                        height: 80px;
+                        background: #e9ecef;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-bottom: 20px;
+                    ">
+                        <i class="bi bi-bar-chart" style="font-size: 32px; color: #6c757d;"></i>
+                    </div>
+                    <h4 style="color: #495057; margin-bottom: 10px;">暂无收益数据</h4>
+                    <p style="color: #6c757d; margin-bottom: 20px; max-width: 300px;">
+                        您还没有添加任何基金持仓，无法生成收益趋势图表
+                    </p>
+                    <a href="/my-holdings-new" class="btn btn-primary" style="
+                        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 8px;
+                        text-decoration: none;
+                        color: white;
+                        font-weight: 500;
+                        transition: all 0.3s ease;
+                    ">
+                        <i class="bi bi-plus-circle me-2"></i>添加基金持仓
+                    </a>
+                </div>
+            `;
+        }
+        
         // 加载收益数据
         async function loadProfitData() {
             try {
@@ -894,6 +944,13 @@
                 const data = await response.json();
 
                 if (data.success && profitChart) {
+                    // 检查是否为无持仓数据情况
+                    if (data.data.data_source === 'no_holdings') {
+                        // 显示无数据提示
+                        showNoHoldingsMessage();
+                        return;
+                    }
+                    
                     profitChart.data.labels = data.data.labels;
                     profitChart.data.datasets[0].data = data.data.profit;
                     profitChart.data.datasets[1].data = data.data.benchmark;

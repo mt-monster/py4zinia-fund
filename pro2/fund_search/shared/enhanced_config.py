@@ -63,6 +63,16 @@ DATA_SOURCE_CONFIG = {
         'sina_enabled': os.environ.get('SINA_ENABLED', 'True').lower() == 'true',
         'eastmoney_enabled': os.environ.get('EASTMONEY_ENABLED', 'True').lower() == 'true',
         'request_timeout': int(os.environ.get('FALLBACK_TIMEOUT', 10))
+    },
+    
+    # 数据源优先级配置
+    # PRIMARY: 主要数据源 - Tushare (稳定性高, 支持 .OF 格式)
+    # BACKUP_1: 第一备用 - Akshare (数据全面, 格式兼容性好)
+    # BACKUP_2: 第二备用 - Sina/Eastmoney (实时性好, 但不支持所有基金)
+    'priority': {
+        'primary': 'tushare',           # 主数据源
+        'backup_1': 'akshare',          # 第一备用
+        'backup_2': ['sina', 'eastmoney']  # 第二备用(按顺序尝试)
     }
 }
 
