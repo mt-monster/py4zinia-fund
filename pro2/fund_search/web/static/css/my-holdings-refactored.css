@@ -1010,11 +1010,40 @@ body {
     box-shadow: 0 2px 4px rgba(155, 89, 182, 0.3);
 }
 
-/* 其他基金 - 灰色 */
-.fund-type-other {
+/* 债券型基金 - 青色 */
+.fund-type-bond {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3);
+}
+
+/* 货币型基金 - 灰色 */
+.fund-type-money {
     background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
     color: white;
     box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
+}
+
+/* ETF基金 - 红色 */
+.fund-type-etf {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(231, 76, 60, 0.3);
+}
+
+/* FOF基金 - 橙色 */
+.fund-type-fof {
+    background: linear-gradient(135deg, #fd7e14 0%, #e56b0a 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(253, 126, 20, 0.3);
+}
+
+/* 其他/未知基金 - 浅灰色 */
+.fund-type-other,
+.fund-type-unknown {
+    background: linear-gradient(135deg, #adb5bd 0%, #868e96 100%);
+    color: #212529;
+    box-shadow: 0 2px 4px rgba(173, 181, 189, 0.3);
 }
 
 /* 基金名称文本样式 */
@@ -1043,9 +1072,30 @@ body {
     border-bottom: 2px solid #9b59b6;
 }
 
-.detail-panel-header.fund-type-other {
+.detail-panel-header.fund-type-bond {
+    background: linear-gradient(135deg, rgba(23, 162, 184, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #17a2b8;
+}
+
+.detail-panel-header.fund-type-money {
     background: linear-gradient(135deg, rgba(108, 117, 125, 0.1) 0%, var(--bg-primary) 100%);
     border-bottom: 2px solid #6c757d;
+}
+
+.detail-panel-header.fund-type-etf {
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #e74c3c;
+}
+
+.detail-panel-header.fund-type-fof {
+    background: linear-gradient(135deg, rgba(253, 126, 20, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #fd7e14;
+}
+
+.detail-panel-header.fund-type-other,
+.detail-panel-header.fund-type-unknown {
+    background: linear-gradient(135deg, rgba(173, 181, 189, 0.1) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid #adb5bd;
 }
 
 /* ============================================

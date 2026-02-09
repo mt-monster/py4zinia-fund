@@ -26,6 +26,10 @@ from backtesting.strategy_evaluator import StrategyEvaluator
 from data_retrieval.enhanced_fund_data import EnhancedFundData
 from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
+from services.fund_type_service import (
+    FundTypeService, classify_fund, get_fund_type_display, 
+    get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
+)
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -528,8 +532,7 @@ def get_allocation():
         
         for _, row in df_holdings.iterrows():
             fund_code = row['fund_code']
-            fund_type = fund_type_map.get(fund_code, '其他')
-            fund_type = normalize_fund_type(fund_type)
+            fund_type = fund_type_map.get(fund_code, 'unknown')
             
             holding_amount = float(row['holding_shares']) * float(row['cost_price'])
             
@@ -542,16 +545,30 @@ def get_allocation():
             
             total_amount += holding_amount
         
-        # 颜色映射 - 优化视觉效果
+        # 颜色映射 - 使用证监会标准分类颜色
+        from services.fund_type_service import FUND_TYPE_COLORS, FundType
         color_map = {
-            '股票型': '#28a745',
-            '债券型': '#17a2b8',
-            '混合型': '#ffc107',
-            '货币型': '#dc3545',
-            '指数型': '#007bff',
-            'QDII': '#6c757d',
-            'FOF': '#343a40',
-            '其他': '#3498db'  # 将原来的浅灰色改为更有活力的蓝色
+            'stock': '#28a745',
+            'bond': '#17a2b8',
+            'hybrid': '#ffc107',
+            'money': '#6c757d',
+            'index': '#007bff',
+            'qdii': '#9b59b6',
+            'etf': '#e74c3c',
+            'fof': '#fd7e14',
+            'unknown': '#adb5bd'
+        }
+        # 中文名称映射
+        cn_name_map = {
+            'stock': '股票型',
+            'bond': '债券型',
+            'hybrid': '混合型',
+            'money': '货币型',
+            'index': '指数型',
+            'qdii': 'QDII',
+            'etf': 'ETF',
+            'fof': 'FOF',
+            'unknown': '其他'
         }
         
         # 构建分布数据
@@ -559,11 +576,12 @@ def get_allocation():
         for fund_type, amount in sorted(type_amounts.items(), key=lambda x: x[1], reverse=True):
             percentage = round((amount / total_amount) * 100, 1) if total_amount > 0 else 0
             distribution.append({
-                'name': f'{fund_type}基金',
+                'name': f'{cn_name_map.get(fund_type, fund_type)}基金',
+                'type_code': fund_type,
                 'percentage': percentage,
                 'count': type_count.get(fund_type, 0),
                 'amount': round(amount, 2),
-                'color': color_map.get(fund_type, '#007bff')
+                'color': color_map.get(fund_type, '#adb5bd')
             })
         
         return jsonify({
@@ -583,8 +601,23 @@ def get_allocation():
 
 
 def get_fund_type_for_allocation(fund_code: str) -> str:
-    """为资产配置获取基金类型"""
-    # 从 fund_analysis_results 获取基金名称推断类型
+    """为资产配置获取基金类型 - 使用证监会标准分类"""
+    # 首先从fund_basic_info获取官方类型
+    try:
+        sql = """
+        SELECT fund_name, fund_type FROM fund_basic_info 
+        WHERE fund_code = :fund_code 
+        LIMIT 1
+        """
+        df = db_manager.execute_query(sql, {'fund_code': fund_code})
+        if not df.empty:
+            fund_name = df.iloc[0]['fund_name'] if pd.notna(df.iloc[0]['fund_name']) else ''
+            official_type = df.iloc[0]['fund_type'] if pd.notna(df.iloc[0]['fund_type']) else ''
+            return classify_fund(fund_name, fund_code, official_type)
+    except:
+        pass
+    
+    # 备选：从fund_analysis_results获取基金名称
     try:
         sql = """
         SELECT fund_name FROM fund_analysis_results 
@@ -593,11 +626,11 @@ def get_fund_type_for_allocation(fund_code: str) -> str:
         """
         df = db_manager.execute_query(sql, {'fund_code': fund_code})
         if not df.empty and pd.notna(df.iloc[0]['fund_name']):
-            return infer_fund_type_from_name(df.iloc[0]['fund_name'])
+            return classify_fund(df.iloc[0]['fund_name'], fund_code)
     except:
         pass
     
-    return '其他'
+    return 'unknown'
 
 
 @app.route('/api/dashboard/holding-stocks', methods=['GET'])
@@ -3038,10 +3071,22 @@ def get_holdings():
                 total_profit = None
                 total_profit_rate = None
             
+            # 使用基金类型服务获取标准化基金类型
+            fund_name = row['fund_name']
+            fund_code = row['fund_code']
+            # 尝试从fund_basic_info获取官方类型
+            official_type = row.get('fund_type', '')
+            fund_type_code = classify_fund(fund_name, fund_code, official_type)
+            fund_type_cn = get_fund_type_display(fund_type_code)
+            fund_type_class = get_fund_type_css_class(fund_type_code)
+            
             holding = {
                 'id': int(row['id']),
-                'fund_code': row['fund_code'],
-                'fund_name': row['fund_name'],
+                'fund_code': fund_code,
+                'fund_name': fund_name,
+                'fund_type': fund_type_code,          # 基金类型代码
+                'fund_type_cn': fund_type_cn,         # 基金类型中文名
+                'fund_type_class': fund_type_class,   # 基金类型CSS类
                 'holding_shares': round(holding_shares, 4),
                 'cost_price': round(cost_price, 4),
                 'holding_amount': round(holding_amount, 2),
@@ -3783,7 +3828,7 @@ def format_time_ago(timestamp) -> str:
 
 def get_real_holding_distribution(user_id: str = 'default_user') -> list:
     """
-    获取真实的持仓分布数据
+    获取真实的持仓分布数据 - 使用证监会标准分类
     根据用户的实际持仓按基金类型统计
     """
     try:
@@ -3802,29 +3847,14 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
         
         logger.info(f"获取到 {len(df_holdings)} 条持仓记录")
         
-        # 第二步：为每个基金获取类型（从 fund_analysis_results 推断）
+        # 第二步：为每个基金获取类型（使用新的基金类型服务）
         fund_codes = df_holdings['fund_code'].tolist()
         fund_type_map = {}
         
         for fund_code in fund_codes:
-            fund_type = None
-            
-            # 从 fund_analysis_results 获取基金名称推断类型
-            try:
-                sql_name = """
-                SELECT fund_name FROM fund_analysis_results 
-                WHERE fund_code = :fund_code 
-                ORDER BY analysis_date DESC LIMIT 1
-                """
-                df_name = db_manager.execute_query(sql_name, {'fund_code': fund_code})
-                if not df_name.empty and pd.notna(df_name.iloc[0]['fund_name']):
-                    fund_name = df_name.iloc[0]['fund_name']
-                    # 从基金名称推断类型
-                    fund_type = infer_fund_type_from_name(fund_name)
-            except Exception as e:
-                logger.debug(f"从 fund_analysis_results 获取 {fund_code} 名称失败: {e}")
-            
-            fund_type_map[fund_code] = fund_type if fund_type else '其他'
+            # 使用统一的基金类型获取方法
+            fund_type_code = get_fund_type_for_allocation(fund_code)
+            fund_type_map[fund_code] = fund_type_code
         
         # 第三步：按基金类型统计持仓金额
         type_amounts = {}
@@ -3832,10 +3862,7 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
         
         for _, row in df_holdings.iterrows():
             fund_code = row['fund_code']
-            fund_type = fund_type_map.get(fund_code, '其他')
-            
-            # 标准化基金类型名称
-            fund_type = normalize_fund_type(fund_type)
+            fund_type = fund_type_map.get(fund_code, 'unknown')
             
             holding_amount = float(row['holding_shares']) * float(row['cost_price'])
             
@@ -3854,36 +3881,50 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
         
         logger.info(f"持仓分布统计完成: {type_amounts}")
         
-        # 颜色映射（Bootstrap 颜色类）
+        # 类型代码到中文名称的映射
+        cn_name_map = {
+            'stock': '股票型',
+            'bond': '债券型',
+            'hybrid': '混合型',
+            'money': '货币型',
+            'index': '指数型',
+            'qdii': 'QDII',
+            'etf': 'ETF',
+            'fof': 'FOF',
+            'unknown': '其他'
+        }
+        
+        # Bootstrap颜色类映射
         color_map = {
-            '股票型': 'success',
-            '债券型': 'info',
-            '混合型': 'warning',
-            '货币型': 'danger',
-            '指数型': 'primary',
-            'QDII': 'secondary',
-            'FOF': 'dark',
-            '其他': 'light'
+            'stock': 'success',
+            'bond': 'info',
+            'hybrid': 'warning',
+            'money': 'secondary',
+            'index': 'primary',
+            'qdii': 'secondary',
+            'etf': 'danger',
+            'fof': 'dark',
+            'unknown': 'light'
         }
         
         # 颜色十六进制值（用于前端显示）
         color_hex_map = {
-            '股票型': '#28a745',
-            '债券型': '#17a2b8',
-            '混合型': '#ffc107',
-            '货币型': '#dc3545',
-            '指数型': '#007bff',
-            'QDII': '#6c757d',
-            'FOF': '#343a40',
-            '其他': '#f8f9fa'
+            'stock': '#28a745',
+            'bond': '#17a2b8',
+            'hybrid': '#ffc107',
+            'money': '#6c757d',
+            'index': '#007bff',
+            'qdii': '#9b59b6',
+            'etf': '#e74c3c',
+            'fof': '#fd7e14',
+            'unknown': '#adb5bd'
         }
         
         # 统计每个类型的基金数量
         type_count = {}
         for _, row in df_holdings.iterrows():
             fund_code = row['fund_code']
-            fund_type = fund_type_map.get(fund_code, '其他')
-            fund_type = normalize_fund_type(fund_type)
+            fund_type = fund_type_map.get(fund_code, 'unknown')
             
             if fund_type in type_count:
                 type_count[fund_type] += 1
@@ -3896,7 +3937,8 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
             percentage = round((amount / total_amount) * 100, 1)
             count = type_count.get(fund_type, 0)
             distribution.append({
-                'name': f'{fund_type}基金',
+                'name': f'{cn_name_map.get(fund_type, fund_type)}基金',
+                'type_code': fund_type,
                 'percentage': percentage,
                 'count': count,
                 'color': color_map.get(fund_type, 'primary'),
