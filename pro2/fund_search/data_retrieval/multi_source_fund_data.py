@@ -542,11 +542,15 @@ class MultiSourceFundData:
                 logger.warning(f"QDII基金 {fund_code} 无历史数据")
                 return None
             
-            # 获取最新数据(T+2)
-            latest = nav_history.iloc[-1]
+            # 确保数据按日期倒序排列（最新在前）
+            if 'date' in nav_history.columns:
+                nav_history = nav_history.sort_values('date', ascending=False)
             
-            # 获取前一日数据
-            previous = nav_history.iloc[-2] if len(nav_history) > 1 else latest
+            # 获取最新数据(T+2) - 第一行是最新数据
+            latest = nav_history.iloc[0]
+            
+            # 获取前一日数据 - 第二行是前一天数据
+            previous = nav_history.iloc[1] if len(nav_history) > 1 else latest
             
             # 计算更多统计指标
             returns = {

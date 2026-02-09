@@ -55,25 +55,48 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             dict: 基金实时数据
         """
         try:
+            from datetime import datetime
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            
             # 判断是否为QDII基金
             is_qdii = self.is_qdii_fund(fund_code, fund_name)
             
             if is_qdii:
                 # QDII基金使用专门方法
                 qdii_data = self.get_qdii_fund_data(fund_code)
-                if qdii_data:
+                if qdii_data and pd.notna(qdii_data.get('current_nav')) and qdii_data.get('current_nav', 0) > 0:
+                    # 获取昨日收益率
+                    yesterday_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+                    
+                    # 获取实时估值（QDII也可能有实时估值）
+                    estimate_data = self._get_realtime_estimate(fund_code)
+                    
+                    if estimate_data and today_str in estimate_data.get('estimate_time', '') and estimate_data.get('estimate_nav', 0) > 0:
+                        # 有今天的实时估值，使用它计算今日收益率
+                        estimate_nav = estimate_data['estimate_nav']
+                        yesterday_nav = estimate_data.get('yesterday_nav', qdii_data['current_nav'])
+                        if yesterday_nav > 0:
+                            today_return = (estimate_nav - yesterday_nav) / yesterday_nav * 100
+                            today_return = round(today_return, 2)
+                        else:
+                            today_return = qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0
+                    else:
+                        # 无实时估值，使用历史日增长率
+                        today_return = qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0
+                        estimate_nav = qdii_data['current_nav']
+                    
                     return {
                         'fund_code': fund_code,
                         'fund_name': fund_name or f'基金{fund_code}',
                         'current_nav': qdii_data['current_nav'],
                         'previous_nav': qdii_data['previous_nav'],
-                        'daily_return': qdii_data['daily_return'],
-                        'today_return': qdii_data['daily_return'],
-                        'yesterday_return': 0.0,  # QDII基金T+2更新，昨日数据需要特殊处理
+                        'daily_return': qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0,
+                        'today_return': today_return,
+                        'yesterday_return': yesterday_return,
                         'nav_date': qdii_data['nav_date'],
                         'data_source': f"tushare_qdii_{qdii_data['data_source']}",
-                        'estimate_nav': qdii_data['current_nav'],
-                        'estimate_return': qdii_data['daily_return']
+                        'estimate_nav': estimate_nav,
+                        'estimate_return': today_return
                     }
             
             # 普通基金使用最新净值数据
