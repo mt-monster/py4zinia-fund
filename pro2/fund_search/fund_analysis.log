@@ -9756,3 +9756,223 @@
 2026-02-09 12:33:15,568 - __main__ - WARNING - 通知发送失败，但分析流程已完成
 2026-02-09 12:33:15,571 - __main__ - INFO - 完整的基金分析流程执行完成
 2026-02-09 12:33:15,571 - __main__ - INFO - 基金分析任务成功完成
+2026-02-09 14:14:34,632 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-09 14:14:34,645 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-09 14:14:34,645 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-09 14:14:34,645 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-09 14:14:34,656 - backtesting.enhanced_strategy - INFO - 成功从YAML加载了 10 个策略规则
+2026-02-09 14:14:34,689 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-09 14:14:34,691 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-09 14:14:34,712 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-09 14:14:34,722 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-09 14:14:34,723 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-09 14:14:34,725 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-09 14:14:34,726 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-09 14:14:34,726 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-09 14:14:34,726 - __main__ - INFO - 成功设置中文字体: SimHei
+2026-02-09 14:14:34,726 - __main__ - WARNING - 策略对比分析系统不可用，将跳过相关功能
+2026-02-09 14:14:34,726 - __main__ - INFO - 增强版基金分析系统初始化完成
+2026-02-09 14:14:34,726 - __main__ - INFO - 运行完整分析流程（默认）
+2026-02-09 14:14:34,726 - __main__ - INFO - 开始运行完整的基金分析流程
+2026-02-09 14:14:34,726 - __main__ - INFO - 正在加载Excel文件: D:\codes\py4zinia\pro2\fund_search\京东金融.xlsx
+2026-02-09 14:14:35,813 - __main__ - INFO - 成功读取Excel文件，共 53 行数据
+2026-02-09 14:14:35,859 - __main__ - INFO - 过滤后有效基金数据: 53 条
+2026-02-09 14:14:35,922 - __main__ - INFO - 开始分析所有基金，共 53 只基金
+2026-02-09 14:14:35,922 - __main__ - INFO - 开始分析基金: 010033 - 安信成长精选混合A
+2026-02-09 14:14:37,340 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:37,341 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:37,341 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:37,341 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:38,654 - data_retrieval.multi_source_fund_data - INFO - 从 Fallback 成功获取 010033 最新净值 (BACKUP_2)
+2026-02-09 14:14:38,654 - __main__ - INFO - 基金 010033 实时数据: current_nav=1.4646, previous_nav=1.4646, daily_return=1.4868, yesterday_return=0.0, data_source=tushare_sina
+2026-02-09 14:14:38,875 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:38,876 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:38,876 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:38,876 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:38,876 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:40,086 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:40,087 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:40,087 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:40,087 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:40,087 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,307 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:41,307 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:41,307 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,307 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,309 - data_retrieval.multi_source_adapter - ERROR - 获取基金 010033 历史数据失败: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,532 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:41,533 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:41,533 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,533 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:41,533 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:42,761 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:42,761 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:42,762 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:42,762 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:42,762 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:43,974 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 010033.OF 失败: 'daily_return'
+2026-02-09 14:14:43,974 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 010033 失败: 'daily_return'
+2026-02-09 14:14:43,974 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:43,974 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:43,974 - data_retrieval.multi_source_adapter - ERROR - 获取基金 010033 历史数据失败: 所有数据源获取 010033 失败: Tushare获取 010033 失败: 'daily_return'; Akshare获取 010033 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:43,975 - __main__ - INFO - 基金 010033 收益率计算完成: today_return=1.49%, prev_day_return=0.0%
+2026-02-09 14:14:43,975 - __main__ - INFO - 基金 010033 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-09 14:14:43,975 - __main__ - INFO - 开始分析基金: 002611 - 博时黄金ETF联接C
+2026-02-09 14:14:43,975 - data_retrieval.multi_source_fund_data - WARNING - Tushare成功率(0.00%)低，降级到Akshare(0.00%)
+2026-02-09 14:14:45,885 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:45,885 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:45,886 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:45,886 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:46,126 - data_retrieval.multi_source_fund_data - INFO - 从 Fallback 成功获取 002611 最新净值 (BACKUP_2)
+2026-02-09 14:14:46,126 - __main__ - INFO - 基金 002611 实时数据: current_nav=3.4377, previous_nav=3.4377, daily_return=3.4746, yesterday_return=0.0, data_source=tushare_sina
+2026-02-09 14:14:46,360 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:46,361 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:46,361 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:46,361 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:46,362 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:47,621 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:47,621 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:47,621 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:47,622 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:47,622 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:48,859 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:48,860 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:48,860 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:48,860 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:48,860 - data_retrieval.multi_source_adapter - ERROR - 获取基金 002611 历史数据失败: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:49,084 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:49,085 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:49,085 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:49,085 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:49,085 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:50,365 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:50,365 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:50,365 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:50,365 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:50,365 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:51,625 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 002611.OF 失败: 'daily_return'
+2026-02-09 14:14:51,625 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 002611 失败: 'daily_return'
+2026-02-09 14:14:51,625 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:51,626 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:51,626 - data_retrieval.multi_source_adapter - ERROR - 获取基金 002611 历史数据失败: 所有数据源获取 002611 失败: Tushare获取 002611 失败: 'daily_return'; Akshare获取 002611 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:51,626 - __main__ - INFO - 基金 002611 收益率计算完成: today_return=3.47%, prev_day_return=0.0%
+2026-02-09 14:14:51,626 - __main__ - INFO - 基金 002611 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-09 14:14:51,627 - __main__ - INFO - 开始分析基金: 013466 - 博时智选量化多因子股票C
+2026-02-09 14:14:51,627 - data_retrieval.multi_source_fund_data - WARNING - Tushare成功率(0.00%)低，降级到Akshare(0.00%)
+2026-02-09 14:14:52,312 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:52,313 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:52,313 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:52,313 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:52,542 - data_retrieval.multi_source_fund_data - INFO - 从 Fallback 成功获取 013466 最新净值 (BACKUP_2)
+2026-02-09 14:14:52,542 - __main__ - INFO - 基金 013466 实时数据: current_nav=1.2451, previous_nav=1.2451, daily_return=1.2451, yesterday_return=0.0, data_source=tushare_sina
+2026-02-09 14:14:52,713 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:52,714 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:52,715 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:52,715 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:52,715 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:53,929 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:53,929 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:53,930 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:53,930 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:53,930 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,108 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:55,108 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:55,108 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,108 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,108 - data_retrieval.multi_source_adapter - ERROR - 获取基金 013466 历史数据失败: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,344 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:55,345 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:55,345 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,345 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:55,345 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:56,554 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:56,554 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:56,554 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:56,555 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:56,555 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:57,735 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 013466.OF 失败: 'daily_return'
+2026-02-09 14:14:57,735 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 013466 失败: 'daily_return'
+2026-02-09 14:14:57,736 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:57,736 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:57,736 - data_retrieval.multi_source_adapter - ERROR - 获取基金 013466 历史数据失败: 所有数据源获取 013466 失败: Tushare获取 013466 失败: 'daily_return'; Akshare获取 013466 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:57,736 - __main__ - INFO - 基金 013466 收益率计算完成: today_return=1.25%, prev_day_return=0.0%
+2026-02-09 14:14:57,737 - __main__ - INFO - 基金 013466 分析完成: status=🔵 **反转上涨**, action=hold, buy_multiplier=0.0, redeem_amount=0
+2026-02-09 14:14:57,737 - __main__ - INFO - 开始分析基金: 096001 - 大成标普500等权重指数(QDII)A人民币
+2026-02-09 14:14:57,737 - data_retrieval.multi_source_fund_data - WARNING - Tushare成功率(0.00%)低，降级到Akshare(0.00%)
+2026-02-09 14:14:58,043 - data_retrieval.multi_source_fund_data - INFO - 获取QDII基金 096001 数据
+2026-02-09 14:14:58,348 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:14:58,348 - data_retrieval.multi_source_fund_data - WARNING - QDII基金 096001 Tushare获取失败: 'daily_return'
+2026-02-09 14:14:58,349 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:58,349 - data_retrieval.multi_source_fund_data - WARNING - QDII基金 096001 Akshare获取失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:58,349 - data_retrieval.multi_source_fund_data - WARNING - QDII基金 096001 无历史数据
+2026-02-09 14:14:58,651 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:14:58,651 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 096001 失败: 'daily_return'
+2026-02-09 14:14:58,651 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:58,651 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:58,906 - data_retrieval.multi_source_fund_data - INFO - 从 Fallback 成功获取 096001 最新净值 (BACKUP_2)
+2026-02-09 14:14:58,906 - __main__ - INFO - 基金 096001 实时数据: current_nav=2.6481, previous_nav=2.6481, daily_return=2.6696, yesterday_return=0.0, data_source=tushare_sina
+2026-02-09 14:14:59,231 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:14:59,232 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 096001 失败: 'daily_return'
+2026-02-09 14:14:59,232 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:59,232 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:14:59,232 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 096001 失败: Tushare获取 096001 失败: 'daily_return'; Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:00,494 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:15:00,494 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 096001 失败: 'daily_return'
+2026-02-09 14:15:00,494 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:00,494 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:00,495 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第2次失败，1秒后重试: 所有数据源获取 096001 失败: Tushare获取 096001 失败: 'daily_return'; Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:01,791 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:15:01,792 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 096001 失败: 'daily_return'
+2026-02-09 14:15:01,792 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:01,792 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:01,792 - data_retrieval.multi_source_adapter - ERROR - 获取基金 096001 历史数据失败: 所有数据源获取 096001 失败: Tushare获取 096001 失败: 'daily_return'; Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:02,106 - data_retrieval.multi_source_fund_data - ERROR - 从tushare获取 096001.OF 失败: 'daily_return'
+2026-02-09 14:15:02,106 - data_retrieval.multi_source_fund_data - WARNING - Tushare获取 096001 失败: 'daily_return'
+2026-02-09 14:15:02,106 - data_retrieval.multi_source_fund_data - ERROR - 从akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:02,107 - data_retrieval.multi_source_fund_data - WARNING - Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:15:02,107 - data_retrieval.multi_source_fund_data - WARNING - get_fund_nav_history 第1次失败，1秒后重试: 所有数据源获取 096001 失败: Tushare获取 096001 失败: 'daily_return'; Akshare获取 096001 失败: fund_open_fund_daily_em() got an unexpected keyword argument 'symbol'
+2026-02-09 14:20:06,087 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-09 14:20:06,095 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-09 14:20:06,095 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-09 14:20:06,095 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-09 14:20:06,109 - backtesting.enhanced_strategy - INFO - 成功从YAML加载了 10 个策略规则
+2026-02-09 14:20:06,137 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-09 14:20:06,138 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-09 14:20:06,169 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-09 14:20:06,169 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-09 14:20:06,169 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-09 14:20:06,169 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-09 14:20:06,171 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-09 14:20:06,171 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-09 14:20:06,171 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-09 14:20:06,194 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-09 14:20:06,195 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-09 14:20:06,196 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-09 14:20:06,198 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-09 14:20:06,198 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-09 14:20:06,198 - __main__ - INFO - 成功设置中文字体: SimHei
+2026-02-09 14:20:06,200 - __main__ - WARNING - 策略对比分析系统不可用，将跳过相关功能
+2026-02-09 14:20:06,200 - __main__ - INFO - 增强版基金分析系统初始化完成
+2026-02-09 14:20:06,200 - __main__ - INFO - 运行完整分析流程（默认）
+2026-02-09 14:20:06,200 - __main__ - INFO - 开始运行完整的基金分析流程
+2026-02-09 14:20:06,200 - __main__ - INFO - 正在加载Excel文件: D:\codes\py4zinia\pro2\fund_search\京东金融.xlsx
+2026-02-09 14:20:06,407 - __main__ - INFO - 成功读取Excel文件，共 53 行数据
+2026-02-09 14:20:06,409 - __main__ - INFO - 过滤后有效基金数据: 53 条
+2026-02-09 14:20:06,409 - __main__ - INFO - 开始分析所有基金，共 53 只基金
+2026-02-09 14:20:06,410 - __main__ - INFO - 开始分析基金: 010033 - 安信成长精选混合A
+2026-02-09 14:20:06,857 - data_retrieval.multi_source_fund_data - INFO - 从 Tushare 成功获取 010033 最新净值
+2026-02-09 14:20:06,857 - __main__ - INFO - 基金 010033 实时数据: current_nav=1.4646, previous_nav=1.4646, daily_return=-1.4931396287328536, yesterday_return=0.0, data_source=tushare_tushare
+2026-02-09 14:20:07,078 - data_retrieval.multi_source_fund_data - INFO - 使用 PRIMARY 数据源 Tushare 获取 010033
+2026-02-09 14:20:07,079 - data_retrieval.multi_source_adapter - INFO - 成功获取基金 010033 的 1286 条历史数据 (Tushare优先)
+2026-02-09 14:20:07,310 - data_retrieval.multi_source_fund_data - INFO - 使用 PRIMARY 数据源 Tushare 获取 010033
+2026-02-09 14:20:07,310 - data_retrieval.multi_source_adapter - INFO - 成功获取基金 010033 的 30 条历史数据 (Tushare优先)
+2026-02-09 14:20:07,311 - __main__ - INFO - 基金 010033 收益率计算完成: today_return=-1.49%, prev_day_return=0.0%
+2026-02-09 14:20:07,311 - __main__ - INFO - 基金 010033 分析完成: status=🟣 **小幅回调** ⚠️, action=hold, buy_multiplier=0.5, redeem_amount=0
+2026-02-09 14:20:07,311 - __main__ - INFO - 开始分析基金: 002611 - 博时黄金ETF联接C
+2026-02-09 14:20:07,758 - __main__ - INFO - 用户中断程序执行

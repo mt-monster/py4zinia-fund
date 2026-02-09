@@ -23,7 +23,7 @@ from data_retrieval.enhanced_database import EnhancedDatabaseManager
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.enhanced_fund_data import EnhancedFundData
+from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
 from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
@@ -54,7 +54,7 @@ def init_components():
         strategy_engine = EnhancedInvestmentStrategy()
         unified_strategy_engine = UnifiedStrategyEngine()
         strategy_evaluator = StrategyEvaluator()
-        fund_data_manager = EnhancedFundData()
+        fund_data_manager = MultiSourceDataAdapter()
         
         # 初始化重仓股数据获取器的数据库连接
         from data_retrieval.heavyweight_stocks_fetcher import init_fetcher
@@ -3088,9 +3088,9 @@ def get_holdings():
             return jsonify({'success': True, 'data': [], 'total': 0})
         
         holdings = []
-        # 导入增强型基金数据获取器用于向前追溯
-        from data_retrieval.enhanced_fund_data import EnhancedFundData
-        fund_data_manager = EnhancedFundData()
+        # 导入多数据源适配器用于向前追溯
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        fund_data_manager = MultiSourceDataAdapter()
         
         for _, row in df.iterrows():
             # 基础持仓数据（必须有的）
@@ -3106,18 +3106,36 @@ def get_holdings():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
             yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else None
             
-            # 使用实时数据校正昨日收益率（修复数据库中可能存在的错误数据）
+            # 使用实时数据校正收益率（修复数据库中可能存在的旧数据）
             fund_code = row['fund_code']
             fund_name = row['fund_name']
             try:
                 # 获取实时数据
                 realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
-                if realtime_data and realtime_data.get('yesterday_return') is not None:
-                    realtime_yesterday_return = float(realtime_data['yesterday_return'])
-                    # 如果数据库中的数据与实时数据差异较大，使用实时数据
-                    if yesterday_return is None or abs(yesterday_return - realtime_yesterday_return) > 0.5:
-                        yesterday_return = realtime_yesterday_return
-                        logger.info(f"基金 {fund_code} 使用实时数据校正昨日收益率: {yesterday_return}%")
+                if realtime_data:
+                    # 校正昨日收益率 (prev_day_return)
+                    if realtime_data.get('yesterday_return') is not None:
+                        realtime_yesterday_return = float(realtime_data['yesterday_return'])
+                        # 如果数据库中的数据与实时数据差异较大，使用实时数据
+                        if yesterday_return is None or abs(yesterday_return - realtime_yesterday_return) > 0.5:
+                            yesterday_return = realtime_yesterday_return
+                            logger.info(f"基金 {fund_code} 使用实时数据校正昨日收益率: {yesterday_return}%")
+                    
+                    # 校正日涨跌幅 (today_return)
+                    if realtime_data.get('today_return') is not None:
+                        realtime_today_return = float(realtime_data['today_return'])
+                        # 如果数据库中没有数据，或数据日期较旧，使用实时数据
+                        if today_return is None:
+                            today_return = realtime_today_return
+                            logger.info(f"基金 {fund_code} 使用实时数据填充日涨跌幅: {today_return}%")
+                        # 如果差异较大，也使用实时数据（可能是数据库数据过期）
+                        elif abs(today_return - realtime_today_return) > 0.5:
+                            today_return = realtime_today_return
+                            logger.info(f"基金 {fund_code} 使用实时数据校正日涨跌幅: {today_return}%")
+                    
+                    # 校正当前净值
+                    if realtime_data.get('current_nav') is not None and current_nav is None:
+                        current_nav = float(realtime_data['current_nav'])
             except Exception as e:
                 logger.debug(f"基金 {fund_code} 实时数据校正失败: {str(e)}")
             sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
@@ -3539,10 +3557,10 @@ def update_holding(fund_code):
         
         # 更新成功后，获取最新实时数据并更新fund_analysis_results表
         try:
-            from data_retrieval.enhanced_fund_data import EnhancedFundData
+            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
             from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
             
-            fund_data_manager = EnhancedFundData()
+            fund_data_manager = MultiSourceDataAdapter()
             strategy_engine = EnhancedInvestmentStrategy()
             
             # 获取实时数据 - 传入fund_name以便正确识别QDII基金
@@ -4153,8 +4171,8 @@ def analyze_fund_correlation():
         if enhanced_analysis:
             try:
                 # 获取基金详细数据用于增强分析
-                from data_retrieval.enhanced_fund_data import EnhancedFundData
-                fund_data_manager = EnhancedFundData()
+                from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+                fund_data_manager = MultiSourceDataAdapter()
                 
                 fund_data_dict = {}
                 fund_names = {}
@@ -4689,10 +4707,10 @@ def get_fund_strategy_analysis(fund_codes):
         dict: 包含策略分析结果的字典
     """
     try:
-        from data_retrieval.enhanced_fund_data import EnhancedFundData
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
         from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
         
-        fund_data_manager = EnhancedFundData()
+        fund_data_manager = MultiSourceDataAdapter()
         strategy_engine = EnhancedInvestmentStrategy()
         
         results = []

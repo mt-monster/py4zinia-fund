@@ -121,7 +121,7 @@ class RealDataFetcher:
     @staticmethod
     def get_index_latest(symbol: str = "sh000300") -> Dict[str, Optional[float]]:
         """
-        获取指数最新行情（实时）
+        获取指数最新行情（实时）- 优先使用Tushare
         
         参数:
             symbol: 指数代码，例如 sh000300
@@ -131,6 +131,14 @@ class RealDataFetcher:
         """
         try:
             logger.info(f"正在获取指数最新行情: {symbol}")
+            
+            # 优先尝试Tushare获取指数数据
+            tushare_result = RealDataFetcher._get_index_from_tushare(symbol)
+            if tushare_result:
+                logger.info(f"使用Tushare获取指数 {symbol} 成功")
+                return tushare_result
+            
+            # 如果Tushare失败，回退到AkShare
             spot_fetchers = [
                 ("stock_zh_index_spot_em", {}),
                 ("stock_zh_index_spot", {}),
@@ -139,16 +147,32 @@ class RealDataFetcher:
 
             df = None
             used_source = None
+            max_retries = 3
+            retry_delay = 1  # 秒
+            
             for fetcher_name, kwargs in spot_fetchers:
                 if hasattr(ak, fetcher_name):
-                    try:
-                        df = getattr(ak, fetcher_name)(**kwargs)
-                        if df is not None and len(df) > 0:
-                            used_source = fetcher_name
-                            break
-                    except Exception as e:
-                        logger.warning(f"{fetcher_name} 获取失败: {str(e)}")
-                        continue
+                    # 为每个数据源添加重试机制
+                    for attempt in range(max_retries):
+                        try:
+                            df = getattr(ak, fetcher_name)(**kwargs)
+                            if df is not None and len(df) > 0:
+                                used_source = fetcher_name
+                                logger.info(f"{fetcher_name} 获取成功 (尝试 {attempt + 1}/{max_retries})")
+                                break
+                            else:
+                                logger.warning(f"{fetcher_name} 返回空数据 (尝试 {attempt + 1}/{max_retries})")
+                        except Exception as e:
+                            error_type = type(e).__name__
+                            error_msg = str(e)
+                            logger.warning(f"{fetcher_name} 获取失败 (尝试 {attempt + 1}/{max_retries}): {error_type} - {error_msg}")
+                            if attempt < max_retries - 1:
+                                import time
+                                time.sleep(retry_delay)
+                            continue
+                    
+                    if df is not None and len(df) > 0:
+                        break
 
             if df is None or df.empty:
                 logger.error("指数最新行情获取失败，返回空结果")
@@ -202,6 +226,98 @@ class RealDataFetcher:
             logger.error(f"获取指数最新行情失败: {str(e)}")
             return {}
 
+    @staticmethod
+    def _get_index_from_tushare(symbol: str) -> Optional[Dict]:
+        """
+        从Tushare获取指数数据
+        
+        参数:
+            symbol: 指数代码，例如 sh000300
+            
+        返回:
+            dict: 指数数据字典，失败返回None
+        """
+        try:
+            import tushare as ts
+            from shared.enhanced_config import DATA_SOURCE_CONFIG
+            
+            # 获取Tushare token
+            tushare_token = DATA_SOURCE_CONFIG.get('tushare', {}).get('token')
+            if not tushare_token:
+                logger.warning("Tushare token未配置，跳过Tushare数据源")
+                return None
+                
+            # 初始化Tushare
+            ts.set_token(tushare_token)
+            pro = ts.pro_api()
+            
+            # 转换指数代码格式
+            ts_symbol = RealDataFetcher._convert_symbol_for_tushare(symbol)
+            if not ts_symbol:
+                logger.warning(f"无法转换指数代码: {symbol}")
+                return None
+            
+            logger.info(f"正在使用Tushare获取指数数据: {ts_symbol}")
+            
+            # 获取指数行情数据
+            df = pro.index_daily(ts_code=ts_symbol, limit=1)
+            
+            if df is None or df.empty:
+                logger.warning(f"Tushare未返回 {ts_symbol} 数据")
+                return None
+            
+            # 提取数据
+            row = df.iloc[0]
+            name = row.get('name', '沪深300')
+            price = float(row.get('close', 0))
+            pre_close = float(row.get('pre_close', price))
+            change = price - pre_close
+            change_percent = (change / pre_close * 100) if pre_close != 0 else 0
+            
+            return {
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'date': str(row.get('trade_date', '')),
+                'source': 'tushare'
+            }
+            
+        except Exception as e:
+            logger.warning(f"Tushare获取指数 {symbol} 失败: {str(e)}")
+            return None
+    
+    @staticmethod
+    def _convert_symbol_for_tushare(symbol: str) -> Optional[str]:
+        """
+        转换指数代码为Tushare格式
+        
+        参数:
+            symbol: 原始指数代码
+            
+        返回:
+            str: Tushare格式的指数代码，无法转换返回None
+        """
+        symbol_lower = symbol.lower()
+        
+        # 沪深300
+        if '000300' in symbol_lower or 'sh000300' in symbol_lower:
+            return '000300.SH'
+        
+        # 上证指数
+        if '000001' in symbol_lower or 'sh000001' in symbol_lower:
+            return '000001.SH'
+        
+        # 深证成指
+        if '399001' in symbol_lower or 'sz399001' in symbol_lower:
+            return '399001.SZ'
+        
+        # 创业板指
+        if '399006' in symbol_lower or 'sz399006' in symbol_lower:
+            return '399006.SZ'
+        
+        logger.warning(f"不支持的指数代码格式: {symbol}")
+        return None
     @staticmethod
     def get_fund_nav_history(fund_code: str, days: int = 365) -> pd.DataFrame:
         """

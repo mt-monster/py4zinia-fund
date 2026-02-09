@@ -270,28 +270,30 @@ class MultiSourceFundData:
         return df
     
     def _get_nav_from_akshare(self, fund_code: str) -> pd.DataFrame:
-        """从akshare获取净值历史"""
+        """从akshare获取净值历史 - 使用 fund_open_fund_info_em"""
         start_time = time.time()
         
         try:
-            df = ak.fund_open_fund_daily_em(symbol=fund_code)
+            # 使用 fund_open_fund_info_em 获取单个基金历史净值
+            # 参数: symbol=基金代码, indicator=单位净值走势, period=最大值
+            df = ak.fund_open_fund_info_em(symbol=fund_code, indicator='单位净值走势', period='最大值')
             
-            # 标准化列名
+            # 标准化列名 (fund_open_fund_info_em 返回: 净值日期, 单位净值, 日增长率)
             column_mapping = {
                 '净值日期': 'date',
                 '单位净值': 'nav',
-                '累计净值': 'accum_nav',
-                '日增长率': 'daily_return',
-                '申购状态': 'purchase_status',
-                '赎回状态': 'redeem_status'
+                '日增长率': 'daily_return'
             }
             df = df.rename(columns=column_mapping)
             df['source'] = 'akshare'
             
             # 数据类型转换
+            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
             df['nav'] = pd.to_numeric(df['nav'], errors='coerce')
-            df['accum_nav'] = pd.to_numeric(df['accum_nav'], errors='coerce')
             df['daily_return'] = pd.to_numeric(df['daily_return'], errors='coerce')
+            
+            # 计算累计净值 (akshare不直接提供)
+            df['accum_nav'] = df['nav']  # 简化处理
             
             # 记录成功
             elapsed = time.time() - start_time
@@ -317,11 +319,12 @@ class MultiSourceFundData:
             df = self.tushare_pro.fund_nav(ts_code=fund_code)
             
             # 标准化列名
+            # Tushare返回: nav_date, unit_nav, accum_nav, adj_nav
+            # 注意: 免费版可能不包含 nv_daily_growth (日增长率)
             column_mapping = {
                 'nav_date': 'date',
                 'unit_nav': 'nav',
-                'accum_nav': 'accum_nav',
-                'nv_daily_growth': 'daily_return'
+                'accum_nav': 'accum_nav'
             }
             df = df.rename(columns=column_mapping)
             df['source'] = 'tushare'
@@ -329,7 +332,16 @@ class MultiSourceFundData:
             # 数据类型转换
             df['nav'] = pd.to_numeric(df['nav'], errors='coerce')
             df['accum_nav'] = pd.to_numeric(df['accum_nav'], errors='coerce')
-            df['daily_return'] = pd.to_numeric(df['daily_return'], errors='coerce')
+            
+            # 计算日增长率 (如果接口未返回)
+            if 'nv_daily_growth' in df.columns:
+                df['daily_return'] = pd.to_numeric(df['nv_daily_growth'], errors='coerce')
+            else:
+                # 通过净值变化计算日增长率
+                # Tushare返回数据是按日期倒序(最新在前)，需要转为正序计算
+                df = df.sort_values('date', ascending=True)  # 正序排列
+                df['daily_return'] = df['nav'].pct_change() * 100
+                df = df.sort_values('date', ascending=False)  # 恢复倒序(最新在前)
             
             # 记录成功
             elapsed = time.time() - start_time
@@ -369,7 +381,8 @@ class MultiSourceFundData:
                 tushare_code = self._convert_to_tushare_format(fund_code)
                 df = self._get_nav_from_tushare(tushare_code)
                 if not df.empty:
-                    latest = df.iloc[-1]
+                    # Tushare数据是按日期倒序(最新在前)，使用 iloc[0]
+                    latest = df.iloc[0]
                     result = self._standardize_nav_data(latest, 'tushare')
                     # 转换回原始code格式
                     result['fund_code'] = fund_code
@@ -453,17 +466,17 @@ class MultiSourceFundData:
         except Exception as e:
             logger.warning(f"Sina获取 {fund_code} 失败: {e}")
         
-        # 尝试 Eastmoney
+        # 尝试 Eastmoney (使用 akshare 的 fund_open_fund_info_em)
         try:
             import akshare as ak
-            df = ak.fund_open_fund_daily_em(symbol=fund_code)
+            df = ak.fund_open_fund_info_em(symbol=fund_code, indicator='单位净值走势', period='1年')
             if not df.empty:
-                latest = df.iloc[0]  # EM数据通常是最新在前
+                latest = df.iloc[-1]  # 取最新一条
                 return {
                     'fund_code': fund_code,
-                    'date': latest.get('净值日期', ''),
+                    'date': str(latest.get('净值日期', '')),
                     'nav': float(latest.get('单位净值', 0)),
-                    'accum_nav': float(latest.get('累计净值', 0)),
+                    'accum_nav': float(latest.get('单位净值', 0)),  # 简化处理
                     'daily_return': float(latest.get('日增长率', 0)),
                     'source': 'eastmoney'
                 }

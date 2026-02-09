@@ -9,13 +9,13 @@
 - 数据字段映射
 """
 
-from .enhanced_fund_data import EnhancedFundData
+from .multi_source_adapter import MultiSourceDataAdapter
 from .fund_realtime import FundRealTime
 from .enhanced_database import EnhancedDatabaseManager
 from .enhanced_notification import EnhancedNotificationManager
 
 __all__ = [
-    'EnhancedFundData',
+    'MultiSourceDataAdapter',
     'FundRealTime', 
     'EnhancedDatabaseManager',
     'EnhancedNotificationManager'
