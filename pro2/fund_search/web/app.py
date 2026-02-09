@@ -880,8 +880,57 @@ def get_funds():
 
 @app.route('/api/fund/<fund_code>', methods=['GET'])
 def get_fund_detail(fund_code):
-    """获取单个基金详情"""
+    """获取单个基金详情（实时数据）"""
     try:
+        # 优先从实时数据获取
+        try:
+            fund_data = fund_data_manager.get_realtime_data(fund_code)
+            if fund_data:
+                # 获取历史数据用于计算prev_day_return
+                hist_data = fund_data_manager.get_historical_data(fund_code, days=10)
+                if hist_data is not None and not hist_data.empty:
+                    # 计算prev_day_return（向前追溯逻辑）
+                    if len(hist_data) >= 2:
+                        current_return = fund_data.get('today_return', 0)
+                        prev_return = 0.0
+                        
+                        # 从倒数第二天开始向前追溯
+                        for i in range(len(hist_data) - 2, -1, -1):
+                            data_row = hist_data.iloc[i]
+                            return_raw = data_row.get('daily_growth_rate', None)
+                            
+                            if pd.notna(return_raw):
+                                return_value = float(return_raw)
+                                # 格式转换处理
+                                if abs(return_value) < 0.1:
+                                    return_value = return_value * 100
+                                return_value = round(return_value, 2)
+                                
+                                # 如果找到非零值，使用该值
+                                if return_value != 0.0:
+                                    prev_return = return_value
+                                    break
+                        
+                        fund_data['prev_day_return'] = prev_return
+                        fund_data['yesterday_return'] = prev_return
+                    
+                    fund = {
+                        'fund_code': fund_code,
+                        'fund_name': fund_data.get('fund_name', ''),
+                        'today_return': round(float(fund_data.get('today_return', 0)), 2),
+                        'prev_day_return': round(float(fund_data.get('prev_day_return', 0)), 2),
+                        'yesterday_return': round(float(fund_data.get('yesterday_return', 0)), 2),
+                        'current_estimate': fund_data.get('current_nav'),
+                        'yesterday_nav': fund_data.get('previous_nav'),
+                        'analysis_date': datetime.now().strftime('%Y-%m-%d'),
+                        'data_source': fund_data.get('data_source', 'unknown')
+                    }
+                    
+                    return jsonify({'success': True, 'data': fund})
+        except Exception as e:
+            logger.warning(f"获取实时数据失败: {str(e)}, 使用缓存数据")
+        
+        # 如果实时数据获取失败，回退到数据库缓存数据
         sql = f"SELECT * FROM fund_analysis_results WHERE fund_code = '{fund_code}' ORDER BY analysis_date DESC LIMIT 1"
         df = db_manager.execute_query(sql)
         
@@ -3008,6 +3057,10 @@ def get_holdings():
             return jsonify({'success': True, 'data': [], 'total': 0})
         
         holdings = []
+        # 导入增强型基金数据获取器用于向前追溯
+        from data_retrieval.enhanced_fund_data import EnhancedFundData
+        fund_data_manager = EnhancedFundData()
+        
         for _, row in df.iterrows():
             # 基础持仓数据（必须有的）
             holding_shares = float(row['holding_shares']) if pd.notna(row['holding_shares']) else 0
@@ -3021,6 +3074,32 @@ def get_holdings():
             previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
             yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else None
+            
+            # 对QDII基金应用向前追溯逻辑
+            fund_code = row['fund_code']
+            fund_name = row['fund_name']
+            if EnhancedFundData.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
+                try:
+                    # 获取实时数据并应用向前追溯
+                    realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+                    if realtime_data and realtime_data.get('yesterday_return') != 0.0:
+                        yesterday_return = float(realtime_data['yesterday_return'])
+                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，昨日收益率: {yesterday_return}%")
+                except Exception as e:
+                    logger.warning(f"QDII基金 {fund_code} 向前追溯失败: {str(e)}")
+            
+            # 对QDII基金应用向前追溯逻辑
+            fund_code = row['fund_code']
+            fund_name = row['fund_name']
+            if EnhancedFundData.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
+                try:
+                    # 获取实时数据并应用向前追溯
+                    realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+                    if realtime_data and realtime_data.get('yesterday_return') != 0.0:
+                        yesterday_return = float(realtime_data['yesterday_return'])
+                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，昨日收益率: {yesterday_return}%")
+                except Exception as e:
+                    logger.warning(f"QDII基金 {fund_code} 向前追溯失败: {str(e)}")
             sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
             sharpe_ratio_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else None
             sharpe_ratio_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else None
@@ -6055,7 +6134,8 @@ def clear_heavyweight_stocks_cache(fund_code):
 
 if __name__ == '__main__':
     init_components()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
 else:
     # 褰撲綔涓烘ā鍧楀鍏ユ椂锛岃嚜鍔ㄥ垵濮嬪寲缁勪欢
     init_components()
