@@ -42,6 +42,30 @@ DATABASE_CONFIG = {
     'charset': os.environ.get('DB_CHARSET', 'utf8mb4')
 }
 
+# 数据源配置
+DATA_SOURCE_CONFIG = {
+    # Tushare 配置
+    'tushare': {
+        'token': os.environ.get('TUSHARE_TOKEN', '5ff19facae0e5b26a407d491d33707a9884a39a714a0d76b6495725b'),
+        'timeout': int(os.environ.get('TUSHARE_TIMEOUT', 30)),
+        'max_retries': int(os.environ.get('TUSHARE_RETRIES', 3))
+    },
+    
+    # Akshare 配置
+    'akshare': {
+        'timeout': int(os.environ.get('AKSHARE_TIMEOUT', 30)),
+        'max_retries': int(os.environ.get('AKSHARE_RETRIES', 3)),
+        'delay_between_requests': float(os.environ.get('AKSHARE_DELAY', 1.0))
+    },
+    
+    # 备用数据源配置
+    'fallback': {
+        'sina_enabled': os.environ.get('SINA_ENABLED', 'True').lower() == 'true',
+        'eastmoney_enabled': os.environ.get('EASTMONEY_ENABLED', 'True').lower() == 'true',
+        'request_timeout': int(os.environ.get('FALLBACK_TIMEOUT', 10))
+    }
+}
+
 # 通知配置
 NOTIFICATION_CONFIG = {
     'wechat': {
