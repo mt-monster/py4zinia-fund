@@ -157,7 +157,7 @@ const FundApp = {
                 FundState.selectedFunds.clear();
                 
                 FundTable.renderData();
-                FundFilters.updateCount();
+                FundFilters.updateResultCount();
                 
                 FundUtils.showNotification('基金列表已清空', 'success');
             } else {

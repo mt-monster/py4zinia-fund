@@ -217,26 +217,34 @@ class EnhancedFundData:
 
 ## 4. 代码整合建议
 
-### 4.1 推荐架构
+### 4.1 推荐架构 (v2.0更新)
 
-建议采用 **主备模式**，Akshare作为主数据源，Tushare作为备用：
+采用 **多级降级模式**，Tushare作为主数据源，Akshare作为第一备用，Sina/Eastmoney作为第二备用：
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    数据获取管理器                            │
-│                  FundDataManager                            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        │              │              │
-        ▼              ▼              ▼
-┌──────────────┐ ┌──────────┐ ┌──────────────┐
-│   Akshare    │ │ Tushare  │ │   数据库     │
-│  (主数据源)   │ │ (备用源)  │ │ (本地缓存)   │
-└──────────────┘ └──────────┘ └──────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    数据获取管理器 (MultiSourceFundData)               │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+    ┌─────────────────┐ ┌─────────────┐ ┌─────────────────────────┐
+    │   Tushare       │ │  Akshare    │ │      Fallback           │
+    │  (PRIMARY)      │ │ (BACKUP_1)  │ │  ┌──────┐  ┌────────┐   │
+    │  - .OF格式      │ │             │ │  │ Sina │  │ Eastm. │   │
+    │  - 98%成功率    │ │ - 95%成功率 │ │  │      │  │        │   │
+    │  - 0.5-2s响应   │ │ - 1-3s响应  │ │  └──────┘  └────────┘   │
+    │  - 专业接口     │ │ - QDII支持好│ │   (BACKUP_2)            │
+    └─────────────────┘ └─────────────┘ └─────────────────────────┘
 ```
 
-### 4.2 整合代码示例
+**优先级说明**:
+1. **PRIMARY**: Tushare - 稳定性最高，响应最快
+2. **BACKUP_1**: Akshare - 数据全面，QDII支持好
+3. **BACKUP_2**: Sina/Eastmoney - 轻量级备用
+
+### 4.2 整合代码示例 (v2.0更新)
 
 ```python
 # pro2/fund_search/data_retrieval/multi_source_fund_data.py
@@ -250,65 +258,74 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MultiSourceFundData:
-    """多数据源基金数据获取器"""
+    """多数据源基金数据获取器 - v2.0: Tushare为主数据源"""
     
     def __init__(self, tushare_token: str = None):
         self.tushare_token = tushare_token
-        self.pro = None
+        self.tushare_pro = None
         if tushare_token:
             ts.set_token(tushare_token)
-            self.pro = ts.pro_api()
+            self.tushare_pro = ts.pro_api()
+        self.health = DataSourceHealth()
+    
+    def _convert_to_tushare_format(self, fund_code: str) -> str:
+        """转换为Tushare格式: 021539 -> 021539.OF"""
+        if not fund_code.endswith('.OF'):
+            return f"{fund_code}.OF"
+        return fund_code
     
     def get_fund_nav_history(self, fund_code: str, source: str = 'auto') -> pd.DataFrame:
         """
         获取基金历史净值
         
         Args:
-            fund_code: 基金代码
+            fund_code: 基金代码 (自动处理.OF后缀)
             source: 数据源 ('akshare', 'tushare', 'auto')
         
         Returns:
             DataFrame: 历史净值数据
         """
         if source == 'auto':
-            # 优先使用akshare，失败时使用tushare
-            try:
-                return self._get_from_akshare(fund_code)
-            except Exception as e:
-                logger.warning(f"Akshare获取失败，尝试Tushare: {e}")
-                if self.pro:
-                    return self._get_from_tushare(fund_code)
-                raise
+            # 新优先级: Tushare > Akshare
+            # 1. 尝试 Tushare (PRIMARY)
+            if self.tushare_pro:
+                try:
+                    tushare_code = self._convert_to_tushare_format(fund_code)
+                    return self._get_nav_from_tushare(tushare_code)
+                except Exception as e:
+                    logger.warning(f"Tushare获取失败，降级到Akshare: {e}")
+            
+            # 2. 尝试 Akshare (BACKUP_1)
+            return self._get_nav_from_akshare(fund_code)
+            
         elif source == 'akshare':
-            return self._get_from_akshare(fund_code)
+            return self._get_nav_from_akshare(fund_code)
         elif source == 'tushare':
-            return self._get_from_tushare(fund_code)
+            tushare_code = self._convert_to_tushare_format(fund_code)
+            return self._get_nav_from_tushare(tushare_code)
         else:
             raise ValueError(f"未知数据源: {source}")
     
-    def _get_from_akshare(self, fund_code: str) -> pd.DataFrame:
-        """从akshare获取数据"""
+    def _get_nav_from_akshare(self, fund_code: str) -> pd.DataFrame:
+        """从akshare获取数据 (BACKUP_1)"""
         df = ak.fund_open_fund_daily_em(symbol=fund_code)
-        # 标准化列名
         column_mapping = {
             '净值日期': 'date',
             '单位净值': 'nav',
             '累计净值': 'accum_nav',
             '日增长率': 'daily_return',
-            '申购状态': 'purchase_status',
-            '赎回状态': 'redeem_status'
         }
         df = df.rename(columns=column_mapping)
         df['source'] = 'akshare'
         return df
     
-    def _get_from_tushare(self, fund_code: str) -> pd.DataFrame:
-        """从tushare获取数据"""
-        if not self.pro:
+    def _get_nav_from_tushare(self, fund_code: str) -> pd.DataFrame:
+        """从tushare获取数据 (PRIMARY)"""
+        if not self.tushare_pro:
             raise ValueError("Tushare未初始化")
         
-        df = self.pro.fund_nav(ts_code=fund_code)
-        # 标准化列名
+        # fund_code 已经是 .OF 格式
+        df = self.tushare_pro.fund_nav(ts_code=fund_code)
         column_mapping = {
             'nav_date': 'date',
             'unit_nav': 'nav',
@@ -319,91 +336,154 @@ class MultiSourceFundData:
         df['source'] = 'tushare'
         return df
     
+    def get_fund_latest_nav(self, fund_code: str) -> Optional[Dict]:
+        """
+        获取最新净值（带三级降级）
+        
+        优先级: Tushare > Akshare > Sina/Eastmoney
+        """
+        errors = []
+        
+        # 1. 尝试 Tushare (PRIMARY)
+        if self.tushare_pro:
+            try:
+                tushare_code = self._convert_to_tushare_format(fund_code)
+                df = self._get_nav_from_tushare(tushare_code)
+                if not df.empty:
+                    latest = df.iloc[-1]
+                    result = self._standardize_nav_data(latest, 'tushare')
+                    result['fund_code'] = fund_code  # 使用原始代码
+                    return result
+            except Exception as e:
+                errors.append(f"Tushare: {e}")
+        
+        # 2. 尝试 Akshare (BACKUP_1)
+        try:
+            df = self._get_nav_from_akshare(fund_code)
+            if not df.empty:
+                latest = df.iloc[-1]
+                result = self._standardize_nav_data(latest, 'akshare')
+                result['fund_code'] = fund_code
+                return result
+        except Exception as e:
+            errors.append(f"Akshare: {e}")
+        
+        # 3. 尝试 Fallback (BACKUP_2)
+        result = self._get_nav_from_fallback(fund_code)
+        if result:
+            return result
+        
+        logger.error(f"所有数据源失败: {'; '.join(errors)}")
+        return None
+    
     def get_qdii_fund_data(self, fund_code: str) -> Dict:
         """
-        获取QDII基金数据（特殊处理）
-        
-        QDII基金特点：
-        1. 净值T+2更新
-        2. 受汇率影响
-        3. 无实时估算
+        获取QDII基金数据（特殊处理，同样遵循Tushare优先）
         """
-        try:
-            # 尝试获取历史数据
-            nav_history = self.get_fund_nav_history(fund_code)
-            
-            if nav_history.empty:
-                return None
-            
-            # 获取最新数据（QDII基金为T+2）
-            latest = nav_history.iloc[-1]
-            
-            # 获取前一日数据用于计算
-            previous = nav_history.iloc[-2] if len(nav_history) > 1 else latest
-            
-            return {
-                'fund_code': fund_code,
-                'current_nav': float(latest['nav']),
-                'previous_nav': float(previous['nav']),
-                'daily_return': float(latest.get('daily_return', 0)),
-                'nav_date': latest['date'],
-                'is_qdii': True,
-                'data_source': latest.get('source', 'unknown'),
-                'note': 'QDII基金净值T+2更新，无实时估算'
-            }
-            
-        except Exception as e:
-            logger.error(f"获取QDII基金 {fund_code} 数据失败: {e}")
+        nav_history = None
+        source_used = None
+        
+        # 1. 尝试 Tushare (PRIMARY)
+        if self.tushare_pro:
+            try:
+                tushare_code = self._convert_to_tushare_format(fund_code)
+                nav_history = self._get_nav_from_tushare(tushare_code)
+                source_used = 'tushare'
+            except Exception as e:
+                logger.warning(f"QDII Tushare失败: {e}")
+        
+        # 2. 尝试 Akshare (BACKUP_1)
+        if nav_history is None or nav_history.empty:
+            try:
+                nav_history = self._get_nav_from_akshare(fund_code)
+                source_used = 'akshare'
+            except Exception as e:
+                logger.warning(f"QDII Akshare失败: {e}")
+        
+        if nav_history is None or nav_history.empty:
             return None
+        
+        # QDII T+2数据处理...
+        latest = nav_history.iloc[-1]
+        return {
+            'fund_code': fund_code,
+            'current_nav': float(latest['nav']),
+            'daily_return': float(latest.get('daily_return', 0)),
+            'data_source': source_used,
+            'is_qdii': True,
+            'update_delay': 'T+2'
+        }
 ```
 
-### 4.3 错误处理策略
+### 4.3 错误处理策略 (v2.0更新)
 
 ```python
-class FundDataFetcher:
-    """基金数据获取器 - 带错误处理和降级"""
+class MultiSourceFundData:
+    """基金数据获取器 - 带三级降级策略"""
     
-    def __init__(self):
-        self.primary_source = 'akshare'
-        self.backup_source = 'tushare'
+    def __init__(self, tushare_token: str = None):
+        self.tushare_token = tushare_token
         self.tushare_pro = None
-        
+        if tushare_token:
+            ts.set_token(tushare_token)
+            self.tushare_pro = ts.pro_api()
+        self.health = DataSourceHealth()
+    
     def fetch_with_fallback(self, fund_code: str) -> Optional[Dict]:
         """
-        带降级策略的数据获取
+        带三级降级策略的数据获取
         
         优先级:
-        1. Akshare 实时数据
-        2. Tushare 实时数据
-        3. 数据库缓存数据
-        4. 默认值
+        1. Tushare (PRIMARY) - 98%成功率，0.5-2s响应
+        2. Akshare (BACKUP_1) - 95%成功率，1-3s响应
+        3. Sina/Eastmoney (BACKUP_2) - 实时数据
+        4. 数据库缓存数据
+        5. 默认值
         """
-        # 尝试主数据源
+        errors = []
+        
+        # 1. 尝试 PRIMARY: Tushare
+        if self.tushare_pro:
+            try:
+                tushare_code = self._convert_to_tushare_format(fund_code)
+                data = self._fetch_from_tushare(tushare_code)
+                if data and self._validate_data(data):
+                    self.health.record_success('tushare', response_time)
+                    return {**data, 'source': 'tushare', 'fund_code': fund_code}
+            except Exception as e:
+                self.health.record_fail('tushare', str(e))
+                errors.append(f"Tushare: {e}")
+                logger.warning(f"Tushare获取失败 [{fund_code}]: {e}")
+        
+        # 2. 尝试 BACKUP_1: Akshare
         try:
             data = self._fetch_from_akshare(fund_code)
             if data and self._validate_data(data):
-                return {**data, 'source': 'akshare'}
+                self.health.record_success('akshare', response_time)
+                return {**data, 'source': 'akshare', 'fund_code': fund_code}
         except Exception as e:
+            self.health.record_fail('akshare', str(e))
+            errors.append(f"Akshare: {e}")
             logger.warning(f"Akshare获取失败 [{fund_code}]: {e}")
         
-        # 尝试备用数据源
+        # 3. 尝试 BACKUP_2: Sina/Eastmoney
         try:
-            if self.tushare_pro:
-                data = self._fetch_from_tushare(fund_code)
-                if data and self._validate_data(data):
-                    return {**data, 'source': 'tushare'}
+            data = self._get_nav_from_fallback(fund_code)
+            if data and self._validate_data(data):
+                return {**data, 'fund_code': fund_code}
         except Exception as e:
-            logger.warning(f"Tushare获取失败 [{fund_code}]: {e}")
+            errors.append(f"Fallback: {e}")
         
-        # 尝试数据库
+        # 4. 尝试数据库缓存
         try:
             data = self._fetch_from_database(fund_code)
             if data:
-                return {**data, 'source': 'database'}
+                return {**data, 'source': 'database', 'fund_code': fund_code}
         except Exception as e:
             logger.warning(f"数据库获取失败 [{fund_code}]: {e}")
         
-        # 返回默认值
+        # 5. 返回默认值
+        logger.error(f"所有数据源获取失败 [{fund_code}]: {'; '.join(errors)}")
         return self._get_default_data(fund_code)
     
     def _validate_data(self, data: Dict) -> bool:
@@ -411,53 +491,90 @@ class FundDataFetcher:
         if not data:
             return False
         
-        # 检查关键字段
-        required_fields = ['current_nav', 'nav_date']
+        required_fields = ['nav', 'date']
         for field in required_fields:
             if field not in data or data[field] is None:
                 return False
         
         # 检查净值合理性
-        nav = data.get('current_nav', 0)
-        if nav <= 0 or nav > 1000:  # 异常值检查
+        nav = data.get('nav', 0)
+        if nav <= 0 or nav > 1000:
             return False
         
         return True
+    
+    def _convert_to_tushare_format(self, fund_code: str) -> str:
+        """转换为Tushare格式"""
+        return f"{fund_code}.OF" if not fund_code.endswith('.OF') else fund_code
 ```
 
 ---
 
-## 5. 结论与建议
+## 5. 结论与建议 (v2.0更新)
 
 ### 5.1 总体评价
 
 | 维度 | 推荐 | 说明 |
 |------|------|------|
-| **主数据源** | Akshare | 免费、开源、数据完整 |
-| **备用数据源** | Tushare | 稳定性高、专业接口 |
-| **QDII基金** | Akshare | 特殊处理逻辑成熟 |
-| **高频请求** | Tushare | 限流更宽松 |
+| **主数据源** | **Tushare** | 稳定性高(98%)、响应快(0.5-2s) |
+| **备用数据源** | **Akshare** | 数据全面、QDII支持好 |
+| **QDII基金** | **Tushare > Akshare** | 两者都支持，优先Tushare |
+| **高频请求** | **Tushare** | 限流更宽松、成功率更高 |
 
 ### 5.2 使用建议
 
 #### 场景1：个人/小团队
-- **推荐**: 仅使用 Akshare
-- **原因**: 免费、无需注册、数据完整
+- **推荐**: Tushare + Akshare 双数据源
+- **原因**: Tushare免费额度足够个人使用，Akshare作为可靠备用
+- **配置**: `DATA_SOURCE_CONFIG['priority']['primary'] = 'tushare'`
 
 #### 场景2：商业/生产环境
-- **推荐**: Akshare + Tushare 双数据源
-- **原因**: 提高稳定性，应对单一数据源故障
+- **推荐**: Tushare (主) + Akshare (备) + Sina/EM (二级备)
+- **原因**: 
+  - Tushare 稳定性最高(98%)，适合生产环境
+  - 三级降级确保高可用性
+  - 自动健康监控和切换
 
 #### 场景3：QDII基金专项
-- **推荐**: 以 Akshare 为主
-- **原因**: QDII处理逻辑更完善
+- **推荐**: Tushare 优先，Akshare备用
+- **原因**: 
+  - Tushare同样支持QDII基金
+  - 两者T+2延迟处理逻辑相同
+  - 优先使用更稳定的数据源
 
-### 5.3 实施路径
+### 5.3 实施路径 (v2.0已实现)
 
-1. **阶段1**: 保持现有Akshare实现
-2. **阶段2**: 添加Tushare作为备用源
-3. **阶段3**: 实现智能数据源选择
-4. **阶段4**: 添加数据源健康监控
+1. **✅ 阶段1**: ~~保持现有Akshare实现~~ → 已升级为Tushare为主
+2. **✅ 阶段2**: ~~添加Tushare作为备用源~~ → Tushare已升级为主数据源
+3. **✅ 阶段3**: 实现智能数据源选择 - 已完成
+4. **✅ 阶段4**: 添加数据源健康监控 - 已完成
+5. **✅ 阶段5**: 添加Sina/Eastmoney作为二级备用 - 已完成
+
+### 5.4 迁移指南 (从v1.0到v2.0)
+
+**代码变更**:
+```python
+# v1.0 - Akshare为主
+fetcher = MultiSourceFundData()
+data = fetcher.get_fund_latest_nav("021539")  # 优先Akshare
+
+# v2.0 - Tushare为主 (自动降级)
+fetcher = MultiSourceFundData(tushare_token="your_token")
+data = fetcher.get_fund_latest_nav("021539")  # 优先Tushare
+
+# v2.0 - 强制使用Akshare (如需兼容旧行为)
+data = fetcher.get_fund_nav_history("021539", source="akshare")
+```
+
+**配置变更**:
+```python
+# v2.0 新增优先级配置
+DATA_SOURCE_CONFIG['priority'] = {
+    'primary': 'tushare',           # 主数据源
+    'backup_1': 'akshare',          # 第一备用
+    'backup_2': ['sina', 'eastmoney']  # 第二备用
+}
+```
 
 ---
 
@@ -466,23 +583,69 @@ class FundDataFetcher:
 ### 6.1 相关文件位置
 
 ```
-pro2/fund_search/data_retrieval/
-├── enhanced_fund_data.py      # 当前akshare实现
-├── multi_source_fund_data.py  # 建议的多源实现(新增)
-└── fund_realtime.py           # 实时数据获取
-
-pro2/tests/
-└── test_data_sources_comparison.py  # 测试脚本
+pro2/fund_search/
+├── data_retrieval/
+│   ├── multi_source_fund_data.py   # v2.0 多源数据获取 (Tushare为主)
+│   ├── enhanced_fund_data.py       # 增强版数据获取
+│   └── fund_realtime.py            # 实时数据获取
+│
+├── shared/
+│   └── enhanced_config.py          # 数据源优先级配置
+│
+├── docs/
+│   ├── DATA_SOURCE_PRIORITY_CONFIG.md   # 本文档
+│   ├── MULTI_SOURCE_USAGE_GUIDE.md      # 使用指南
+│   ├── TUSHARE_INTEGRATION_GUIDE.md     # Tushare集成指南
+│   └── QDII基金特殊处理说明.md          # QDII处理说明
+│
+└── tests/
+    └── test_data_sources_comparison.py   # 测试脚本
 ```
 
-### 6.2 参考资料
+### 6.2 关键配置项
+
+```python
+# shared/enhanced_config.py
+
+DATA_SOURCE_CONFIG = {
+    'tushare': {
+        'token': os.environ.get('TUSHARE_TOKEN', 'your_token'),
+        'timeout': 30,
+        'max_retries': 3
+    },
+    'akshare': {
+        'timeout': 30,
+        'max_retries': 3,
+        'delay_between_requests': 1.0
+    },
+    'fallback': {
+        'sina_enabled': True,
+        'eastmoney_enabled': True,
+        'request_timeout': 10
+    },
+    # v2.0 新增优先级配置
+    'priority': {
+        'primary': 'tushare',
+        'backup_1': 'akshare',
+        'backup_2': ['sina', 'eastmoney']
+    }
+}
+```
+
+### 6.3 参考资料
 
 - [Akshare文档](https://www.akshare.xyz/)
 - [Tushare文档](https://tushare.pro/)
+- [数据源优先级配置说明](./DATA_SOURCE_PRIORITY_CONFIG.md)
 - [项目QDII处理说明](./QDII基金特殊处理说明.md)
 
 ---
 
-**文档版本**: 1.0  
+**文档版本**: 2.0  
 **更新日期**: 2026-02-09  
 **作者**: Fund Analysis System
+
+**更新说明**: 
+- v2.0: 数据源优先级重大调整 - Tushare提升为主数据源，Akshare降级为第一备用
+- 新增Sina/Eastmoney作为第二备用数据源
+- 新增自动代码格式转换功能 (.OF后缀处理)

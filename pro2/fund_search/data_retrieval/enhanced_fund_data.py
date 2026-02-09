@@ -556,8 +556,10 @@ class EnhancedFundData:
                         else:
                             previous_nav = sina_previous_nav
                         
-                        # 获取昨日盈亏率（直接从最新一条数据的日增长率获取）
+                        # 获取昨日盈亏率（从最新数据的日增长率获取）
                         # 注意：akshare返回的日增长率已经是百分数格式（如-0.94），不需要再乘以100
+                        # 修复：最新数据的日增长率就是"昨日收益率"（相对于前一日）
+                        yesterday_return = 0.0
                         yesterday_return_raw = latest_data.get('日增长率', 0)
                         if pd.notna(yesterday_return_raw):
                             yesterday_return = float(yesterday_return_raw)
@@ -565,8 +567,6 @@ class EnhancedFundData:
                             if abs(yesterday_return) < 0.1:
                                 yesterday_return = yesterday_return * 100
                             yesterday_return = round(yesterday_return, 2)
-                        else:
-                            yesterday_return = 0.0
                     else:
                         # AKShare数据为空，使用新浪数据作为默认值
                         nav_date = datetime.now().strftime('%Y-%m-%d')
@@ -653,17 +653,16 @@ class EnhancedFundData:
                         else:
                             daily_return = 0.0
                     
-                    # 获取昨日盈亏率（倒数第二个记录的日增长率，如果存在）
+                    # 获取昨日盈亏率（从最新记录的日增长率获取）
+                    # 修复：最新数据的日增长率就是"昨日收益率"
                     yesterday_return = 0.0
-                    if len(fund_nav) > 1:
-                        second_latest_data = fund_nav.iloc[-2]
-                        yesterday_return_raw = second_latest_data.get('日增长率', 0)
-                        if pd.notna(yesterday_return_raw):
-                            yesterday_return = float(yesterday_return_raw)
-                            # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
-                            if abs(yesterday_return) < 0.1:
-                                yesterday_return = yesterday_return * 100
-                            yesterday_return = round(yesterday_return, 2)
+                    yesterday_return_raw = latest_data.get('日增长率', 0)
+                    if pd.notna(yesterday_return_raw):
+                        yesterday_return = float(yesterday_return_raw)
+                        # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
+                        if abs(yesterday_return) < 0.1:
+                            yesterday_return = yesterday_return * 100
+                        yesterday_return = round(yesterday_return, 2)
                 except Exception as akshare_e:
                     logger.warning(f"AKShare接口异常，基金 {fund_code} 尝试从数据库获取: {akshare_e}")
                     # 尝试从数据库获取历史数据

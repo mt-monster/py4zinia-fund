@@ -429,6 +429,28 @@ class EnhancedDatabaseManager:
         logger.info("基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成")
 
 
+    def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Tuple]:
+        """
+        执行查询并返回单行结果
+        
+        参数：
+        sql: SQL查询语句
+        params: 查询参数字典
+        
+        返回：
+        单行查询结果元组或None
+        """
+        try:
+            with self.engine.connect() as conn:
+                if params:
+                    result = conn.execute(text(sql), params)
+                else:
+                    result = conn.execute(text(sql))
+                return result.fetchone()
+        except Exception as e:
+            logger.error(f"执行单行查询失败: {str(e)}")
+            return None
+    
     def execute_query_raw(self, sql: str, params: Optional[Tuple] = None) -> Optional[List]:
         """
         执行原始查询并返回结果
