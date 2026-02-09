@@ -312,7 +312,7 @@ class EnhancedFundAnalysisSystem:
             logger.info(f"基金 {fund_code} 实时数据: current_nav={realtime_data.get('current_nav')}, "
                        f"previous_nav={realtime_data.get('previous_nav')}, "
                        f"daily_return={realtime_data.get('daily_return')}, "
-                       f"yesterday_return={realtime_data.get('yesterday_return')}, "
+                       f"prev_day_return={realtime_data.get('prev_day_return')}, "
                        f"data_source={realtime_data.get('data_source')}")
             
             # 获取绩效指标
@@ -339,8 +339,8 @@ class EnhancedFundAnalysisSystem:
             yesterday_return = 0.0
             
             # 首先尝试从实时数据获取昨日收益率（更可靠）
-            if 'yesterday_return' in realtime_data:
-                yesterday_return = realtime_data['yesterday_return']
+            if 'prev_day_return' in realtime_data:
+                yesterday_return = realtime_data['prev_day_return']
                 try:
                     yesterday_return = float(yesterday_return)
                     # 检查昨日收益率是否异常（超过±100%）
