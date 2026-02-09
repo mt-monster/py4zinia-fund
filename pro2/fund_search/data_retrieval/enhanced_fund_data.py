@@ -328,6 +328,7 @@ class EnhancedFundData:
 
             # 获取昨日盈亏率（从前一条数据的日增长率获取）
             # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
+            yesterday_return = 0.0
             if len(fund_nav) > 1:
                 yesterday_return_raw = previous_data.get('日增长率', 0)
                 if pd.notna(yesterday_return_raw):
@@ -336,10 +337,15 @@ class EnhancedFundData:
                     if abs(yesterday_return) < 0.1:
                         yesterday_return = yesterday_return * 100
                     yesterday_return = round(yesterday_return, 2)
-                else:
-                    yesterday_return = 0.0
+                
+                # 如果昨日收益率为0，向前追溯获取非零值（针对QDII基金）
+                if yesterday_return == 0.0 and EnhancedFundData.is_qdii_fund(fund_code, fund_name):
+                    logger.info(f"QDII基金 {fund_code} 昨日收益率为0，开始向前追溯获取有效数据")
+                    yesterday_return = EnhancedFundData._get_previous_nonzero_return(fund_nav, fund_code)
             else:
-                yesterday_return = 0.0
+                # 如果只有一条数据，也尝试向前追溯（理论上不应该发生）
+                if EnhancedFundData.is_qdii_fund(fund_code, fund_name):
+                    yesterday_return = EnhancedFundData._get_previous_nonzero_return(fund_nav, fund_code)
             
             logger.info(f"QDII基金 {fund_code} 使用AKShare数据: 当日净值={current_nav}, 当日盈亏={daily_return}%, 昨日盈亏={yesterday_return}% (AKShare日增长率直接使用，不进行格式转换)")
             
@@ -387,6 +393,48 @@ class EnhancedFundData:
                 'data_source': 'akshare_qdii_error',
                 'estimate_time': ''
             }
+    
+    @staticmethod
+    def _get_previous_nonzero_return(fund_nav: pd.DataFrame, fund_code: str) -> float:
+        """
+        向前追溯获取非零的昨日收益率（专门针对QDII基金）
+        
+        参数：
+        fund_nav: 基金历史净值数据DataFrame
+        fund_code: 基金代码
+        
+        返回：
+        float: 非零的昨日收益率，如果找不到则返回0.0
+        """
+        try:
+            # 从倒数第二条数据开始向前追溯
+            for i in range(len(fund_nav) - 2, -1, -1):  # 从倒数第二条开始往前遍历
+                data_row = fund_nav.iloc[i]
+                return_raw = data_row.get('日增长率', None)
+                
+                if pd.notna(return_raw):
+                    return_value = float(return_raw)
+                    # 判断格式：如果绝对值 < 0.1，说明是小数格式，需要乘100
+                    if abs(return_value) < 0.1:
+                        return_value = return_value * 100
+                    return_value = round(return_value, 2)
+                    
+                    # 如果找到非零值，返回该值
+                    if return_value != 0.0:
+                        nav_date = data_row.get('净值日期', 'Unknown')
+                        logger.info(f"QDII基金 {fund_code} 向前追溯成功: 在 {nav_date} 找到非零收益率 {return_value}%")
+                        return return_value
+                
+                # 限制追溯范围，避免过度追溯
+                if len(fund_nav) - i > 10:  # 最多向前追溯10个交易日
+                    break
+            
+            logger.info(f"QDII基金 {fund_code} 向前追溯完成，未找到非零收益率，使用默认值0.0%")
+            return 0.0
+            
+        except Exception as e:
+            logger.warning(f"QDII基金 {fund_code} 向前追溯获取收益率时出错: {str(e)}，使用默认值0.0%")
+            return 0.0
     
     @staticmethod
     def _get_historical_data_from_db(fund_code: str) -> Dict:
