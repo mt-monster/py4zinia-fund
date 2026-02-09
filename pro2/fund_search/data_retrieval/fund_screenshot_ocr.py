@@ -524,10 +524,10 @@ def validate_recognized_fund(fund: Dict) -> Tuple[bool, str]:
     
     # 尝试从数据源验证基金是否存在
     try:
-        from data_retrieval.enhanced_fund_data import EnhancedFundData
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
         
         # 获取基金基本信息
-        basic_info = EnhancedFundData.get_fund_basic_info(fund_code)
+        basic_info = MultiSourceDataAdapter.get_fund_basic_info(fund_code)
         
         if basic_info and basic_info.get('fund_name'):
             real_name = basic_info['fund_name']

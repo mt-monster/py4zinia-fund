@@ -188,10 +188,10 @@ python pro2/fund_search/tests/quick_test_qdii_006105.py
 QDII基金数据获取已集成到系统中，使用方式与普通基金相同：
 
 ```python
-from data_retrieval.enhanced_fund_data import EnhancedFundData
+from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
 
-# 创建数据管理器
-fund_data_manager = EnhancedFundData()
+# 创建数据管理器（Tushare优先）
+fund_data_manager = MultiSourceDataAdapter()
 
 # 获取QDII基金数据（与普通基金相同的接口）
 basic_info = fund_data_manager.get_fund_basic_info("006105")

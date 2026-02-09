@@ -89,6 +89,8 @@ const FundApp = {
                 FundState.filteredFunds = [...response.data];
                 FundTable.renderData();
                 FundFilters.updateResultCount();
+                // 更新顶部基金总数显示
+                this.updateTotalCount();
             } else {
                 // 数据加载失败（静默处理）
                 console.warn('数据加载失败:', response.error);
@@ -158,6 +160,8 @@ const FundApp = {
                 
                 FundTable.renderData();
                 FundFilters.updateResultCount();
+                // 更新顶部基金总数显示
+                this.updateTotalCount();
                 
                 FundUtils.showNotification('基金列表已清空', 'success');
             } else {
@@ -315,6 +319,16 @@ const FundApp = {
             if (btnIcon) {
                 btnIcon.className = 'bi bi-chart-line';
             }
+        }
+    },
+
+    /**
+     * 更新顶部基金总数显示
+     */
+    updateTotalCount() {
+        const totalCountElement = document.getElementById('total-count');
+        if (totalCountElement) {
+            totalCountElement.textContent = FundState.funds.length;
         }
     },
 

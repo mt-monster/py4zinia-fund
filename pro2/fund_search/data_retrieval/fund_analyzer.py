@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
-from .enhanced_fund_data import EnhancedFundData
+from .multi_source_adapter import MultiSourceDataAdapter
 from .enhanced_database import EnhancedDatabaseManager
 from shared.enhanced_config import DATABASE_CONFIG
 
@@ -29,7 +29,7 @@ class FundAnalyzer:
         参数：
         enable_cache: 是否启用缓存机制
         """
-        self.fund_data = EnhancedFundData()
+        self.fund_data = MultiSourceDataAdapter()
         self.db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
         self.enable_cache = enable_cache
         self._cache = {}  # 缓存相关性结果

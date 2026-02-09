@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
 from shared.enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_fund_data import EnhancedFundData
+from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.enhanced_analytics import EnhancedFundAnalytics
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
@@ -52,7 +52,7 @@ class EnhancedFundAnalysisSystem:
     
     def __init__(self):
         """初始化系统组件"""
-        self.fund_data_manager = EnhancedFundData()
+        self.fund_data_manager = MultiSourceDataAdapter()
         self.strategy_engine = EnhancedInvestmentStrategy()
         self.analytics_engine = EnhancedFundAnalytics()
         self.db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
@@ -363,7 +363,7 @@ class EnhancedFundAnalysisSystem:
                         try:
                             # 向前追溯寻找非零值（特别针对QDII基金）
                             from data_retrieval.enhanced_fund_data import EnhancedFundData
-                            if EnhancedFundData.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
+                            if MultiSourceDataAdapter.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
                                 logger.info(f"检测到QDII基金 {fund_code} 且昨日收益率为0，开始向前追溯获取非零值")
                                 # 从最新的数据开始向前查找非零值
                                 for i in range(len(recent_growth_series) - 1, -1, -1):
