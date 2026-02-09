@@ -53,7 +53,7 @@ const FundApp = {
             // Ctrl+F 打开筛选
             if (e.ctrlKey && e.key === 'f') {
                 e.preventDefault();
-                FundFilters.openModal();
+                FundFilters.togglePanel();
             }
             
             // Escape 关闭模态框
@@ -88,7 +88,7 @@ const FundApp = {
                 FundState.funds = response.data;
                 FundState.filteredFunds = [...response.data];
                 FundTable.renderData();
-                FundFilters.updateCount();
+                FundFilters.updateResultCount();
             } else {
                 // 数据加载失败（静默处理）
                 console.warn('数据加载失败:', response.error);

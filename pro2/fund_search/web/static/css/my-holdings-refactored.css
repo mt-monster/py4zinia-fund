@@ -1792,3 +1792,507 @@ textarea:focus-visible {
         min-height: 400px;
     }
 }
+/* 图表容器样式，防止负半径错误 */
+#fund-analysis-dashboard {
+    min-height: 500px;
+    width: 100%;
+    position: relative;
+}
+
+#fund-analysis-dashboard canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .modal-large {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+    
+    .investment-advice-container {
+        min-height: auto;
+    }
+    
+    #fund-analysis-dashboard {
+        min-height: 400px;
+    }
+}
+
+/* ============================================
+   24. 高级筛选面板样式
+   ============================================ */
+
+/* 筛选面板遮罩 */
+.filter-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-base);
+}
+
+.filter-panel-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 筛选面板 */
+.filter-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 380px;
+    max-width: 90vw;
+    height: 100vh;
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-xl);
+    z-index: 1050;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-panel.open {
+    transform: translateX(0);
+}
+
+/* 筛选面板头部 */
+.filter-panel-header {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.filter-panel-title {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.filter-panel-title i {
+    color: var(--info);
+}
+
+.filter-panel-close {
+    background: none;
+    border: none;
+    font-size: var(--text-xl);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: var(--space-1);
+    transition: color var(--transition-fast);
+}
+
+.filter-panel-close:hover {
+    color: var(--text-primary);
+}
+
+/* 筛选面板内容区 */
+.filter-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4);
+}
+
+/* 筛选面板底部 */
+.filter-panel-footer {
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+}
+
+.filter-result-count {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+}
+
+.filter-result-count strong {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.filter-panel-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+/* 筛选区块 */
+.filter-section {
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+/* 有值的筛选区块高亮 */
+.filter-section.has-value .filter-section-title {
+    color: var(--info);
+    font-weight: 600;
+}
+
+.filter-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-3);
+}
+
+.filter-section-title {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.clear-section-btn {
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: var(--space-1);
+    font-size: var(--text-sm);
+    transition: color var(--transition-fast);
+}
+
+.clear-section-btn:hover {
+    color: var(--danger);
+}
+
+/* 预设筛选 */
+.preset-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.preset-tag {
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.preset-tag:hover {
+    border-color: var(--info);
+    color: var(--info);
+}
+
+.preset-tag.active {
+    background: var(--info);
+    border-color: var(--info);
+    color: white;
+}
+
+/* 筛选选项 */
+.filter-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--text-sm);
+    background: var(--bg-primary);
+}
+
+.filter-option:hover {
+    border-color: var(--info);
+}
+
+.filter-option.selected {
+    background: var(--info-light);
+    border-color: var(--info);
+    color: var(--info);
+}
+
+.filter-option.selected .option-label {
+    font-weight: 500;
+}
+
+.filter-option input[type="checkbox"],
+.filter-option input[type="radio"] {
+    display: none;
+}
+
+.option-label {
+    white-space: nowrap;
+}
+
+.option-desc {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-left: var(--space-1);
+}
+
+/* 范围选择 */
+.filter-range {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.range-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.range-input-group {
+    flex: 1;
+    position: relative;
+}
+
+.range-input {
+    width: 100%;
+    padding-right: 30px;
+}
+
+.range-unit {
+    position: absolute;
+    right: var(--space-2);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+}
+
+.range-separator {
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+}
+
+/* 范围滑块 */
+.range-slider {
+    position: relative;
+    height: 20px;
+    margin-top: var(--space-2);
+}
+
+.range-slider-track {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    transform: translateY(-50%);
+}
+
+.range-slider-fill {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    height: 4px;
+    background: var(--info);
+    border-radius: 2px;
+    transform: translateY(-50%);
+}
+
+.range-slider-thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border: 2px solid var(--info);
+    border-radius: 50%;
+    transform: translateY(-50%);
+    cursor: grab;
+    box-shadow: var(--shadow-sm);
+}
+
+.range-slider-thumb:active {
+    cursor: grabbing;
+}
+
+.range-slider-thumb.min {
+    left: 0;
+}
+
+.range-slider-thumb.max {
+    right: 0;
+}
+
+/* 分组范围选择（收益率） */
+.filter-range-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.period-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius-md);
+}
+
+.period-tab {
+    padding: var(--space-1) var(--space-2);
+    border: none;
+    background: transparent;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--border-radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.period-tab:hover {
+    color: var(--text-primary);
+}
+
+.period-tab.active {
+    background: var(--info);
+    color: white;
+}
+
+.range-quick-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.range-quick-btn {
+    padding: var(--space-1) var(--space-2);
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--border-radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.range-quick-btn:hover {
+    border-color: var(--info);
+    color: var(--info);
+}
+
+/* 活动筛选标签 */
+.active-filter-tags {
+    padding: var(--space-3) var(--space-6);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.filter-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.filter-tags-label {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    background: var(--info-light);
+    color: var(--info);
+    border-radius: var(--border-radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.filter-tag i {
+    cursor: pointer;
+    font-size: var(--text-xs);
+    opacity: 0.7;
+    transition: opacity var(--transition-fast);
+}
+
+.filter-tag i:hover {
+    opacity: 1;
+}
+
+.clear-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    border: 1px dashed var(--text-tertiary);
+    background: transparent;
+    color: var(--text-tertiary);
+    border-radius: var(--border-radius-md);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.clear-all-btn:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .filter-panel {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .filter-options {
+        gap: var(--space-1);
+    }
+    
+    .filter-option {
+        padding: var(--space-1) var(--space-2);
+        font-size: var(--text-xs);
+    }
+    
+    .range-inputs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .range-separator {
+        display: none;
+    }
+}
