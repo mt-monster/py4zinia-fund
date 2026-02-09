@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级筛选功能测试</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="../fund_search/web/static/css/my-holdings-refactored.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .test-pass {
+            background: #d4edda;
+            color: #155724;
+        }
+        .test-fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .mock-fund {
+            padding: 8px;
+            margin: 4px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>高级筛选功能测试</h1>
+        
+        <div class="test-section">
+            <h3>测试1: 基金类型筛选</h3>
+            <div id="test1-result" class="test-result">测试中...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>测试2: 风险等级筛选</h3>
+            <div id="test2-result" class="test-result">测试中...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>测试3: 收益率筛选</h3>
+            <div id="test3-result" class="test-result">测试中...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>测试4: 多条件组合筛选</h3>
+            <div id="test4-result" class="test-result">测试中...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>测试5: 预设筛选条件</h3>
+            <div id="test5-result" class="test-result">测试中...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>测试基金数据</h3>
+            <div id="mock-funds"></div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟基金数据
+        const mockFunds = [
+            { fund_code: '000001', fund_name: '华夏成长混合', fund_type: 'hybrid', today_return: 1.5, annualized_return: 15, max_drawdown: -20, sharpe_ratio: 1.2, volatility: 18, holding_amount: 10000 },
+            { fund_code: '510300', fund_name: '华泰柏瑞沪深300ETF', fund_type: 'etf', today_return: 0.8, annualized_return: 8, max_drawdown: -25, sharpe_ratio: 0.8, volatility: 22, holding_amount: 50000 },
+            { fund_code: '000003', fund_name: '广发纯债债券A', fund_type: 'bond', today_return: 0.1, annualized_return: 4, max_drawdown: -3, sharpe_ratio: 2.5, volatility: 3, holding_amount: 30000 },
+            { fund_code: '000004', fund_name: '南方全球精选QDII', fund_type: 'qdii', today_return: -0.5, annualized_return: 12, max_drawdown: -30, sharpe_ratio: 0.6, volatility: 25, holding_amount: 20000 },
+            { fund_code: '000005', fund_name: '天弘余额宝货币', fund_type: 'money', today_return: 0.01, annualized_return: 2, max_drawdown: -0.1, sharpe_ratio: 3.0, volatility: 0.5, holding_amount: 5000 },
+            { fund_code: '000006', fund_name: '易方达消费行业股票', fund_type: 'stock', today_return: 2.5, annualized_return: 25, max_drawdown: -35, sharpe_ratio: 1.5, volatility: 28, holding_amount: 40000 },
+            { fund_code: '000007', fund_name: '嘉实沪深300指数', fund_type: 'index', today_return: 0.7, annualized_return: 7, max_drawdown: -28, sharpe_ratio: 0.7, volatility: 23, holding_amount: 35000 },
+            { fund_code: '000008', fund_name: '交银养老FOF', fund_type: 'fof', today_return: 0.5, annualized_return: 10, max_drawdown: -15, sharpe_ratio: 1.0, volatility: 12, holding_amount: 25000 },
+        ];
+
+        // 显示测试数据
+        document.getElementById('mock-funds').innerHTML = mockFunds.map(f => `
+            <div class="mock-fund">
+                <strong>${f.fund_code}</strong> - ${f.fund_name} 
+                (类型: ${f.fund_type}, 年化: ${f.annualized_return}%, 回撤: ${f.max_drawdown}%)
+            </div>
+        `).join('');
+
+        // 模拟筛选逻辑（简化版）
+        function testFilter(description, filterFn, expectedCount) {
+            const result = mockFunds.filter(filterFn);
+            const pass = result.length === expectedCount;
+            return {
+                pass,
+                message: `${description}: 期望 ${expectedCount} 只, 实际 ${result.length} 只${pass ? ' ✓' : ' ✗'}`,
+                funds: result
+            };
+        }
+
+        // 测试1: 基金类型筛选
+        function runTest1() {
+            const tests = [
+                testFilter('股票型基金', f => f.fund_type === 'stock', 1),
+                testFilter('债券型基金', f => f.fund_type === 'bond', 1),
+                testFilter('混合型基金', f => f.fund_type === 'hybrid', 1),
+                testFilter('ETF基金', f => f.fund_type === 'etf', 1),
+                testFilter('QDII基金', f => f.fund_type === 'qdii', 1),
+                testFilter('FOF基金', f => f.fund_type === 'fof', 1),
+            ];
+            
+            const allPass = tests.every(t => t.pass);
+            const resultDiv = document.getElementById('test1-result');
+            resultDiv.className = 'test-result ' + (allPass ? 'test-pass' : 'test-fail');
+            resultDiv.innerHTML = tests.map(t => t.message).join('<br>');
+        }
+
+        // 测试2: 风险等级筛选
+        function runTest2() {
+            // 根据回撤判断风险等级
+            const lowRisk = f => Math.abs(f.max_drawdown) < 5;     // 低风险
+            const midRisk = f => Math.abs(f.max_drawdown) >= 5 && Math.abs(f.max_drawdown) < 25;  // 中风险
+            const highRisk = f => Math.abs(f.max_drawdown) >= 25;  // 高风险
+            
+            const tests = [
+                testFilter('低风险基金', lowRisk, 1),   // 货币型
+                testFilter('中风险基金', midRisk, 3),   // 债券、FOF、混合
+                testFilter('高风险基金', highRisk, 4),  // 股票、ETF、指数、QDII
+            ];
+            
+            const allPass = tests.every(t => t.pass);
+            const resultDiv = document.getElementById('test2-result');
+            resultDiv.className = 'test-result ' + (allPass ? 'test-pass' : 'test-fail');
+            resultDiv.innerHTML = tests.map(t => t.message).join('<br>');
+        }
+
+        // 测试3: 收益率筛选
+        function runTest3() {
+            const tests = [
+                testFilter('年化收益 > 15%', f => f.annualized_return > 15, 2),  // 股票型、混合型
+                testFilter('年化收益 5-15%', f => f.annualized_return >= 5 && f.annualized_return <= 15, 4),
+                testFilter('今日收益 > 1%', f => f.today_return > 1, 2),  // 股票型、混合型
+            ];
+            
+            const allPass = tests.every(t => t.pass);
+            const resultDiv = document.getElementById('test3-result');
+            resultDiv.className = 'test-result ' + (allPass ? 'test-pass' : 'test-fail');
+            resultDiv.innerHTML = tests.map(t => t.message).join('<br>');
+        }
+
+        // 测试4: 多条件组合筛选
+        function runTest4() {
+            // 高收益低风险（夏普比率>1且回撤<20%）
+            const highReturnLowRisk = f => f.sharpe_ratio > 1 && Math.abs(f.max_drawdown) < 20;
+            const result1 = mockFunds.filter(highReturnLowRisk);
+            
+            // 股票型或混合型，且年化>10%
+            const stockOrHybridHighReturn = f => 
+                (f.fund_type === 'stock' || f.fund_type === 'hybrid') && f.annualized_return > 10;
+            const result2 = mockFunds.filter(stockOrHybridHighReturn);
+            
+            const resultDiv = document.getElementById('test4-result');
+            const allPass = result1.length === 2 && result2.length === 2;
+            resultDiv.className = 'test-result ' + (allPass ? 'test-pass' : 'test-fail');
+            resultDiv.innerHTML = `
+                高收益低风险（夏普>1且回撤<20%）: 期望 2 只, 实际 ${result1.length} 只${result1.length === 2 ? ' ✓' : ' ✗'}<br>
+                股票/混合型且年化>10%: 期望 2 只, 实际 ${result2.length} 只${result2.length === 2 ? ' ✓' : ' ✗'}<br>
+                <small>满足条件的基金: ${result1.map(f => f.fund_name).join(', ')}</small>
+            `;
+        }
+
+        // 测试5: 预设筛选条件
+        function runTest5() {
+            // 高收益基金（年化>20%）
+            const highReturn = mockFunds.filter(f => f.annualized_return > 20);
+            
+            // 稳健基金（回撤<10%且夏普>1）
+            const stableFunds = mockFunds.filter(f => Math.abs(f.max_drawdown) < 10 && f.sharpe_ratio > 1);
+            
+            // 指数基金（ETF或指数型）
+            const indexFunds = mockFunds.filter(f => f.fund_type === 'etf' || f.fund_type === 'index');
+            
+            const resultDiv = document.getElementById('test5-result');
+            const allPass = highReturn.length === 1 && stableFunds.length === 2 && indexFunds.length === 2;
+            resultDiv.className = 'test-result ' + (allPass ? 'test-pass' : 'test-fail');
+            resultDiv.innerHTML = `
+                高收益基金（年化>20%）: 期望 1 只, 实际 ${highReturn.length} 只<br>
+                稳健基金（回撤<10%且夏普>1）: 期望 2 只, 实际 ${stableFunds.length} 只<br>
+                指数基金（ETF或指数型）: 期望 2 只, 实际 ${indexFunds.length} 只<br>
+                ${allPass ? '所有预设筛选测试通过 ✓' : '部分测试失败 ✗'}
+            `;
+        }
+
+        // 运行所有测试
+        window.onload = function() {
+            runTest1();
+            runTest2();
+            runTest3();
+            runTest4();
+            runTest5();
+        };
+    </script>
+</body>
+</html>
