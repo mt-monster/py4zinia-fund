@@ -917,6 +917,17 @@ def get_fund_detail(fund_code):
         try:
             fund_data = fund_data_manager.get_realtime_data(fund_code)
             if fund_data:
+                # 获取真实的基金名称
+                real_fund_name = fund_code  # 默认使用基金代码
+                try:
+                    import akshare as ak
+                    fund_list = ak.fund_name_em()
+                    fund_info = fund_list[fund_list['基金代码'] == fund_code]
+                    if not fund_info.empty:
+                        real_fund_name = fund_info.iloc[0]['基金简称']
+                except Exception as e:
+                    logger.warning(f"获取基金 {fund_code} 真实名称失败: {e}")
+                
                 # 获取历史数据用于计算prev_day_return
                 hist_data = fund_data_manager.get_historical_data(fund_code, days=10)
                 if hist_data is not None and not hist_data.empty:
@@ -947,7 +958,7 @@ def get_fund_detail(fund_code):
                     
                     fund = {
                         'fund_code': fund_code,
-                        'fund_name': fund_data.get('fund_name', ''),
+                        'fund_name': real_fund_name,  # 使用真实的基金名称
                         'today_return': round(float(fund_data.get('today_return', 0)), 2),
                         'prev_day_return': round(float(fund_data.get('prev_day_return', 0)), 2),
                         'yesterday_return': round(float(fund_data.get('yesterday_return', 0)), 2),
