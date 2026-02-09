@@ -93,70 +93,60 @@ const FundTable = {
     },
 
     /**
-     * 获取基金类型
-     * 返回: 'index'(指数型), 'stock'(股票型), 'hybrid'(混合型), 'qdii'(QDII), 'other'(其他)
+     * 获取基金类型信息
+     * 使用后端返回的基金类型数据（证监会标准分类）
+     * 类型代码: stock(股票型), bond(债券型), hybrid(混合型), money(货币型), 
+     *          index(指数型), qdii(QDII), etf(ETF), fof(FOF), unknown(未知)
      */
-    getFundType(fund) {
-        const name = (fund.fund_name || '').toUpperCase();
+    getFundTypeInfo(fund) {
+        // 优先使用后端返回的基金类型数据
+        const typeCode = fund.fund_type || 'unknown';
+        const typeCn = fund.fund_type_cn || this.getFundTypeDisplayName(typeCode);
+        const typeClass = fund.fund_type_class || this.getFundTypeClass(typeCode);
         
-        // QDII基金 (最高优先级)
-        if (name.includes('QDII') || name.includes('全球') || name.includes('海外') || 
-            name.includes('美国') || name.includes('香港') || name.includes('亚太') || 
-            name.includes('环球') || name.includes('德国') || name.includes('日本') ||
-            name.includes('印度') || name.includes('越南') || name.includes('欧洲')) {
-            return 'qdii';
-        }
-        
-        // 指数型基金
-        if (name.includes('指数') || name.includes('ETF') || name.includes('INDEX') ||
-            name.includes('沪深300') || name.includes('中证500') || name.includes('上证50') ||
-            name.includes('创业板') || name.includes('科创板') || name.includes('联接')) {
-            return 'index';
-        }
-        
-        // 股票型基金
-        if (name.includes('股票') || name.includes('EQUITY') || name.includes('GROWTH') || 
-            name.includes('VALUE') || name.includes('红利') || name.includes('精选') ||
-            name.includes('优选') || name.includes('成长') || name.includes('价值')) {
-            return 'stock';
-        }
-        
-        // 混合型基金
-        if (name.includes('混合') || name.includes('MIX') || name.includes('灵活配置') || 
-            name.includes('偏股') || name.includes('偏债') || name.includes('平衡')) {
-            return 'hybrid';
-        }
-        
-        // 默认为其他
-        return 'other';
+        return {
+            code: typeCode,
+            label: typeCn,
+            className: typeClass
+        };
     },
 
     /**
-     * 获取基金类型的CSS类名
+     * 获取基金类型的CSS类名（备用，当后端未返回时）
      */
     getFundTypeClass(fundType) {
         const classMap = {
-            'index': 'fund-type-index',
             'stock': 'fund-type-stock',
+            'bond': 'fund-type-bond',
             'hybrid': 'fund-type-hybrid',
+            'money': 'fund-type-money',
+            'index': 'fund-type-index',
             'qdii': 'fund-type-qdii',
-            'other': 'fund-type-other'
+            'etf': 'fund-type-etf',
+            'fof': 'fund-type-fof',
+            'unknown': 'fund-type-unknown',
+            'other': 'fund-type-unknown'
         };
-        return classMap[fundType] || 'fund-type-other';
+        return classMap[fundType] || 'fund-type-unknown';
     },
 
     /**
-     * 获取基金类型的显示标签
+     * 获取基金类型的显示名称（备用，当后端未返回时）
      */
-    getFundTypeLabel(fundType) {
-        const labelMap = {
-            'index': '指数',
-            'stock': '股票',
-            'hybrid': '混合',
+    getFundTypeDisplayName(fundType) {
+        const nameMap = {
+            'stock': '股票型',
+            'bond': '债券型',
+            'hybrid': '混合型',
+            'money': '货币型',
+            'index': '指数型',
             'qdii': 'QDII',
+            'etf': 'ETF',
+            'fof': 'FOF',
+            'unknown': '其他',
             'other': '其他'
         };
-        return labelMap[fundType] || '其他';
+        return nameMap[fundType] || '其他';
     },
 
     /**
@@ -164,9 +154,8 @@ const FundTable = {
      */
     renderRow(fund) {
         const isSelected = FundState.selectedFunds.has(fund.fund_code);
-        const fundType = this.getFundType(fund);
-        const typeClass = this.getFundTypeClass(fundType);
-        const typeLabel = this.getFundTypeLabel(fundType);
+        // 使用后端返回的基金类型信息（证监会标准分类）
+        const typeInfo = this.getFundTypeInfo(fund);
         const visibleColumns = FundState.columnConfig.filter(col => col.visible);
         
         let cells = visibleColumns.map(col => {
@@ -181,8 +170,8 @@ const FundTable = {
                     onclick="FundTable.openDetailPanel('${fund.fund_code}')"
                     title="点击查看详情">${value}</a>`;
             } else if (col.key === 'fund_name') {
-                // 基金名称列添加类型标签
-                displayValue = `<span class="fund-name-text">${value}</span><span class="fund-type-tag ${typeClass}">${typeLabel}</span>`;
+                // 基金名称列添加类型标签（使用后端返回的证监会标准分类）
+                displayValue = `<span class="fund-name-text">${value}</span><span class="fund-type-tag ${typeInfo.className}">${typeInfo.label}</span>`;
             } else {
                 switch (col.type) {
                     case 'percent':
