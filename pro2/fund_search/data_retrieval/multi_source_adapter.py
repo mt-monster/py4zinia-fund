@@ -58,15 +58,20 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             from datetime import datetime
             today_str = datetime.now().strftime('%Y-%m-%d')
             
+            logger.info(f"开始获取基金 {fund_code} 实时数据")
+            
             # 判断是否为QDII基金
             is_qdii = self.is_qdii_fund(fund_code, fund_name)
+            logger.debug(f"基金 {fund_code} 是否为QDII: {is_qdii}")
             
             if is_qdii:
                 # QDII基金使用专门方法
+                logger.debug(f"使用QDII专用方法获取基金 {fund_code} 数据")
                 qdii_data = self.get_qdii_fund_data(fund_code)
                 if qdii_data and pd.notna(qdii_data.get('current_nav')) and qdii_data.get('current_nav', 0) > 0:
                     # 获取昨日收益率
-                    yesterday_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+                    prev_day_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+                    logger.debug(f"QDII基金 {fund_code} 昨日收益率: {prev_day_return}%")
                     
                     # 获取实时估值（QDII也可能有实时估值）
                     estimate_data = self._get_realtime_estimate(fund_code)
@@ -85,25 +90,32 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                         today_return = qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0
                         estimate_nav = qdii_data['current_nav']
                     
-                    return {
+                    result = {
                         'fund_code': fund_code,
                         'fund_name': fund_name or f'基金{fund_code}',
                         'current_nav': qdii_data['current_nav'],
                         'previous_nav': qdii_data['previous_nav'],
                         'daily_return': qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0,
                         'today_return': today_return,
-                        'yesterday_return': yesterday_return,
+                        'prev_day_return': prev_day_return,
                         'nav_date': qdii_data['nav_date'],
                         'data_source': f"tushare_qdii_{qdii_data['data_source']}",
                         'estimate_nav': estimate_nav,
                         'estimate_return': today_return
                     }
+                    logger.info(f"QDII基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+                    return result
+                else:
+                    logger.warning(f"QDII基金 {fund_code} 数据获取失败或净值无效")
             
             # 普通基金使用最新净值数据
+            logger.debug(f"使用普通方法获取基金 {fund_code} 数据")
             latest_nav = self.get_fund_latest_nav(fund_code)
             if latest_nav:
+                logger.debug(f"基金 {fund_code} 最新净值数据获取成功: {latest_nav}")
                 # 获取昨日收益率：从历史数据中获取前一天的日增长率
-                yesterday_return = self._get_yesterday_return(fund_code, latest_nav.get('date'))
+                prev_day_return = self._get_yesterday_return(fund_code, latest_nav.get('date'))
+                logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
                 
                 # 获取实时估值数据并计算今日收益率
                 estimate_data = self._get_realtime_estimate(fund_code)
@@ -124,21 +136,26 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 # 使用新浪实时数据中的昨日净值作为 previous_nav
                 previous_nav = estimate_data.get('yesterday_nav', latest_nav['nav']) if estimate_data else latest_nav.get('previous_nav', latest_nav['nav'])
                 
-                return {
+                result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name or f'基金{fund_code}',
                     'current_nav': latest_nav['nav'],
                     'previous_nav': previous_nav,
                     'daily_return': latest_nav['daily_return'],
                     'today_return': today_return,
-                    'yesterday_return': yesterday_return,
+                    'prev_day_return': prev_day_return,
                     'nav_date': latest_nav['date'],
                     'data_source': f"tushare_{latest_nav['source']}",
                     'estimate_nav': estimate_nav,
                     'estimate_return': today_return
                 }
+                logger.info(f"普通基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+                return result
+            else:
+                logger.warning(f"基金 {fund_code} 最新净值数据获取失败")
             
             # 降级到默认值
+            logger.warning(f"基金 {fund_code} 所有数据源都失败，返回默认值")
             return {
                 'fund_code': fund_code,
                 'fund_name': fund_name or f'基金{fund_code}',
@@ -146,7 +163,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 'previous_nav': 0.0,
                 'daily_return': 0.0,
                 'today_return': 0.0,
-                'yesterday_return': 0.0,
+                'prev_day_return': 0.0,
                 'nav_date': datetime.now().strftime('%Y-%m-%d'),
                 'data_source': 'tushare_failed',
                 'estimate_nav': 0.0,
@@ -154,7 +171,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             }
             
         except Exception as e:
-            logger.error(f"获取基金 {fund_code} 实时数据失败: {e}")
+            logger.error(f"获取基金 {fund_code} 实时数据失败: {e}", exc_info=True)
             return {
                 'fund_code': fund_code,
                 'fund_name': fund_name or f'基金{fund_code}',
@@ -162,7 +179,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 'previous_nav': 0.0,
                 'daily_return': 0.0,
                 'today_return': 0.0,
-                'yesterday_return': 0.0,
+                'prev_day_return': 0.0,
                 'nav_date': datetime.now().strftime('%Y-%m-%d'),
                 'data_source': 'tushare_error',
                 'estimate_nav': 0.0,
@@ -187,6 +204,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             df = self.get_fund_nav_history(fund_code, source='auto')
             
             if df is None or df.empty or len(df) < 2:
+                logger.debug(f"基金 {fund_code} 历史数据不足，无法计算昨日收益率")
                 return 0.0
             
             # 确保数据按日期倒序排列（最新在前）
@@ -197,12 +215,17 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             latest_nav = float(df.iloc[0]['nav'])
             yesterday_nav = float(df.iloc[1]['nav'])
             
+            logger.debug(f"基金 {fund_code} 计算昨日收益率: 最新净值={latest_nav}, 昨日净值={yesterday_nav}")
+            
             # 计算收益率: (最新 - 昨日) / 昨日 * 100
             if yesterday_nav > 0:
                 yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
-                return round(yesterday_return, 2)
-            
-            return 0.0
+                result = round(yesterday_return, 2)
+                logger.debug(f"基金 {fund_code} 昨日收益率计算结果: {result}%")
+                return result
+            else:
+                logger.warning(f"基金 {fund_code} 昨日净值为0或负数: {yesterday_nav}")
+                return 0.0
             
         except Exception as e:
             logger.warning(f"获取基金 {fund_code} 昨日收益率失败: {e}")
@@ -327,20 +350,22 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             
             if df is not None and not df.empty:
                 # 转换列名为 EnhancedFundData 格式
+                # Tushare 返回的是中文列名，需要映射为英文列名
                 column_mapping = {
-                    'date': '净值日期',
-                    'nav': '单位净值',
-                    'accum_nav': '累计净值',
-                    'daily_return': '日增长率'
+                    '净值日期': 'date',
+                    '单位净值': 'nav',
+                    '累计净值': 'accum_nav',
+                    '日增长率': 'daily_return'
                 }
                 
-                # 只映射存在的列
+                # 只映射存在的列（检查中文列名是否在 df 中）
                 existing_mapping = {k: v for k, v in column_mapping.items() if k in df.columns}
                 df = df.rename(columns=existing_mapping)
                 
                 # 如果指定了天数限制，进行截取
+                # 先按日期升序排列，再取最后days条记录，确保获取最新的数据
                 if days and len(df) > days:
-                    df = df.tail(days)
+                    df = df.sort_values('date', ascending=True).tail(days)
                 
                 logger.info(f"成功获取基金 {fund_code} 的 {len(df)} 条历史数据 (Tushare优先)")
                 return df

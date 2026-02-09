@@ -64,7 +64,6 @@ def fetch_fund_history_from_akshare(fund_code: str, days: int = 90) -> pd.DataFr
             'analysis_date': df['date'],
             'today_return': df['today_return'],
             'prev_day_return': df['prev_day_return'],
-            'yesterday_return': df['prev_day_return'],  # 兼容字段
             'current_estimate': df['nav'],
             'yesterday_nav': df['previous_nav'],
             'status_label': '正常',  # 默认值
@@ -116,9 +115,7 @@ def fetch_fund_history_with_fallback(fund_code: str, days: int, db_manager) -> p
         df = db_manager.execute_query(sql)
         
         # 添加兼容字段
-        if not df.empty:
-            df['yesterday_return'] = df['prev_day_return']  # 兼容字段
-        
+
         # 如果数据库中有足够的数据（至少需要 days 的 50%）
         if not df.empty and len(df) >= days * 0.5:
             logger.info(f"从数据库获取到基金 {fund_code} 的 {len(df)} 条数据")

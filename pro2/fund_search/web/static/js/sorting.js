@@ -90,7 +90,7 @@ class SortController {
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
-            'yesterday_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
+            'prev_day_return': { type: 'number', sortable: true, label: '昨日盈亏率' },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
             'today_profit_rate': { type: 'number', sortable: true, label: '当日盈亏率' },

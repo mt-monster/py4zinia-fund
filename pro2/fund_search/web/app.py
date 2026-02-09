@@ -954,14 +954,12 @@ def get_fund_detail(fund_code):
                                     break
                         
                         fund_data['prev_day_return'] = prev_return
-                        fund_data['yesterday_return'] = prev_return
                     
                     fund = {
                         'fund_code': fund_code,
                         'fund_name': real_fund_name,  # 使用真实的基金名称
                         'today_return': round(float(fund_data.get('today_return', 0)), 2),
                         'prev_day_return': round(float(fund_data.get('prev_day_return', 0)), 2),
-                        'yesterday_return': round(float(fund_data.get('yesterday_return', 0)), 2),
                         'current_estimate': fund_data.get('current_nav'),
                         'yesterday_nav': fund_data.get('previous_nav'),
                         'analysis_date': datetime.now().strftime('%Y-%m-%d'),
@@ -991,7 +989,7 @@ def get_fund_detail(fund_code):
             if fund.get(key) is not None:
                 fund[key] = round(float(fund[key]) * 100, 2)
         # 单独处理已经是百分比格式的字段
-        for key in ['today_return', 'yesterday_return', 'prev_day_return']:
+        for key in ['today_return', 'prev_day_return']:
             if fund.get(key) is not None:
                 fund[key] = round(float(fund[key]), 2)
         for key in ['sharpe_ratio', 'calmar_ratio', 'sortino_ratio', 'var_95', 'profit_loss_ratio', 'composite_score']:
@@ -1040,21 +1038,42 @@ def get_fund_history(fund_code):
         # 尝试从AKShare获取实时净值数据
         try:
             hist_data = fund_data_manager.get_historical_data(fund_code, days=days)
+            logger.info(f"原始获取到的历史数据形状: {hist_data.shape if hist_data is not None else 'None'}")
+            
             if hist_data is not None and not hist_data.empty:
+                logger.info(f"原始数据列名: {list(hist_data.columns)}")
+                if 'nav' in hist_data.columns:
+                    nan_count = hist_data['nav'].isna().sum()
+                    logger.info(f"nav列NaN值数量: {nan_count}/{len(hist_data)}")
+                    if nan_count > 0:
+                        logger.info(f"包含NaN的行:\n{hist_data[hist_data['nav'].isna()]}")
+                
                 # 清理NaN值
                 hist_data = hist_data.dropna(subset=['nav'])
+                logger.info(f"清理NaN后数据形状: {hist_data.shape}")
+                
                 if not hist_data.empty:
+                    # 确保date列是datetime类型
+                    if not pd.api.types.is_datetime64_any_dtype(hist_data['date']):
+                        hist_data['date'] = pd.to_datetime(hist_data['date'])
+                    
                     # 转换日期格式
                     hist_data['date'] = hist_data['date'].dt.strftime('%Y-%m-%d')
                     # 确保nav是数值类型
                     hist_data['nav'] = hist_data['nav'].astype(float)
                     result_data = hist_data[['date', 'nav']].tail(days).to_dict('records')
+                    logger.info(f"最终返回数据条数: {len(result_data)}")
+                    
                     # 清理可能的NaN值
                     for item in result_data:
                         for key in item:
                             if pd.isna(item[key]):
                                 item[key] = None
                     return jsonify({'success': True, 'data': result_data, 'source': 'akshare'})
+                else:
+                    logger.warning("清理NaN值后数据为空")
+            else:
+                logger.warning("获取到的历史数据为空")
         except Exception as e:
             logger.warning(f"从AKShare获取历史数据失败: {str(e)}, 尝试从数据库获取")
         
@@ -1889,7 +1908,7 @@ def backtest_strategy():
         
         # 获取历史数据
         sql = f"""
-        SELECT analysis_date, today_return, prev_day_return, yesterday_return,
+        SELECT analysis_date, today_return, prev_day_return,
                status_label, operation_suggestion, buy_multiplier, redeem_amount,
                current_estimate as current_nav, yesterday_nav as previous_nav
         FROM fund_analysis_results WHERE fund_code = '{fund_code}'
@@ -1911,7 +1930,6 @@ def backtest_strategy():
         
         for idx, row in df.iterrows():
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
-            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0
             sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
             max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
             volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
@@ -2944,7 +2962,7 @@ def get_funds_by_date(date):
         if search:
             sql += f" AND (fund_code LIKE '%%{search}%%' OR fund_name LIKE '%%{search}%%')"
         
-        valid_sort_fields = ['composite_score', 'today_return', 'yesterday_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
+        valid_sort_fields = ['composite_score', 'today_return', 'prev_day_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
         if sort_by not in valid_sort_fields:
             sort_by = 'composite_score'
         
@@ -2965,7 +2983,7 @@ def get_funds_by_date(date):
         
         for fund in funds:
             # today_return, prev_day_return, yesterday_return 已经是百分比格式，不需要乘100
-            for key in ['today_return', 'prev_day_return', 'yesterday_return']:
+            for key in ['today_return', 'prev_day_return']:
                 if fund.get(key) is not None:
                     fund[key] = round(float(fund[key]), 2)
             # 其他需要转换为百分比的字段
@@ -3066,7 +3084,7 @@ def get_holdings():
         
         sql = """
         SELECT h.*, 
-               far.today_return, far.prev_day_return as yesterday_return,
+               far.today_return, far.prev_day_return,
                far.current_estimate as current_nav,
                far.yesterday_nav as previous_nav,
                far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
@@ -3115,7 +3133,7 @@ def get_holdings():
             current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
             previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
-            yesterday_return = float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else None
+            prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else None
             
             # 使用实时数据校正收益率（修复数据库中可能存在的旧数据）
             fund_code = row['fund_code']
@@ -3125,12 +3143,12 @@ def get_holdings():
                 realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
                 if realtime_data:
                     # 校正昨日收益率 (prev_day_return)
-                    if realtime_data.get('yesterday_return') is not None:
-                        realtime_yesterday_return = float(realtime_data['yesterday_return'])
+                    if realtime_data.get('prev_day_return') is not None:
+                        realtime_prev_day_return = float(realtime_data['prev_day_return'])
                         # 如果数据库中的数据与实时数据差异较大，使用实时数据
-                        if yesterday_return is None or abs(yesterday_return - realtime_yesterday_return) > 0.5:
-                            yesterday_return = realtime_yesterday_return
-                            logger.info(f"基金 {fund_code} 使用实时数据校正昨日收益率: {yesterday_return}%")
+                        if prev_day_return is None or abs(prev_day_return - realtime_prev_day_return) > 0.5:
+                            prev_day_return = realtime_prev_day_return
+                            logger.info(f"基金 {fund_code} 使用实时数据校正昨日收益率: {prev_day_return}%")
                     
                     # 校正日涨跌幅 (today_return)
                     if realtime_data.get('today_return') is not None:
@@ -3176,9 +3194,9 @@ def get_holdings():
                 today_profit_rate = (today_profit / previous_value * 100) if previous_value > 0 else 0
                 
                 # 昨日盈亏 - 基于昨日市值和基金昨日涨跌幅计算
-                if yesterday_return is not None:
-                    yesterday_profit = previous_value * (yesterday_return / 100)
-                    yesterday_profit_rate = yesterday_return
+                if prev_day_return is not None:
+                    yesterday_profit = previous_value * (prev_day_return / 100)
+                    yesterday_profit_rate = prev_day_return
                 else:
                     yesterday_profit = 0
                     yesterday_profit_rate = None
@@ -3230,10 +3248,9 @@ def get_holdings():
                 'total_profit': round(total_profit, 2) if total_profit is not None else None,
                 'total_profit_rate': round(total_profit_rate, 2) if total_profit_rate is not None else None,
                 'today_return': round(today_return, 2) if today_return is not None else None,
-                'yesterday_return': round(yesterday_return, 2) if yesterday_return is not None else None,
+                'prev_day_return': round(prev_day_return, 2) if prev_day_return is not None else None,
                 'yesterday_profit': round(yesterday_profit, 2) if yesterday_profit is not None else None,
                 'yesterday_profit_rate': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,
-                'prev_day_return': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,  # 兼容前端字段名
                 # 绩效指标
                 'sharpe_ratio': round(sharpe_ratio, 4) if sharpe_ratio is not None else None,
                 'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4) if sharpe_ratio_ytd is not None else None,
@@ -3580,10 +3597,10 @@ def update_holding(fund_code):
             
             # 计算今日和昨日收益率
             today_return = float(realtime_data.get('today_return', 0.0))
-            yesterday_return = float(realtime_data.get('yesterday_return', 0.0))
+            prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
             
             # 投资策略分析
-            strategy_result = strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
+            strategy_result = strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
             
             # 更新fund_analysis_results表
             from datetime import datetime
@@ -3642,7 +3659,7 @@ def update_holding(fund_code):
                 'yesterday_nav': realtime_data.get('previous_nav', 0.0),
                 'current_estimate': realtime_data.get('estimate_nav', 0.0),
                 'today_return': today_return,
-                'prev_day_return': yesterday_return,
+                'prev_day_return': prev_day_return,
                 'status_label': strategy_result.get('status_label', ''),
                 'operation_suggestion': strategy_result.get('operation_suggestion', ''),
                 'execution_amount': strategy_result.get('execution_amount', ''),
@@ -4740,20 +4757,20 @@ def get_fund_strategy_analysis(fund_codes):
                 
                 # 计算今日和昨日收益率
                 today_return = float(realtime_data.get('today_return', 0.0))
-                yesterday_return = float(realtime_data.get('yesterday_return', 0.0))
+                prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
                 
                 # 投资策略分析
-                strategy_result = strategy_engine.analyze_strategy(today_return, yesterday_return, performance_metrics)
+                strategy_result = strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
                 
                 # 补充策略逻辑说明
-                strategy_explanation = get_strategy_explanation(today_return, yesterday_return, strategy_result)
+                strategy_explanation = get_strategy_explanation(today_return, prev_day_return, strategy_result)
                 
                 fund_result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name,
                     'today_return': round(today_return, 2),
-                    'yesterday_return': round(yesterday_return, 2),
-                    'return_diff': round(today_return - yesterday_return, 2),
+                    'prev_day_return': round(prev_day_return, 2),
+                    'return_diff': round(today_return - prev_day_return, 2),
                     'status_label': strategy_result.get('status_label', ''),
                     'operation_suggestion': strategy_result.get('operation_suggestion', ''),
                     'execution_amount': strategy_result.get('execution_amount', ''),
@@ -4782,7 +4799,7 @@ def get_fund_strategy_analysis(fund_codes):
                     'fund_code': fund_code,
                     'fund_name': fund_code,
                     'today_return': 0,
-                    'yesterday_return': 0,
+                    'prev_day_return': 0,
                     'return_diff': 0,
                     'status_label': '🔴 数据获取失败',
                     'operation_suggestion': '暂无建议',
@@ -4812,26 +4829,26 @@ def get_fund_strategy_analysis(fund_codes):
         return {'funds': [], 'summary': {'total_count': 0, 'buy_count': 0, 'sell_count': 0, 'hold_count': 0}}
 
 
-def get_strategy_explanation(today_return, yesterday_return, strategy_result):
+def get_strategy_explanation(today_return, prev_day_return, strategy_result):
     """
     生成策略判断的详细解释
     
     Args:
         today_return: 今日收益率
-        yesterday_return: 昨日收益率
+        prev_day_return: 昨日收益率
         strategy_result: 策略分析结果
         
     Returns:
         str: 策略解释文本
     """
-    return_diff = today_return - yesterday_return
+    return_diff = today_return - prev_day_return
     action = strategy_result.get('action', 'hold')
     status_label = strategy_result.get('status_label', '')
     
     explanation_parts = []
     
     # 收益率趋势分析
-    if today_return > 0 and yesterday_return > 0:
+    if today_return > 0 and prev_day_return > 0:
         if return_diff > 1:
             explanation_parts.append(f"连续上涨且涨幅扩大(差值+{return_diff:.2f}%)，处于上升趋势强势区")
         elif return_diff > 0:
@@ -4840,29 +4857,29 @@ def get_strategy_explanation(today_return, yesterday_return, strategy_result):
             explanation_parts.append(f"连续上涨涨幅收窄(差值{return_diff:.2f}%)，上涨动能减弱")
         else:
             explanation_parts.append(f"连续上涨但涨幅大幅回落(差值{return_diff:.2f}%)，注意回调风险")
-    elif today_return > 0 and yesterday_return <= 0:
-        explanation_parts.append(f"由跌转涨形成反转(今日+{today_return:.2f}% vs 昨日{yesterday_return:.2f}%)，可能是买入时机")
-    elif today_return == 0 and yesterday_return > 0:
-        explanation_parts.append(f"涨势暂停进入休整(今日0% vs 昨日+{yesterday_return:.2f}%)，观察后续走势")
-    elif today_return < 0 and yesterday_return > 0:
-        explanation_parts.append(f"由涨转跌形成反转(今日{today_return:.2f}% vs 昨日+{yesterday_return:.2f}%)，需要防范风险")
-    elif today_return == 0 and yesterday_return <= 0:
-        explanation_parts.append(f"下跌企稳(今日0% vs 昨日{yesterday_return:.2f}%)，可能是建仓时机")
-    elif today_return < 0 and yesterday_return == 0:
+    elif today_return > 0 and prev_day_return <= 0:
+        explanation_parts.append(f"由跌转涨形成反转(今日+{today_return:.2f}% vs 昨日{prev_day_return:.2f}%)，可能是买入时机")
+    elif today_return == 0 and prev_day_return > 0:
+        explanation_parts.append(f"涨势暂停进入休整(今日0% vs 昨日+{prev_day_return:.2f}%)，观察后续走势")
+    elif today_return < 0 and prev_day_return > 0:
+        explanation_parts.append(f"由涨转跌形成反转(今日{today_return:.2f}% vs 昨日+{prev_day_return:.2f}%)，需要防范风险")
+    elif today_return == 0 and prev_day_return <= 0:
+        explanation_parts.append(f"下跌企稳(今日0% vs 昨日{prev_day_return:.2f}%)，可能是建仓时机")
+    elif today_return < 0 and prev_day_return == 0:
         if today_return <= -2:
             explanation_parts.append(f"首次大跌(今日{today_return:.2f}%)，跌幅较大可考虑分批建仓")
         elif today_return <= -0.5:
             explanation_parts.append(f"首次下跌(今日{today_return:.2f}%)，可适度建仓")
         else:
             explanation_parts.append(f"微跌试探(今日{today_return:.2f}%)，观察为主")
-    elif today_return < 0 and yesterday_return < 0:
+    elif today_return < 0 and prev_day_return < 0:
         if return_diff > 1 and today_return <= -2:
             explanation_parts.append(f"连续下跌且跌幅加速(差值+{return_diff:.2f}%)，暴跌中可分批抄底")
         elif return_diff > 1:
             explanation_parts.append(f"连续下跌跌幅扩大(差值+{return_diff:.2f}%)，下跌趋势加速")
-        elif (yesterday_return - today_return) > 0 and yesterday_return <= -2:
+        elif (prev_day_return - today_return) > 0 and prev_day_return <= -2:
             explanation_parts.append(f"暴跌后跌幅收窄(差值{return_diff:.2f}%)，可能企稳")
-        elif (yesterday_return - today_return) > 0:
+        elif (prev_day_return - today_return) > 0:
             explanation_parts.append(f"下跌动能减弱(差值{return_diff:.2f}%)，跌速放缓")
         else:
             explanation_parts.append(f"阴跌持续(差值{return_diff:.2f}%)，可能在筑底")

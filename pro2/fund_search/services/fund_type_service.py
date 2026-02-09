@@ -197,7 +197,7 @@ class FundTypeService:
         
         # 股票型基金
         if any(kw in name for kw in ['股票', 'EQUITY', 'GROWTH', 'VALUE', '精选', 
-                                      '优选', '成长', '价值', '红利']):
+                                      '优选', '成长', '价值', '红利', '蓝筹']):
             # 排除混合型和指数型
             if not any(kw in name for kw in ['混合', '指数', 'ETF']):
                 return FundType.STOCK
