@@ -102,6 +102,9 @@ class EnhancedDatabaseManager:
             # 创建基金重仓股数据表
             self._create_fund_heavyweight_stocks_table()
             
+            # 创建用户操作记录表
+            self._create_user_operations_table()
+            
             logger.info("数据库表结构初始化完成")
             
         except Exception as e:
@@ -427,6 +430,34 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
         logger.info("基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成")
+    
+    def _create_user_operations_table(self):
+        """
+        创建用户操作记录表
+        存储用户的操作历史记录
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS user_operations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
+            operation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            operation_type VARCHAR(20) NOT NULL,
+            fund_code VARCHAR(10),
+            fund_name VARCHAR(100),
+            operation_detail TEXT,
+            amount DECIMAL(15,2),
+            shares DECIMAL(15,4),
+            price DECIMAL(10,4),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_id (user_id),
+            INDEX idx_operation_date (operation_date),
+            INDEX idx_operation_type (operation_type),
+            INDEX idx_fund_code (fund_code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        """
+        self.execute_sql(sql)
+        logger.info("用户操作记录表 user_operations 创建/检查完成")
 
 
     def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Tuple]:

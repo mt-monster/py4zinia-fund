@@ -29,6 +29,7 @@ from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
 )
+from shared.cache_utils import cached, _global_cache
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -121,6 +122,7 @@ def get_real_holding_distribution(user_id='default_user'):
 
 # ==================== API 路由 ====================
 
+@cached(ttl=60, key_prefix='dashboard_stats')  # 缓存1分钟
 def get_dashboard_stats():
     """获取仪表盘统计数据"""
     try:
@@ -235,6 +237,7 @@ def get_dashboard_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@cached(ttl=300, key_prefix='profit_trend')  # 缓存5分钟，历史数据变化不频繁
 def get_profit_trend():
     """获取收益趋势数据（使用真实历史数据）"""
     try:
@@ -439,6 +442,7 @@ def get_profit_trend():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@cached(ttl=30, key_prefix='market_index')  # 缓存30秒，市场数据较实时
 def get_market_index():
     """获取市场指数实时数据（沪深300）"""
     try:
@@ -467,6 +471,7 @@ def get_market_index():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@cached(ttl=120, key_prefix='allocation')  # 缓存2分钟
 def get_allocation():
     """获取资产配置数据 - 按基金类型分布"""
     try:
@@ -605,6 +610,7 @@ def get_fund_type_for_allocation(fund_code: str) -> str:
     return 'unknown'
 
 
+@cached(ttl=600, key_prefix='holding_stocks')  # 缓存10分钟，重仓股变化不频繁
 def get_holding_stocks():
     """
     获取用户持仓基金的重仓股票统计
@@ -752,5 +758,6 @@ def register_routes(app, **kwargs):
     app.route('/api/market/index', methods=['GET'])(get_market_index)
     app.route('/api/dashboard/allocation', methods=['GET'])(get_allocation)
     app.route('/api/dashboard/holding-stocks', methods=['GET'])(get_holding_stocks)
+    app.route('/api/dashboard/recent-activities', methods=['GET'])(lambda: jsonify({'success': True, 'data': get_recent_activities()}))
     
     logger.info("Dashboard 路由注册完成")
