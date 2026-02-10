@@ -127,23 +127,43 @@ def _register_fund_routes(app):
             for _, row in df.iterrows():
                 fund = row.to_dict()
                 
-                # 清理NaN值，将其转换为None（JSON兼容）
-                for key in fund:
-                    if pd.isna(fund[key]):
-                        fund[key] = None
+                # 清理NaN值，将其转换为None（JSON兼容）- 使用numpy的函数处理各种类型的NaN
+                import numpy as np
+                for key in list(fund.keys()):
+                    val = fund[key]
+                    # 检查各种类型的NaN和Infinity
+                    try:
+                        if val is None:
+                            continue
+                        if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
+                            fund[key] = None
+                        elif pd.isna(val):
+                            fund[key] = None
+                    except:
+                        # 如果检查失败，保留原值
+                        pass
                 
                 # 基础数据格式化
                 for key in ['annualized_return', 'max_drawdown', 'volatility']:
-                    if fund.get(key) is not None and pd.notna(fund[key]):
-                        fund[key] = round(float(fund[key]) * 100, 2)
+                    if fund.get(key) is not None:
+                        try:
+                            fund[key] = round(float(fund[key]) * 100, 2)
+                        except (ValueError, TypeError):
+                            fund[key] = None
                 
                 for key in ['today_return', 'prev_day_return']:
-                    if fund.get(key) is not None and pd.notna(fund[key]):
-                        fund[key] = round(float(fund[key]), 2)
+                    if fund.get(key) is not None:
+                        try:
+                            fund[key] = round(float(fund[key]), 2)
+                        except (ValueError, TypeError):
+                            fund[key] = None
                 
                 for key in ['sharpe_ratio', 'sharpe_ratio_ytd', 'sharpe_ratio_1y', 'sharpe_ratio_all', 'composite_score']:
-                    if fund.get(key) is not None and pd.notna(fund[key]):
-                        fund[key] = round(float(fund[key]), 4)
+                    if fund.get(key) is not None:
+                        try:
+                            fund[key] = round(float(fund[key]), 4)
+                        except (ValueError, TypeError):
+                            fund[key] = None
                 
                 # 计算持仓盈亏
                 if pd.notna(fund.get('holding_shares')) and fund.get('holding_shares') is not None:

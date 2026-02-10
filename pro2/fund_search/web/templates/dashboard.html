@@ -696,6 +696,55 @@
             return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         }
 
+        // ==================== 前端缓存工具 ====================
+        const DashboardCache = {
+            cache: new Map(),
+            
+            get(key) {
+                const item = this.cache.get(key);
+                if (!item) return null;
+                
+                // 检查是否过期
+                if (Date.now() > item.expireTime) {
+                    this.cache.delete(key);
+                    return null;
+                }
+                return item.data;
+            },
+            
+            set(key, data, ttlSeconds = 60) {
+                this.cache.set(key, {
+                    data: data,
+                    expireTime: Date.now() + (ttlSeconds * 1000)
+                });
+            },
+            
+            clear() {
+                this.cache.clear();
+            }
+        };
+
+        // 带缓存的 fetch 请求
+        async function cachedFetch(url, cacheKey, ttlSeconds = 60) {
+            // 先检查缓存
+            const cached = DashboardCache.get(cacheKey);
+            if (cached) {
+                console.log(`[缓存命中] ${cacheKey}`);
+                return { success: true, data: cached, fromCache: true };
+            }
+            
+            // 发起请求
+            const response = await fetch(url);
+            const result = await response.json();
+            
+            // 缓存成功响应
+            if (result.success && result.data) {
+                DashboardCache.set(cacheKey, result.data, ttlSeconds);
+            }
+            
+            return result;
+        }
+
         // 初始化仪表盘
         document.addEventListener('DOMContentLoaded', function() {
             loadDashboardData();
@@ -705,10 +754,13 @@
         });
 
         // 加载仪表盘数据
-        async function loadDashboardData() {
+        async function loadDashboardData(forceRefresh = false) {
             try {
-                const response = await fetch('/api/dashboard/stats');
-                const data = await response.json();
+                if (forceRefresh) {
+                    DashboardCache.clear(); // 强制刷新时清除缓存
+                }
+                
+                const data = await cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60);
 
                 if (data.success) {
                     updateStatsCards(data.data);
@@ -941,8 +993,8 @@
                     user_id: 'default_user'  // 可以根据实际情况修改
                 });
                 
-                const response = await fetch(`/api/dashboard/profit-trend?${params}`);
-                const data = await response.json();
+                const cacheKey = `profit_trend_${params.toString()}`;
+                const data = await cachedFetch(`/api/dashboard/profit-trend?${params}`, cacheKey, 300); // 缓存5分钟
 
                 if (data.success && profitChart) {
                     // 检查是否为无持仓数据情况
@@ -979,8 +1031,7 @@
         async function loadAllocationData() {
             try {
                 console.log('开始加载资产配置数据...');
-                const response = await fetch('/api/dashboard/allocation');
-                const data = await response.json();
+                const data = await cachedFetch('/api/dashboard/allocation', 'allocation', 120); // 缓存2分钟
                 console.log('资产配置API响应:', data);
 
                 if (data.success && allocationChart) {
@@ -1124,8 +1175,7 @@
         // 加载重仓股统计
         async function loadHoldingStocks() {
             try {
-                const response = await fetch('/api/dashboard/holding-stocks?top=10');
-                const data = await response.json();
+                const data = await cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300); // 缓存5分钟
 
                 if (data.success) {
                     updateHoldingStocks(data.data);

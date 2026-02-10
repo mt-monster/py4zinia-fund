@@ -542,6 +542,9 @@ def import_holding_confirm():
                 holding_shares = float(fund_data.get('holding_shares', 0))
                 cost_price = float(fund_data.get('cost_price', 0))
                 buy_date = fund_data.get('buy_date')
+                # 处理空字符串或无效日期
+                if buy_date is None or buy_date == '' or buy_date.lower() in ['none', 'null']:
+                    buy_date = None
                 notes = fund_data.get('notes', '手工导入')
                 
                 # 计算持有金额
@@ -639,6 +642,10 @@ def add_holding():
         holding_shares = float(data.get('holding_shares', 0))
         cost_price = float(data.get('cost_price', 0))
         buy_date = data.get('buy_date')
+        # 处理空字符串或无效日期
+        if buy_date is None or buy_date == '' or buy_date.lower() in ['none', 'null']:
+            buy_date = None
+        
         notes = data.get('notes', '')
         
         # 计算持有金额
@@ -735,7 +742,7 @@ def update_holding(fund_code):
                 'holding_shares': holding_shares,
                 'cost_price': cost_price,
                 'holding_amount': old_data['holding_amount'],
-                'buy_date': old_data.get('buy_date'),
+                'buy_date': old_data.get('buy_date') if old_data.get('buy_date') and old_data.get('buy_date').strip() else None,
                 'notes': old_data.get('notes', '')
             }
             success = db_manager.execute_sql(insert_sql, insert_params)
@@ -776,8 +783,13 @@ def update_holding(fund_code):
                     logger.info(f"重新计算持有金额: {current_shares} × {current_price} = {params['holding_amount']}")
             
             if 'buy_date' in data:
-                update_fields.append('buy_date = :buy_date')
-                params['buy_date'] = data['buy_date']
+                buy_date = data['buy_date']
+                # 处理空字符串或无效日期
+                if buy_date is None or buy_date == '' or buy_date.lower() in ['none', 'null']:
+                    update_fields.append('buy_date = NULL')
+                else:
+                    update_fields.append('buy_date = :buy_date')
+                    params['buy_date'] = buy_date
             
             if 'notes' in data:
                 update_fields.append('notes = :notes')
