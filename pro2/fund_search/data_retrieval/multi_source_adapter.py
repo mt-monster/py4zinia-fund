@@ -189,6 +189,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
     def _get_yesterday_return(self, fund_code: str, latest_date: str = None) -> float:
         """
         获取昨日收益率（最新净值相对于前一天净值的变化率）
+        带前向追溯功能，当获取到零值时会向前查找非零的历史收益率
         
         计算公式: (nav_latest - nav_yesterday) / nav_yesterday * 100
         
@@ -211,7 +212,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             if 'date' in df.columns:
                 df = df.sort_values('date', ascending=False)
             
-            # 获取最新净值和前一天净值
+            # 首先尝试直接计算相邻两天的收益率
             latest_nav = float(df.iloc[0]['nav'])
             yesterday_nav = float(df.iloc[1]['nav'])
             
@@ -221,14 +222,88 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             if yesterday_nav > 0:
                 yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
                 result = round(yesterday_return, 2)
-                logger.debug(f"基金 {fund_code} 昨日收益率计算结果: {result}%")
+                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result}%")
+                
+                # 如果计算结果为0，且是QDII基金，则进行前向追溯
+                if result == 0.0 and self.is_qdii_fund(fund_code):
+                    logger.info(f"QDII基金 {fund_code} 昨日收益率为0，开始前向追溯获取非零值")
+                    traced_return = self._get_previous_nonzero_return(df, fund_code)
+                    if traced_return != 0.0:
+                        logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {traced_return}%")
+                        return traced_return
+                
                 return result
             else:
                 logger.warning(f"基金 {fund_code} 昨日净值为0或负数: {yesterday_nav}")
+                # 尝试前向追溯获取有效数据
+                traced_return = self._get_previous_nonzero_return(df, fund_code)
+                if traced_return != 0.0:
+                    logger.info(f"基金 {fund_code} 前向追溯成功获取有效收益率: {traced_return}%")
+                    return traced_return
                 return 0.0
             
         except Exception as e:
             logger.warning(f"获取基金 {fund_code} 昨日收益率失败: {e}")
+            return 0.0
+    
+    def _get_previous_nonzero_return(self, fund_nav: pd.DataFrame, fund_code: str) -> float:
+        """
+        向前追溯获取非零的昨日收益率
+        
+        Args:
+            fund_nav: 基金历史净值数据DataFrame
+            fund_code: 基金代码
+            
+        Returns:
+            float: 非零的昨日收益率，如果找不到则返回0.0
+        """
+        try:
+            # 查找包含daily_return或日增长率的列
+            return_column = None
+            if 'daily_return' in fund_nav.columns:
+                return_column = 'daily_return'
+            elif '日增长率' in fund_nav.columns:
+                return_column = '日增长率'
+            
+            if return_column is None:
+                logger.debug(f"基金 {fund_code} 数据中未找到收益率列")
+                return 0.0
+            
+            # 从较早的数据开始向前查找非零值（避免使用最新数据）
+            # 从倒数第三条开始往前查找（跳过最新的两条）
+            start_index = min(len(fund_nav) - 3, 5)  # 最多向前查找5条数据
+            start_index = max(start_index, 0)
+            
+            for i in range(start_index, -1, -1):
+                data_row = fund_nav.iloc[i]
+                return_raw = data_row.get(return_column, None)
+                
+                if pd.notna(return_raw):
+                    try:
+                        return_value = float(return_raw)
+                        # 格式转换处理（如果是小数格式则乘以100）
+                        if abs(return_value) < 0.1:
+                            return_value = return_value * 100
+                        return_value = round(return_value, 2)
+                        
+                        # 检查是否为有效非零值（在合理范围内）
+                        if return_value != 0.0 and abs(return_value) <= 100:
+                            nav_date = data_row.get('date', data_row.get('净值日期', 'Unknown'))
+                            logger.debug(f"基金 {fund_code} 在 {nav_date} 找到有效收益率: {return_value}%")
+                            return return_value
+                    except (ValueError, TypeError) as parse_error:
+                        logger.debug(f"基金 {fund_code} 解析收益率数据失败: {parse_error}")
+                        continue
+                
+                # 限制追溯范围
+                if start_index - i > 10:
+                    break
+            
+            logger.debug(f"基金 {fund_code} 未找到有效的非零收益率")
+            return 0.0
+            
+        except Exception as e:
+            logger.warning(f"基金 {fund_code} 前向追溯获取收益率时出错: {str(e)}")
             return 0.0
     
     def _get_realtime_estimate(self, fund_code: str) -> Optional[Dict]:
@@ -586,6 +661,196 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 'custody_fee': 0.0
             }
 
+    def get_etf_list(self) -> pd.DataFrame:
+        """
+        获取ETF列表数据
+        
+        Returns:
+            DataFrame: ETF列表数据，包含以下列：
+                - etf_code: ETF代码
+                - etf_name: ETF名称
+                - current_price: 当前价格
+                - change: 涨跌额
+                - change_percent: 涨跌幅
+                - volume: 成交量
+                - turnover: 成交额
+                - pe: 市盈率
+                - pb: 市净率
+        """
+        try:
+            import akshare as ak
+            
+            logger.info("开始获取ETF列表数据...")
+            
+            # 使用akshare获取ETF实时行情数据
+            etf_df = ak.fund_etf_spot_em()
+            
+            if etf_df is None or etf_df.empty:
+                logger.warning("ETF列表数据获取为空")
+                return pd.DataFrame()
+            
+            # 标准化列名映射
+            column_mapping = {
+                '代码': 'etf_code',
+                '名称': 'etf_name',
+                '最新价': 'current_price',
+                '涨跌额': 'change',
+                '涨跌幅': 'change_percent',
+                '成交量': 'volume',
+                '成交额': 'turnover',
+                '市盈率': 'pe',
+                '市净率': 'pb'
+            }
+            
+            # 只映射存在的列
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in etf_df.columns}
+            etf_df = etf_df.rename(columns=existing_mapping)
+            
+            # 数据类型转换
+            numeric_columns = ['current_price', 'change', 'change_percent', 'volume', 'turnover', 'pe', 'pb']
+            for col in numeric_columns:
+                if col in etf_df.columns:
+                    etf_df[col] = pd.to_numeric(etf_df[col], errors='coerce')
+            
+            # 添加数据源标识
+            etf_df['data_source'] = 'akshare'
+            
+            logger.info(f"成功获取ETF列表数据，共 {len(etf_df)} 只ETF")
+            return etf_df
+            
+        except Exception as e:
+            logger.error(f"获取ETF列表数据失败: {e}")
+            return pd.DataFrame()
+    
+    def get_etf_nav_history(self, etf_code: str, days: int = 30, 
+                           start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        获取ETF净值历史数据
+        
+        Args:
+            etf_code: ETF代码
+            days: 历史数据天数
+            start_date: 开始日期
+            end_date: 结束日期
+            
+        Returns:
+            DataFrame: ETF净值历史数据
+        """
+        try:
+            import akshare as ak
+            
+            logger.info(f"开始获取ETF {etf_code} 净值历史数据...")
+            
+            # 使用akshare获取ETF历史净值
+            # 注意：ETF基金代码通常需要加后缀，这里假设传入的是纯数字代码
+            fund_code_with_suffix = f"{etf_code}" if etf_code.endswith('.OF') else f"{etf_code}.OF"
+            
+            # 获取历史净值数据
+            df = ak.fund_open_fund_info_em(symbol=etf_code, indicator="单位净值走势", period="最大值")
+            
+            if df is None or df.empty:
+                logger.warning(f"ETF {etf_code} 净值历史数据获取为空")
+                return pd.DataFrame()
+            
+            # 标准化列名
+            column_mapping = {
+                '净值日期': 'date',
+                '单位净值': 'nav',
+                '累计净值': 'accum_nav',
+                '日增长率': 'daily_return'
+            }
+            
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in df.columns}
+            df = df.rename(columns=existing_mapping)
+            
+            # 数据类型转换
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            
+            numeric_columns = ['nav', 'accum_nav', 'daily_return']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 日期过滤
+            if start_date:
+                df = df[df['date'] >= start_date]
+            if end_date:
+                df = df[df['date'] <= end_date]
+            
+            # 天数限制
+            if days and len(df) > days:
+                df = df.tail(days)
+            
+            logger.info(f"成功获取ETF {etf_code} 净值历史数据 {len(df)} 条")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 净值历史数据失败: {e}")
+            return pd.DataFrame()
+    
+    def get_etf_history(self, etf_code: str, days: int = 30) -> pd.DataFrame:
+        """
+        获取ETF行情历史数据
+        
+        Args:
+            etf_code: ETF代码
+            days: 历史数据天数
+            
+        Returns:
+            DataFrame: ETF行情历史数据
+        """
+        try:
+            import akshare as ak
+            
+            logger.info(f"开始获取ETF {etf_code} 行情历史数据...")
+            
+            # 使用akshare获取ETF历史行情
+            df = ak.fund_etf_hist_em(symbol=etf_code, period="daily", start_date="", end_date="", adjust="")
+            
+            if df is None or df.empty:
+                logger.warning(f"ETF {etf_code} 行情历史数据获取为空")
+                return pd.DataFrame()
+            
+            # 标准化列名
+            column_mapping = {
+                '日期': 'date',
+                '开盘': 'open',
+                '最高': 'high',
+                '最低': 'low',
+                '收盘': 'close',
+                '成交量': 'volume',
+                '成交额': 'turnover',
+                '振幅': 'amplitude',
+                '涨跌幅': 'change_percent',
+                '涨跌额': 'change',
+                '换手率': 'turnover_rate'
+            }
+            
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in df.columns}
+            df = df.rename(columns=existing_mapping)
+            
+            # 数据类型转换
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'turnover', 
+                             'amplitude', 'change_percent', 'change', 'turnover_rate']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 天数限制
+            if days and len(df) > days:
+                df = df.tail(days)
+            
+            logger.info(f"成功获取ETF {etf_code} 行情历史数据 {len(df)} 条")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 行情历史数据失败: {e}")
+            return pd.DataFrame()
+    
     @staticmethod
     def is_qdii_fund(fund_code: str, fund_name: str = None) -> bool:
         """

@@ -251,8 +251,12 @@ const FundEdit = {
             return;
         }
 
+        // 使用原始基金代码作为URL参数（用于后端查找原记录）
+        // 如果修改了基金代码，新的代码放在body里传递给后端
+        const originalFundCode = this.currentFund.fund_code;
+
         try {
-            const response = await fetch(`/api/holdings/${fundCode}`, {
+            const response = await fetch(`/api/holdings/${originalFundCode}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
