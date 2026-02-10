@@ -91,6 +91,7 @@ def analyze_strategy():
         returns_history = data.get('returns_history', None)
         cumulative_pnl = data.get('cumulative_pnl', None)
         performance_metrics = data.get('performance_metrics', None)
+        base_invest = data.get('base_invest', 100)  # 添加基准定投金额参数
         
         # 使用统一策略引擎进行分析
         result = unified_strategy_engine.analyze(
@@ -98,7 +99,8 @@ def analyze_strategy():
             prev_day_return=prev_day_return,
             returns_history=returns_history,
             cumulative_pnl=cumulative_pnl,
-            performance_metrics=performance_metrics
+            performance_metrics=performance_metrics,
+            base_invest=base_invest
         )
         
         # 转换为字典格式
