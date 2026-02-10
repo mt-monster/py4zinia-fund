@@ -27,6 +27,7 @@ from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
 )
+from shared.json_utils import safe_jsonify, create_safe_response
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -87,7 +88,7 @@ def _register_fund_routes(app):
             date_df = db_manager.execute_query(date_sql)
             
             if date_df.empty or date_df.iloc[0]['max_date'] is None:
-                return jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
+                return safe_jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
             
             max_date = date_df.iloc[0]['max_date']
             
@@ -119,7 +120,7 @@ def _register_fund_routes(app):
             df = db_manager.execute_query(sql)
             
             if df.empty:
-                return jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
+                return safe_jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
             
             # 计算盈亏指标
             funds_with_profit = []
@@ -198,7 +199,7 @@ def _register_fund_routes(app):
             start = (page - 1) * per_page
             funds_page = funds_with_profit[start:start + per_page]
             
-            return jsonify({'success': True, 'data': funds_page, 'total': total, 'page': page, 'per_page': per_page})
+            return safe_jsonify({'success': True, 'data': funds_page, 'total': total, 'page': page, 'per_page': per_page})
             
         except Exception as e:
             logger.error(f"获取基金列表失败: {str(e)}")
@@ -270,7 +271,7 @@ def _register_fund_routes(app):
                             'data_source': fund_data.get('data_source', 'unknown')
                         }
                         
-                        return jsonify({'success': True, 'data': fund})
+                        return safe_jsonify({'success': True, 'data': fund})
             except Exception as e:
                 logger.warning(f"获取实时数据失败: {str(e)}, 使用缓存数据")
             
@@ -300,7 +301,7 @@ def _register_fund_routes(app):
                 if fund.get(key) is not None:
                     fund[key] = round(float(fund[key]), 4)
             
-            return jsonify({'success': True, 'data': fund})
+            return safe_jsonify({'success': True, 'data': fund})
             
         except Exception as e:
             logger.error(f"获取基金详情失败: {str(e)}")
@@ -373,7 +374,7 @@ def _register_fund_routes(app):
                             for key in item:
                                 if pd.isna(item[key]):
                                     item[key] = None
-                        return jsonify({'success': True, 'data': result_data, 'source': 'akshare'})
+                        return safe_jsonify({'success': True, 'data': result_data, 'source': 'akshare'})
                     else:
                         logger.warning("清理NaN值后数据为空")
                 else:
@@ -411,11 +412,11 @@ def _register_fund_routes(app):
             # 清理所有剩余的NaN值
             df = df.where(pd.notna(df), None)
             
-            return jsonify({'success': True, 'data': df.to_dict('records'), 'source': 'database'})
+            return safe_jsonify({'success': True, 'data': df.to_dict('records'), 'source': 'database'})
             
         except Exception as e:
             logger.error(f"获取基金历史数据失败: {str(e)}")
-            return jsonify({'success': False, 'error': str(e)}), 500
+            return safe_jsonify({'success': False, 'error': str(e)}), 500
     
     @app.route('/api/fund/<fund_code>/holdings', methods=['GET'])
     def get_fund_holdings(fund_code):
@@ -515,7 +516,7 @@ def _register_fund_routes(app):
                     
                     logger.info(f"获取基金持仓数据成功 {fund_code}, 持仓数量: {len(holdings)}")
                     
-                    return jsonify({
+                    return safe_jsonify({
                         'success': True,
                         'data': {
                             'holdings': holdings,
@@ -619,7 +620,7 @@ def _register_fund_routes(app):
             except Exception as e:
                 logger.warning(f"获取沪深300阶段涨幅失败: {str(e)}")
             
-            return jsonify({'success': True, 'data': result})
+            return safe_jsonify({'success': True, 'data': result})
             
         except Exception as e:
             logger.error(f"获取阶段涨幅失败: {str(e)}")

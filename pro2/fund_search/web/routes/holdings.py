@@ -30,6 +30,49 @@ from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
 )
+from shared.json_utils import safe_jsonify, create_safe_response
+import math
+
+
+# 添加安全的浮点数处理函数
+def _safe_round_float(value, decimals=4, multiplier=1):
+    """
+    安全地处理浮点数，避免NaN和无穷大值
+    
+    Args:
+        value: 要处理的值
+        decimals: 保留小数位数
+        multiplier: 乘数（如转换为百分比时用100）
+    
+    Returns:
+        处理后的数值或None
+    """
+    try:
+        # 检查是否为None
+        if value is None:
+            return None
+        
+        # 特殊处理字符串形式的NaN
+        if isinstance(value, str):
+            upper_val = value.upper()
+            if upper_val == 'NAN' or upper_val == 'NULL' or upper_val == 'NONE':
+                return None
+        
+        # 转换为float
+        float_val = float(value)
+        
+        # 检查NaN和无穷大
+        if math.isnan(float_val) or math.isinf(float_val):
+            return None
+        
+        # 应用乘数
+        result = float_val * multiplier
+        
+        # 四舍五入
+        return round(result, decimals)
+        
+    except (ValueError, TypeError):
+        return None
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -101,7 +144,7 @@ def get_user_holdings():
         df = db_manager.execute_query(sql, {'user_id': user_id})
         
         if df.empty:
-            return jsonify({'success': True, 'data': []})
+            return safe_jsonify({'success': True, 'data': []})
         
         # 转换为字典列表
         holdings = []
@@ -116,11 +159,11 @@ def get_user_holdings():
             }
             holdings.append(holding)
         
-        return jsonify({'success': True, 'data': holdings})
+        return safe_jsonify({'success': True, 'data': holdings})
         
     except Exception as e:
         logger.error(f"获取用户持仓失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
 
 
 def get_strategies_metadata():
@@ -140,14 +183,14 @@ def get_strategies_metadata():
         parser = StrategyReportParser(report_path)
         strategies = parser.parse()
         
-        return jsonify({'success': True, 'data': strategies})
+        return safe_jsonify({'success': True, 'data': strategies})
         
     except FileNotFoundError as e:
         logger.error(f"策略报告文件未找到: {str(e)}")
-        return jsonify({'success': False, 'error': '策略报告文件未找到'}), 500
+        return safe_jsonify({'success': False, 'error': '策略报告文件未找到'}), 500
     except ValueError as e:
         logger.error(f"策略报告解析失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'策略报告解析失败: {str(e)}'}), 500
+        return safe_jsonify({'success': False, 'error': f'策略报告解析失败: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"获取策略元数据失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -216,13 +259,23 @@ def get_holdings():
                 current_nav = data.get('current_nav') if data.get('current_nav') is not None else analysis_data.get('current_nav')
                 
                 # 绩效指标优先使用 fund_analysis_results 的数据
-                sharpe_ratio = analysis_data.get('sharpe_ratio') if analysis_data.get('sharpe_ratio') is not None else data.get('sharpe_ratio')
-                max_drawdown = analysis_data.get('max_drawdown') if analysis_data.get('max_drawdown') is not None else data.get('max_drawdown')
-                annualized_return = analysis_data.get('annualized_return') if analysis_data.get('annualized_return') is not None else data.get('annualized_return')
-                volatility = analysis_data.get('volatility') if analysis_data.get('volatility') is not None else data.get('volatility')
-                calmar_ratio = analysis_data.get('calmar_ratio') if analysis_data.get('calmar_ratio') is not None else data.get('calmar_ratio')
-                sortino_ratio = analysis_data.get('sortino_ratio') if analysis_data.get('sortino_ratio') is not None else data.get('sortino_ratio')
-                composite_score = analysis_data.get('composite_score') if analysis_data.get('composite_score') is not None else data.get('composite_score')
+                # 使用安全的NaN检查
+                def _is_valid_number(val):
+                    if val is None:
+                        return False
+                    try:
+                        float_val = float(val)
+                        return not (math.isnan(float_val) or math.isinf(float_val))
+                    except (ValueError, TypeError):
+                        return False
+                
+                sharpe_ratio = analysis_data.get('sharpe_ratio') if _is_valid_number(analysis_data.get('sharpe_ratio')) else data.get('sharpe_ratio')
+                max_drawdown = analysis_data.get('max_drawdown') if _is_valid_number(analysis_data.get('max_drawdown')) else data.get('max_drawdown')
+                annualized_return = analysis_data.get('annualized_return') if _is_valid_number(analysis_data.get('annualized_return')) else data.get('annualized_return')
+                volatility = analysis_data.get('volatility') if _is_valid_number(analysis_data.get('volatility')) else data.get('volatility')
+                calmar_ratio = analysis_data.get('calmar_ratio') if _is_valid_number(analysis_data.get('calmar_ratio')) else data.get('calmar_ratio')
+                sortino_ratio = analysis_data.get('sortino_ratio') if _is_valid_number(analysis_data.get('sortino_ratio')) else data.get('sortino_ratio')
+                composite_score = analysis_data.get('composite_score') if _is_valid_number(analysis_data.get('composite_score')) else data.get('composite_score')
                 
                 # 使用基金类型服务获取标准化基金类型
                 fund_type_code = classify_fund(fund_name, fund_code, data.get('fund_type', ''))
@@ -256,9 +309,9 @@ def get_holdings():
                     'yesterday_profit_rate': prev_day_return,
                     # 绩效指标
                     'sharpe_ratio': sharpe_ratio,
-                    'sharpe_ratio_ytd': analysis_data.get('sharpe_ratio_ytd') if analysis_data.get('sharpe_ratio_ytd') is not None else sharpe_ratio,
-                    'sharpe_ratio_1y': analysis_data.get('sharpe_ratio_1y') if analysis_data.get('sharpe_ratio_1y') is not None else sharpe_ratio,
-                    'sharpe_ratio_all': analysis_data.get('sharpe_ratio_all') if analysis_data.get('sharpe_ratio_all') is not None else sharpe_ratio,
+                    'sharpe_ratio_ytd': analysis_data.get('sharpe_ratio_ytd') if _is_valid_number(analysis_data.get('sharpe_ratio_ytd')) else sharpe_ratio,
+                    'sharpe_ratio_1y': analysis_data.get('sharpe_ratio_1y') if _is_valid_number(analysis_data.get('sharpe_ratio_1y')) else sharpe_ratio,
+                    'sharpe_ratio_all': analysis_data.get('sharpe_ratio_all') if _is_valid_number(analysis_data.get('sharpe_ratio_all')) else sharpe_ratio,
                     'max_drawdown': max_drawdown,
                     'volatility': volatility,
                     'annualized_return': annualized_return,
@@ -406,25 +459,33 @@ def get_holdings():
                 'prev_day_return': round(prev_day_return, 2) if prev_day_return is not None else None,
                 'yesterday_profit': round(yesterday_profit, 2) if yesterday_profit is not None else None,
                 'yesterday_profit_rate': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,
-                # 绩效指标
-                'sharpe_ratio': round(sharpe_ratio, 4) if sharpe_ratio is not None else None,
-                'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4) if sharpe_ratio_ytd is not None else None,
-                'sharpe_ratio_1y': round(sharpe_ratio_1y, 4) if sharpe_ratio_1y is not None else None,
-                'sharpe_ratio_all': round(sharpe_ratio_all, 4) if sharpe_ratio_all is not None else None,
-                'max_drawdown': round(max_drawdown * 100, 2) if max_drawdown is not None else None,
-                'volatility': round(volatility * 100, 2) if volatility is not None else None,
-                'annualized_return': round(annualized_return * 100, 2) if annualized_return is not None else None,
-                'calmar_ratio': round(calmar_ratio, 4) if calmar_ratio is not None else None,
-                'sortino_ratio': round(sortino_ratio, 4) if sortino_ratio is not None else None,
-                'composite_score': round(composite_score, 4) if composite_score is not None else None
+                # 绩效指标 - 加强NaN值处理
+                'sharpe_ratio': _safe_round_float(sharpe_ratio, 4),
+                'sharpe_ratio_ytd': _safe_round_float(sharpe_ratio_ytd, 4),
+                'sharpe_ratio_1y': _safe_round_float(sharpe_ratio_1y, 4),
+                'sharpe_ratio_all': _safe_round_float(sharpe_ratio_all, 4) if _safe_round_float(sharpe_ratio_all, 4) is not None else None,
+                'max_drawdown': _safe_round_float(max_drawdown, 2, multiplier=100),
+                'volatility': _safe_round_float(volatility, 2, multiplier=100),
+                'annualized_return': _safe_round_float(annualized_return, 2, multiplier=100),
+                'calmar_ratio': _safe_round_float(calmar_ratio, 4),
+                'sortino_ratio': _safe_round_float(sortino_ratio, 4),
+                'composite_score': _safe_round_float(composite_score, 4)
             }
             holdings.append(holding)
         
-        return jsonify({'success': True, 'data': holdings, 'total': len(holdings)})
+        # 最终清理：确保没有NaN值
+        for holding in holdings:
+            for key, value in holding.items():
+                if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                    holding[key] = None
+                elif isinstance(value, str) and value.upper() in ['NAN', 'NULL', 'NONE']:
+                    holding[key] = None
+        
+        return safe_jsonify({'success': True, 'data': holdings, 'total': len(holdings)})
         
     except Exception as e:
         logger.error(f"获取持仓列表失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
 
 
 def import_holding_screenshot():
@@ -1920,7 +1981,7 @@ def generate_analysis_summary(asset_allocation, industry_distribution, top_stock
 
 def get_fund_strategy_analysis(fund_codes):
     """
-    获取基金策略分析数据（集成enhanced_main.py的策略逻辑）
+    获取基金策略分析数据（使用统一策略引擎）
     
     Args:
         fund_codes: 基金代码列表
@@ -1930,10 +1991,10 @@ def get_fund_strategy_analysis(fund_codes):
     """
     try:
         from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
-        from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+        from backtesting.unified_strategy_engine import UnifiedStrategyEngine
         
         fund_data_manager = MultiSourceDataAdapter()
-        strategy_engine = EnhancedInvestmentStrategy()
+        strategy_engine = UnifiedStrategyEngine()
         
         results = []
         buy_count = 0
@@ -1953,8 +2014,16 @@ def get_fund_strategy_analysis(fund_codes):
                 today_return = float(realtime_data.get('today_return', 0.0))
                 prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
                 
-                # 投资策略分析
-                strategy_result = strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
+                # 投资策略分析（使用统一策略引擎）
+                unified_result = strategy_engine.analyze(
+                    today_return=today_return,
+                    prev_day_return=prev_day_return,
+                    performance_metrics=performance_metrics,
+                    base_invest=100.0  # 使用默认基准定投金额
+                )
+                
+                # 转换为字典格式
+                strategy_result = strategy_engine.to_dict(unified_result)
                 
                 # 补充策略逻辑说明
                 strategy_explanation = get_strategy_explanation(today_return, prev_day_return, strategy_result)
@@ -1969,7 +2038,7 @@ def get_fund_strategy_analysis(fund_codes):
                     'operation_suggestion': strategy_result.get('operation_suggestion', ''),
                     'execution_amount': strategy_result.get('execution_amount', ''),
                     'action': strategy_result.get('action', 'hold'),
-                    'buy_multiplier': strategy_result.get('buy_multiplier', 0.0),
+                    'buy_multiplier': strategy_result.get('final_buy_multiplier', 0.0),
                     'redeem_amount': strategy_result.get('redeem_amount', 0.0),
                     'strategy_explanation': strategy_explanation,
                     'composite_score': performance_metrics.get('composite_score', 0.0),
