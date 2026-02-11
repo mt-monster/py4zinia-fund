@@ -220,6 +220,11 @@ class MultiSourceFundData:
                 try:
                     tushare_code = self._convert_to_tushare_format(fund_code)
                     df = self._get_nav_from_tushare(tushare_code)
+                    
+                    # 检查返回的数据是否为空
+                    if df is None or df.empty:
+                        raise ValueError(f"Tushare返回空数据")
+                    
                     logger.info(f"使用 PRIMARY 数据源 Tushare 获取 {fund_code}")
                     
                     # 日期过滤

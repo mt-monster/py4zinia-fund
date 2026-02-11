@@ -256,7 +256,8 @@ def _register_fund_routes(app):
                             
                             # 优先使用fund_data_manager的内置前向追溯方法
                             try:
-                                prev_return = fund_data_manager._get_yesterday_return(fund_code)
+                                return_result = fund_data_manager._get_yesterday_return(fund_code)
+                                prev_return = return_result.get('value', 0.0) if isinstance(return_result, dict) else return_result
                                 logger.debug(f"基金 {fund_code} 使用内置方法获取prev_day_return: {prev_return}%")
                             except Exception as e:
                                 logger.warning(f"基金 {fund_code} 内置方法获取prev_day_return失败: {e}")

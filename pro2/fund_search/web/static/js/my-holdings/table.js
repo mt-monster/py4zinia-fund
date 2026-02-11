@@ -162,6 +162,7 @@ const FundTable = {
             const value = fund[col.key];
             let displayValue;
             let cellClass = '';
+            let titleAttr = '';
             
             // Fund code becomes a clickable link
             if (col.key === 'fund_code') {
@@ -172,6 +173,24 @@ const FundTable = {
             } else if (col.key === 'fund_name') {
                 // 基金名称列添加类型标签（使用后端返回的证监会标准分类）
                 displayValue = `<span class="fund-name-text">${value}</span><span class="fund-type-tag ${typeInfo.className}">${typeInfo.label}</span>`;
+            } else if (col.key === 'prev_day_return') {
+                // 昨日盈亏率列添加数据时效性标记
+                const isStale = fund.yesterday_return_is_stale;
+                const daysDiff = fund.yesterday_return_days_diff;
+                const dateStr = fund.yesterday_return_date;
+                
+                displayValue = FundUtils.formatPercent(value);
+                cellClass = FundUtils.getCellClass(value, 'percent');
+                
+                if (isStale && daysDiff > 1) {
+                    // 延迟数据标记
+                    cellClass += ' stale-data';
+                    const tLabel = `T-${daysDiff}`;
+                    displayValue = `<span class="stale-value">${displayValue}</span><span class="stale-badge" title="数据日期: ${dateStr || '未知'}，延迟 ${daysDiff} 天">(${tLabel})</span>`;
+                    titleAttr = `昨日盈亏率数据来自 ${dateStr || '未知'}，比最新净值延迟 ${daysDiff} 天`;
+                } else if (dateStr) {
+                    titleAttr = `数据日期: ${dateStr}`;
+                }
             } else {
                 switch (col.type) {
                     case 'percent':
@@ -190,7 +209,7 @@ const FundTable = {
                 }
             }
             
-            return `<td class="${cellClass}">${displayValue}</td>`;
+            return `<td class="${cellClass}"${titleAttr ? ` title="${titleAttr}"` : ''}>${displayValue}</td>`;
         }).join('');
         
         return `
@@ -263,6 +282,23 @@ const FundTable = {
             if (col.type === 'number' || col.type === 'percent' || col.type === 'currency') {
                 aVal = parseFloat(aVal) || 0;
                 bVal = parseFloat(bVal) || 0;
+            } else if (FundState.sortColumn === 'fund_name') {
+                // 基金名称按拼音排序
+                const strA = String(aVal);
+                const strB = String(bVal);
+                
+                if (typeof pinyinPro !== 'undefined') {
+                    // 使用 pinyin-pro 库
+                    const pinyinA = pinyinPro.pinyin(strA, { toneType: 'none', type: 'string' });
+                    const pinyinB = pinyinPro.pinyin(strB, { toneType: 'none', type: 'string' });
+                    if (pinyinA < pinyinB) return FundState.sortDirection === 'asc' ? -1 : 1;
+                    if (pinyinA > pinyinB) return FundState.sortDirection === 'asc' ? 1 : -1;
+                    return 0;
+                } else {
+                    // 降级到普通字符串比较
+                    aVal = strA.toLowerCase();
+                    bVal = strB.toLowerCase();
+                }
             } else {
                 aVal = String(aVal).toLowerCase();
                 bVal = String(bVal).toLowerCase();

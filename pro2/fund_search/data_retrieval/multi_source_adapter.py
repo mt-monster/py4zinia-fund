@@ -200,16 +200,17 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             return self._get_default_fund_data(fund_code, fund_name)
         
         # 获取昨日收益率（带前向追溯）
-        prev_day_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+        return_result = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+        prev_day_return = return_result.get('value', 0.0)
         
         # 如果昨日收益率为0且是QDII基金，尝试前向追溯
         if prev_day_return == 0.0:
             logger.info(f"QDII基金 {fund_code} 昨日收益率为0，尝试前向追溯")
             df = self.get_fund_nav_history(fund_code, source='auto')
             if df is not None and not df.empty and len(df) >= 2:
-                traced_return = self._get_previous_nonzero_return(df, fund_code)
-                if traced_return != 0.0:
-                    prev_day_return = traced_return
+                traced_result = self._get_previous_nonzero_return_with_date(df, fund_code)
+                if traced_result.get('value', 0.0) != 0.0:
+                    prev_day_return = traced_result.get('value')
                     logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {prev_day_return}%")
         
         # 获取实时估值并计算 today_return
@@ -258,7 +259,8 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         logger.debug(f"基金 {fund_code} 最新净值数据获取成功: {latest_nav}")
         
         # 获取昨日收益率
-        prev_day_return = self._get_yesterday_return(fund_code, latest_nav.get('date'))
+        return_result = self._get_yesterday_return(fund_code, latest_nav.get('date'))
+        prev_day_return = return_result.get('value', 0.0)
         logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
         
         # 获取实时估值并计算 today_return
@@ -336,7 +338,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             'estimate_return': 0.0
         }
     
-    def _get_yesterday_return(self, fund_code: str, latest_date: str = None) -> float:
+    def _get_yesterday_return(self, fund_code: str, latest_date: str = None) -> Dict:
         """
         获取昨日收益率（最新净值相对于前一天净值的变化率）
         带前向追溯功能，当获取到零值时会向前查找非零的历史收益率
@@ -348,53 +350,100 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             latest_date: 最新净值日期（可选）
             
         Returns:
-            float: 昨日收益率（百分比），失败返回0.0
+            Dict: 包含以下字段的字典
+                - value: 昨日收益率（百分比）
+                - date: 用于计算昨日收益率的净值日期
+                - days_diff: 与最新净值的日期差（T-1=1, T-2=2, 等）
+                - is_stale: 是否为延迟数据（days_diff > 1）
         """
+        from datetime import datetime, timedelta
+        
+        default_result = {
+            'value': 0.0,
+            'date': None,
+            'days_diff': None,
+            'is_stale': False
+        }
+        
         try:
             # 获取最近几天的历史数据
             df = self.get_fund_nav_history(fund_code, source='auto')
             
             if df is None or df.empty or len(df) < 2:
                 logger.debug(f"基金 {fund_code} 历史数据不足，无法计算昨日收益率")
-                return 0.0
+                return default_result
             
             # 确保数据按日期倒序排列（最新在前）
             if 'date' in df.columns:
                 df = df.sort_values('date', ascending=False)
             
+            # 获取最新净值日期
+            latest_date_str = str(df.iloc[0].get('date', ''))
+            latest_date_obj = None
+            try:
+                if len(latest_date_str) == 8:  # YYYYMMDD
+                    latest_date_obj = datetime.strptime(latest_date_str, '%Y%m%d')
+                elif '-' in latest_date_str:  # YYYY-MM-DD
+                    latest_date_obj = datetime.strptime(latest_date_str, '%Y-%m-%d')
+            except:
+                latest_date_obj = datetime.now()
+            
             # 首先尝试直接计算相邻两天的收益率
             latest_nav = float(df.iloc[0]['nav'])
             yesterday_nav = float(df.iloc[1]['nav'])
+            yesterday_date = str(df.iloc[1].get('date', ''))
             
-            logger.debug(f"基金 {fund_code} 计算昨日收益率: 最新净值={latest_nav}, 昨日净值={yesterday_nav}")
+            logger.debug(f"基金 {fund_code} 计算昨日收益率: 最新净值={latest_nav}({latest_date_str}), 昨日净值={yesterday_nav}({yesterday_date})")
+            
+            # 计算日期差
+            days_diff = 1  # 默认为T-1
+            try:
+                if yesterday_date:
+                    if len(yesterday_date) == 8:
+                        y_date_obj = datetime.strptime(yesterday_date, '%Y%m%d')
+                    elif '-' in yesterday_date:
+                        y_date_obj = datetime.strptime(yesterday_date, '%Y-%m-%d')
+                    else:
+                        y_date_obj = latest_date_obj - timedelta(days=1)
+                    
+                    days_diff = (latest_date_obj - y_date_obj).days
+                    if days_diff <= 0:
+                        days_diff = 1
+            except:
+                days_diff = 1
             
             # 计算收益率: (最新 - 昨日) / 昨日 * 100
             if yesterday_nav > 0:
                 yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
-                result = round(yesterday_return, 2)
-                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result}%")
+                result_value = round(yesterday_return, 2)
+                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result_value}%, 使用日期: {yesterday_date}, 日期差: T-{days_diff}")
                 
                 # 如果计算结果为0，且是QDII基金，则进行前向追溯
-                if result == 0.0 and self.is_qdii_fund(fund_code):
+                if result_value == 0.0 and self.is_qdii_fund(fund_code):
                     logger.info(f"QDII基金 {fund_code} 昨日收益率为0，开始前向追溯获取非零值")
-                    traced_return = self._get_previous_nonzero_return(df, fund_code)
-                    if traced_return != 0.0:
-                        logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {traced_return}%")
-                        return traced_return
+                    traced_result = self._get_previous_nonzero_return_with_date(df, fund_code, latest_date_obj)
+                    if traced_result['value'] != 0.0:
+                        logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {traced_result['value']}%")
+                        return traced_result
                 
-                return result
+                return {
+                    'value': result_value,
+                    'date': yesterday_date,
+                    'days_diff': days_diff,
+                    'is_stale': days_diff > 1
+                }
             else:
                 logger.warning(f"基金 {fund_code} 昨日净值为0或负数: {yesterday_nav}")
                 # 尝试前向追溯获取有效数据
-                traced_return = self._get_previous_nonzero_return(df, fund_code)
-                if traced_return != 0.0:
-                    logger.info(f"基金 {fund_code} 前向追溯成功获取有效收益率: {traced_return}%")
-                    return traced_return
-                return 0.0
+                traced_result = self._get_previous_nonzero_return_with_date(df, fund_code, latest_date_obj)
+                if traced_result['value'] != 0.0:
+                    logger.info(f"基金 {fund_code} 前向追溯成功获取有效收益率: {traced_result['value']}%")
+                    return traced_result
+                return default_result
             
         except Exception as e:
             logger.warning(f"获取基金 {fund_code} 昨日收益率失败: {e}")
-            return 0.0
+            return default_result
     
     def _get_previous_nonzero_return(self, fund_nav: pd.DataFrame, fund_code: str) -> float:
         """
@@ -455,6 +504,105 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         except Exception as e:
             logger.warning(f"基金 {fund_code} 前向追溯获取收益率时出错: {str(e)}")
             return 0.0
+    
+    def _get_previous_nonzero_return_with_date(self, fund_nav: pd.DataFrame, fund_code: str, latest_date: datetime = None) -> Dict:
+        """
+        向前追溯获取非零的昨日收益率（带日期信息）
+        
+        Args:
+            fund_nav: 基金历史净值数据DataFrame
+            fund_code: 基金代码
+            latest_date: 最新净值日期
+            
+        Returns:
+            Dict: 包含以下字段的字典
+                - value: 昨日收益率（百分比）
+                - date: 用于计算昨日收益率的净值日期
+                - days_diff: 与最新净值的日期差（T-1=1, T-2=2, 等）
+                - is_stale: 是否为延迟数据（days_diff > 1）
+        """
+        from datetime import datetime, timedelta
+        
+        default_result = {
+            'value': 0.0,
+            'date': None,
+            'days_diff': None,
+            'is_stale': False
+        }
+        
+        try:
+            # 查找包含daily_return或日增长率的列
+            return_column = None
+            date_column = None
+            if 'daily_return' in fund_nav.columns:
+                return_column = 'daily_return'
+                date_column = 'date'
+            elif '日增长率' in fund_nav.columns:
+                return_column = '日增长率'
+                date_column = '净值日期'
+            
+            if return_column is None:
+                logger.debug(f"基金 {fund_code} 数据中未找到收益率列")
+                return default_result
+            
+            # 从较早的数据开始向前查找非零值（避免使用最新数据）
+            # 从倒数第三条开始往前查找（跳过最新的两条）
+            start_index = min(len(fund_nav) - 3, 5)  # 最多向前查找5条数据
+            start_index = max(start_index, 0)
+            
+            for i in range(start_index, -1, -1):
+                data_row = fund_nav.iloc[i]
+                return_raw = data_row.get(return_column, None)
+                nav_date = str(data_row.get(date_column, ''))
+                
+                if pd.notna(return_raw):
+                    try:
+                        return_value = float(return_raw)
+                        # 格式转换处理（如果是小数格式则乘以100）
+                        if abs(return_value) < 0.1:
+                            return_value = return_value * 100
+                        return_value = round(return_value, 2)
+                        
+                        # 检查是否为有效非零值（在合理范围内）
+                        if return_value != 0.0 and abs(return_value) <= 100:
+                            # 计算日期差
+                            days_diff = i + 1  # 默认为相对位置
+                            if latest_date and nav_date:
+                                try:
+                                    if len(nav_date) == 8:
+                                        nav_date_obj = datetime.strptime(nav_date, '%Y%m%d')
+                                    elif '-' in nav_date:
+                                        nav_date_obj = datetime.strptime(nav_date, '%Y-%m-%d')
+                                    else:
+                                        nav_date_obj = latest_date - timedelta(days=i+1)
+                                    
+                                    days_diff = (latest_date - nav_date_obj).days
+                                    if days_diff <= 0:
+                                        days_diff = i + 1
+                                except:
+                                    days_diff = i + 1
+                            
+                            logger.debug(f"基金 {fund_code} 在 {nav_date} 找到有效收益率: {return_value}%, 日期差: T-{days_diff}")
+                            return {
+                                'value': return_value,
+                                'date': nav_date,
+                                'days_diff': days_diff,
+                                'is_stale': days_diff > 1
+                            }
+                    except (ValueError, TypeError) as parse_error:
+                        logger.debug(f"基金 {fund_code} 解析收益率数据失败: {parse_error}")
+                        continue
+                
+                # 限制追溯范围
+                if start_index - i > 10:
+                    break
+            
+            logger.debug(f"基金 {fund_code} 未找到有效的非零收益率")
+            return default_result
+            
+        except Exception as e:
+            logger.warning(f"基金 {fund_code} 前向追溯获取收益率时出错: {str(e)}")
+            return default_result
     
     def _get_realtime_estimate(self, fund_code: str) -> Optional[Dict]:
         """
@@ -736,6 +884,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
     def _calculate_metrics(self, daily_returns: pd.Series, hist_data: pd.DataFrame) -> Dict:
         """
         计算绩效指标（与 EnhancedFundData 保持一致）
+        分别计算不同时期的夏普比率：成立以来、近一年、今年以来
         """
         try:
             from shared.enhanced_config import PERFORMANCE_CONFIG, INVESTMENT_STRATEGY_CONFIG
@@ -761,8 +910,11 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         trading_days = PERFORMANCE_CONFIG['trading_days_per_year']
         var_confidence = PERFORMANCE_CONFIG['var_confidence']
         
-        # 计算总收益率
+        # 获取净值列名
         nav_col = '单位净值' if '单位净值' in hist_data.columns else 'nav'
+        date_col = '日期' if '日期' in hist_data.columns else 'date'
+        
+        # 计算总收益率（成立以来）
         if nav_col in hist_data.columns:
             start_nav = float(hist_data[nav_col].iloc[0])
             end_nav = float(hist_data[nav_col].iloc[-1])
@@ -770,18 +922,59 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         else:
             total_return = 0.0
         
-        # 计算年化收益率
+        # 计算年化收益率（成立以来）
         days = len(hist_data)
         if days > 0:
             annualized_return = (1 + total_return) ** (trading_days / days) - 1
         else:
             annualized_return = 0.0
         
-        # 计算年化波动率
+        # 计算年化波动率（成立以来）
         volatility = daily_returns.std() * np.sqrt(trading_days)
         
-        # 计算夏普比率
-        sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0.0
+        # 计算夏普比率（成立以来）- 使用全部数据
+        sharpe_ratio_all = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0.0
+        
+        # 计算不同时期的夏普比率
+        sharpe_ratio_1y = sharpe_ratio_all  # 默认使用全部数据
+        sharpe_ratio_ytd = sharpe_ratio_all  # 默认使用全部数据
+        
+        # 获取日期列
+        if date_col in hist_data.columns:
+            hist_data_copy = hist_data.copy()
+            hist_data_copy[date_col] = pd.to_datetime(hist_data_copy[date_col])
+            now = pd.Timestamp.now()
+            
+            # 计算近一年夏普比率
+            one_year_ago = now - pd.DateOffset(years=1)
+            last_year_data = hist_data_copy[hist_data_copy[date_col] >= one_year_ago]
+            if len(last_year_data) >= 30:  # 至少30个交易日数据
+                last_year_returns = daily_returns[-len(last_year_data):]
+                if len(last_year_returns) > 0:
+                    vol_1y = last_year_returns.std() * np.sqrt(trading_days)
+                    # 计算近一年年化收益率
+                    start_nav_1y = float(last_year_data[nav_col].iloc[0]) if nav_col in last_year_data.columns else start_nav
+                    end_nav_1y = float(last_year_data[nav_col].iloc[-1]) if nav_col in last_year_data.columns else end_nav
+                    if start_nav_1y != 0:
+                        total_return_1y = (end_nav_1y - start_nav_1y) / start_nav_1y
+                        annualized_return_1y = (1 + total_return_1y) ** (trading_days / len(last_year_data)) - 1
+                        sharpe_ratio_1y = (annualized_return_1y - risk_free_rate) / vol_1y if vol_1y != 0 else 0.0
+            
+            # 计算今年以来夏普比率
+            ytd_start = pd.Timestamp(year=now.year, month=1, day=1)
+            ytd_data = hist_data_copy[hist_data_copy[date_col] >= ytd_start]
+            if len(ytd_data) >= 10:  # 至少10个交易日数据
+                ytd_returns = daily_returns[-len(ytd_data):]
+                if len(ytd_returns) > 0:
+                    vol_ytd = ytd_returns.std() * np.sqrt(trading_days)
+                    # 计算今年以来年化收益率
+                    start_nav_ytd = float(ytd_data[nav_col].iloc[0]) if nav_col in ytd_data.columns else start_nav
+                    end_nav_ytd = float(ytd_data[nav_col].iloc[-1]) if nav_col in ytd_data.columns else end_nav
+                    if start_nav_ytd != 0:
+                        total_return_ytd = (end_nav_ytd - start_nav_ytd) / start_nav_ytd
+                        days_ytd = len(ytd_data)
+                        annualized_return_ytd = (1 + total_return_ytd) ** (trading_days / days_ytd) - 1 if days_ytd > 0 else 0.0
+                        sharpe_ratio_ytd = (annualized_return_ytd - risk_free_rate) / vol_ytd if vol_ytd != 0 else 0.0
         
         # 计算最大回撤
         if nav_col in hist_data.columns:
@@ -817,7 +1010,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         weights = PERFORMANCE_CONFIG['weights']
         composite_score = (
             weights['annualized_return'] * max(0, min(1, (annualized_return + 0.5) / 1.0)) +
-            weights['sharpe_ratio'] * max(0, min(1, (sharpe_ratio + 2) / 4.0)) +
+            weights['sharpe_ratio'] * max(0, min(1, (sharpe_ratio_all + 2) / 4.0)) +
             weights['max_drawdown'] * max(0, min(1, 1 - abs(max_drawdown) / 0.5)) +
             weights['volatility'] * max(0, min(1, 1 - volatility / 0.5)) +
             weights['win_rate'] * win_rate
@@ -825,10 +1018,10 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         
         return {
             'annualized_return': annualized_return,
-            'sharpe_ratio': sharpe_ratio,
-            'sharpe_ratio_ytd': sharpe_ratio,
-            'sharpe_ratio_1y': sharpe_ratio,
-            'sharpe_ratio_all': sharpe_ratio,
+            'sharpe_ratio': sharpe_ratio_all,  # 默认使用成立以来
+            'sharpe_ratio_ytd': sharpe_ratio_ytd,
+            'sharpe_ratio_1y': sharpe_ratio_1y,
+            'sharpe_ratio_all': sharpe_ratio_all,
             'max_drawdown': max_drawdown,
             'volatility': volatility,
             'calmar_ratio': calmar_ratio,

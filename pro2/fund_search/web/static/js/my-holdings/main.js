@@ -24,6 +24,9 @@ const FundApp = {
             // 更新市场指数
             this.updateMarketIndex();
             
+            // 启动市场指数定时更新（每分钟更新一次）
+            this.startMarketIndexTimer();
+            
             // 页面加载完成（不显示提示）
         } catch (error) {
             console.error('App initialization error:', error);
@@ -110,9 +113,12 @@ const FundApp = {
      */
     async updateMarketIndex() {
         try {
+            console.log('[FundApp] 开始更新市场指数');
             const response = await FundAPI.getMarketIndex();
+            console.log('[FundApp] API响应:', response);
             if (response.success) {
                 const indexElement = document.getElementById('index-value');
+                console.log('[FundApp] indexElement:', indexElement);
                 const value = Number(response.data.value);
                 const change = Number(response.data.change);
                 const changePercent = Number(response.data.changePercent);
@@ -120,11 +126,48 @@ const FundApp = {
                 const formattedChangePercent = Number.isNaN(changePercent)
                     ? '--'
                     : `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+                
+                console.log('[FundApp] 更新前文本:', indexElement.textContent);
                 indexElement.textContent = `${formattedValue} ${formattedChangePercent}`;
                 indexElement.className = change >= 0 ? 'cell-positive' : 'cell-negative';
+                console.log('[FundApp] 更新后文本:', indexElement.textContent);
+            } else {
+                console.error('[FundApp] API调用失败:', response.error);
             }
         } catch (error) {
             console.error('Update market index error:', error);
+        }
+    },
+    
+    /**
+     * 启动市场指数定时更新
+     */
+    startMarketIndexTimer() {
+        // 清除已存在的定时器
+        if (this.marketIndexTimer) {
+            clearInterval(this.marketIndexTimer);
+        }
+        
+        console.log('[FundApp] 启动市场指数定时更新，每分钟更新一次');
+        
+        // 立即执行一次更新
+        this.updateMarketIndex();
+        
+        // 设置定时器，每60秒更新一次
+        this.marketIndexTimer = setInterval(() => {
+            console.log('[FundApp] 定时更新市场指数');
+            this.updateMarketIndex();
+        }, 60000); // 60000毫秒 = 1分钟
+    },
+    
+    /**
+     * 停止市场指数定时更新
+     */
+    stopMarketIndexTimer() {
+        if (this.marketIndexTimer) {
+            clearInterval(this.marketIndexTimer);
+            this.marketIndexTimer = null;
+            console.log('[FundApp] 停止市场指数定时更新');
         }
     },
 
@@ -651,6 +694,13 @@ function switchManualImportTab(tabName) {
         content.classList.remove('active');
     });
     document.getElementById(`tab-${tabName}`).classList.add('active');
+    
+    // 页面卸载时清理资源
+    window.addEventListener('beforeunload', () => {
+        if (FundApp && typeof FundApp.stopMarketIndexTimer === 'function') {
+            FundApp.stopMarketIndexTimer();
+        }
+    });
     
     // 如果切换到历史标签，重新加载历史
     if (tabName === 'history') {

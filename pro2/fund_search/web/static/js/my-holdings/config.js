@@ -3,6 +3,11 @@
  */
 const FundConfig = {
     // 默认表头配置 - 与 /api/holdings 返回字段匹配
+    // 夏普比率说明：
+    // - sharpe_ratio: 默认夏普比率（当前周期，默认显示）
+    // - sharpe_ratio_1y: 近一年夏普比率（可选）
+    // - sharpe_ratio_ytd: 今年以来夏普比率（可选）
+    // - sharpe_ratio_all: 成立以来夏普比率（可选）
     defaultColumns: [
         { key: 'fund_code', label: '基金代码', visible: true, sortable: true },
         { key: 'fund_name', label: '基金名称', visible: true, sortable: true },
@@ -14,9 +19,11 @@ const FundConfig = {
         { key: 'current_value', label: '当前市值', visible: true, sortable: true, type: 'currency' },
         { key: 'annualized_return', label: '年化收益', visible: true, sortable: true, type: 'percent' },
         { key: 'max_drawdown', label: '最大回撤', visible: true, sortable: true, type: 'percent' },
+        // 默认夏普比率：当前周期（近1年），可通过表头设置切换显示其他周期
         { key: 'sharpe_ratio', label: '夏普比率', visible: true, sortable: true, type: 'number' },
-        { key: 'sharpe_ratio_ytd', label: '夏普(今年以来)', visible: false, sortable: true, type: 'number' },
+        // 可选的夏普比率周期（通过表头设置显示/隐藏）
         { key: 'sharpe_ratio_1y', label: '夏普(近一年)', visible: false, sortable: true, type: 'number' },
+        { key: 'sharpe_ratio_ytd', label: '夏普(今年以来)', visible: false, sortable: true, type: 'number' },
         { key: 'sharpe_ratio_all', label: '夏普(成立以来)', visible: false, sortable: true, type: 'number' },
         { key: 'volatility', label: '波动率', visible: false, sortable: true, type: 'percent' },
         { key: 'calmar_ratio', label: '卡玛比率', visible: false, sortable: true, type: 'number' },

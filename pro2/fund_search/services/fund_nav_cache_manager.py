@@ -234,7 +234,7 @@ class FundNavCacheManager:
             sql = """
                 SELECT 
                     annualized_return, max_drawdown, volatility,
-                    sharpe_ratio, sharpe_ratio_1y, sharpe_ratio_ytd,
+                    sharpe_ratio, sharpe_ratio_1y, sharpe_ratio_ytd, sharpe_ratio_all,
                     calmar_ratio, sortino_ratio, var_95,
                     composite_score, total_return,
                     analysis_date as calc_date
@@ -258,6 +258,7 @@ class FundNavCacheManager:
                 'sharpe_ratio': float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None,
                 'sharpe_ratio_1y': float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else None,
                 'sharpe_ratio_ytd': float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else None,
+                'sharpe_ratio_all': float(row['sharpe_ratio_all']) if pd.notna(row['sharpe_ratio_all']) else None,
                 'calmar_ratio': float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else None,
                 'sortino_ratio': float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else None,
                 'var_95': float(row['var_95']) if pd.notna(row['var_95']) else None,
@@ -297,13 +298,13 @@ class FundNavCacheManager:
                 INSERT INTO fund_analysis_results (
                     fund_code, fund_name, analysis_date,
                     annualized_return, max_drawdown, volatility,
-                    sharpe_ratio, sharpe_ratio_1y, sharpe_ratio_ytd,
+                    sharpe_ratio, sharpe_ratio_1y, sharpe_ratio_ytd, sharpe_ratio_all,
                     calmar_ratio, sortino_ratio, var_95,
                     composite_score, total_return
                 ) VALUES (
                     :fund_code, :fund_name, :analysis_date,
                     :annualized_return, :max_drawdown, :volatility,
-                    :sharpe_ratio, :sharpe_ratio_1y, :sharpe_ratio_ytd,
+                    :sharpe_ratio, :sharpe_ratio_1y, :sharpe_ratio_ytd, :sharpe_ratio_all,
                     :calmar_ratio, :sortino_ratio, :var_95,
                     :composite_score, :total_return
                 )
@@ -315,6 +316,7 @@ class FundNavCacheManager:
                 sharpe_ratio = VALUES(sharpe_ratio),
                 sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
                 sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
+                sharpe_ratio_all = VALUES(sharpe_ratio_all),
                 calmar_ratio = VALUES(calmar_ratio),
                 sortino_ratio = VALUES(sortino_ratio),
                 var_95 = VALUES(var_95),
@@ -333,6 +335,7 @@ class FundNavCacheManager:
                 'sharpe_ratio': metrics.get('sharpe_ratio'),
                 'sharpe_ratio_1y': metrics.get('sharpe_ratio_1y'),
                 'sharpe_ratio_ytd': metrics.get('sharpe_ratio_ytd'),
+                'sharpe_ratio_all': metrics.get('sharpe_ratio_all'),
                 'calmar_ratio': metrics.get('calmar_ratio'),
                 'sortino_ratio': metrics.get('sortino_ratio'),
                 'var_95': metrics.get('var_95'),
@@ -601,8 +604,55 @@ class FundNavCacheManager:
             # 年化波动率
             volatility = daily_returns.std() * np.sqrt(trading_days) / 100  # 转换为小数
             
-            # 夏普比率
+            # 夏普比率（成立以来）- 使用全部数据
             sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility != 0 else 0
+            
+            # 计算不同时期的夏普比率
+            sharpe_ratio_1y = sharpe_ratio  # 默认使用全部数据
+            sharpe_ratio_ytd = sharpe_ratio  # 默认使用全部数据
+            sharpe_ratio_all = sharpe_ratio  # 成立以来
+            
+            # 根据日期范围分别计算近一年和今年以来的夏普比率
+            if 'date' in df.columns:
+                df_copy = df.copy()
+                df_copy['date'] = pd.to_datetime(df_copy['date'])
+                now = pd.Timestamp.now()
+                
+                # 计算近一年夏普比率
+                one_year_ago = now - pd.DateOffset(years=1)
+                last_year_data = df_copy[df_copy['date'] >= one_year_ago]
+                if len(last_year_data) >= 30:  # 至少30个交易日数据
+                    # 获取近一年的收益率序列
+                    start_idx = max(0, len(daily_returns) - len(last_year_data))
+                    last_year_returns = daily_returns.iloc[start_idx:]
+                    if len(last_year_returns) > 0:
+                        vol_1y = last_year_returns.std() * np.sqrt(trading_days) / 100
+                        # 计算近一年年化收益率
+                        nav_1y_start = pd.to_numeric(last_year_data['nav'].iloc[0], errors='coerce')
+                        nav_1y_end = pd.to_numeric(last_year_data['nav'].iloc[-1], errors='coerce')
+                        if pd.notna(nav_1y_start) and nav_1y_start != 0 and pd.notna(nav_1y_end):
+                            total_return_1y = (nav_1y_end - nav_1y_start) / nav_1y_start
+                            days_1y = len(last_year_data)
+                            annualized_return_1y = (1 + total_return_1y) ** (trading_days / max(days_1y, 1)) - 1
+                            sharpe_ratio_1y = (annualized_return_1y - risk_free_rate) / vol_1y if vol_1y != 0 else 0.0
+                
+                # 计算今年以来夏普比率
+                ytd_start = pd.Timestamp(year=now.year, month=1, day=1)
+                ytd_data = df_copy[df_copy['date'] >= ytd_start]
+                if len(ytd_data) >= 10:  # 至少10个交易日数据
+                    # 获取今年以来的收益率序列
+                    start_idx = max(0, len(daily_returns) - len(ytd_data))
+                    ytd_returns = daily_returns.iloc[start_idx:]
+                    if len(ytd_returns) > 0:
+                        vol_ytd = ytd_returns.std() * np.sqrt(trading_days) / 100
+                        # 计算今年以来年化收益率
+                        nav_ytd_start = pd.to_numeric(ytd_data['nav'].iloc[0], errors='coerce')
+                        nav_ytd_end = pd.to_numeric(ytd_data['nav'].iloc[-1], errors='coerce')
+                        if pd.notna(nav_ytd_start) and nav_ytd_start != 0 and pd.notna(nav_ytd_end):
+                            total_return_ytd = (nav_ytd_end - nav_ytd_start) / nav_ytd_start
+                            days_ytd = len(ytd_data)
+                            annualized_return_ytd = (1 + total_return_ytd) ** (trading_days / max(days_ytd, 1)) - 1 if days_ytd > 0 else 0.0
+                            sharpe_ratio_ytd = (annualized_return_ytd - risk_free_rate) / vol_ytd if vol_ytd != 0 else 0.0
             
             # 最大回撤
             cumulative_max = nav_values.expanding().max()
@@ -638,9 +688,10 @@ class FundNavCacheManager:
                 'annualized_return': round(annualized_return * 100, 2),  # 转回百分比
                 'max_drawdown': round(max_drawdown * 100, 2),
                 'volatility': round(volatility * 100, 2),
-                'sharpe_ratio': round(sharpe_ratio, 4),
-                'sharpe_ratio_1y': round(sharpe_ratio, 4),
-                'sharpe_ratio_ytd': round(sharpe_ratio, 4),
+                'sharpe_ratio': round(sharpe_ratio_1y, 4) if sharpe_ratio_1y != sharpe_ratio else round(sharpe_ratio, 4),  # 默认使用近一年
+                'sharpe_ratio_1y': round(sharpe_ratio_1y, 4),
+                'sharpe_ratio_ytd': round(sharpe_ratio_ytd, 4),
+                'sharpe_ratio_all': round(sharpe_ratio_all, 4),
                 'calmar_ratio': round(calmar_ratio, 4),
                 'sortino_ratio': round(sortino_ratio, 4),
                 'var_95': round(var_95 * 100, 2),
@@ -668,6 +719,7 @@ class FundNavCacheManager:
             'sharpe_ratio': None,
             'sharpe_ratio_1y': None,
             'sharpe_ratio_ytd': None,
+            'sharpe_ratio_all': None,
             'calmar_ratio': None,
             'sortino_ratio': None,
             'var_95': None,

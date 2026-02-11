@@ -84,6 +84,141 @@ holding_service = None
 cache_manager = None
 
 
+def update_fund_analysis_results(fund_code, fund_name):
+    """
+    计算并更新基金的绩效指标到 fund_analysis_results 表
+    
+    Args:
+        fund_code: 基金代码
+        fund_name: 基金名称
+        
+    Returns:
+        bool: 是否成功
+    """
+    try:
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+        from datetime import datetime
+        
+        # 初始化数据适配器和策略引擎
+        fund_data_manager = MultiSourceDataAdapter()
+        strategy_engine = EnhancedInvestmentStrategy()
+        
+        # 获取实时数据
+        realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+        performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
+        
+        # 获取收益率数据
+        today_return = float(realtime_data.get('today_return', 0.0))
+        prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
+        
+        # 投资策略分析
+        strategy_result = strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
+        
+        # 准备数据
+        analysis_date = datetime.now().date()
+        
+        # 获取数据库管理器
+        global db_manager
+        if db_manager is None:
+            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            from shared.enhanced_config import DATABASE_CONFIG
+            db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+        
+        # 插入或更新 fund_analysis_results 表
+        update_sql = """
+        INSERT INTO fund_analysis_results (
+            fund_code, fund_name, analysis_date,
+            yesterday_nav, current_estimate, today_return, prev_day_return,
+            status_label, operation_suggestion, execution_amount,
+            is_buy, buy_multiplier, redeem_amount, comparison_value,
+            annualized_return, sharpe_ratio, sharpe_ratio_ytd, sharpe_ratio_1y, sharpe_ratio_all,
+            max_drawdown, volatility, calmar_ratio, sortino_ratio, var_95,
+            win_rate, profit_loss_ratio, total_return, composite_score
+        ) VALUES (
+            :fund_code, :fund_name, :analysis_date,
+            :yesterday_nav, :current_estimate, :today_return, :prev_day_return,
+            :status_label, :operation_suggestion, :execution_amount,
+            :is_buy, :buy_multiplier, :redeem_amount, :comparison_value,
+            :annualized_return, :sharpe_ratio, :sharpe_ratio_ytd, :sharpe_ratio_1y, :sharpe_ratio_all,
+            :max_drawdown, :volatility, :calmar_ratio, :sortino_ratio, :var_95,
+            :win_rate, :profit_loss_ratio, :total_return, :composite_score
+        ) ON DUPLICATE KEY UPDATE
+            fund_name = VALUES(fund_name),
+            yesterday_nav = VALUES(yesterday_nav),
+            current_estimate = VALUES(current_estimate),
+            today_return = VALUES(today_return),
+            prev_day_return = VALUES(prev_day_return),
+            status_label = VALUES(status_label),
+            operation_suggestion = VALUES(operation_suggestion),
+            execution_amount = VALUES(execution_amount),
+            is_buy = VALUES(is_buy),
+            buy_multiplier = VALUES(buy_multiplier),
+            redeem_amount = VALUES(redeem_amount),
+            comparison_value = VALUES(comparison_value),
+            annualized_return = VALUES(annualized_return),
+            sharpe_ratio = VALUES(sharpe_ratio),
+            sharpe_ratio_ytd = VALUES(sharpe_ratio_ytd),
+            sharpe_ratio_1y = VALUES(sharpe_ratio_1y),
+            sharpe_ratio_all = VALUES(sharpe_ratio_all),
+            max_drawdown = VALUES(max_drawdown),
+            volatility = VALUES(volatility),
+            calmar_ratio = VALUES(calmar_ratio),
+            sortino_ratio = VALUES(sortino_ratio),
+            var_95 = VALUES(var_95),
+            win_rate = VALUES(win_rate),
+            profit_loss_ratio = VALUES(profit_loss_ratio),
+            total_return = VALUES(total_return),
+            composite_score = VALUES(composite_score)
+        """
+        
+        params = {
+            'fund_code': fund_code,
+            'fund_name': fund_name or realtime_data.get('fund_name', f'基金{fund_code}'),
+            'analysis_date': analysis_date,
+            'yesterday_nav': realtime_data.get('previous_nav'),
+            'current_estimate': realtime_data.get('current_nav'),
+            'today_return': today_return,
+            'prev_day_return': prev_day_return,
+            'status_label': strategy_result.get('status_label', '待分析'),
+            'operation_suggestion': strategy_result.get('operation_suggestion', '持有观察'),
+            'execution_amount': strategy_result.get('execution_amount', '0'),
+            'is_buy': strategy_result.get('is_buy', False),
+            'buy_multiplier': strategy_result.get('buy_multiplier', 1.0),
+            'redeem_amount': strategy_result.get('redeem_amount', 0.0),
+            'comparison_value': strategy_result.get('comparison_value', 0.0),
+            'annualized_return': performance_metrics.get('annualized_return'),
+            'sharpe_ratio': performance_metrics.get('sharpe_ratio'),
+            'sharpe_ratio_ytd': performance_metrics.get('sharpe_ratio_ytd'),
+            'sharpe_ratio_1y': performance_metrics.get('sharpe_ratio_1y'),
+            'sharpe_ratio_all': performance_metrics.get('sharpe_ratio_all'),
+            'max_drawdown': performance_metrics.get('max_drawdown'),
+            'volatility': performance_metrics.get('volatility'),
+            'calmar_ratio': performance_metrics.get('calmar_ratio'),
+            'sortino_ratio': performance_metrics.get('sortino_ratio'),
+            'var_95': performance_metrics.get('var_95'),
+            'win_rate': performance_metrics.get('win_rate'),
+            'profit_loss_ratio': performance_metrics.get('profit_loss_ratio'),
+            'total_return': performance_metrics.get('total_return'),
+            'composite_score': performance_metrics.get('composite_score')
+        }
+        
+        success = db_manager.execute_sql(update_sql, params)
+        
+        if success:
+            logger.info(f"基金 {fund_code} 绩效指标更新成功")
+        else:
+            logger.warning(f"基金 {fund_code} 绩效指标更新失败")
+            
+        return success
+        
+    except Exception as e:
+        logger.error(f"更新基金 {fund_code} 绩效指标时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def register_routes(app, **kwargs):
     """注册持仓管理相关路由
     
@@ -258,6 +393,17 @@ def get_holdings():
                 prev_day_return = data.get('yesterday_return') if data.get('yesterday_return') is not None else analysis_data.get('prev_day_return')
                 current_nav = data.get('current_nav') if data.get('current_nav') is not None else analysis_data.get('current_nav')
                 
+                # 昨日盈亏率数据时效性标记 - 优先使用 holding_service 的数据
+                yesterday_return_date = data.get('yesterday_return_date')
+                yesterday_return_days_diff = data.get('yesterday_return_days_diff')
+                yesterday_return_is_stale = data.get('yesterday_return_is_stale', False)
+                
+                # 如果 holding_service 没有提供标记，但 prev_day_return 来自 fund_analysis_results，
+                # 设置为非延迟数据（因为 fund_analysis_results 通常是 T-1 数据）
+                if prev_day_return is not None and yesterday_return_days_diff is None:
+                    yesterday_return_days_diff = 1  # 默认为 T-1
+                    yesterday_return_is_stale = False
+                
                 # 绩效指标优先使用 fund_analysis_results 的数据
                 # 使用安全的NaN检查
                 def _is_valid_number(val):
@@ -269,7 +415,15 @@ def get_holdings():
                     except (ValueError, TypeError):
                         return False
                 
-                sharpe_ratio = analysis_data.get('sharpe_ratio') if _is_valid_number(analysis_data.get('sharpe_ratio')) else data.get('sharpe_ratio')
+                # 夏普比率 - 分别获取不同时期的值（独立处理，不使用fallback）
+                sharpe_ratio_all = analysis_data.get('sharpe_ratio_all') if _is_valid_number(analysis_data.get('sharpe_ratio_all')) else data.get('sharpe_ratio_all')
+                sharpe_ratio_1y = analysis_data.get('sharpe_ratio_1y') if _is_valid_number(analysis_data.get('sharpe_ratio_1y')) else data.get('sharpe_ratio_1y')
+                sharpe_ratio_ytd = analysis_data.get('sharpe_ratio_ytd') if _is_valid_number(analysis_data.get('sharpe_ratio_ytd')) else data.get('sharpe_ratio_ytd')
+                # 默认sharpe_ratio优先使用近一年，其次成立以来
+                sharpe_ratio = analysis_data.get('sharpe_ratio') if _is_valid_number(analysis_data.get('sharpe_ratio')) else None
+                if sharpe_ratio is None:
+                    sharpe_ratio = sharpe_ratio_1y if sharpe_ratio_1y is not None else sharpe_ratio_all
+                
                 max_drawdown = analysis_data.get('max_drawdown') if _is_valid_number(analysis_data.get('max_drawdown')) else data.get('max_drawdown')
                 annualized_return = analysis_data.get('annualized_return') if _is_valid_number(analysis_data.get('annualized_return')) else data.get('annualized_return')
                 volatility = analysis_data.get('volatility') if _is_valid_number(analysis_data.get('volatility')) else data.get('volatility')
@@ -307,11 +461,15 @@ def get_holdings():
                     'prev_day_return': prev_day_return,
                     'yesterday_profit': data.get('yesterday_profit'),
                     'yesterday_profit_rate': prev_day_return,
-                    # 绩效指标
+                    # 昨日盈亏率数据时效性标记
+                    'yesterday_return_date': yesterday_return_date,
+                    'yesterday_return_days_diff': yesterday_return_days_diff,
+                    'yesterday_return_is_stale': yesterday_return_is_stale,
+                    # 绩效指标 - 夏普比率（默认优先使用近一年）
                     'sharpe_ratio': sharpe_ratio,
-                    'sharpe_ratio_ytd': analysis_data.get('sharpe_ratio_ytd') if _is_valid_number(analysis_data.get('sharpe_ratio_ytd')) else sharpe_ratio,
-                    'sharpe_ratio_1y': analysis_data.get('sharpe_ratio_1y') if _is_valid_number(analysis_data.get('sharpe_ratio_1y')) else sharpe_ratio,
-                    'sharpe_ratio_all': analysis_data.get('sharpe_ratio_all') if _is_valid_number(analysis_data.get('sharpe_ratio_all')) else sharpe_ratio,
+                    'sharpe_ratio_ytd': sharpe_ratio_ytd,  # 今年以来（独立值）
+                    'sharpe_ratio_1y': sharpe_ratio_1y,    # 近一年（独立值）
+                    'sharpe_ratio_all': sharpe_ratio_all,  # 成立以来（独立值）
                     'max_drawdown': max_drawdown,
                     'volatility': volatility,
                     'annualized_return': annualized_return,
@@ -459,6 +617,10 @@ def get_holdings():
                 'prev_day_return': round(prev_day_return, 2) if prev_day_return is not None else None,
                 'yesterday_profit': round(yesterday_profit, 2) if yesterday_profit is not None else None,
                 'yesterday_profit_rate': round(yesterday_profit_rate, 2) if yesterday_profit_rate is not None else None,
+                # 昨日盈亏率数据时效性标记（降级逻辑默认为T-1）
+                'yesterday_return_date': None,
+                'yesterday_return_days_diff': 1 if prev_day_return is not None else None,
+                'yesterday_return_is_stale': False,
                 # 绩效指标 - 加强NaN值处理
                 'sharpe_ratio': _safe_round_float(sharpe_ratio, 4),
                 'sharpe_ratio_ytd': _safe_round_float(sharpe_ratio_ytd, 4),
@@ -602,6 +764,11 @@ def import_holding_confirm():
                 
                 if success:
                     imported_count += 1
+                    # 导入成功后立即计算并更新绩效指标
+                    try:
+                        update_fund_analysis_results(fund_code, fund_name)
+                    except Exception as e:
+                        logger.warning(f"基金 {fund_code} 绩效指标计算失败: {e}")
                 else:
                     errors.append(f"基金 {fund_code} 导入失败")
                     
@@ -669,6 +836,12 @@ def add_holding():
         })
         
         if success:
+            # 添加成功后立即计算并更新绩效指标
+            try:
+                update_fund_analysis_results(fund_code, fund_name)
+            except Exception as e:
+                logger.warning(f"基金 {fund_code} 绩效指标计算失败: {e}")
+            
             return jsonify({'success': True, 'message': '持仓添加成功'})
         else:
             return jsonify({'success': False, 'error': '持仓添加失败'}), 500

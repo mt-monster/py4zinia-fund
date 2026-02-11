@@ -46,11 +46,17 @@ class HoldingDataDTO:
     yesterday_nav: Optional[float] = None
     yesterday_return: Optional[float] = None
     yesterday_profit: Optional[float] = None
+    yesterday_return_date: Optional[str] = None  # 昨日收益率使用的净值日期
+    yesterday_return_days_diff: Optional[int] = None  # 日期差（T-1=1, T-2=2）
+    yesterday_return_is_stale: bool = False  # 是否为延迟数据
     
     # 低频指标（绩效缓存）
     annualized_return: Optional[float] = None
     max_drawdown: Optional[float] = None
-    sharpe_ratio: Optional[float] = None
+    sharpe_ratio: Optional[float] = None  # 默认夏普比率（成立以来）
+    sharpe_ratio_ytd: Optional[float] = None  # 今年以来
+    sharpe_ratio_1y: Optional[float] = None  # 近一年
+    sharpe_ratio_all: Optional[float] = None  # 成立以来
     composite_score: Optional[float] = None
     
     # 计算字段
@@ -100,11 +106,17 @@ class HoldingDataDTO:
             # 准实时
             'yesterday_return': self.yesterday_return,
             'yesterday_profit': self.yesterday_profit,
+            'yesterday_return_date': self.yesterday_return_date,
+            'yesterday_return_days_diff': self.yesterday_return_days_diff,
+            'yesterday_return_is_stale': self.yesterday_return_is_stale,
             
             # 低频
             'annualized_return': self.annualized_return,
             'max_drawdown': self.max_drawdown,
             'sharpe_ratio': self.sharpe_ratio,
+            'sharpe_ratio_ytd': self.sharpe_ratio_ytd,
+            'sharpe_ratio_1y': self.sharpe_ratio_1y,
+            'sharpe_ratio_all': self.sharpe_ratio_all,
             'composite_score': self.composite_score,
             
             # 计算
@@ -120,6 +132,13 @@ class RealtimeDataFetcher:
     实时数据获取器
     
     专门用于获取日涨跌幅等实时数据，带短期内存缓存（2分钟）
+    
+    数据源优先级（实时数据计算）：
+    1. 天天基金（最实时，有估算涨跌幅）
+    2. 新浪（实时性好）
+    3. 东方财富（备用）
+    4. Tushare（稳定性高）
+    5. AKShare（降级）
     """
     
     def __init__(self, cache_ttl_seconds: int = 120):
@@ -173,11 +192,13 @@ class RealtimeDataFetcher:
         """
         获取基金实时数据（日涨跌幅等）
         
-        优先级：
+        优先级（实时数据计算）：
         1. 内存缓存（2分钟有效）
         2. 天天基金估值接口（最实时，有估算涨跌幅）
-        3. 新浪实时接口
-        4. AKShare接口（降级）
+        3. 新浪实时接口（实时性好）
+        4. 东方财富接口（备用）
+        5. Tushare接口（稳定性高）
+        6. AKShare接口（降级）
         """
         # 0. 先检查缓存
         cached_data = self._get_from_cache(fund_code)
@@ -204,7 +225,25 @@ class RealtimeDataFetcher:
         except Exception as e:
             logger.debug(f"新浪获取失败 {fund_code}: {e}")
         
-        # 3. 降级到AKShare
+        # 3. 尝试东方财富
+        try:
+            result = self._from_eastmoney(fund_code)
+            if result:
+                self._save_to_cache(fund_code, result)
+                return result
+        except Exception as e:
+            logger.debug(f"东方财富获取失败 {fund_code}: {e}")
+        
+        # 4. 尝试 Tushare
+        try:
+            result = self._from_tushare(fund_code)
+            if result:
+                self._save_to_cache(fund_code, result)
+                return result
+        except Exception as e:
+            logger.debug(f"Tushare获取失败 {fund_code}: {e}")
+        
+        # 5. 降级到AKShare
         try:
             result = self._from_akshare(fund_code)
             if result:
@@ -263,6 +302,77 @@ class RealtimeDataFetcher:
                         'today_return': float(parts[5]) if parts[5] else 0.0,
                         'source': 'sina'
                     }
+        return None
+    
+    def _from_eastmoney(self, fund_code: str) -> Optional[Dict]:
+        """东方财富实时接口"""
+        try:
+            import akshare as ak
+            
+            # 使用东方财富接口获取实时估值
+            df = ak.fund_em_valuation(fund_code)
+            
+            if df is not None and not df.empty:
+                latest = df.iloc[0]
+                
+                current_nav = float(latest.get('单位净值', 0)) if pd.notna(latest.get('单位净值')) else None
+                estimate_nav = float(latest.get('估算净值', 0)) if pd.notna(latest.get('估算净值')) else None
+                today_return = float(latest.get('估算涨跌', 0)) if pd.notna(latest.get('估算涨跌')) else 0.0
+                
+                return {
+                    'current_nav': current_nav,
+                    'estimate_nav': estimate_nav,
+                    'today_return': today_return,
+                    'source': 'eastmoney'
+                }
+        except Exception as e:
+            logger.debug(f"东方财富获取 {fund_code} 失败: {e}")
+        
+        return None
+    
+    def _from_tushare(self, fund_code: str) -> Optional[Dict]:
+        """Tushare 实时数据接口"""
+        try:
+            import tushare as ts
+            
+            # 从配置获取 token
+            token = None
+            try:
+                from shared.enhanced_config import DATA_SOURCE_CONFIG
+                token = DATA_SOURCE_CONFIG.get('tushare', {}).get('token')
+            except ImportError:
+                token = '5ff19facae0e5b26a407d491d33707a9884a39a714a0d76b6495725b'
+            
+            ts_pro = ts.pro_api(token)
+            
+            # Tushare 需要 .OF 后缀
+            ts_code = fund_code if fund_code.endswith('.OF') else f"{fund_code}.OF"
+            
+            # 获取最新净值
+            df = ts_pro.fund_nav(ts_code=ts_code)
+            
+            if df is not None and not df.empty:
+                latest = df.iloc[0]
+                
+                # 获取单位净值
+                nav = float(latest.get('unit_nav', 0)) if pd.notna(latest.get('unit_nav')) else None
+                
+                # 计算日涨跌幅（如果 API 没有直接返回）
+                today_return = 0.0
+                if len(df) >= 2:
+                    prev_nav = float(df.iloc[1].get('unit_nav', 0)) if pd.notna(df.iloc[1].get('unit_nav')) else None
+                    if nav and prev_nav and prev_nav > 0:
+                        today_return = round((nav - prev_nav) / prev_nav * 100, 2)
+                
+                return {
+                    'current_nav': nav,
+                    'estimate_nav': nav,  # Tushare 不提供估算净值，使用实际净值
+                    'today_return': today_return,
+                    'source': 'tushare'
+                }
+        except Exception as e:
+            logger.debug(f"Tushare 获取 {fund_code} 失败: {e}")
+        
         return None
     
     def _from_akshare(self, fund_code: str) -> Optional[Dict]:
@@ -391,12 +501,18 @@ class HoldingRealtimeService:
             yd = yesterday_data.get(fund_code, {})
             dto.yesterday_nav = yd.get('yesterday_nav')
             dto.yesterday_return = yd.get('yesterday_return')
+            dto.yesterday_return_date = yd.get('yesterday_return_date')
+            dto.yesterday_return_days_diff = yd.get('yesterday_return_days_diff')
+            dto.yesterday_return_is_stale = yd.get('yesterday_return_is_stale', False)
             
             # 填充绩效指标
             perf = performance_data.get(fund_code, {})
             dto.annualized_return = perf.get('annualized_return')
             dto.max_drawdown = perf.get('max_drawdown')
-            dto.sharpe_ratio = perf.get('sharpe_ratio')
+            dto.sharpe_ratio = perf.get('sharpe_ratio')  # 默认夏普比率
+            dto.sharpe_ratio_ytd = perf.get('sharpe_ratio_ytd')  # 今年以来
+            dto.sharpe_ratio_1y = perf.get('sharpe_ratio_1y')  # 近一年
+            dto.sharpe_ratio_all = perf.get('sharpe_ratio_all')  # 成立以来
             dto.composite_score = perf.get('composite_score')
             
             # 计算衍生字段
@@ -475,7 +591,10 @@ class HoldingRealtimeService:
                             code = row['fund_code']
                             data = {
                                 'yesterday_nav': float(row['yesterday_nav']) if pd.notna(row['yesterday_nav']) else None,
-                                'yesterday_return': float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0.0
+                                'yesterday_return': float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0.0,
+                                'yesterday_return_date': yesterday,
+                                'yesterday_return_days_diff': 1,
+                                'yesterday_return_is_stale': False
                             }
                             results[code] = data
                             # 回填内存缓存
@@ -489,9 +608,16 @@ class HoldingRealtimeService:
                 
                 # 从 fund_analysis_results 获取（作为 fallback 或补充）
                 still_missing = [code for code in missing_codes if code not in results]
-                if still_missing:
+                
+                # 对于 QDII 基金，需要从 Adapter 获取以获取正确的延迟标记
+                # 所以这里只处理非 QDII 基金
+                from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+                qdii_codes = [code for code in still_missing if MultiSourceDataAdapter.is_qdii_fund(code)]
+                non_qdii_codes = [code for code in still_missing if not MultiSourceDataAdapter.is_qdii_fund(code)]
+                
+                if non_qdii_codes:
                     try:
-                        placeholders2 = ','.join([f':code{i}' for i in range(len(still_missing))])
+                        placeholders2 = ','.join([f':code{i}' for i in range(len(non_qdii_codes))])
                         sql2 = f"""
                             SELECT 
                                 fund_code,
@@ -504,7 +630,7 @@ class HoldingRealtimeService:
                                 GROUP BY fund_code
                             )
                         """
-                        params2 = {f'code{i}': code for i, code in enumerate(still_missing)}
+                        params2 = {f'code{i}': code for i, code in enumerate(non_qdii_codes)}
                         df2 = self.db.execute_query(sql2, params2)
                         
                         if not df2.empty:
@@ -512,9 +638,13 @@ class HoldingRealtimeService:
                                 code = row['fund_code']
                                 prev_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0.0
                                 # 使用获取到的值（包括0值，因为0是有效的收益率）
+                                # fund_analysis_results 数据默认为 T-1（非延迟）
                                 results[code] = {
                                     'yesterday_nav': None,
-                                    'yesterday_return': prev_return
+                                    'yesterday_return': prev_return,
+                                    'yesterday_return_date': datetime.now().strftime('%Y-%m-%d'),
+                                    'yesterday_return_days_diff': 1,
+                                    'yesterday_return_is_stale': False
                                 }
                                 # 回填内存缓存
                                 self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
@@ -522,10 +652,14 @@ class HoldingRealtimeService:
                     except Exception as e2:
                         logger.debug(f"从 fund_analysis_results 获取昨日数据失败: {e2}")
                 
-                # 对于数据库中仍缺失的基金，从 AKShare 实时获取
+                # QDII 基金需要继续到 Adapter 获取，以获取正确的延迟标记
+                if qdii_codes:
+                    logger.info(f"QDII 基金 {len(qdii_codes)} 只将从 Adapter 获取以获取延迟标记")
+                
+                # 对于数据库中仍缺失的基金，从 MultiSourceDataAdapter 实时获取
                 still_missing_after_db = [code for code in missing_codes if code not in results]
                 if still_missing_after_db:
-                    logger.info(f"尝试从 AKShare 获取 {len(still_missing_after_db)} 只基金的昨日收益率")
+                    logger.info(f"尝试从 MultiSourceDataAdapter 获取 {len(still_missing_after_db)} 只基金的昨日收益率")
                     try:
                         from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
                         adapter = MultiSourceDataAdapter()
@@ -533,27 +667,41 @@ class HoldingRealtimeService:
                         for code in still_missing_after_db:
                             try:
                                 # 获取基金历史数据来计算昨日收益率
-                                yesterday_return = adapter._get_yesterday_return(code)
-                                if yesterday_return != 0.0:
-                                    results[code] = {
-                                        'yesterday_nav': None,
-                                        'yesterday_return': yesterday_return
-                                    }
-                                    # 回填内存缓存
-                                    self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
-                                    logger.info(f"从 AKShare 获取 {code} 昨日收益率: {yesterday_return}%")
-                                else:
-                                    # 获取到0值，可能是数据不足，标记为 None
-                                    results[code] = {'yesterday_nav': None, 'yesterday_return': None}
-                                    logger.debug(f"基金 {code} 从 AKShare 获取的昨日收益率为0，标记为缺失")
+                                # QDII基金会进行前向追溯获取最近的非零收益率
+                                # 返回包含日期信息的字典
+                                return_result = adapter._get_yesterday_return(code)
+                                
+                                # 保存获取到的值（包括日期信息）
+                                results[code] = {
+                                    'yesterday_nav': None,
+                                    'yesterday_return': return_result.get('value'),
+                                    'yesterday_return_date': return_result.get('date'),
+                                    'yesterday_return_days_diff': return_result.get('days_diff'),
+                                    'yesterday_return_is_stale': return_result.get('is_stale', False)
+                                }
+                                # 回填内存缓存
+                                self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
+                                logger.info(f"从 Adapter 获取 {code} 昨日收益率: {return_result.get('value')}% (T-{return_result.get('days_diff')})")
                             except Exception as e:
-                                logger.warning(f"从 AKShare 获取基金 {code} 昨日收益率失败: {e}")
-                                results[code] = {'yesterday_nav': None, 'yesterday_return': None}
+                                logger.warning(f"从 Adapter 获取基金 {code} 昨日收益率失败: {e}")
+                                results[code] = {
+                                    'yesterday_nav': None, 
+                                    'yesterday_return': None,
+                                    'yesterday_return_date': None,
+                                    'yesterday_return_days_diff': None,
+                                    'yesterday_return_is_stale': False
+                                }
                     except Exception as e:
                         logger.error(f"初始化 MultiSourceDataAdapter 失败: {e}")
                         # 所有缺失基金标记为 None
                         for code in still_missing_after_db:
-                            results[code] = {'yesterday_nav': None, 'yesterday_return': None}
+                            results[code] = {
+                                'yesterday_nav': None, 
+                                'yesterday_return': None,
+                                'yesterday_return_date': None,
+                                'yesterday_return_days_diff': None,
+                                'yesterday_return_is_stale': False
+                            }
                         
             except Exception as e:
                 logger.error(f"获取昨日数据批量失败: {e}")
@@ -592,6 +740,9 @@ class HoldingRealtimeService:
                         max_drawdown,
                         volatility,
                         sharpe_ratio,
+                        sharpe_ratio_ytd,
+                        sharpe_ratio_1y,
+                        sharpe_ratio_all,
                         composite_score
                     FROM fund_analysis_results
                     WHERE fund_code IN ({placeholders})
@@ -608,11 +759,25 @@ class HoldingRealtimeService:
                         fund_df = df[df['fund_code'] == code]
                         if not fund_df.empty:
                             row = fund_df.iloc[0]
+                            # 获取默认夏普比率（成立以来）
+                            # 各个周期的夏普比率独立处理，不使用fallback
+                            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
+                            sharpe_ytd = float(row['sharpe_ratio_ytd']) if pd.notna(row['sharpe_ratio_ytd']) else None
+                            sharpe_1y = float(row['sharpe_ratio_1y']) if pd.notna(row['sharpe_ratio_1y']) else None
+                            sharpe_all = float(row['sharpe_ratio_all']) if pd.notna(row['sharpe_ratio_all']) else None
+                            
+                            # 如果 sharpe_ratio 为空，优先使用 sharpe_1y（近一年）作为默认值
+                            if sharpe_ratio is None:
+                                sharpe_ratio = sharpe_1y if sharpe_1y is not None else sharpe_all
+                            
                             data = {
                                 'annualized_return': float(row['annualized_return']) if pd.notna(row['annualized_return']) else None,
                                 'max_drawdown': float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else None,
                                 'volatility': float(row['volatility']) if pd.notna(row['volatility']) else None,
-                                'sharpe_ratio': float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None,
+                                'sharpe_ratio': sharpe_ratio,  # 默认夏普比率（优先近一年）
+                                'sharpe_ratio_ytd': sharpe_ytd,  # 今年以来（独立值，不fallback）
+                                'sharpe_ratio_1y': sharpe_1y,    # 近一年（独立值，不fallback）
+                                'sharpe_ratio_all': sharpe_all,  # 成立以来（独立值，不fallback）
                                 'composite_score': float(row['composite_score']) if pd.notna(row['composite_score']) else None
                             }
                             results[code] = data
@@ -625,13 +790,25 @@ class HoldingRealtimeService:
                     logger.info(f"绩效指标缺失，使用实时计算: {still_missing}")
                     for code in still_missing:
                         # 实时计算（不缓存到数据库，只放内存）
-                        metrics = self.cache._calculate_performance_metrics(code, 365)
+                        metrics = self.cache._calculate_performance_metrics(code, 3650)  # 使用10年数据
                         if metrics:
+                            sharpe_ratio = metrics.get('sharpe_ratio')
+                            sharpe_ytd = metrics.get('sharpe_ratio_ytd')
+                            sharpe_1y = metrics.get('sharpe_ratio_1y')
+                            sharpe_all = metrics.get('sharpe_ratio_all')
+                            
+                            # 如果 sharpe_ratio 为空，优先使用 sharpe_1y 作为默认值
+                            if sharpe_ratio is None:
+                                sharpe_ratio = sharpe_1y if sharpe_1y is not None else sharpe_all
+                            
                             results[code] = {
                                 'annualized_return': metrics.get('annualized_return'),
                                 'max_drawdown': metrics.get('max_drawdown'),
                                 'volatility': metrics.get('volatility'),
-                                'sharpe_ratio': metrics.get('sharpe_ratio'),
+                                'sharpe_ratio': sharpe_ratio,      # 默认夏普比率（优先近一年）
+                                'sharpe_ratio_ytd': sharpe_ytd,    # 今年以来（独立值）
+                                'sharpe_ratio_1y': sharpe_1y,      # 近一年（独立值）
+                                'sharpe_ratio_all': sharpe_all,    # 成立以来（独立值）
                                 'composite_score': metrics.get('composite_score')
                             }
                             self.cache.set_to_memory(f'perf:{code}', results[code], ttl_minutes=30)
@@ -652,6 +829,9 @@ class HoldingRealtimeService:
             'max_drawdown': None,
             'volatility': None,
             'sharpe_ratio': None,
+            'sharpe_ratio_ytd': None,
+            'sharpe_ratio_1y': None,
+            'sharpe_ratio_all': None,
             'composite_score': None
         }
     
