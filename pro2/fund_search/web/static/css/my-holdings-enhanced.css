@@ -1364,3 +1364,84 @@ body {
 .fund-table tbody tr:nth-child(3) { animation-delay: 0.15s; }
 .fund-table tbody tr:nth-child(4) { animation-delay: 0.2s; }
 .fund-table tbody tr:nth-child(5) { animation-delay: 0.25s; }
+
+/* ============================================
+   昨日盈亏率数据时效性标记样式
+   ============================================ */
+
+/* 延迟数据单元格样式 */
+td.stale-data {
+    background-color: #fff3cd !important;
+    position: relative;
+}
+
+td.stale-data:hover {
+    background-color: #ffeaa7 !important;
+}
+
+/* 延迟数值样式 */
+.stale-value {
+    color: #856404;
+    font-weight: 500;
+}
+
+/* T-N 延迟标记徽章 */
+.stale-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #856404;
+    background-color: #ffc107;
+    border-radius: 3px;
+    vertical-align: middle;
+    cursor: help;
+    white-space: nowrap;
+}
+
+/* 不同延迟天数的颜色 */
+.stale-badge[data-days="2"],
+.stale-badge:contains("T-2") {
+    background-color: #ffc107;
+    color: #856404;
+}
+
+.stale-badge[data-days="3"],
+.stale-badge:contains("T-3") {
+    background-color: #fd7e14;
+    color: #fff;
+}
+
+.stale-badge[data-days="4"],
+.stale-badge:contains("T-4"),
+.stale-badge[data-days="5"],
+.stale-badge:contains("T-5") {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+/* 深色主题适配 */
+@media (prefers-color-scheme: dark) {
+    td.stale-data {
+        background-color: #3d3a25 !important;
+    }
+    
+    td.stale-data:hover {
+        background-color: #4d4a35 !important;
+    }
+    
+    .stale-value {
+        color: #ffeaa7;
+    }
+    
+    .stale-badge {
+        background-color: #b8860b;
+        color: #fff;
+    }
+}
+
+/* 工具提示增强 */
+td[title] {
+    cursor: help;
+}

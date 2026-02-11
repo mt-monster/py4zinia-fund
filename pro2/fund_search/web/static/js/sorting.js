@@ -52,6 +52,36 @@ class DataSorter {
         return order === 'asc' ? result : -result;
     }
 
+    // 比较字符串（按拼音排序）
+    compareStringsPinyin(a, b, order) {
+        const aVal = this.handleNullValue(a);
+        const bVal = this.handleNullValue(b);
+        
+        // 空值处理
+        if (aVal === null && bVal === null) return 0;
+        if (aVal === null) return order === 'asc' ? 1 : -1;
+        if (bVal === null) return order === 'asc' ? -1 : 1;
+        
+        const strA = String(aVal);
+        const strB = String(bVal);
+        
+        // 使用 pinyin-pro 获取拼音
+        let pinyinA, pinyinB;
+        
+        if (typeof pinyinPro !== 'undefined') {
+            // 使用 pinyin-pro 库
+            pinyinA = pinyinPro.pinyin(strA, { toneType: 'none', type: 'string' });
+            pinyinB = pinyinPro.pinyin(strB, { toneType: 'none', type: 'string' });
+        } else {
+            // 降级到普通字符串比较
+            pinyinA = strA;
+            pinyinB = strB;
+        }
+        
+        const result = pinyinA.localeCompare(pinyinB, 'en-US');
+        return order === 'asc' ? result : -result;
+    }
+
     // 按列排序数据
     sortByColumn(data, columnName, order, columnType) {
         if (!data || data.length === 0) return data;
@@ -65,6 +95,9 @@ class DataSorter {
             
             if (columnType === 'number') {
                 return this.compareNumbers(aValue, bValue, order);
+            } else if (columnName === 'fund_name') {
+                // 基金名称按拼音排序
+                return this.compareStringsPinyin(aValue, bValue, order);
             } else {
                 return this.compareStrings(aValue, bValue, order);
             }

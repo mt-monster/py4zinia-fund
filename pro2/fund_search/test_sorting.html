@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>基金名称排序测试</title>
+</head>
+<body>
+    <h2>基金名称拼音排序测试</h2>
+    <button onclick="testSorting()">测试排序</button>
+    <div id="result"></div>
+
+    <script>
+        // 模拟基金数据
+        const mockFunds = [
+            {fund_code: '000001', fund_name: '招商白酒指数A', today_return: 1.5},
+            {fund_code: '000002', fund_name: '易方达蓝筹精选混合', today_return: 2.1},
+            {fund_code: '000003', fund_name: '华夏大盘精选混合', today_return: -0.5},
+            {fund_code: '000004', fund_name: '广发稳健增长混合A', today_return: 0.8},
+            {fund_code: '000005', fund_name: '南方中证500ETF联接A', today_return: 1.2},
+            {fund_code: '016667', fund_name: '基金016667', today_return: 1.69},
+            {fund_code: '100061', fund_name: '富国全球科技互联网股票(QDII)A', today_return: 0.0},
+            {fund_code: '005443', fund_name: '长城久嘉创新成长混合C', today_return: 0.0}
+        ];
+
+        // 比较字符串（支持中文拼音排序）
+        function compareStrings(a, b, order) {
+            const aVal = a || '';
+            const bVal = b || '';
+            
+            const strA = String(aVal);
+            const strB = String(bVal);
+            
+            // 使用 localeCompare 进行中文拼音排序
+            const result = strA.localeCompare(strB, 'zh-CN');
+            return order === 'asc' ? result : -result;
+        }
+
+        // 按基金名称排序
+        function sortByFundName(data, order = 'asc') {
+            const sortedData = [...data];
+            sortedData.sort((a, b) => {
+                return compareStrings(a.fund_name, b.fund_name, order);
+            });
+            return sortedData;
+        }
+
+        // 测试排序功能
+        function testSorting() {
+            const resultDiv = document.getElementById('result');
+            
+            // 原始顺序
+            let html = '<h3>原始顺序:</h3><ul>';
+            mockFunds.forEach(fund => {
+                html += `<li>${fund.fund_name}</li>`;
+            });
+            html += '</ul>';
+            
+            // 升序排序
+            const ascending = sortByFundName(mockFunds, 'asc');
+            html += '<h3>拼音升序:</h3><ul>';
+            ascending.forEach(fund => {
+                html += `<li>${fund.fund_name}</li>`;
+            });
+            html += '</ul>';
+            
+            // 降序排序
+            const descending = sortByFundName(mockFunds, 'desc');
+            html += '<h3>拼音降序:</h3><ul>';
+            descending.forEach(fund => {
+                html += `<li>${fund.fund_name}</li>`;
+            });
+            html += '</ul>';
+            
+            resultDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
