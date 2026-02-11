@@ -431,6 +431,8 @@ class HoldingRealtimeService:
     def _get_yesterday_data_batch(self, fund_codes: List[str]) -> Dict[str, Dict]:
         """
         批量获取昨日数据（准实时，内存缓存15分钟）
+        
+        优先从 fund_nav_cache 获取，如果表不存在则直接使用 fund_analysis_results
         """
         results = {}
         missing_codes = []
@@ -451,34 +453,41 @@ class HoldingRealtimeService:
             try:
                 yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
                 
-                # 批量查询 - 使用命名参数
-                placeholders = ','.join([f':code{i}' for i in range(len(missing_codes))])
-                sql = f"""
-                    SELECT 
-                        fund_code,
-                        nav_value as yesterday_nav,
-                        daily_return as yesterday_return
-                    FROM fund_nav_cache
-                    WHERE fund_code IN ({placeholders})
-                      AND nav_date = :yesterday
-                """
+                # 尝试从 fund_nav_cache 获取（如果表存在）
+                try:
+                    placeholders = ','.join([f':code{i}' for i in range(len(missing_codes))])
+                    sql = f"""
+                        SELECT 
+                            fund_code,
+                            nav_value as yesterday_nav,
+                            daily_return as yesterday_return
+                        FROM fund_nav_cache
+                        WHERE fund_code IN ({placeholders})
+                          AND nav_date = :yesterday
+                    """
+                    
+                    params = {f'code{i}': code for i, code in enumerate(missing_codes)}
+                    params['yesterday'] = yesterday
+                    df = self.db.execute_query(sql, params)
+                    
+                    if not df.empty:
+                        for _, row in df.iterrows():
+                            code = row['fund_code']
+                            data = {
+                                'yesterday_nav': float(row['yesterday_nav']) if pd.notna(row['yesterday_nav']) else None,
+                                'yesterday_return': float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0.0
+                            }
+                            results[code] = data
+                            # 回填内存缓存
+                            self.cache.set_to_memory(f'yesterday:{code}', data, ttl_minutes=15)
+                        
+                        # 更新缺失列表
+                        missing_codes = [code for code in missing_codes if code not in results]
+                except Exception as e:
+                    # fund_nav_cache 表可能不存在，记录日志继续
+                    logger.debug(f"从 fund_nav_cache 获取数据失败（表可能不存在）: {e}")
                 
-                params = {f'code{i}': code for i, code in enumerate(missing_codes)}
-                params['yesterday'] = yesterday
-                df = self.db.execute_query(sql, params)
-                
-                if not df.empty:
-                    for _, row in df.iterrows():
-                        code = row['fund_code']
-                        data = {
-                            'yesterday_nav': float(row['yesterday_nav']) if pd.notna(row['yesterday_nav']) else None,
-                            'yesterday_return': float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0.0
-                        }
-                        results[code] = data
-                        # 回填内存缓存
-                        self.cache.set_to_memory(f'yesterday:{code}', data, ttl_minutes=15)
-                
-                # 补充缺失的 - 尝试从 fund_analysis_results 获取昨日收益率（QDII基金）
+                # 从 fund_analysis_results 获取（作为 fallback 或补充）
                 still_missing = [code for code in missing_codes if code not in results]
                 if still_missing:
                     try:
@@ -502,26 +511,55 @@ class HoldingRealtimeService:
                             for _, row in df2.iterrows():
                                 code = row['fund_code']
                                 prev_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0.0
-                                if prev_return != 0:  # 只使用非零值
-                                    results[code] = {
-                                        'yesterday_nav': None,
-                                        'yesterday_return': prev_return
-                                    }
-                                    # 回填内存缓存
-                                    self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
-                                    logger.info(f"从 fund_analysis_results 获取 {code} 昨日收益率: {prev_return}%")
+                                # 使用获取到的值（包括0值，因为0是有效的收益率）
+                                results[code] = {
+                                    'yesterday_nav': None,
+                                    'yesterday_return': prev_return
+                                }
+                                # 回填内存缓存
+                                self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
+                                logger.info(f"从 fund_analysis_results 获取 {code} 昨日收益率: {prev_return}%")
                     except Exception as e2:
                         logger.debug(f"从 fund_analysis_results 获取昨日数据失败: {e2}")
                 
-                # 最终补充仍为缺失的
-                for code in missing_codes:
-                    if code not in results:
-                        results[code] = {'yesterday_nav': None, 'yesterday_return': 0.0}
+                # 对于数据库中仍缺失的基金，从 AKShare 实时获取
+                still_missing_after_db = [code for code in missing_codes if code not in results]
+                if still_missing_after_db:
+                    logger.info(f"尝试从 AKShare 获取 {len(still_missing_after_db)} 只基金的昨日收益率")
+                    try:
+                        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+                        adapter = MultiSourceDataAdapter()
+                        
+                        for code in still_missing_after_db:
+                            try:
+                                # 获取基金历史数据来计算昨日收益率
+                                yesterday_return = adapter._get_yesterday_return(code)
+                                if yesterday_return != 0.0:
+                                    results[code] = {
+                                        'yesterday_nav': None,
+                                        'yesterday_return': yesterday_return
+                                    }
+                                    # 回填内存缓存
+                                    self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
+                                    logger.info(f"从 AKShare 获取 {code} 昨日收益率: {yesterday_return}%")
+                                else:
+                                    # 获取到0值，可能是数据不足，标记为 None
+                                    results[code] = {'yesterday_nav': None, 'yesterday_return': None}
+                                    logger.debug(f"基金 {code} 从 AKShare 获取的昨日收益率为0，标记为缺失")
+                            except Exception as e:
+                                logger.warning(f"从 AKShare 获取基金 {code} 昨日收益率失败: {e}")
+                                results[code] = {'yesterday_nav': None, 'yesterday_return': None}
+                    except Exception as e:
+                        logger.error(f"初始化 MultiSourceDataAdapter 失败: {e}")
+                        # 所有缺失基金标记为 None
+                        for code in still_missing_after_db:
+                            results[code] = {'yesterday_nav': None, 'yesterday_return': None}
                         
             except Exception as e:
                 logger.error(f"获取昨日数据批量失败: {e}")
                 for code in missing_codes:
-                    results[code] = {'yesterday_nav': None, 'yesterday_return': 0.0}
+                    if code not in results:
+                        results[code] = {'yesterday_nav': None, 'yesterday_return': None}
         
         return results
     

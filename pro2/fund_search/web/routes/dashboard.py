@@ -724,6 +724,8 @@ def register_routes(app, **kwargs):
     global db_manager, strategy_engine, unified_strategy_engine, strategy_evaluator, fund_data_manager
     global cache_manager, holding_service, sync_service
     
+    logger.info(f"Dashboard路由注册开始，收到参数: {list(kwargs.keys())}")
+    
     # 从 kwargs 获取组件
     db_manager = kwargs.get('db_manager') or kwargs.get('database_manager')
     strategy_engine = kwargs.get('strategy_engine')
@@ -733,6 +735,8 @@ def register_routes(app, **kwargs):
     cache_manager = kwargs.get('cache_manager')
     holding_service = kwargs.get('holding_service')
     sync_service = kwargs.get('sync_service')
+    
+    logger.info(f"组件初始化状态 - db_manager: {db_manager is not None}, fund_data_manager: {fund_data_manager is not None}")
     
     # 如果 kwargs 中没有，尝试从 app 属性获取
     if db_manager is None:
@@ -752,12 +756,25 @@ def register_routes(app, **kwargs):
     if sync_service is None:
         sync_service = app.sync_service if hasattr(app, 'sync_service') else None
     
+    logger.info(f"最终组件状态 - db_manager: {db_manager is not None}, fund_data_manager: {fund_data_manager is not None}")
+    
+    # 检查必需组件是否存在
+    if db_manager is None:
+        logger.error("数据库管理器未初始化，无法注册dashboard路由")
+        return
+    
     # 注册路由
+    logger.info("开始注册dashboard路由...")
     app.route('/api/dashboard/stats', methods=['GET'])(get_dashboard_stats)
     app.route('/api/dashboard/profit-trend', methods=['GET'])(get_profit_trend)
     app.route('/api/market/index', methods=['GET'])(get_market_index)
     app.route('/api/dashboard/allocation', methods=['GET'])(get_allocation)
     app.route('/api/dashboard/holding-stocks', methods=['GET'])(get_holding_stocks)
     app.route('/api/dashboard/recent-activities', methods=['GET'])(lambda: jsonify({'success': True, 'data': get_recent_activities()}))
+    
+    # 验证路由是否注册成功
+    logger.info(f"应用路由数量: {len(app.url_map._rules)}")
+    dashboard_routes = [rule.rule for rule in app.url_map._rules if 'dashboard' in rule.rule]
+    logger.info(f"已注册的dashboard路由: {dashboard_routes}")
     
     logger.info("Dashboard 路由注册完成")

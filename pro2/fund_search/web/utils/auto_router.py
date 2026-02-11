@@ -244,7 +244,7 @@ def print_route_summary(router: RouteRegistry):
     print("="*60)
     
     for module_name, info in registered_routes.items():
-        status_icon = "✅" if info['status'] == 'registered' else "❌"
+        status_icon = "[OK]" if info['status'] == 'registered' else "[FAIL]"
         print(f"{status_icon} {module_name}")
         print(f"   路径: {info.get('path', 'N/A')}")
         if info['status'] == 'failed':
