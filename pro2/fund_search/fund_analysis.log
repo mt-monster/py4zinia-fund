@@ -24439,3 +24439,681 @@ with app.app_context(). See the documentation for more information.
 2026-02-10 23:25:13,899 - __main__ - WARNING - 通知发送失败，但分析流程已完成
 2026-02-10 23:25:13,902 - __main__ - INFO - 完整的基金分析流程执行完成
 2026-02-10 23:25:13,902 - __main__ - INFO - 基金分析任务成功完成
+2026-02-11 14:25:48,106 - __main__ - INFO - 开始初始化基金分析系统...
+2026-02-11 14:25:48,132 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:25:48,133 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:25:48,172 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:25:48,173 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:25:48,173 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:25:48,174 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:25:48,178 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:25:48,179 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:25:48,180 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:25:48,264 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:25:48,267 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:25:48,269 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:25:48,271 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:25:48,274 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:25:48,274 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:25:48,297 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 14:25:48,297 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:25:48,298 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:25:48,304 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:25:48,305 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:25:48,305 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-11 14:25:48,306 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:25:48,307 - __main__ - INFO - 系统组件初始化完成
+2026-02-11 14:25:48,465 - web.utils.auto_router - ERROR - 路由模块注册失败 backtest: No module named 'schedule'
+2026-02-11 14:25:48,467 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:25:48,475 - web.utils.auto_router - ERROR - 路由模块注册失败 dashboard: No module named 'schedule'
+2026-02-11 14:25:48,477 - web.utils.auto_router - ERROR - 路由模块注册失败 etf: No module named 'schedule'
+2026-02-11 14:25:48,479 - web.utils.auto_router - ERROR - 路由模块注册失败 funds: No module named 'schedule'
+2026-02-11 14:25:48,481 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: No module named 'schedule'
+2026-02-11 14:25:48,483 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: No module named 'schedule'
+2026-02-11 14:25:48,484 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: No module named 'schedule'
+2026-02-11 14:25:48,487 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings: No module named 'schedule'
+2026-02-11 14:25:48,490 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: No module named 'schedule'
+2026-02-11 14:25:48,491 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:25:48,496 - pages - INFO - 页面路由注册完成
+2026-02-11 14:25:48,496 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:25:48,500 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:25:48,500 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:25:48,502 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:25:48,502 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:25:48,502 - web.utils.auto_router - INFO - 路由注册完成: 4/13 个模块注册成功
+2026-02-11 14:25:48,505 - __main__ - WARNING - 以下路由模块注册失败: backtest, dashboard, etf, funds, funds_v2, funds_v2_complete, fund_api_new, holdings, holdings_v2
+2026-02-11 14:25:48,505 - __main__ - INFO - 应用初始化完成
+2026-02-11 14:25:48,506 - __main__ - INFO - 启动基金分析系统 v2.0
+2026-02-11 14:25:48,506 - __main__ - INFO - 监听地址: 0.0.0.0:5001
+2026-02-11 14:25:48,506 - __main__ - INFO - 调试模式: False
+2026-02-11 14:25:48,514 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.3.80:5001
+2026-02-11 14:25:48,514 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-11 14:26:35,316 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 14:26:35,342 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:26:35,343 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:26:35,369 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:26:35,370 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:26:35,370 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:26:35,370 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:26:35,372 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:26:35,372 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:26:35,373 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:26:35,382 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:26:35,383 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:26:35,385 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:26:35,386 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:26:35,388 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:26:35,388 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:26:35,400 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 14:26:35,400 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:26:35,400 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:26:35,405 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:26:35,406 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:26:35,406 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-11 14:26:35,407 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:26:35,407 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 14:26:35,408 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 14:26:35,408 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 14:26:35,409 - web.app - INFO - 数据同步服务已启动
+2026-02-11 14:26:35,411 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 14:26:35,411 - web.app - INFO - 系统组件初始化完成
+2026-02-11 14:26:35,420 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 14:26:35,422 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:26:35,424 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 14:26:35,425 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:26:35,425 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:26:35,426 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 14:26:35,427 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 14:26:35,429 - etf - INFO - ETF 路由注册完成
+2026-02-11 14:26:35,429 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 14:26:35,433 - funds - INFO - 基金相关路由已注册
+2026-02-11 14:26:35,433 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 14:26:35,435 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 14:26:35,436 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 14:26:35,436 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,436 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,443 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 14:26:35,445 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 14:26:35,445 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,446 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:26:35,451 - pages - INFO - 页面路由注册完成
+2026-02-11 14:26:35,451 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:26:35,456 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:26:35,457 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:26:35,461 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:26:35,461 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:26:35,461 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 14:26:35,463 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 14:26:35,464 - web.app - INFO - 应用初始化完成
+2026-02-11 14:26:35,464 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 14:26:35,465 - __main__ - INFO - 开始初始化基金分析系统...
+2026-02-11 14:26:35,491 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:26:35,492 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:26:35,525 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:26:35,525 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:26:35,525 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:26:35,525 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:26:35,527 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:26:35,527 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:26:35,527 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:26:35,531 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:26:35,533 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:26:35,534 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:26:35,535 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:26:35,537 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:26:35,537 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:26:35,537 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:26:35,538 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:26:35,541 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:26:35,542 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:26:35,542 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-11 14:26:35,542 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:26:35,543 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 14:26:35,543 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 14:26:35,543 - __main__ - INFO - 数据同步服务已启动
+2026-02-11 14:26:35,545 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 14:26:35,545 - __main__ - INFO - 系统组件初始化完成
+2026-02-11 14:26:35,552 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 14:26:35,555 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:26:35,557 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 14:26:35,557 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:26:35,557 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:26:35,560 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 14:26:35,561 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 14:26:35,564 - etf - INFO - ETF 路由注册完成
+2026-02-11 14:26:35,564 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 14:26:35,567 - funds - INFO - 基金相关路由已注册
+2026-02-11 14:26:35,568 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 14:26:35,569 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,570 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 14:26:35,570 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,571 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,575 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 14:26:35,577 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 14:26:35,577 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:26:35,578 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:26:35,582 - pages - INFO - 页面路由注册完成
+2026-02-11 14:26:35,583 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:26:35,586 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:26:35,587 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:26:35,590 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:26:35,590 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:26:35,591 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 14:26:35,593 - __main__ - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 14:26:35,593 - __main__ - INFO - 应用初始化完成
+2026-02-11 14:26:35,593 - __main__ - INFO - 启动基金分析系统 v2.0
+2026-02-11 14:26:35,593 - __main__ - INFO - 监听地址: 0.0.0.0:5001
+2026-02-11 14:26:35,593 - __main__ - INFO - 调试模式: False
+2026-02-11 14:26:35,598 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.3.80:5001
+2026-02-11 14:26:35,598 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-11 14:28:05,492 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 14:28:05,516 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:28:05,517 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:28:05,526 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:28:05,526 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:28:05,526 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:28:05,527 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:28:05,528 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:28:05,528 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:28:05,528 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:28:05,536 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:28:05,538 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:28:05,539 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:28:05,540 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:28:05,542 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:28:05,542 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:28:05,554 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 14:28:05,554 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:28:05,555 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:28:05,559 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:28:05,559 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:28:05,560 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-11 14:28:05,560 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:28:05,561 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 14:28:05,562 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 14:28:05,562 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 14:28:05,562 - web.app - INFO - 数据同步服务已启动
+2026-02-11 14:28:05,564 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 14:28:05,564 - web.app - INFO - 系统组件初始化完成
+2026-02-11 14:28:05,573 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 14:28:05,576 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:28:05,582 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 14:28:05,582 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:28:05,583 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:28:05,583 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 14:28:05,584 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 14:28:05,584 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 14:28:05,584 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 14:28:05,585 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 14:28:05,587 - etf - INFO - ETF 路由注册完成
+2026-02-11 14:28:05,587 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 14:28:05,590 - funds - INFO - 基金相关路由已注册
+2026-02-11 14:28:05,590 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 14:28:05,592 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 14:28:05,593 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 14:28:05,593 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,594 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,597 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 14:28:05,598 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 14:28:05,598 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,599 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:28:05,603 - pages - INFO - 页面路由注册完成
+2026-02-11 14:28:05,604 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:28:05,610 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:28:05,610 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:28:05,613 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:28:05,614 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:28:05,614 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 14:28:05,615 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 14:28:05,615 - web.app - INFO - 应用初始化完成
+2026-02-11 14:28:05,615 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 14:28:05,616 - __main__ - INFO - 开始初始化基金分析系统...
+2026-02-11 14:28:05,640 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:28:05,641 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:28:05,660 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:28:05,661 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:28:05,661 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:28:05,661 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:28:05,662 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:28:05,662 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:28:05,662 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:28:05,667 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:28:05,668 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:28:05,670 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:28:05,672 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:28:05,674 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:28:05,674 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:28:05,674 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:28:05,675 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:28:05,678 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:28:05,678 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:28:05,678 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用
+2026-02-11 14:28:05,678 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:28:05,679 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 14:28:05,679 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 14:28:05,679 - __main__ - INFO - 数据同步服务已启动
+2026-02-11 14:28:05,681 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 14:28:05,682 - __main__ - INFO - 系统组件初始化完成
+2026-02-11 14:28:05,687 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 14:28:05,689 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:28:05,690 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 14:28:05,690 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:28:05,690 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:28:05,690 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 14:28:05,692 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 14:28:05,692 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 14:28:05,692 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 14:28:05,692 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 14:28:05,695 - etf - INFO - ETF 路由注册完成
+2026-02-11 14:28:05,696 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 14:28:05,699 - funds - INFO - 基金相关路由已注册
+2026-02-11 14:28:05,700 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 14:28:05,701 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,702 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 14:28:05,702 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,703 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,708 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 14:28:05,709 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 14:28:05,709 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:28:05,710 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:28:05,715 - pages - INFO - 页面路由注册完成
+2026-02-11 14:28:05,715 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:28:05,719 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:28:05,719 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:28:05,722 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:28:05,723 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:28:05,723 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 14:28:05,725 - __main__ - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 14:28:05,726 - __main__ - INFO - 应用初始化完成
+2026-02-11 14:28:05,726 - __main__ - INFO - 启动基金分析系统 v2.0
+2026-02-11 14:28:05,726 - __main__ - INFO - 监听地址: 0.0.0.0:5001
+2026-02-11 14:28:05,726 - __main__ - INFO - 调试模式: False
+2026-02-11 14:28:05,731 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.3.80:5001
+2026-02-11 14:28:05,731 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-02-11 14:53:40,051 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 14:53:40,076 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 14:53:40,077 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 14:53:40,085 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 14:53:40,086 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 14:53:40,086 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 14:53:40,086 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 14:53:40,087 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 14:53:40,087 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 14:53:40,087 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 14:53:40,096 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 14:53:40,098 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 14:53:40,100 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 14:53:40,101 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 14:53:40,103 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 14:53:40,103 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 14:53:40,115 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 14:53:40,115 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 14:53:40,115 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 14:53:40,121 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 14:53:40,121 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 14:53:40,121 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动
+2026-02-11 14:53:40,122 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 14:53:40,122 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 14:53:40,123 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 14:53:40,123 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 14:53:40,123 - web.app - INFO - 数据同步服务已启动
+2026-02-11 14:53:40,125 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 14:53:40,125 - web.app - INFO - 系统组件初始化完成
+2026-02-11 14:53:40,138 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 14:53:40,142 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 14:53:40,143 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 14:53:40,144 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:53:40,144 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 14:53:40,144 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 14:53:40,146 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 14:53:40,147 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 14:53:40,147 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 14:53:40,147 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 14:53:40,150 - etf - INFO - ETF 路由注册完成
+2026-02-11 14:53:40,150 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 14:53:40,155 - funds - INFO - 基金相关路由已注册
+2026-02-11 14:53:40,155 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 14:53:40,157 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 14:53:40,158 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 14:53:40,158 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:53:40,159 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:53:40,163 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 14:53:40,164 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 14:53:40,164 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 14:53:40,165 - pages - INFO - 开始注册页面路由...
+2026-02-11 14:53:40,172 - pages - INFO - 页面路由注册完成
+2026-02-11 14:53:40,172 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 14:53:40,180 - strategies - INFO - 策略路由注册完成
+2026-02-11 14:53:40,180 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 14:53:40,183 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 14:53:40,183 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 14:53:40,183 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 14:53:40,183 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 14:53:40,183 - web.app - INFO - 应用初始化完成
+2026-02-11 14:53:40,184 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 15:05:55,048 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 15:05:55,072 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:05:55,072 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:05:55,080 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:05:55,080 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:05:55,081 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:05:55,081 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:05:55,082 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:05:55,082 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:05:55,082 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:05:55,090 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:05:55,091 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:05:55,093 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:05:55,095 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:05:55,096 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:05:55,096 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:05:55,108 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 15:05:55,109 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 15:05:55,109 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 15:05:55,120 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 15:05:55,120 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 15:05:55,120 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动
+2026-02-11 15:05:55,122 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 15:05:55,122 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 15:05:55,123 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 15:05:55,123 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 15:05:55,123 - web.app - INFO - 数据同步服务已启动
+2026-02-11 15:05:55,126 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 15:05:55,126 - web.app - INFO - 系统组件初始化完成
+2026-02-11 15:05:55,135 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 15:05:55,138 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 15:05:55,139 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 15:05:55,139 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:05:55,139 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:05:55,140 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 15:05:55,141 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 15:05:55,141 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 15:05:55,142 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 15:05:55,142 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 15:05:55,144 - etf - INFO - ETF 路由注册完成
+2026-02-11 15:05:55,144 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 15:05:55,147 - funds - INFO - 基金相关路由已注册
+2026-02-11 15:05:55,147 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 15:05:55,148 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 15:05:55,149 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 15:05:55,149 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:55,150 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:55,155 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 15:05:55,156 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 15:05:55,157 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:55,158 - pages - INFO - 开始注册页面路由...
+2026-02-11 15:05:55,162 - pages - INFO - 页面路由注册完成
+2026-02-11 15:05:55,162 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 15:05:55,169 - strategies - INFO - 策略路由注册完成
+2026-02-11 15:05:55,170 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 15:05:55,173 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 15:05:55,174 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 15:05:55,174 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 15:05:55,176 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 15:05:55,176 - web.app - INFO - 应用初始化完成
+2026-02-11 15:05:55,176 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 15:05:55,177 - __main__ - INFO - ============================================================
+2026-02-11 15:05:55,177 - __main__ - INFO - 基金数据缓存系统初始化
+2026-02-11 15:05:55,178 - __main__ - INFO - ============================================================
+2026-02-11 15:05:55,178 - __main__ - INFO - 连接数据库...
+2026-02-11 15:05:55,184 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:05:55,185 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:05:55,211 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:05:55,211 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:05:55,212 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:05:55,212 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:05:55,213 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:05:55,213 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:05:55,213 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:05:55,219 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:05:55,221 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:05:55,223 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:05:55,224 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:05:55,226 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:05:55,226 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:05:55,227 - __main__ - INFO - 开始创建缓存表...
+2026-02-11 15:05:55,261 - __main__ - INFO - 表 1/5 创建成功
+2026-02-11 15:05:55,292 - __main__ - INFO - 表 2/5 创建成功
+2026-02-11 15:05:55,325 - __main__ - INFO - 表 3/5 创建成功
+2026-02-11 15:05:55,355 - __main__ - INFO - 表 4/5 创建成功
+2026-02-11 15:05:55,381 - __main__ - INFO - 表 5/5 创建成功
+2026-02-11 15:05:55,381 - __main__ - INFO - 所有缓存表创建完成
+2026-02-11 15:05:55,382 - __main__ - INFO - 初始化缓存元数据...
+2026-02-11 15:05:55,383 - __main__ - INFO - 发现 5 只持仓基金
+2026-02-11 15:05:55,395 - __main__ - INFO - 缓存元数据初始化完成
+2026-02-11 15:05:55,395 - __main__ - INFO - ============================================================
+2026-02-11 15:05:55,395 - __main__ - INFO - 基础初始化完成！
+2026-02-11 15:05:55,396 - __main__ - INFO - 提示：使用 --full 参数可同步历史数据
+2026-02-11 15:05:55,396 - __main__ - INFO - 提示：系统会自动在晚上22:00执行数据同步
+2026-02-11 15:05:55,396 - __main__ - INFO - ============================================================
+2026-02-11 15:05:58,081 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 15:05:58,105 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:05:58,106 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:05:58,126 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:05:58,126 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:05:58,127 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:05:58,127 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:05:58,127 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:05:58,128 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:05:58,128 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:05:58,135 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:05:58,136 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:05:58,138 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:05:58,139 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:05:58,141 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:05:58,142 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:05:58,152 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 15:05:58,153 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 15:05:58,153 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 15:05:58,157 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 15:05:58,157 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 15:05:58,158 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动
+2026-02-11 15:05:58,159 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 15:05:58,159 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 15:05:58,160 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 15:05:58,160 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 15:05:58,160 - web.app - INFO - 数据同步服务已启动
+2026-02-11 15:05:58,162 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 15:05:58,162 - web.app - INFO - 系统组件初始化完成
+2026-02-11 15:05:58,179 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 15:05:58,182 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 15:05:58,184 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 15:05:58,184 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:05:58,184 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:05:58,184 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 15:05:58,186 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 15:05:58,187 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 15:05:58,187 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 15:05:58,188 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 15:05:58,191 - etf - INFO - ETF 路由注册完成
+2026-02-11 15:05:58,192 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 15:05:58,196 - funds - INFO - 基金相关路由已注册
+2026-02-11 15:05:58,196 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 15:05:58,198 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 15:05:58,199 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 15:05:58,199 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:58,200 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:58,204 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 15:05:58,205 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 15:05:58,205 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:05:58,206 - pages - INFO - 开始注册页面路由...
+2026-02-11 15:05:58,211 - pages - INFO - 页面路由注册完成
+2026-02-11 15:05:58,211 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 15:05:58,217 - strategies - INFO - 策略路由注册完成
+2026-02-11 15:05:58,217 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 15:05:58,220 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 15:05:58,220 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 15:05:58,220 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 15:05:58,224 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 15:05:58,224 - web.app - INFO - 应用初始化完成
+2026-02-11 15:05:58,224 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 15:05:58,225 - __main__ - INFO - ============================================================
+2026-02-11 15:05:58,225 - __main__ - INFO - 基金数据缓存系统初始化
+2026-02-11 15:05:58,226 - __main__ - INFO - ============================================================
+2026-02-11 15:05:58,226 - __main__ - INFO - 连接数据库...
+2026-02-11 15:05:58,245 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:05:58,246 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:05:58,266 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:05:58,266 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:05:58,266 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:05:58,267 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:05:58,268 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:05:58,268 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:05:58,268 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:05:58,275 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:05:58,277 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:05:58,279 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:05:58,281 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:05:58,282 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:05:58,283 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:05:58,283 - __main__ - INFO - 开始创建缓存表...
+2026-02-11 15:05:58,286 - __main__ - INFO - 表 1/5 创建成功
+2026-02-11 15:05:58,288 - __main__ - INFO - 表 2/5 创建成功
+2026-02-11 15:05:58,291 - __main__ - INFO - 表 3/5 创建成功
+2026-02-11 15:05:58,294 - __main__ - INFO - 表 4/5 创建成功
+2026-02-11 15:05:58,298 - __main__ - INFO - 表 5/5 创建成功
+2026-02-11 15:05:58,298 - __main__ - INFO - 所有缓存表创建完成
+2026-02-11 15:05:58,298 - __main__ - INFO - 初始化缓存元数据...
+2026-02-11 15:05:58,300 - __main__ - INFO - 发现 5 只持仓基金
+2026-02-11 15:05:58,313 - __main__ - INFO - 缓存元数据初始化完成
+2026-02-11 15:05:58,314 - __main__ - INFO - ============================================================
+2026-02-11 15:05:58,314 - __main__ - INFO - 基础初始化完成！
+2026-02-11 15:05:58,314 - __main__ - INFO - 提示：使用 --full 参数可同步历史数据
+2026-02-11 15:05:58,314 - __main__ - INFO - 提示：系统会自动在晚上22:00执行数据同步
+2026-02-11 15:05:58,314 - __main__ - INFO - ============================================================
+2026-02-11 15:06:48,970 - web.app - INFO - 开始初始化基金分析系统...
+2026-02-11 15:06:49,013 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:06:49,014 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:06:49,040 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:06:49,040 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:06:49,041 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:06:49,041 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:06:49,043 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:06:49,043 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:06:49,043 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:06:49,054 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:06:49,056 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:06:49,058 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:06:49,060 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:06:49,061 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:06:49,061 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:06:49,073 - backtesting.strategy_config - INFO - 配置文件加载成功: D:\coding\traeCN_project\py4zinia\pro2\fund_search\shared\strategy_config.yaml
+2026-02-11 15:06:49,073 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 15:06:49,073 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 15:06:49,079 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 15:06:49,080 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 15:06:49,080 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动
+2026-02-11 15:06:49,081 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 15:06:49,082 - services.fund_nav_cache_manager - INFO - FundNavCacheManager 初始化完成，默认内存缓存TTL=15分钟
+2026-02-11 15:06:49,083 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 15:06:49,083 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 15:06:49,084 - web.app - INFO - 数据同步服务已启动
+2026-02-11 15:06:49,085 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 15:06:49,086 - web.app - INFO - 系统组件初始化完成
+2026-02-11 15:06:49,095 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 15:06:49,098 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 15:06:49,099 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 15:06:49,100 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:06:49,100 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:06:49,100 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 15:06:49,101 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 15:06:49,101 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 15:06:49,101 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 15:06:49,102 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 15:06:49,104 - etf - INFO - ETF 路由注册完成
+2026-02-11 15:06:49,104 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 15:06:49,107 - funds - INFO - 基金相关路由已注册
+2026-02-11 15:06:49,107 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 15:06:49,109 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: partially initialized module 'services.fund_business_service' from 'D:\coding\traeCN_project\py4zinia\pro2\fund_search\services\fund_business_service.py' has no attribute 'fund_repo' (most likely due to a circular import)
+2026-02-11 15:06:49,110 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 15:06:49,110 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,111 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,115 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 15:06:49,116 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 15:06:49,116 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,117 - pages - INFO - 开始注册页面路由...
+2026-02-11 15:06:49,121 - pages - INFO - 页面路由注册完成
+2026-02-11 15:06:49,121 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 15:06:49,128 - strategies - INFO - 策略路由注册完成
+2026-02-11 15:06:49,128 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 15:06:49,131 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 15:06:49,131 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 15:06:49,132 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 15:06:49,133 - web.app - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 15:06:49,134 - web.app - INFO - 应用初始化完成
+2026-02-11 15:06:49,134 - services.fund_business_service - INFO - 基金业务服务初始化完成
+2026-02-11 15:06:49,135 - __main__ - INFO - 开始初始化基金分析系统...
+2026-02-11 15:06:49,160 - data_retrieval.enhanced_database - INFO - 数据库 fund_analysis 检查/创建成功
+2026-02-11 15:06:49,161 - data_retrieval.enhanced_database - INFO - 数据库引擎创建成功
+2026-02-11 15:06:49,180 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_ytd 已存在，跳过
+2026-02-11 15:06:49,180 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_1y 已存在，跳过
+2026-02-11 15:06:49,180 - data_retrieval.enhanced_database - INFO - 字段 sharpe_ratio_all 已存在，跳过
+2026-02-11 15:06:49,180 - data_retrieval.enhanced_database - INFO - 夏普比率字段检查完成
+2026-02-11 15:06:49,182 - data_retrieval.enhanced_database - INFO - 字段 yesterday_return 不存在，跳过删除
+2026-02-11 15:06:49,182 - data_retrieval.enhanced_database - INFO - 字段 daily_return 不存在，跳过删除
+2026-02-11 15:06:49,183 - data_retrieval.enhanced_database - INFO - 冗余字段清理完成
+2026-02-11 15:06:49,187 - data_retrieval.enhanced_database - INFO - user_holdings表notes列已存在
+2026-02-11 15:06:49,189 - data_retrieval.enhanced_database - INFO - 用户策略表 user_strategies 创建/检查完成
+2026-02-11 15:06:49,190 - data_retrieval.enhanced_database - INFO - 策略回测结果表 strategy_backtest_results 创建/检查完成
+2026-02-11 15:06:49,191 - data_retrieval.enhanced_database - INFO - 基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成
+2026-02-11 15:06:49,193 - data_retrieval.enhanced_database - INFO - 用户操作记录表 user_operations 创建/检查完成
+2026-02-11 15:06:49,193 - data_retrieval.enhanced_database - INFO - 数据库表结构初始化完成
+2026-02-11 15:06:49,193 - backtesting.unified_strategy_engine - INFO - 统一策略引擎初始化完成
+2026-02-11 15:06:49,193 - data_retrieval.multi_source_adapter - INFO - 从配置文件获取Tushare token: 5ff19facae...
+2026-02-11 15:06:49,196 - data_retrieval.multi_source_fund_data - INFO - Tushare 初始化成功
+2026-02-11 15:06:49,197 - data_retrieval.multi_source_fund_data - INFO - MultiSourceFundData 初始化完成
+2026-02-11 15:06:49,197 - data_retrieval.multi_source_adapter - INFO - MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动
+2026-02-11 15:06:49,197 - data_retrieval.heavyweight_stocks_fetcher - INFO - 重仓股数据获取器已初始化数据库连接
+2026-02-11 15:06:49,198 - services.fund_data_sync_service - INFO - 基金数据同步服务已启动
+2026-02-11 15:06:49,198 - services.fund_data_sync_service - INFO - 定时任务：16:00净值同步 | 16:10绩效计算 | 16:20快照生成
+2026-02-11 15:06:49,198 - __main__ - INFO - 数据同步服务已启动
+2026-02-11 15:06:49,201 - services.cache_api_routes - INFO - 缓存API路由已注册
+2026-02-11 15:06:49,201 - __main__ - INFO - 系统组件初始化完成
+2026-02-11 15:06:49,206 - web.utils.auto_router - INFO - 路由模块注册成功: backtest
+2026-02-11 15:06:49,208 - web.utils.auto_router - INFO - 路由模块注册成功: builtin_strategies
+2026-02-11 15:06:49,208 - dashboard - INFO - Dashboard路由注册开始，收到参数: ['db_manager', 'strategy_engine', 'strategy_evaluator', 'fund_data_manager', 'cache_manager', 'holding_service', 'sync_service']
+2026-02-11 15:06:49,209 - dashboard - INFO - 组件初始化状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:06:49,209 - dashboard - INFO - 最终组件状态 - db_manager: True, fund_data_manager: True
+2026-02-11 15:06:49,209 - dashboard - INFO - 开始注册dashboard路由...
+2026-02-11 15:06:49,210 - dashboard - INFO - 应用路由数量: 27
+2026-02-11 15:06:49,210 - dashboard - INFO - 已注册的dashboard路由: ['/api/dashboard/stats', '/api/dashboard/profit-trend', '/api/dashboard/allocation', '/api/dashboard/holding-stocks', '/api/dashboard/recent-activities']
+2026-02-11 15:06:49,210 - dashboard - INFO - Dashboard 路由注册完成
+2026-02-11 15:06:49,211 - web.utils.auto_router - INFO - 路由模块注册成功: dashboard
+2026-02-11 15:06:49,213 - etf - INFO - ETF 路由注册完成
+2026-02-11 15:06:49,213 - web.utils.auto_router - INFO - 路由模块注册成功: etf
+2026-02-11 15:06:49,216 - funds - INFO - 基金相关路由已注册
+2026-02-11 15:06:49,216 - web.utils.auto_router - INFO - 路由模块注册成功: funds
+2026-02-11 15:06:49,217 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,218 - funds_v2_complete - INFO - 注册新版基金路由 v2 (complete)
+2026-02-11 15:06:49,218 - web.utils.auto_router - ERROR - 路由模块注册失败 funds_v2_complete: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,219 - web.utils.auto_router - ERROR - 路由模块注册失败 fund_api_new: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,223 - web.utils.auto_router - INFO - 路由模块注册成功: holdings
+2026-02-11 15:06:49,224 - holdings_v2 - INFO - 注册新版持仓路由 v2
+2026-02-11 15:06:49,224 - web.utils.auto_router - ERROR - 路由模块注册失败 holdings_v2: api_endpoint() takes 0 positional arguments but 1 was given
+2026-02-11 15:06:49,224 - pages - INFO - 开始注册页面路由...
+2026-02-11 15:06:49,229 - pages - INFO - 页面路由注册完成
+2026-02-11 15:06:49,229 - web.utils.auto_router - INFO - 路由模块注册成功: pages
+2026-02-11 15:06:49,232 - strategies - INFO - 策略路由注册完成
+2026-02-11 15:06:49,233 - web.utils.auto_router - INFO - 路由模块注册成功: strategies
+2026-02-11 15:06:49,235 - user_strategies - INFO - 用户策略管理 API 路由已注册
+2026-02-11 15:06:49,236 - web.utils.auto_router - INFO - 路由模块注册成功: user_strategies
+2026-02-11 15:06:49,236 - web.utils.auto_router - INFO - 路由注册完成: 9/13 个模块注册成功
+2026-02-11 15:06:49,238 - __main__ - WARNING - 以下路由模块注册失败: funds_v2, funds_v2_complete, fund_api_new, holdings_v2
+2026-02-11 15:06:49,238 - __main__ - INFO - 应用初始化完成
+2026-02-11 15:06:49,238 - __main__ - INFO - 启动基金分析系统 v2.0
+2026-02-11 15:06:49,239 - __main__ - INFO - 监听地址: 0.0.0.0:5001
+2026-02-11 15:06:49,239 - __main__ - INFO - 调试模式: False
+2026-02-11 15:06:49,243 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5001
+ * Running on http://192.168.3.80:5001
+2026-02-11 15:06:49,243 - werkzeug - INFO - [33mPress CTRL+C to quit[0m

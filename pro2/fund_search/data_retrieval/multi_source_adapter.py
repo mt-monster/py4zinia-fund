@@ -3,6 +3,12 @@
 """
 MultiSourceFundData 适配器
 使 MultiSourceFundData 兼容 EnhancedFundData 的接口
+
+缓存策略：
+1. 首次访问：从 Tushare 获取完整数据，存入缓存
+2. 非首次访问：优先使用缓存数据，但 today_return 实时计算
+3. prev_day_return 可缓存（1天有效期）
+4. current_nav 可缓存（1小时有效期）
 """
 
 import pandas as pd
@@ -13,6 +19,7 @@ import logging
 import time
 
 from .multi_source_fund_data import MultiSourceFundData
+from .fund_cache_manager import FundDataCache
 
 logger = logging.getLogger(__name__)
 
@@ -21,15 +28,21 @@ class MultiSourceDataAdapter(MultiSourceFundData):
     """
     MultiSourceFundData 适配器类
     兼容 EnhancedFundData 的接口方法
+    
+    缓存策略：
+    - prev_day_return: 缓存1天（昨日数据不常变）
+    - current_nav: 缓存1小时（净值相对稳定）
+    - today_return: 实时计算（必须实时）
     """
     
-    def __init__(self, tushare_token: Optional[str] = None, timeout: int = 10):
+    def __init__(self, tushare_token: Optional[str] = None, timeout: int = 10, db_manager=None):
         """
         初始化适配器
         
         Args:
             tushare_token: Tushare API token，如果不提供则从配置中读取
             timeout: 请求超时时间(秒)
+            db_manager: 数据库管理器，用于持久化缓存
         """
         # 如果没有提供token，则从配置中获取
         if tushare_token is None:
@@ -42,11 +55,21 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 tushare_token = '5ff19facae0e5b26a407d491d33707a9884a39a714a0d76b6495725b'
         
         super().__init__(tushare_token, timeout)
-        logger.info("MultiSourceDataAdapter 初始化完成，Tushare优先级已启用")
+        
+        # 初始化缓存管理器
+        self.cache = FundDataCache(db_manager)
+        
+        logger.info("MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动")
     
     def get_realtime_data(self, fund_code: str, fund_name: str = None) -> Dict:
         """
-        获取基金实时数据（兼容 EnhancedFundData 接口）
+        获取基金实时数据（带缓存策略）
+        
+        缓存策略：
+        1. 首次访问：从 Tushare 获取完整数据，存入缓存
+        2. 非首次访问：优先使用缓存数据，但 today_return 实时计算
+        3. prev_day_return 可缓存（1天有效期）
+        4. QDII基金特殊处理：昨日收益率为0时前向追溯
         
         Args:
             fund_code: 基金代码
@@ -59,133 +82,259 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             from datetime import datetime
             today_str = datetime.now().strftime('%Y-%m-%d')
             
-            logger.info(f"开始获取基金 {fund_code} 实时数据")
+            logger.info(f"开始获取基金 {fund_code} 实时数据（带缓存策略）")
             
             # 判断是否为QDII基金
             is_qdii = self.is_qdii_fund(fund_code, fund_name)
             logger.debug(f"基金 {fund_code} 是否为QDII: {is_qdii}")
             
-            if is_qdii:
-                # QDII基金使用专门方法
-                logger.debug(f"使用QDII专用方法获取基金 {fund_code} 数据")
-                qdii_data = self.get_qdii_fund_data(fund_code)
-                if qdii_data and pd.notna(qdii_data.get('current_nav')) and qdii_data.get('current_nav', 0) > 0:
-                    # 获取昨日收益率
-                    prev_day_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
-                    logger.debug(f"QDII基金 {fund_code} 昨日收益率: {prev_day_return}%")
-                    
-                    # 获取实时估值（QDII也可能有实时估值）
-                    estimate_data = self._get_realtime_estimate(fund_code)
-                    
-                    if estimate_data and today_str in estimate_data.get('estimate_time', '') and estimate_data.get('estimate_nav', 0) > 0:
-                        # 有今天的实时估值，使用它计算今日收益率
-                        estimate_nav = estimate_data['estimate_nav']
-                        yesterday_nav = estimate_data.get('yesterday_nav', qdii_data['current_nav'])
-                        if yesterday_nav > 0:
-                            today_return = (estimate_nav - yesterday_nav) / yesterday_nav * 100
-                            today_return = round(today_return, 2)
-                        else:
-                            today_return = qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0
-                    else:
-                        # 无实时估值，使用历史日增长率
-                        today_return = qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0
-                        estimate_nav = qdii_data['current_nav']
-                    
-                    result = {
-                        'fund_code': fund_code,
-                        'fund_name': fund_name or f'基金{fund_code}',
-                        'current_nav': qdii_data['current_nav'],
-                        'previous_nav': qdii_data['previous_nav'],
-                        'daily_return': qdii_data.get('daily_return', 0) if pd.notna(qdii_data.get('daily_return')) else 0,
-                        'today_return': today_return,
-                        'prev_day_return': prev_day_return,
-                        'nav_date': qdii_data['nav_date'],
-                        'data_source': f"tushare_qdii_{qdii_data['data_source']}",
-                        'estimate_nav': estimate_nav,
-                        'estimate_return': today_return
-                    }
-                    logger.info(f"QDII基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
-                    return result
-                else:
-                    logger.warning(f"QDII基金 {fund_code} 数据获取失败或净值无效")
+            # 步骤1：尝试从缓存获取可缓存数据
+            cached_prev_return = self.cache.get_cached_data(fund_code, 'prev_day_return')
+            cached_current_nav = self.cache.get_cached_data(fund_code, 'current_nav')
+            cached_previous_nav = self.cache.get_cached_data(fund_code, 'previous_nav')
             
-            # 普通基金使用最新净值数据
-            logger.debug(f"使用普通方法获取基金 {fund_code} 数据")
-            latest_nav = self.get_fund_latest_nav(fund_code)
-            if latest_nav:
-                logger.debug(f"基金 {fund_code} 最新净值数据获取成功: {latest_nav}")
-                # 获取昨日收益率：从历史数据中获取前一天的日增长率
-                prev_day_return = self._get_yesterday_return(fund_code, latest_nav.get('date'))
-                logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
-                
-                # 获取实时估值数据并计算今日收益率
-                estimate_data = self._get_realtime_estimate(fund_code)
-                if estimate_data and estimate_data.get('estimate_nav', 0) > 0:
-                    # 有实时估值：today_return = (实时估值 - 昨日净值) / 昨日净值 * 100
-                    estimate_nav = estimate_data['estimate_nav']
-                    yesterday_nav = estimate_data.get('yesterday_nav', latest_nav['nav'])
-                    if yesterday_nav > 0:
-                        today_return = (estimate_nav - yesterday_nav) / yesterday_nav * 100
-                        today_return = round(today_return, 2)
-                    else:
-                        today_return = latest_nav['daily_return']
-                else:
-                    # 无实时估值：使用历史数据中的日增长率
-                    today_return = latest_nav['daily_return']
-                    estimate_nav = latest_nav['nav']
-                
-                # 使用新浪实时数据中的昨日净值作为 previous_nav
-                previous_nav = estimate_data.get('yesterday_nav', latest_nav['nav']) if estimate_data else latest_nav.get('previous_nav', latest_nav['nav'])
+            cache_hit = cached_prev_return is not None and cached_current_nav is not None
+            
+            if cache_hit:
+                logger.info(f"基金 {fund_code} 缓存命中，使用缓存数据并实时计算 today_return")
+                # 使用缓存数据，但 today_return 需要实时计算
+                today_return = self._calculate_today_return_realtime(
+                    fund_code, cached_current_nav, cached_previous_nav
+                )
                 
                 result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name or f'基金{fund_code}',
-                    'current_nav': latest_nav['nav'],
-                    'previous_nav': previous_nav,
-                    'daily_return': latest_nav['daily_return'],
+                    'current_nav': cached_current_nav,
+                    'previous_nav': cached_previous_nav or cached_current_nav,
+                    'daily_return': today_return,  # 日涨跌幅使用实时计算的 today_return
                     'today_return': today_return,
-                    'prev_day_return': prev_day_return,
-                    'nav_date': latest_nav['date'],
-                    'data_source': f"tushare_{latest_nav['source']}",
-                    'estimate_nav': estimate_nav,
+                    'prev_day_return': cached_prev_return,
+                    'nav_date': today_str,
+                    'data_source': 'cache_with_realtime',
+                    'estimate_nav': cached_current_nav,
                     'estimate_return': today_return
                 }
-                logger.info(f"普通基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+                logger.info(f"基金 {fund_code} 缓存数据使用成功: today_return={today_return}%, prev_day_return={cached_prev_return}%")
                 return result
-            else:
-                logger.warning(f"基金 {fund_code} 最新净值数据获取失败")
             
-            # 降级到默认值
-            logger.warning(f"基金 {fund_code} 所有数据源都失败，返回默认值")
-            return {
-                'fund_code': fund_code,
-                'fund_name': fund_name or f'基金{fund_code}',
-                'current_nav': 0.0,
-                'previous_nav': 0.0,
-                'daily_return': 0.0,
-                'today_return': 0.0,
-                'prev_day_return': 0.0,
-                'nav_date': datetime.now().strftime('%Y-%m-%d'),
-                'data_source': 'tushare_failed',
-                'estimate_nav': 0.0,
-                'estimate_return': 0.0
-            }
+            # 步骤2：缓存未命中，从数据源获取
+            logger.info(f"基金 {fund_code} 缓存未命中，从 Tushare 获取数据")
+            
+            if is_qdii:
+                # QDII基金使用专门方法
+                result = self._get_qdii_data_with_cache(fund_code, fund_name, today_str)
+            else:
+                # 普通基金使用最新净值数据
+                result = self._get_normal_fund_data_with_cache(fund_code, fund_name, today_str)
+            
+            # 保存到缓存（供下次使用）
+            if result and result.get('current_nav', 0) > 0:
+                self._save_fund_data_to_cache(fund_code, result)
+            
+            return result
             
         except Exception as e:
             logger.error(f"获取基金 {fund_code} 实时数据失败: {e}", exc_info=True)
-            return {
-                'fund_code': fund_code,
-                'fund_name': fund_name or f'基金{fund_code}',
-                'current_nav': 0.0,
-                'previous_nav': 0.0,
-                'daily_return': 0.0,
-                'today_return': 0.0,
-                'prev_day_return': 0.0,
-                'nav_date': datetime.now().strftime('%Y-%m-%d'),
-                'data_source': 'tushare_error',
-                'estimate_nav': 0.0,
-                'estimate_return': 0.0
-            }
+            return self._get_default_fund_data(fund_code, fund_name)
+    
+    def _calculate_today_return_realtime(self, fund_code: str, current_nav: float, previous_nav: float) -> float:
+        """
+        实时计算今日收益率
+        
+        优先使用实时估值接口计算，如果失败则使用缓存的净值计算
+        
+        Args:
+            fund_code: 基金代码
+            current_nav: 当前净值（缓存值）
+            previous_nav: 昨日净值（缓存值）
+            
+        Returns:
+            float: 今日收益率（百分比）
+        """
+        try:
+            # 尝试获取实时估值
+            estimate_data = self._get_realtime_estimate(fund_code)
+            
+            if estimate_data and estimate_data.get('estimate_nav', 0) > 0:
+                estimate_nav = estimate_data['estimate_nav']
+                yesterday_nav = estimate_data.get('yesterday_nav', previous_nav)
+                
+                if yesterday_nav and yesterday_nav > 0:
+                    today_return = (estimate_nav - yesterday_nav) / yesterday_nav * 100
+                    today_return = round(today_return, 2)
+                    logger.debug(f"基金 {fund_code} 使用实时估值计算 today_return: {today_return}%")
+                    return today_return
+            
+            # 无法获取实时估值，使用缓存净值计算
+            if previous_nav and previous_nav > 0 and current_nav and current_nav > 0:
+                today_return = (current_nav - previous_nav) / previous_nav * 100
+                today_return = round(today_return, 2)
+                logger.debug(f"基金 {fund_code} 使用缓存净值计算 today_return: {today_return}%")
+                return today_return
+            
+            logger.warning(f"基金 {fund_code} 无法计算 today_return，净值数据无效")
+            return 0.0
+            
+        except Exception as e:
+            logger.warning(f"基金 {fund_code} 计算 today_return 失败: {e}")
+            return 0.0
+    
+    def _get_qdii_data_with_cache(self, fund_code: str, fund_name: str, today_str: str) -> Dict:
+        """
+        获取QDII基金数据（带缓存逻辑）
+        
+        Args:
+            fund_code: 基金代码
+            fund_name: 基金名称
+            today_str: 今日日期字符串
+            
+        Returns:
+            dict: 基金数据
+        """
+        logger.debug(f"使用QDII专用方法获取基金 {fund_code} 数据")
+        qdii_data = self.get_qdii_fund_data(fund_code)
+        
+        if not qdii_data or not pd.notna(qdii_data.get('current_nav')) or qdii_data.get('current_nav', 0) <= 0:
+            logger.warning(f"QDII基金 {fund_code} 数据获取失败或净值无效")
+            return self._get_default_fund_data(fund_code, fund_name)
+        
+        # 获取昨日收益率（带前向追溯）
+        prev_day_return = self._get_yesterday_return(fund_code, qdii_data.get('nav_date'))
+        
+        # 如果昨日收益率为0且是QDII基金，尝试前向追溯
+        if prev_day_return == 0.0:
+            logger.info(f"QDII基金 {fund_code} 昨日收益率为0，尝试前向追溯")
+            df = self.get_fund_nav_history(fund_code, source='auto')
+            if df is not None and not df.empty and len(df) >= 2:
+                traced_return = self._get_previous_nonzero_return(df, fund_code)
+                if traced_return != 0.0:
+                    prev_day_return = traced_return
+                    logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {prev_day_return}%")
+        
+        # 获取实时估值并计算 today_return
+        today_return = self._calculate_today_return_realtime(
+            fund_code,
+            qdii_data['current_nav'],
+            qdii_data.get('previous_nav', qdii_data['current_nav'])
+        )
+        
+        result = {
+            'fund_code': fund_code,
+            'fund_name': fund_name or f'基金{fund_code}',
+            'current_nav': qdii_data['current_nav'],
+            'previous_nav': qdii_data.get('previous_nav', qdii_data['current_nav']),
+            'daily_return': today_return,
+            'today_return': today_return,
+            'prev_day_return': prev_day_return,
+            'nav_date': qdii_data.get('nav_date', today_str),
+            'data_source': f"tushare_qdii_{qdii_data.get('data_source', 'unknown')}",
+            'estimate_nav': qdii_data['current_nav'],
+            'estimate_return': today_return
+        }
+        
+        logger.info(f"QDII基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+        return result
+    
+    def _get_normal_fund_data_with_cache(self, fund_code: str, fund_name: str, today_str: str) -> Dict:
+        """
+        获取普通基金数据（带缓存逻辑）
+        
+        Args:
+            fund_code: 基金代码
+            fund_name: 基金名称
+            today_str: 今日日期字符串
+            
+        Returns:
+            dict: 基金数据
+        """
+        logger.debug(f"使用普通方法获取基金 {fund_code} 数据")
+        latest_nav = self.get_fund_latest_nav(fund_code)
+        
+        if not latest_nav:
+            logger.warning(f"基金 {fund_code} 最新净值数据获取失败")
+            return self._get_default_fund_data(fund_code, fund_name)
+        
+        logger.debug(f"基金 {fund_code} 最新净值数据获取成功: {latest_nav}")
+        
+        # 获取昨日收益率
+        prev_day_return = self._get_yesterday_return(fund_code, latest_nav.get('date'))
+        logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
+        
+        # 获取实时估值并计算 today_return
+        today_return = self._calculate_today_return_realtime(
+            fund_code,
+            latest_nav['nav'],
+            latest_nav.get('previous_nav', latest_nav['nav'])
+        )
+        
+        # 使用新浪实时数据中的昨日净值作为 previous_nav
+        estimate_data = self._get_realtime_estimate(fund_code)
+        previous_nav = estimate_data.get('yesterday_nav', latest_nav['nav']) if estimate_data else latest_nav.get('previous_nav', latest_nav['nav'])
+        
+        result = {
+            'fund_code': fund_code,
+            'fund_name': fund_name or f'基金{fund_code}',
+            'current_nav': latest_nav['nav'],
+            'previous_nav': previous_nav,
+            'daily_return': today_return,
+            'today_return': today_return,
+            'prev_day_return': prev_day_return,
+            'nav_date': latest_nav.get('date', today_str),
+            'data_source': f"tushare_{latest_nav.get('source', 'unknown')}",
+            'estimate_nav': estimate_data.get('estimate_nav', latest_nav['nav']) if estimate_data else latest_nav['nav'],
+            'estimate_return': today_return
+        }
+        
+        logger.info(f"普通基金 {fund_code} 数据获取完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
+        return result
+    
+    def _save_fund_data_to_cache(self, fund_code: str, data: Dict):
+        """
+        保存基金数据到缓存
+        
+        Args:
+            fund_code: 基金代码
+            data: 基金数据字典
+        """
+        try:
+            # 保存到内存缓存
+            self.cache.save_cached_data(fund_code, 'prev_day_return', data.get('prev_day_return'))
+            self.cache.save_cached_data(fund_code, 'current_nav', data.get('current_nav'))
+            self.cache.save_cached_data(fund_code, 'previous_nav', data.get('previous_nav'))
+            
+            # 持久化到数据库缓存
+            self.cache.save_cached_data(fund_code, 'full_data', data, persist=True)
+            
+            logger.debug(f"基金 {fund_code} 数据已保存到缓存")
+        except Exception as e:
+            logger.warning(f"保存基金 {fund_code} 数据到缓存失败: {e}")
+    
+    def _get_default_fund_data(self, fund_code: str, fund_name: str = None) -> Dict:
+        """
+        获取默认基金数据（当所有数据源都失败时）
+        
+        Args:
+            fund_code: 基金代码
+            fund_name: 基金名称
+            
+        Returns:
+            dict: 默认基金数据
+        """
+        logger.warning(f"基金 {fund_code} 所有数据源都失败，返回默认值")
+        return {
+            'fund_code': fund_code,
+            'fund_name': fund_name or f'基金{fund_code}',
+            'current_nav': 0.0,
+            'previous_nav': 0.0,
+            'daily_return': 0.0,
+            'today_return': 0.0,
+            'prev_day_return': 0.0,
+            'nav_date': datetime.now().strftime('%Y-%m-%d'),
+            'data_source': 'tushare_failed',
+            'estimate_nav': 0.0,
+            'estimate_return': 0.0
+        }
     
     def _get_yesterday_return(self, fund_code: str, latest_date: str = None) -> float:
         """
@@ -400,6 +549,97 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             logger.debug(f"东方财富估值获取失败 {fund_code}: {e}")
         
         return None
+    
+    def get_batch_realtime_data(self, fund_codes: List[str], fund_names: Dict[str, str] = None) -> Dict[str, Dict]:
+        """
+        批量获取基金实时数据（带缓存优化）
+        
+        优先使用缓存数据，减少API调用次数
+        
+        Args:
+            fund_codes: 基金代码列表
+            fund_names: 基金名称字典 {code: name}
+            
+        Returns:
+            Dict[基金代码, 基金数据]
+        """
+        if fund_names is None:
+            fund_names = {}
+        
+        results = {}
+        missing_codes = []
+        
+        logger.info(f"批量获取 {len(fund_codes)} 只基金数据")
+        
+        # 步骤1：尝试从缓存获取
+        for code in fund_codes:
+            cached_prev = self.cache.get_cached_data(code, 'prev_day_return')
+            cached_nav = self.cache.get_cached_data(code, 'current_nav')
+            cached_prev_nav = self.cache.get_cached_data(code, 'previous_nav')
+            
+            if cached_prev is not None and cached_nav is not None:
+                # 缓存命中，实时计算 today_return
+                today_return = self._calculate_today_return_realtime(
+                    code, cached_nav, cached_prev_nav
+                )
+                
+                results[code] = {
+                    'fund_code': code,
+                    'fund_name': fund_names.get(code, f'基金{code}'),
+                    'current_nav': cached_nav,
+                    'previous_nav': cached_prev_nav or cached_nav,
+                    'daily_return': today_return,
+                    'today_return': today_return,
+                    'prev_day_return': cached_prev,
+                    'nav_date': datetime.now().strftime('%Y-%m-%d'),
+                    'data_source': 'cache',
+                    'estimate_nav': cached_nav,
+                    'estimate_return': today_return
+                }
+            else:
+                missing_codes.append(code)
+        
+        logger.info(f"缓存命中: {len(results)}/{len(fund_codes)}, 需从API获取: {len(missing_codes)}")
+        
+        # 步骤2：对未命中的基金，批量从API获取
+        if missing_codes:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            
+            def fetch_single(code):
+                try:
+                    return code, self.get_realtime_data(code, fund_names.get(code))
+                except Exception as e:
+                    logger.error(f"获取基金 {code} 数据失败: {e}")
+                    return code, self._get_default_fund_data(code, fund_names.get(code))
+            
+            # 使用线程池并行获取（最多5个并发）
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                future_to_code = {executor.submit(fetch_single, code): code for code in missing_codes}
+                
+                for future in as_completed(future_to_code):
+                    code, data = future.result()
+                    results[code] = data
+        
+        return results
+    
+    def invalidate_fund_cache(self, fund_code: str = None):
+        """
+        使基金缓存失效
+        
+        Args:
+            fund_code: 基金代码，如果为None则清除所有缓存
+        """
+        self.cache.invalidate_cache(fund_code)
+        logger.info(f"基金 {fund_code or 'all'} 缓存已清除")
+    
+    def get_cache_statistics(self) -> Dict:
+        """
+        获取缓存统计信息
+        
+        Returns:
+            dict: 缓存统计
+        """
+        return self.cache.get_cache_stats()
     
     def get_historical_data(self, fund_code: str, days: int = 30, 
                           start_date: str = None, end_date: str = None) -> pd.DataFrame:

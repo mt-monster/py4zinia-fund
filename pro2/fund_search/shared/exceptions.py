@@ -81,7 +81,7 @@ class BaseApplicationError(Exception):
         """记录错误日志"""
         log_data = {
             'error_code': self.error_code.name,
-            'message': self.message,
+            'error_msg': self.message,
             'details': self.details,
             'http_status': self.http_status
         }

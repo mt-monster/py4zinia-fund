@@ -66,9 +66,13 @@ class FundBusinessService:
             return
         
         if db_manager is None:
-            # 尝试从全局获取
-            from web.app import components
-            db_manager = components.get('db_manager')
+            # 尝试从全局获取（延迟导入避免循环导入）
+            try:
+                from web.app import components
+                db_manager = components.get('db_manager')
+            except ImportError:
+                # app.py 尚未完全初始化，暂时不设置 db_manager
+                db_manager = None
         
         self.db_manager = db_manager
         
