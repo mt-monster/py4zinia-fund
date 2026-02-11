@@ -8,7 +8,7 @@ JSON工具模块
 import json
 import numpy as np
 import pandas as pd
-from flask import jsonify
+from flask import jsonify, Response
 from typing import Any, Dict, List, Union
 import logging
 
@@ -45,40 +45,101 @@ def _is_nan_or_inf(val) -> bool:
     return False
 
 
-def safe_json_serialize(obj: Any) -> Any:
+def safe_json_serialize(obj: Any, _seen: set = None) -> Any:
     """
     安全的JSON序列化函数
-    处理NaN、Infinity、-Infinity等特殊值
+    处理NaN、Infinity、-Infinity等特殊值，以及循环引用
     
     Args:
         obj: 要序列化的对象
+        _seen: 内部使用的已见对象集合（用于检测循环引用）
         
     Returns:
         处理后的可JSON序列化对象
     """
-    if isinstance(obj, dict):
-        return {key: safe_json_serialize(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [safe_json_serialize(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return [safe_json_serialize(item) for item in obj]
-    elif isinstance(obj, (np.integer, np.floating)):
-        # 处理numpy数值类型
-        if _is_nan_or_inf(obj):
+    if _seen is None:
+        _seen = set()
+    
+    # 检测循环引用
+    obj_id = id(obj)
+    if obj_id in _seen:
+        return "[Circular Reference]"
+    
+    # 对复杂对象类型添加到已见集合
+    if isinstance(obj, (dict, list, tuple)):
+        _seen.add(obj_id)
+    
+    try:
+        if isinstance(obj, dict):
+            return {key: safe_json_serialize(value, _seen) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [safe_json_serialize(item, _seen) for item in obj]
+        elif isinstance(obj, tuple):
+            return [safe_json_serialize(item, _seen) for item in obj]
+        elif isinstance(obj, np.ndarray):
+            # 处理numpy数组
+            return safe_json_serialize(obj.tolist(), _seen)
+        elif isinstance(obj, np.integer):
+            # 处理所有numpy整数类型（包括int64, int32等）
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            # 处理所有numpy浮点数类型（包括float64, float32等）
+            if _is_nan_or_inf(obj):
+                return None
+            return float(obj)
+        elif isinstance(obj, (int, float)):
+            # 处理Python数值类型
+            if _is_nan_or_inf(obj):
+                return None
+            return obj
+        elif isinstance(obj, pd.Timestamp):
+            # 处理pandas时间戳
+            return obj.isoformat()
+        elif isinstance(obj, pd.Series):
+            # 处理pandas Series
+            return safe_json_serialize(obj.to_list(), _seen)
+        elif isinstance(obj, pd.DataFrame):
+            # 处理pandas DataFrame
+            return safe_json_serialize(obj.to_dict(orient='records'), _seen)
+        elif obj is None:
             return None
-        return obj.item()
-    elif isinstance(obj, (int, float)):
-        # 处理Python数值类型
-        if _is_nan_or_inf(obj):
+        elif hasattr(obj, '__dict__'):
+            # 处理自定义对象，转换为字典
+            return safe_json_serialize(obj.__dict__, _seen)
+        else:
+            # 对其他类型，尝试检查是否为NaN
+            if _is_nan_or_inf(obj):
+                return None
+            # 尝试转换为字符串
+            try:
+                return str(obj)
+            except:
+                return "[Unserializable Object]"
+    finally:
+        # 清理已见集合（可选，用于减少内存占用）
+        pass
+
+
+def _json_default(obj):
+    """处理json.dumps的default参数"""
+    # 处理numpy整数类型（包括int64, int32等）
+    if isinstance(obj, np.integer):
+        return int(obj)
+    # 处理numpy浮点数类型
+    elif isinstance(obj, np.floating):
+        if np.isnan(obj) or np.isinf(obj):
             return None
-        return obj
-    elif obj is None:
-        return None
-    else:
-        # 对其他类型，尝试检查是否为NaN
-        if _is_nan_or_inf(obj):
-            return None
-        return obj
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    elif isinstance(obj, pd.Series):
+        return obj.to_list()
+    elif isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient='records')
+    # 其他类型转字符串
+    return str(obj)
 
 
 def safe_jsonify(data: Dict[str, Any], **kwargs):
@@ -93,12 +154,11 @@ def safe_jsonify(data: Dict[str, Any], **kwargs):
         Flask Response对象
     """
     try:
-        # 先处理特殊值
+        # 先处理特殊值和循环引用
         safe_data = safe_json_serialize(data)
-        # 使用Python标准json.dumps确保NaN被正确处理
-        json_str = json.dumps(safe_data, cls=SafeJSONEncoder, ensure_ascii=False, allow_nan=False)
+        # 使用Python标准json.dumps，使用default处理剩余类型
+        json_str = json.dumps(safe_data, ensure_ascii=False, allow_nan=False, default=_json_default)
         # 创建Flask Response
-        from flask import Response
         return Response(json_str, mimetype='application/json', **kwargs)
     except Exception as e:
         logger.error(f"JSON序列化失败: {e}")

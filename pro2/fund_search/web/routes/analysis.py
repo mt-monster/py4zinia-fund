@@ -308,11 +308,21 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
     try:
         # 首先收集每只股票关联的基金信息
         stock_fund_map = {}
+        # 缓存基金名称避免重复查询
+        fund_name_cache = {}
+        
         if 'fund_code' in holdings_df.columns:
             for _, row in holdings_df.iterrows():
                 stock_key = (str(row.get('stock_code', '')), str(row.get('stock_name', '')))
                 fund_code = str(row.get('fund_code', ''))
                 proportion = float(row.get('proportion', 0))
+                
+                # 获取基金名称（优先从缓存）
+                if fund_code not in fund_name_cache:
+                    fund_name = row.get('fund_name', '') or get_fund_name_from_db(fund_code) or fund_code
+                    fund_name_cache[fund_code] = fund_name
+                else:
+                    fund_name = fund_name_cache[fund_code]
                 
                 if stock_key not in stock_fund_map:
                     stock_fund_map[stock_key] = []
@@ -322,6 +332,7 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
                 if fund_code and fund_code not in existing_codes:
                     stock_fund_map[stock_key].append({
                         'fund_code': fund_code,
+                        'fund_name': fund_name,
                         'proportion': round(proportion, 2)
                     })
         
@@ -577,16 +588,322 @@ def get_strategy_explanation(today_return, prev_day_return, strategy_result):
 
 
 def get_fund_name_from_db(fund_code):
-    """从数据库获取基金名称"""
+    """从数据库获取基金名称（支持多个数据源）"""
     try:
-        sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
-        result = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if result is not None and not result.empty:
-            return result.iloc[0]['fund_name']
+        # 1. 首先尝试从 fund_basic_info 表获取（标准基金信息表）
+        try:
+            sql = "SELECT fund_name FROM fund_basic_info WHERE fund_code = :fund_code"
+            result = db_manager.execute_query(sql, {'fund_code': fund_code})
+            if result is not None and not result.empty:
+                name = result.iloc[0]['fund_name']
+                if name and name != fund_code:
+                    return name
+        except Exception as e:
+            logger.debug(f"从fund_basic_info获取基金名称失败: {e}")
+        
+        # 2. 尝试从用户持仓表获取
+        try:
+            sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
+            result = db_manager.execute_query(sql, {'fund_code': fund_code})
+            if result is not None and not result.empty:
+                name = result.iloc[0]['fund_name']
+                if name and name != fund_code:
+                    return name
+        except Exception as e:
+            logger.debug(f"从user_holdings获取基金名称失败: {e}")
+        
+        # 3. 尝试从基金分析结果表获取
+        try:
+            sql = "SELECT fund_name FROM fund_analysis_results WHERE fund_code = :fund_code ORDER BY analysis_date DESC LIMIT 1"
+            result = db_manager.execute_query(sql, {'fund_code': fund_code})
+            if result is not None and not result.empty:
+                name = result.iloc[0]['fund_name']
+                if name and name != fund_code:
+                    return name
+        except Exception as e:
+            logger.debug(f"从fund_analysis_results获取基金名称失败: {e}")
+        
+        # 4. 尝试使用akshare实时获取
+        try:
+            import akshare as ak
+            # 方法1: 从基金列表获取
+            try:
+                fund_list = ak.fund_name_em()
+                if '基金代码' in fund_list.columns and '基金简称' in fund_list.columns:
+                    fund_row = fund_list[fund_list['基金代码'] == fund_code]
+                    if not fund_row.empty:
+                        return fund_row.iloc[0]['基金简称']
+            except:
+                pass
+            
+            # 方法2: 从基金基本信息获取
+            try:
+                fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
+                if '基金名称' in fund_info.columns:
+                    return fund_info['基金名称'].values[0]
+            except:
+                pass
+                
+            # 方法3: 从每日基金数据获取
+            try:
+                fund_daily = ak.fund_open_fund_daily_em()
+                if '基金代码' in fund_daily.columns and '基金简称' in fund_daily.columns:
+                    fund_row = fund_daily[fund_daily['基金代码'] == fund_code]
+                    if not fund_row.empty:
+                        return fund_row.iloc[0]['基金简称']
+            except:
+                pass
+        except Exception as e:
+            logger.debug(f"从akshare获取基金名称失败: {e}")
+        
         return None
     except Exception as e:
         logger.warning(f"获取基金名称失败: {e}")
         return None
+
+
+def get_personalized_investment_advice(fund_codes):
+    """
+    获取个性化投资建议（基于策略选择器）
+    
+    为每只基金分析其历史数据、风险特征、收益模式，
+    从策略库中选择最优策略进行个性化分析
+    
+    Args:
+        fund_codes: 基金代码列表
+        
+    Returns:
+        dict: 包含每只基金的个性化投资建议
+    """
+    try:
+        from backtesting.akshare_data_fetcher import fetch_fund_history_from_akshare
+        from backtesting.strategy_selector import get_strategy_selector
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        
+        fund_data_manager = MultiSourceDataAdapter()
+        strategy_selector = get_strategy_selector()
+        
+        results = []
+        strategy_stats = {}
+        
+        for fund_code in fund_codes:
+            try:
+                # 获取基金名称
+                fund_name = get_fund_name_from_db(fund_code) or fund_code
+                
+                # 获取基金历史数据（用于策略分析）
+                historical_data = fetch_fund_history_from_akshare(fund_code, days=252)
+                
+                # 获取实时数据
+                realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+                performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
+                
+                today_return = float(realtime_data.get('today_return', 0.0))
+                prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
+                
+                # 使用策略选择器选择最优策略
+                if historical_data is not None and not historical_data.empty:
+                    match_result = strategy_selector.select_best_strategy(historical_data)
+                    
+                    # 获取基金画像
+                    fund_profile = strategy_selector.analyze_fund_characteristics(historical_data)
+                    
+                    # 获取所有策略对比（用于展示）
+                    all_signals = strategy_selector.get_all_strategy_signals(historical_data)
+                else:
+                    # 数据不足时使用默认策略
+                    from backtesting.advanced_strategies import EnhancedRuleBasedStrategy
+                    default_strategy = EnhancedRuleBasedStrategy()
+                    
+                    # 创建最小数据集
+                    match_result = type('obj', (object,), {
+                        'strategy_name': '增强规则基准策略',
+                        'strategy_type': 'enhanced_rule',
+                        'match_score': 50.0,
+                        'reason': '历史数据不足，使用默认策略',
+                        'signal': default_strategy.generate_signal(
+                            pd.DataFrame({'nav': [1.0, 1.0 + today_return/100]}), 
+                            current_index=1
+                        ),
+                        'backtest_score': 50.0
+                    })()
+                    fund_profile = None
+                    all_signals = []
+                
+                # 构建建议详情
+                signal = match_result.signal
+                
+                fund_result = {
+                    'fund_code': fund_code,
+                    'fund_name': fund_name,
+                    'today_return': round(today_return, 2),
+                    'prev_day_return': round(prev_day_return, 2),
+                    
+                    # 最优策略信息
+                    'optimal_strategy': {
+                        'name': match_result.strategy_name,
+                        'type': match_result.strategy_type,
+                        'match_score': match_result.match_score,
+                        'selection_reason': match_result.reason,
+                        'backtest_score': match_result.backtest_score
+                    },
+                    
+                    # 基金特征画像
+                    'fund_profile': {
+                        'volatility': round(fund_profile.volatility, 4) if fund_profile else None,
+                        'trend_strength': round(fund_profile.trend_strength, 4) if fund_profile else None,
+                        'mean_reversion_score': round(fund_profile.mean_reversion_score, 4) if fund_profile else None,
+                        'sharpe_ratio': round(fund_profile.sharpe_ratio, 4) if fund_profile else performance_metrics.get('sharpe_ratio', 0),
+                        'max_drawdown': round(fund_profile.max_drawdown, 4) if fund_profile else None,
+                        'risk_level': fund_profile.risk_level if fund_profile else 'unknown'
+                    } if fund_profile else None,
+                    
+                    # 当前建议
+                    'advice': {
+                        'action': signal.action,
+                        'amount_multiplier': round(signal.amount_multiplier, 2),
+                        'reason': signal.reason,
+                        'description': signal.description,
+                        'suggestion': signal.suggestion if hasattr(signal, 'suggestion') else '',
+                        'status_label': _get_status_label(signal.action, signal.reason),
+                        'operation_suggestion': _get_operation_suggestion(signal.action, signal.amount_multiplier),
+                        'execution_amount': _get_execution_amount(signal.action, signal.amount_multiplier)
+                    },
+                    
+                    # 所有策略对比（可选展示）
+                    'all_strategies_comparison': [
+                        {
+                            'strategy_name': s['strategy_name'],
+                            'action': s['action'],
+                            'multiplier': round(s['multiplier'], 2),
+                            'reason': s['reason']
+                        }
+                        for s in all_signals
+                    ] if all_signals else []
+                }
+                
+                results.append(fund_result)
+                
+                # 统计策略使用情况
+                strategy_type = match_result.strategy_type
+                strategy_stats[strategy_type] = strategy_stats.get(strategy_type, 0) + 1
+                
+            except Exception as e:
+                logger.warning(f"分析基金 {fund_code} 个性化建议失败: {e}")
+                import traceback
+                traceback.print_exc()
+                
+                # 添加失败记录
+                results.append({
+                    'fund_code': fund_code,
+                    'fund_name': fund_code,
+                    'today_return': 0,
+                    'prev_day_return': 0,
+                    'optimal_strategy': {
+                        'name': '分析失败',
+                        'type': 'error',
+                        'match_score': 0,
+                        'selection_reason': str(e),
+                        'backtest_score': 0
+                    },
+                    'advice': {
+                        'action': 'hold',
+                        'amount_multiplier': 0,
+                        'reason': '分析失败',
+                        'description': '无法获取数据',
+                        'status_label': '数据异常',
+                        'operation_suggestion': '暂时持有',
+                        'execution_amount': '持有不动'
+                    }
+                })
+        
+        # 统计汇总
+        buy_count = sum(1 for r in results if r['advice']['action'] in ['buy', 'strong_buy'])
+        sell_count = sum(1 for r in results if r['advice']['action'] in ['sell', 'redeem'])
+        hold_count = sum(1 for r in results if r['advice']['action'] == 'hold')
+        
+        return {
+            'success': True,
+            'funds': results,
+            'summary': {
+                'total_count': len(fund_codes),
+                'buy_count': buy_count,
+                'sell_count': sell_count,
+                'hold_count': hold_count,
+                'strategy_distribution': strategy_stats,
+                'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'is_personalized': True  # 标记为个性化分析
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"获取个性化投资建议失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e),
+            'funds': [],
+            'summary': {
+                'total_count': len(fund_codes),
+                'buy_count': 0,
+                'sell_count': 0,
+                'hold_count': 0
+            }
+        }
+
+
+def _get_status_label(action, reason):
+    """根据操作和原因生成状态标签"""
+    action_icons = {
+        'buy': '🟢',
+        'strong_buy': '🟢',
+        'weak_buy': '🟢',
+        'sell': '🔴',
+        'redeem': '🔴',
+        'hold': '🟡'
+    }
+    
+    icon = action_icons.get(action, '⚪')
+    
+    # 从reason中提取关键词
+    if '低估' in reason or '超低' in reason:
+        return f"{icon} 低估区域"
+    elif '高估' in reason or '超高' in reason:
+        return f"{icon} 高估区域"
+    elif '金叉' in reason:
+        return f"{icon} 金叉趋势"
+    elif '死叉' in reason:
+        return f"{icon} 死叉趋势"
+    elif '网格' in reason:
+        return f"{icon} 网格触发"
+    else:
+        return f"{icon} {reason[:10]}" if reason else f"{icon} 分析完成"
+
+
+def _get_operation_suggestion(action, multiplier):
+    """生成操作建议"""
+    if action in ['buy', 'strong_buy']:
+        if multiplier >= 2.0:
+            return f"强烈买入({multiplier}×定投额)"
+        elif multiplier >= 1.5:
+            return f"积极买入({multiplier}×定投额)"
+        else:
+            return f"适度买入({multiplier}×定投额)"
+    elif action in ['sell', 'redeem']:
+        return "建议止盈出售"
+    else:
+        return "建议持有观望"
+
+
+def _get_execution_amount(action, multiplier):
+    """生成执行金额建议"""
+    if action in ['buy', 'strong_buy']:
+        return f"买入{multiplier}×基础定投额"
+    elif action in ['sell', 'redeem']:
+        return "赎回部分仓位"
+    else:
+        return "持有不动"
 
 
 # 模块导出
@@ -604,4 +921,5 @@ __all__ = [
     'get_fund_strategy_analysis',
     'get_strategy_explanation',
     'get_fund_name_from_db',
+    'get_personalized_investment_advice',
 ]

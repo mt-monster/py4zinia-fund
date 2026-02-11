@@ -1,0 +1,173 @@
+# 投资策略配置文件（优化版）
+# 简化策略体系：从11个策略精简为6个核心策略
+
+# ============================================
+# 策略阈值配置 (Strategy Thresholds)
+# ============================================
+strategies:
+  # 1. 大涨止盈策略 - 连续上涨后止盈
+  take_profit:
+    conditions:
+      - today_return_min: 0.5
+        today_return_max: .inf
+        prev_day_return_min: 0.0
+        prev_day_return_max: .inf
+    action: weak_sell
+    buy_multiplier: 0.0
+    redeem_amount: 0.05
+    label: "🟡 **大涨止盈**"
+    description: "连续上涨，建议部分止盈（赎回5%仓位）"
+
+  # 2. 温和上涨策略 - 正常上涨（含上涨放缓），持有
+  gentle_rise:
+    conditions:
+      - today_return_min: 0.0
+        today_return_max: 0.5
+        prev_day_return_min: -.inf
+        prev_day_return_max: .inf
+    action: hold
+    buy_multiplier: 0.0
+    redeem_amount: 0
+    label: "🟢 **温和上涨**"
+    description: "基金上涨，建议持有观望"
+
+  # 3. 反转上涨策略 - 由跌转涨，持有（今日较大涨）
+  reversal_up:
+    conditions:
+      - today_return_min: 0.5
+        today_return_max: .inf
+        prev_day_return_min: -.inf
+        prev_day_return_max: 0.0
+    action: hold
+    buy_multiplier: 0.0
+    redeem_amount: 0
+    label: "🔵 **反转上涨**"
+    description: "由跌转涨，建议持有观望"
+
+  # 4. 反转下跌策略 - 由涨转跌，止盈
+  reversal_down:
+    conditions:
+      - today_return_min: -.inf
+        today_return_max: 0.0
+        prev_day_return_min: 0.0
+        prev_day_return_max: .inf
+    action: sell
+    buy_multiplier: 0.0
+    redeem_amount: 0.08
+    label: "🔴 **反转下跌**"
+    description: "由涨转跌，建议止盈（赎回8%仓位）"
+
+  # 5. 小跌买入策略 - 正常下跌，补仓
+  gentle_fall:
+    conditions:
+      - today_return_min: -1.0
+        today_return_max: 0.0
+        prev_day_return_min: -.inf
+        prev_day_return_max: 0.0
+    action: buy
+    buy_multiplier: 1.5
+    redeem_amount: 0
+    label: "🟣 **小跌买入**"
+    description: "基金下跌，建议逢低买入（摊低成本）"
+
+  # 6. 大跌抄底策略 - 大幅下跌，积极买入
+  bottom_fishing:
+    conditions:
+      - today_return_min: -.inf
+        today_return_max: -1.0
+        prev_day_return_min: -.inf
+        prev_day_return_max: .inf
+    action: strong_buy
+    buy_multiplier: 2.5
+    redeem_amount: 0
+    label: "🔴 **大跌抄底**"
+    description: "大幅下跌，建议积极买入（抄底良机）"
+
+# ============================================
+# 买入倍数配置 (Buy Multipliers)
+# ============================================
+buy_multipliers:
+  strong_buy: 2.5      # 强烈买入（大跌时）
+  buy: 1.5             # 正常买入（下跌时）
+  weak_buy: 1.2        # 谨慎买入
+  hold: 0.0            # 持有
+  sell: 0.0            # 卖出
+  weak_sell: 0.0       # 弱卖出
+  stop_loss: 0.0       # 止损
+
+# ============================================
+# 止损配置 (Stop Loss Configuration)
+# ============================================
+stop_loss:
+  warning_threshold: -0.08
+  stop_loss_threshold: -0.12
+  full_redeem: false
+  redeem_ratio: 0.3
+  stop_loss_label: "🛑 **止损触发**"
+  warning_label: "⚠️ **亏损警告**"
+  stop_loss_suggestion: "累计亏损超过阈值，建议赎回30%仓位止损"
+  warning_suggestion: "累计亏损接近止损线，请密切关注"
+
+# ============================================
+# 波动率配置 (Volatility Configuration)
+# ============================================
+volatility:
+  high_threshold: 0.25
+  low_threshold: 0.10
+  high_adjustment: 0.5
+  low_adjustment: 1.2
+  normal_adjustment: 1.0
+  lookback_days: 20
+
+# ============================================
+# 趋势配置 (Trend Configuration)
+# ============================================
+trend:
+  ma_short_period: 5
+  ma_long_period: 10
+  uptrend_adjustment: 1.2
+  downtrend_adjustment: 0.7
+  sideways_adjustment: 1.0
+
+# ============================================
+# 全局风险控制配置
+# ============================================
+global_risk_control:
+  max_total_position: 1.0
+  max_single_fund_position: 0.3
+  min_cash_ratio: 0.1
+  max_fund_count: 10
+  extreme_market_position_limit: 0.5
+  volatility_high_multiplier: 0.7
+  small_fund_multiplier: 0.8
+
+# ============================================
+# 策略执行配置
+# ============================================
+execution_rules:
+  enable_observation_period: true
+  major_operation_observation_days: 3
+  enable_position_control: true
+  enable_market_sentiment: false
+  enable_fundamentals: false
+
+# ============================================
+# 策略优先级（数值越大优先级越高）
+# ============================================
+priority_weights:
+  bottom_fishing: 9
+  take_profit: 8
+  reversal_down: 7
+  reversal_up: 6
+  gentle_fall: 5
+  gentle_rise: 4
+
+# ============================================
+# 默认策略配置
+# ============================================
+default_strategy:
+  action: hold
+  buy_multiplier: 0.0
+  redeem_amount: 0
+  label: "⚪ **观望**"
+  description: "走势不明，建议观望"

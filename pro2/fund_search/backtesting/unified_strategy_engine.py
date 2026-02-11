@@ -241,9 +241,19 @@ class UnifiedStrategyEngine:
                 'comparison_value': today_return - prev_day_return
             }
         
-        # 否则，按原有逻辑遍历所有策略规则
-        # 遍历所有策略规则
-        for strategy_name, rule in self.strategy_rules.items():
+        # 否则，按优先级遍历所有策略规则
+        # 获取优先级配置
+        priority_weights = self.config.get('priority_weights', {})
+        
+        # 按优先级排序（数值越大优先级越高）
+        sorted_strategies = sorted(
+            self.strategy_rules.items(),
+            key=lambda x: priority_weights.get(x[0], 0),
+            reverse=True
+        )
+        
+        # 遍历排序后的策略规则
+        for strategy_name, rule in sorted_strategies:
             conditions = rule.get('conditions', [])
             
             for condition in conditions:
