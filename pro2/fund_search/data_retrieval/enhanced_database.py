@@ -115,20 +115,21 @@ class EnhancedDatabaseManager:
         """创建基金基本信息表"""
         sql = """
         CREATE TABLE IF NOT EXISTS fund_basic_info (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fund_code VARCHAR(10) NOT NULL UNIQUE,
-            fund_name VARCHAR(100) NOT NULL,
-            fund_type VARCHAR(50),
-            fund_company VARCHAR(100),
-            fund_manager VARCHAR(100),
-            establish_date DATE,
-            management_fee DECIMAL(5,4),
-            custody_fee DECIMAL(5,4),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键ID',
+            fund_code VARCHAR(10) NOT NULL UNIQUE COMMENT '基金代码，唯一标识',
+            fund_name VARCHAR(100) NOT NULL COMMENT '基金全称',
+            fund_type VARCHAR(50) COMMENT '基金类型：股票型/债券型/混合型/指数型等',
+            fund_company VARCHAR(100) COMMENT '基金公司/管理人',
+            fund_manager VARCHAR(100) COMMENT '基金经理',
+            establish_date DATE COMMENT '基金成立日期',
+            management_fee DECIMAL(5,4) COMMENT '管理费率(%)',
+            custody_fee DECIMAL(5,4) COMMENT '托管费率(%)',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             INDEX idx_fund_code (fund_code),
             INDEX idx_fund_type (fund_type)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='基金基本信息表 - 存储基金基础档案信息';
         """
         self.execute_sql(sql)
     
@@ -136,31 +137,31 @@ class EnhancedDatabaseManager:
         """创建基金绩效数据表"""
         sql = """
         CREATE TABLE IF NOT EXISTS fund_performance (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fund_code VARCHAR(10) NOT NULL,
-            analysis_date DATE NOT NULL,
-            current_nav DECIMAL(10,4),
-            previous_nav DECIMAL(10,4),
-            daily_return DECIMAL(8,4),
-            nav_date DATE,
-            annualized_return DECIMAL(8,4),
-            sharpe_ratio DECIMAL(8,4),
-            max_drawdown DECIMAL(8,4),
-            volatility DECIMAL(8,4),
-            calmar_ratio DECIMAL(8,4),
-            sortino_ratio DECIMAL(8,4),
-            var_95 DECIMAL(8,4),
-            win_rate DECIMAL(5,4),
-            profit_loss_ratio DECIMAL(8,4),
-            composite_score DECIMAL(5,4),
-            total_return DECIMAL(8,4),
-            data_days INT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键ID',
+            fund_code VARCHAR(10) NOT NULL COMMENT '基金代码',
+            analysis_date DATE NOT NULL COMMENT '分析日期',
+            current_nav DECIMAL(10,4) COMMENT '当日单位净值',
+            previous_nav DECIMAL(10,4) COMMENT '前一日单位净值',
+            nav_date DATE COMMENT '净值日期',
+            annualized_return DECIMAL(8,4) COMMENT '年化收益率(%)',
+            sharpe_ratio DECIMAL(8,4) COMMENT '夏普比率',
+            max_drawdown DECIMAL(8,4) COMMENT '最大回撤(%)',
+            volatility DECIMAL(8,4) COMMENT '波动率(%)',
+            calmar_ratio DECIMAL(8,4) COMMENT '卡玛比率',
+            sortino_ratio DECIMAL(8,4) COMMENT '索提诺比率',
+            var_95 DECIMAL(8,4) COMMENT 'VaR风险价值(95%置信度)',
+            win_rate DECIMAL(5,4) COMMENT '胜率(%)',
+            profit_loss_ratio DECIMAL(8,4) COMMENT '盈亏比',
+            composite_score DECIMAL(5,4) COMMENT '综合评分',
+            total_return DECIMAL(8,4) COMMENT '累计收益率(%)',
+            data_days INT COMMENT '数据天数/样本量',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             INDEX idx_fund_code (fund_code),
             INDEX idx_analysis_date (analysis_date),
             UNIQUE KEY uk_fund_date (fund_code, analysis_date)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='基金绩效数据表 - 存储历史净值和绩效指标（按日期汇总）';
         """
         self.execute_sql(sql)
     
@@ -170,23 +171,24 @@ class EnhancedDatabaseManager:
         """创建分析汇总表"""
         sql = """
         CREATE TABLE IF NOT EXISTS analysis_summary (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            analysis_date DATE NOT NULL UNIQUE,
-            total_funds INT,
-            buy_signals INT,
-            sell_signals INT,
-            hold_signals INT,
-            avg_buy_multiplier DECIMAL(5,2),
-            total_redeem_amount INT,
-            best_performing_fund VARCHAR(10),
-            worst_performing_fund VARCHAR(10),
-            highest_sharpe_fund VARCHAR(10),
-            lowest_volatility_fund VARCHAR(10),
-            report_files JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键ID',
+            analysis_date DATE NOT NULL UNIQUE COMMENT '分析日期',
+            total_funds INT COMMENT '分析基金总数',
+            buy_signals INT COMMENT '买入信号数量',
+            sell_signals INT COMMENT '卖出信号数量',
+            hold_signals INT COMMENT '持有信号数量',
+            avg_buy_multiplier DECIMAL(5,2) COMMENT '平均买入倍率',
+            total_redeem_amount INT COMMENT '总建议赎回金额',
+            best_performing_fund VARCHAR(10) COMMENT '表现最佳基金代码',
+            worst_performing_fund VARCHAR(10) COMMENT '表现最差基金代码',
+            highest_sharpe_fund VARCHAR(10) COMMENT '夏普比率最高基金',
+            lowest_volatility_fund VARCHAR(10) COMMENT '波动率最低基金',
+            report_files JSON COMMENT '报告文件路径（JSON格式）',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             INDEX idx_analysis_date (analysis_date)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='分析汇总表 - 存储每日分析汇总统计';
         """
         self.execute_sql(sql)
     
@@ -195,41 +197,41 @@ class EnhancedDatabaseManager:
         """创建基金分析结果表"""
         sql = """
         CREATE TABLE IF NOT EXISTS fund_analysis_results (
-            fund_code VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-            fund_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-            yesterday_nav FLOAT DEFAULT NULL,
-            current_estimate FLOAT DEFAULT NULL,
-            today_return FLOAT DEFAULT NULL,
-            yesterday_return FLOAT DEFAULT NULL,
-            prev_day_return FLOAT DEFAULT NULL,
-            status_label VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-            is_buy TINYINT(1) DEFAULT NULL,
-            redeem_amount DECIMAL(10,2) DEFAULT NULL,
-            comparison_value FLOAT DEFAULT NULL,
-            operation_suggestion VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-            execution_amount VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-            analysis_date DATE DEFAULT NULL,
-            buy_multiplier FLOAT DEFAULT NULL,
-            annualized_return FLOAT DEFAULT NULL,
-            sharpe_ratio FLOAT DEFAULT NULL,
-            sharpe_ratio_ytd FLOAT DEFAULT NULL,
-            sharpe_ratio_1y FLOAT DEFAULT NULL,
-            sharpe_ratio_all FLOAT DEFAULT NULL,
-            max_drawdown FLOAT DEFAULT NULL,
-            volatility FLOAT DEFAULT NULL,
-            calmar_ratio FLOAT DEFAULT NULL,
-            sortino_ratio FLOAT DEFAULT NULL,
-            var_95 FLOAT DEFAULT NULL,
-            win_rate FLOAT DEFAULT NULL,
-            profit_loss_ratio FLOAT DEFAULT NULL,
-            total_return FLOAT DEFAULT NULL,
-            composite_score FLOAT DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            fund_code VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '基金代码，如：000001',
+            fund_name VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '基金名称',
+            yesterday_nav FLOAT DEFAULT NULL COMMENT '昨日净值',
+            current_estimate FLOAT DEFAULT NULL COMMENT '当前估算净值/最新净值',
+            today_return FLOAT DEFAULT NULL COMMENT '当日收益率(%)',
+            prev_day_return FLOAT DEFAULT NULL COMMENT '昨日收益率(%) - 主要使用的昨日盈亏字段',
+            status_label VARCHAR(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '策略状态标签，如：强烈买入、观望等',
+            is_buy TINYINT(1) DEFAULT NULL COMMENT '是否为买入信号：1=买入，0=非买入',
+            buy_multiplier FLOAT DEFAULT NULL COMMENT '买入倍率，建议加仓倍数',
+            redeem_amount DECIMAL(10,2) DEFAULT NULL COMMENT '赎回金额建议',
+            comparison_value FLOAT DEFAULT NULL COMMENT '对比值（今日-昨日收益率差值）',
+            operation_suggestion VARCHAR(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '操作建议描述',
+            execution_amount VARCHAR(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '执行金额建议',
+            analysis_date DATE DEFAULT NULL COMMENT '分析日期',
+            annualized_return FLOAT DEFAULT NULL COMMENT '年化收益率(%)',
+            sharpe_ratio FLOAT DEFAULT NULL COMMENT '夏普比率-默认周期',
+            sharpe_ratio_ytd FLOAT DEFAULT NULL COMMENT '夏普比率-今年以来',
+            sharpe_ratio_1y FLOAT DEFAULT NULL COMMENT '夏普比率-近一年',
+            sharpe_ratio_all FLOAT DEFAULT NULL COMMENT '夏普比率-成立以来',
+            max_drawdown FLOAT DEFAULT NULL COMMENT '最大回撤(%)',
+            volatility FLOAT DEFAULT NULL COMMENT '波动率(%)',
+            calmar_ratio FLOAT DEFAULT NULL COMMENT '卡玛比率',
+            sortino_ratio FLOAT DEFAULT NULL COMMENT '索提诺比率',
+            var_95 FLOAT DEFAULT NULL COMMENT 'VaR风险价值(95%置信度)',
+            win_rate FLOAT DEFAULT NULL COMMENT '胜率(%)',
+            profit_loss_ratio FLOAT DEFAULT NULL COMMENT '盈亏比',
+            total_return FLOAT DEFAULT NULL COMMENT '累计收益率(%)',
+            composite_score FLOAT DEFAULT NULL COMMENT '综合评分',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             UNIQUE KEY uk_fund_date (fund_code, analysis_date),
             INDEX idx_fund_code (fund_code),
             INDEX idx_analysis_date (analysis_date)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='基金分析结果表 - 存储基金实时分析数据、策略信号、绩效指标';
         """
         self.execute_sql(sql)
         
@@ -326,21 +328,22 @@ class EnhancedDatabaseManager:
         """
         sql = """
         CREATE TABLE IF NOT EXISTS user_holdings (
-            id INT PRIMARY KEY AUTO_INCREMENT,
-            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
-            fund_code VARCHAR(20) NOT NULL,
-            fund_name VARCHAR(100) NOT NULL,
-            holding_shares FLOAT DEFAULT 0,
-            cost_price FLOAT DEFAULT 0,
-            holding_amount FLOAT DEFAULT 0,
-            buy_date DATE DEFAULT NULL,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键ID',
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user' COMMENT '用户ID，默认default_user',
+            fund_code VARCHAR(20) NOT NULL COMMENT '基金代码',
+            fund_name VARCHAR(100) NOT NULL COMMENT '基金名称',
+            holding_shares FLOAT DEFAULT 0 COMMENT '持仓份额',
+            cost_price FLOAT DEFAULT 0 COMMENT '成本价',
+            holding_amount FLOAT DEFAULT 0 COMMENT '持有金额（份额×成本价）',
+            buy_date DATE DEFAULT NULL COMMENT '买入日期',
+            notes TEXT COMMENT '备注信息',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             UNIQUE KEY uk_user_fund (user_id, fund_code),
             INDEX idx_user_id (user_id),
             INDEX idx_fund_code (fund_code)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='用户持仓表 - 存储用户基金持仓信息';
         """
         self.execute_sql(sql)
         
@@ -366,16 +369,17 @@ class EnhancedDatabaseManager:
         """
         sql = """
         CREATE TABLE IF NOT EXISTS user_strategies (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
-            name VARCHAR(100) NOT NULL,
-            description TEXT,
-            config JSON NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '策略ID，自增主键',
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user' COMMENT '用户ID',
+            name VARCHAR(100) NOT NULL COMMENT '策略名称',
+            description TEXT COMMENT '策略描述',
+            config JSON NOT NULL COMMENT '策略配置（JSON格式）',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
             INDEX idx_user_id (user_id),
             INDEX idx_name (name)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='用户策略表 - 存储用户自定义投资策略';
         """
         self.execute_sql(sql)
         logger.info("用户策略表 user_strategies 创建/检查完成")
@@ -387,18 +391,19 @@ class EnhancedDatabaseManager:
         """
         sql = """
         CREATE TABLE IF NOT EXISTS strategy_backtest_results (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            strategy_id INT NOT NULL,
-            task_id VARCHAR(50) NOT NULL UNIQUE,
-            status VARCHAR(20) DEFAULT 'pending',
-            result JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '回测记录ID',
+            strategy_id INT NOT NULL COMMENT '关联的策略ID',
+            task_id VARCHAR(50) NOT NULL UNIQUE COMMENT '任务唯一标识',
+            status VARCHAR(20) DEFAULT 'pending' COMMENT '回测状态：pending/running/success/failed',
+            result JSON COMMENT '回测结果数据（JSON格式）',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+            completed_at TIMESTAMP NULL COMMENT '完成时间',
             FOREIGN KEY (strategy_id) REFERENCES user_strategies(id) ON DELETE CASCADE,
             INDEX idx_task_id (task_id),
             INDEX idx_strategy_id (strategy_id),
             INDEX idx_status (status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='策略回测结果表 - 存储策略回测执行结果';
         """
         self.execute_sql(sql)
         logger.info("策略回测结果表 strategy_backtest_results 创建/检查完成")
@@ -410,23 +415,24 @@ class EnhancedDatabaseManager:
         """
         sql = """
         CREATE TABLE IF NOT EXISTS fund_heavyweight_stocks (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            fund_code VARCHAR(10) NOT NULL,
-            stock_code VARCHAR(10) NOT NULL,
-            stock_name VARCHAR(100) NOT NULL,
-            holding_ratio DECIMAL(8,4),
-            market_value DECIMAL(15,2),
-            change_percent DECIMAL(8,4),
-            report_period VARCHAR(20),
-            ranking INT DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
+            fund_code VARCHAR(10) NOT NULL COMMENT '基金代码',
+            stock_code VARCHAR(10) NOT NULL COMMENT '股票代码',
+            stock_name VARCHAR(100) NOT NULL COMMENT '股票名称',
+            holding_ratio DECIMAL(8,4) COMMENT '持仓比例(%)',
+            market_value DECIMAL(15,2) COMMENT '持仓市值',
+            change_percent DECIMAL(8,4) COMMENT '持仓变动比例(%)',
+            report_period VARCHAR(20) COMMENT '报告期，如：2024Q1',
+            ranking INT DEFAULT 0 COMMENT '重仓排名',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             UNIQUE KEY uk_fund_stock_period (fund_code, stock_code, report_period),
             INDEX idx_fund_code (fund_code),
             INDEX idx_stock_code (stock_code),
             INDEX idx_report_period (report_period),
             INDEX idx_updated_at (updated_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='基金重仓股表 - 存储基金重仓持股信息';
         """
         self.execute_sql(sql)
         logger.info("基金重仓股数据表 fund_heavyweight_stocks 创建/检查完成")
@@ -438,23 +444,24 @@ class EnhancedDatabaseManager:
         """
         sql = """
         CREATE TABLE IF NOT EXISTS user_operations (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user',
-            operation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            operation_type VARCHAR(20) NOT NULL,
-            fund_code VARCHAR(10),
-            fund_name VARCHAR(100),
-            operation_detail TEXT,
-            amount DECIMAL(15,2),
-            shares DECIMAL(15,4),
-            price DECIMAL(10,4),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            id INT AUTO_INCREMENT PRIMARY KEY COMMENT '记录ID',
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user' COMMENT '用户ID',
+            operation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+            operation_type VARCHAR(20) NOT NULL COMMENT '操作类型：buy/sell/hold等',
+            fund_code VARCHAR(10) COMMENT '基金代码',
+            fund_name VARCHAR(100) COMMENT '基金名称',
+            operation_detail TEXT COMMENT '操作详情',
+            amount DECIMAL(15,2) COMMENT '金额',
+            shares DECIMAL(15,4) COMMENT '份额',
+            price DECIMAL(10,4) COMMENT '价格',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
             INDEX idx_user_id (user_id),
             INDEX idx_operation_date (operation_date),
             INDEX idx_operation_type (operation_type),
             INDEX idx_fund_code (fund_code)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='用户操作记录表 - 存储用户操作历史';
         """
         self.execute_sql(sql)
         logger.info("用户操作记录表 user_operations 创建/检查完成")
