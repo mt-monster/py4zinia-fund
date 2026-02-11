@@ -333,40 +333,50 @@ class EnhancedFundAnalysisSystem:
             
             # 如果实时数据中的昨日收益率不可用或异常，从历史数据获取
             if yesterday_return == 0.0 and not historical_data.empty:
-                if 'daily_growth_rate' in historical_data.columns:
-                    recent_growth_series = historical_data['daily_growth_rate'].dropna()
+                # 支持两种列名：daily_return (来自adapter) 或 daily_growth_rate (旧格式)
+                growth_rate_col = 'daily_return' if 'daily_return' in historical_data.columns else 'daily_growth_rate'
+                if growth_rate_col in historical_data.columns:
+                    recent_growth_series = historical_data[growth_rate_col].dropna()
                     
                     if len(recent_growth_series) >= 1:
                         try:
+                            # 检查是否为QDII基金
+                            is_qdii = MultiSourceDataAdapter.is_qdii_fund(fund_code, fund_name)
+                            logger.debug(f"基金 {fund_code} 名称={fund_name}, QDII判断结果={is_qdii}")
+                            
                             # 向前追溯寻找非零值（特别针对QDII基金）
-                            from data_retrieval.enhanced_fund_data import EnhancedFundData
-                            if MultiSourceDataAdapter.is_qdii_fund(fund_code, fund_name) and yesterday_return == 0.0:
-                                logger.info(f"检测到QDII基金 {fund_code} 且昨日收益率为0，开始向前追溯获取非零值")
-                                # 从最新的数据开始向前查找非零值
+                            if is_qdii and yesterday_return == 0.0:
+                                logger.info(f"检测到QDII基金 {fund_code} ({fund_name}) 且昨日收益率为0，开始向前追溯获取非零值")
+                                logger.debug(f"QDII基金 {fund_code} 历史数据共 {len(recent_growth_series)} 条: {recent_growth_series.tolist()}")
+                                
+                                # 从最新的数据开始向前查找非零值（QDII基金可能延迟更多天）
+                                max_trace_days = 15  # QDII基金最多追溯15天
                                 for i in range(len(recent_growth_series) - 1, -1, -1):
                                     raw_value = float(recent_growth_series.iloc[i]) if pd.notna(recent_growth_series.iloc[i]) else 0.0
                                     # AKShare返回的日增长率已经是百分比格式
                                     candidate_return = raw_value
                                     
                                     # 检查是否为有效非零值
-                                    if abs(candidate_return) <= 100 and candidate_return != 0.0:
+                                    if abs(candidate_return) <= 100 and abs(candidate_return) > 0.001:  # 允许微小非零值
                                         yesterday_return = candidate_return
-                                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，使用收益率: {yesterday_return}%")
+                                        days_back = len(recent_growth_series) - 1 - i
+                                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，往前第{days_back}天收益率: {yesterday_return}%")
                                         break
                                     
                                     # 限制追溯范围
-                                    if len(recent_growth_series) - i > 10:
+                                    if len(recent_growth_series) - 1 - i >= max_trace_days:
+                                        logger.warning(f"QDII基金 {fund_code} 追溯{max_trace_days}天仍未找到非零值，停止追溯")
                                         break
                             
-                            # 如果仍然为0，使用最新的数据
-                            if yesterday_return == 0.0:
+                            # 如果仍然为0且不是QDII，使用最新的数据
+                            if yesterday_return == 0.0 and not is_qdii:
                                 raw_value = float(recent_growth_series.iloc[-1]) if pd.notna(recent_growth_series.iloc[-1]) else 0.0
                                 # AKShare返回的日增长率已经是百分比格式
                                 yesterday_return = raw_value
-                                logger.debug(f"基金 {fund_code} 从历史数据daily_growth_rate获取昨日收益率: {yesterday_return}%")
+                                logger.debug(f"基金 {fund_code} 从历史数据{growth_rate_col}获取昨日收益率: {yesterday_return}%")
                                 
                         except (ValueError, TypeError) as e:
-                            logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败: {str(e)}，使用默认值")
+                            logger.warning(f"基金 {fund_code} 历史数据{growth_rate_col}解析失败: {str(e)}，使用默认值")
                             yesterday_return = 0.0
             
             # 确保收益率格式正确，保留两位小数
