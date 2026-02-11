@@ -159,9 +159,21 @@ class FundAnalyzer:
                     failed_codes.append((fund_code, "过滤后数据不足"))
                     continue
                 
+                # 选择需要的列
+                nav_data = nav_data[['date', 'daily_return']].copy()
+                
+                # 移除日期重复的行（保留第一个）
+                nav_data = nav_data.drop_duplicates(subset=['date'], keep='first')
+                
+                # 限制单个基金数据量，避免内存溢出
+                max_single_fund_points = 500
+                if len(nav_data) > max_single_fund_points:
+                    logger.warning(f"基金 {fund_code} 数据过多({len(nav_data)})，限制为最近{max_single_fund_points}个")
+                    nav_data = nav_data.sort_values('date').tail(max_single_fund_points)
+                
                 # 保存数据
-                fund_data[fund_code] = nav_data[['date', 'daily_return']].copy()
-                logger.info(f"基金 {fund_code} 数据获取成功: {len(nav_data)} 个数据点")
+                fund_data[fund_code] = nav_data
+                logger.info(f"基金 {fund_code} 数据获取成功: {len(fund_data[fund_code])} 个数据点，日期范围: {nav_data['date'].min()} 至 {nav_data['date'].max()}")
                 
             except Exception as e:
                 failed_codes.append((fund_code, str(e)))
@@ -179,19 +191,45 @@ class FundAnalyzer:
             df_renamed = df.rename(columns={'daily_return': fund_code})
             if merged_df is None:
                 merged_df = df_renamed
+                logger.info(f"初始化合并数据: {len(merged_df)} 行")
             else:
-                # 使用外连接保留所有日期
-                merged_df = pd.merge(merged_df, df_renamed, on='date', how='outer')
+                # 使用内连接只保留共同日期，避免数据量爆炸
+                logger.info(f"合并前: {len(merged_df)} 行，正在合并 {fund_code}: {len(df_renamed)} 行")
+                
+                # 紧急检查：如果数据量已经过大，直接报错
+                if len(merged_df) > 10000:
+                    raise ValueError(f"合并前数据量过大({len(merged_df)})，可能存在数据质量问题")
+                
+                merged_df = pd.merge(merged_df, df_renamed, on='date', how='inner')
+                logger.info(f"合并后: {len(merged_df)} 行")
+                
+                # 如果合并后数据为空，提前退出
+                if len(merged_df) == 0:
+                    logger.error(f"与基金 {fund_code} 合并后无共同日期")
+                    break
         
-        # 填充缺失值（使用前向填充和后向填充）
-        merged_df = merged_df.ffill().bfill()
+        # 检查合并后数据是否为空
+        if merged_df is None or len(merged_df) == 0:
+            raise ValueError("合并后数据为空，基金可能没有共同的交易日")
+        
+        # 限制数据点数量，避免内存溢出（最多使用最近500个交易日）
+        max_data_points = 500
+        if len(merged_df) > max_data_points:
+            logger.warning(f"数据点过多({len(merged_df)})，限制为最近{max_data_points}个交易日")
+            merged_df = merged_df.sort_values('date').tail(max_data_points)
         
         # 再次检查是否有足够的数据
         if len(merged_df) < min_data_points:
             raise ValueError(f"合并后数据不足: {len(merged_df)} < {min_data_points}")
         
+        # 最终检查：确保数据量不会导致内存溢出
+        if len(merged_df) > 1000:
+            logger.warning(f"最终数据量过大({len(merged_df)})，强制限制为1000行")
+            merged_df = merged_df.sort_values('date').tail(1000)
+        
         # 计算相关性矩阵
         return_columns = list(fund_data.keys())
+        logger.info(f"开始计算相关性矩阵: {len(return_columns)}只基金 x {len(merged_df)}个数据点")
         correlation_matrix = merged_df[return_columns].corr().values.tolist()
         
         # 准备返回数据

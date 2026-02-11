@@ -150,13 +150,17 @@ const FundApp = {
         
         console.log('[FundApp] 启动市场指数定时更新，每分钟更新一次');
         
-        // 立即执行一次更新
-        this.updateMarketIndex();
+        // 立即执行一次更新（正确处理Promise）
+        this.updateMarketIndex().catch(err => {
+            console.error('[FundApp] 初始市场指数更新失败:', err);
+        });
         
         // 设置定时器，每60秒更新一次
         this.marketIndexTimer = setInterval(() => {
             console.log('[FundApp] 定时更新市场指数');
-            this.updateMarketIndex();
+            this.updateMarketIndex().catch(err => {
+                console.error('[FundApp] 定时市场指数更新失败:', err);
+            });
         }, 60000); // 60000毫秒 = 1分钟
     },
     
@@ -257,13 +261,18 @@ const FundApp = {
             console.log('📊 API响应结果:', result);
             
             if (result.success) {
-                // 添加基金代码到数据中
-                result.data.fund_codes = fundCodes;
+                // 只存储基金代码，避免sessionStorage超限（48只基金产生1128种组合，数据量过大）
+                // 详细数据将在correlation-analysis页面通过API异步加载
+                const storageData = {
+                    fund_codes: fundCodes,
+                    // 只存储基础数据用于快速显示
+                    basic_correlation: result.data.basic_correlation
+                };
                 
-                console.log('💾 准备存储到sessionStorage的数据:', result.data);
+                console.log('💾 存储到sessionStorage:', storageData);
                 
-                // 使用 sessionStorage 存储数据，避免URL过长
-                sessionStorage.setItem('correlationAnalysisData', JSON.stringify(result.data));
+                // 使用 sessionStorage 存储精简数据
+                sessionStorage.setItem('correlationAnalysisData', JSON.stringify(storageData));
                 console.log('✅ 数据已存储到sessionStorage');
                 
                 window.location.href = '/correlation-analysis';
