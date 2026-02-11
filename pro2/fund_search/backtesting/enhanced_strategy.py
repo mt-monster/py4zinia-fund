@@ -226,56 +226,74 @@ class EnhancedInvestmentStrategy:
 
     def _get_default_strategy_rules(self) -> Dict:
         """
-        获取默认的策略规则（作为YAML加载失败时的fallback）
-
-        返回：
-        dict: 默认策略规则
+        获取默认的策略规则（优化版，6个核心策略）
+        作为YAML加载失败时的fallback
         """
         return {
-            # 强势上涨策略
-            'strong_bull': {
+            # 1. 大涨止盈策略 - 连续上涨后止盈
+            'take_profit': {
                 'conditions': [
-                    {'today_return': (1.0, float('inf')), 'prev_day_return': (0.5, float('inf'))},
-                    {'today_return': (0.5, float('inf')), 'prev_day_return': (1.0, float('inf'))}
+                    {'today_return': (0.5, float('inf')), 'prev_day_return': (0.0, float('inf'))}
+                ],
+                'action': 'weak_sell',
+                'redeem_amount': 0.05,
+                'label': "🟡 **大涨止盈**",
+                'description': "连续上涨，建议部分止盈（赎回5%仓位）"
+            },
+
+            # 2. 温和上涨策略 - 正常上涨，持有
+            'gentle_rise': {
+                'conditions': [
+                    {'today_return': (0.0, 0.5), 'prev_day_return': (float('-inf'), float('inf'))}
+                ],
+                'action': 'hold',
+                'redeem_amount': 0,
+                'label': "🟢 **温和上涨**",
+                'description': "基金上涨，建议持有观望"
+            },
+
+            # 3. 反转上涨策略 - 由跌转涨，持有
+            'reversal_up': {
+                'conditions': [
+                    {'today_return': (0.5, float('inf')), 'prev_day_return': (float('-inf'), 0.0)}
+                ],
+                'action': 'hold',
+                'redeem_amount': 0,
+                'label': "🔵 **反转上涨**",
+                'description': "由跌转涨，建议持有观望"
+            },
+
+            # 4. 反转下跌策略 - 由涨转跌，止盈
+            'reversal_down': {
+                'conditions': [
+                    {'today_return': (float('-inf'), 0.0), 'prev_day_return': (0.0, float('inf'))}
+                ],
+                'action': 'sell',
+                'redeem_amount': 0.08,
+                'label': "🔴 **反转下跌**",
+                'description': "由涨转跌，建议止盈（赎回8%仓位）"
+            },
+
+            # 5. 小跌买入策略 - 正常下跌，补仓
+            'gentle_fall': {
+                'conditions': [
+                    {'today_return': (-1.0, 0.0), 'prev_day_return': (float('-inf'), 0.0)}
+                ],
+                'action': 'buy',
+                'redeem_amount': 0,
+                'label': "🟣 **小跌买入**",
+                'description': "基金下跌，建议遇低买入（摊低成本）"
+            },
+
+            # 6. 大跌抄底策略 - 大幅下跌，积极买入
+            'bottom_fishing': {
+                'conditions': [
+                    {'today_return': (float('-inf'), -1.0), 'prev_day_return': (float('-inf'), float('inf'))}
                 ],
                 'action': 'strong_buy',
                 'redeem_amount': 0,
-                'label': "🟢 **强势突破**",
-                'description': "基金强势上涨，建议积极买入"
-            },
-
-            # 持续上涨策略
-            'bull_continuation': {
-                'conditions': [
-                    {'today_return': (0.3, 1.0), 'prev_day_return': (0.3, 1.0)},
-                    {'today_return': (0.2, 0.5), 'prev_day_return': (0.5, 1.0)}
-                ],
-                'action': 'buy',
-                'redeem_amount': 0.02,  # 改为比例赎回
-                'label': "🟡 **连涨加速**",
-                'description': "基金持续上涨，建议适量买入（胜率偏低，谨慎操作）"
-            },
-
-            # 绝对企稳策略
-            'absolute_bottom': {
-                'conditions': [
-                    {'today_return': (0.0, 0.01), 'prev_day_return': (-0.3, 0.0)}
-                ],
-                'action': 'buy',
-                'redeem_amount': 0,
-                'label': "⚪ **绝对企稳**",
-                'description': "基金企稳，建议适量买入（需观察确认）"
-            },
-
-            # 持续下跌策略
-            'bear_continuation': {
-                'conditions': [
-                    {'today_return': (-float('inf'), -0.5), 'prev_day_return': (-float('inf'), -0.5)}
-                ],
-                'action': 'hold',  # 改为持有
-                'redeem_amount': 0,
-                'label': "🟣 **持续下跌**",
-                'description': "基金持续下跌，建议持有观望（避免抄底风险）"
+                'label': "🔴 **大跌抄底**",
+                'description': "大幅下跌，建议积极买入（抄底良机）"
             },
 
             # 默认策略
@@ -283,8 +301,8 @@ class EnhancedInvestmentStrategy:
                 'conditions': [],
                 'action': 'hold',
                 'redeem_amount': 0,
-                'label': "🔴 **未知状态**",
-                'description': "不买入，不赎回"
+                'label': "⚪ **观望**",
+                'description': "走势不明，建议观望"
             }
         }
     

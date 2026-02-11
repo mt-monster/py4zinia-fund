@@ -66,6 +66,8 @@ def fetch_fund_history_from_akshare(fund_code: str, days: int = 90) -> pd.DataFr
             'prev_day_return': df['prev_day_return'],
             'current_estimate': df['nav'],
             'yesterday_nav': df['previous_nav'],
+            'nav': df['nav'],  # 兼容性：同时提供nav列
+            '单位净值': df['nav'],  # 兼容性：同时提供中文列名
             'status_label': '正常',  # 默认值
             'operation_suggestion': '持有',  # 默认值
             'buy_multiplier': 1.0,  # 默认值

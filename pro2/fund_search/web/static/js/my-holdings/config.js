@@ -10,7 +10,7 @@ const FundConfig = {
     // - sharpe_ratio_all: 成立以来夏普比率（可选）
     defaultColumns: [
         { key: 'fund_code', label: '基金代码', visible: true, sortable: true },
-        { key: 'fund_name', label: '基金名称', visible: true, sortable: true },
+        { key: 'fund_name', label: '基金名称', visible: true, sortable: true, required: true },
         { key: 'today_return', label: '日涨跌幅', visible: true, sortable: true, type: 'percent' },
         { key: 'prev_day_return', label: '昨日盈亏率', visible: true, sortable: true, type: 'percent' },
         { key: 'holding_amount', label: '持有金额', visible: true, sortable: true, type: 'currency' },

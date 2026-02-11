@@ -279,6 +279,148 @@
         .hidden {
             display: none !important;
         }
+
+        /* ========== 个性化策略样式 ========== */
+        
+        /* 策略匹配度显示 */
+        .match-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .match-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .match-bar {
+            height: 6px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        /* 操作标签 */
+        .op-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 8px;
+        }
+        
+        .op-tag.buy {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .op-tag.sell {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .op-tag.hold {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        /* 风险标签 */
+        .risk-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+        
+        .risk-tag.high {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .risk-tag.medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .risk-tag.low {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        /* 策略表格样式 */
+        .personalized-strategy-section {
+            margin-top: 30px;
+        }
+        
+        .strategy-badge {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .strategy-badge .strategy-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+        
+        .strategy-badge .strategy-reason {
+            font-size: 11px;
+            color: #666;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* 策略分布 */
+        .strategy-dist-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .dist-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        
+        .dist-item .dist-count {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        /* 状态点 */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .status-dot.buy {
+            background: #28a745;
+        }
+        
+        .status-dot.sell {
+            background: #dc3545;
+        }
+        
+        .status-dot.hold {
+            background: #ffc107;
+        }
     </style>
 </head>
 <body>
@@ -379,7 +521,7 @@
             console.log('=== 页面加载完成 ===');
         };
 
-        // 加载投资建议数据
+        // 加载投资建议数据（个性化策略版本）
         async function loadInvestmentAdvice() {
             showLoadingState();
             
@@ -390,7 +532,8 @@
             }
 
             try {
-                const response = await fetch('/api/holdings/analyze/comprehensive', {
+                // 使用新的个性化投资建议API
+                const response = await fetch('/api/holdings/analyze/personalized-advice', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -401,9 +544,10 @@
                 const result = await response.json();
                 
                 if (result.success) {
+                    console.log('个性化投资建议结果:', result);
                     // 延迟渲染以确保容器有正确尺寸
                     setTimeout(() => {
-                        renderInvestmentAdvice(result.data, data.fund_codes);
+                        renderPersonalizedAdvice(result, data.fund_codes);
                     }, 100);
                 } else {
                     showErrorState(result.error || '分析失败');
@@ -438,55 +582,222 @@
             }
         }
 
-        // 渲染投资建议概览
-        function renderAdviceOverview(data) {
+        // 渲染个性化投资建议
+        function renderPersonalizedAdvice(result, fundCodes) {
+            const data = result;
+            data.fund_codes = fundCodes;
+            
+            // 显示结果区域
+            document.getElementById('loading-section').classList.add('hidden');
+            document.getElementById('error-section').classList.add('hidden');
+            document.getElementById('empty-section').classList.add('hidden');
+            document.getElementById('analysis-result-section').style.display = 'block';
+            
+            // 渲染个性化建议概览
+            renderPersonalizedOverview(data);
+            
+            // 渲染个性化策略表格
+            renderPersonalizedStrategyTable(data);
+            
+            // 渲染策略统计
+            renderStrategyDistribution(data);
+        }
+
+        // 渲染个性化建议概览
+        function renderPersonalizedOverview(data) {
             const container = document.getElementById('advice-overview');
             const summary = data.summary || {};
-            const strategyAnalysis = data.strategy_analysis || {};
+            const funds = data.funds || [];
             
-            // 确定风险等级
-            let riskLevel = 'low';
-            let riskText = '低风险';
-            let riskDesc = '您的投资组合风险较低，适合稳健型投资者。';
+            // 计算平均匹配度
+            const avgMatchScore = funds.length > 0 
+                ? (funds.reduce((sum, f) => sum + (f.optimal_strategy?.match_score || 0), 0) / funds.length).toFixed(1)
+                : 0;
             
-            if (summary.volatility > 0.2) {
-                riskLevel = 'high';
-                riskText = '高风险';
-                riskDesc = '您的投资组合波动较大，建议适当分散投资。';
-            } else if (summary.volatility > 0.12) {
-                riskLevel = 'medium';
-                riskText = '中等风险';
-                riskDesc = '您的投资组合风险适中，收益与风险相对平衡。';
-            }
-            
-            // 生成投资建议
-            let adviceText = '您的投资组合整体表现良好。';
-            if (strategyAnalysis.recommendations && strategyAnalysis.recommendations.length > 0) {
-                adviceText = strategyAnalysis.recommendations[0];
-            }
+            // 统计各操作类型
+            const buyCount = funds.filter(f => f.advice?.action === 'buy' || f.advice?.action === 'strong_buy').length;
+            const sellCount = funds.filter(f => f.advice?.action === 'sell' || f.advice?.action === 'redeem').length;
+            const holdCount = funds.filter(f => f.advice?.action === 'hold').length;
             
             container.innerHTML = `
                 <div class="advice-card">
-                    <h4><i class="bi bi-shield-check"></i> 风险评估</h4>
+                    <h4><i class="bi bi-cpu"></i> 策略匹配</h4>
                     <p>
-                        <span class="risk-badge risk-${riskLevel}">${riskText}</span>
+                        <span class="match-score">${avgMatchScore}%</span>
                         <br><br>
-                        ${riskDesc}
+                        已为 ${funds.length} 只基金匹配最优策略<br>
+                        根据历史数据、波动率、趋势特征等特征分析
                     </p>
                 </div>
                 <div class="advice-card">
-                    <h4><i class="bi bi-pie-chart"></i> 资产配置</h4>
+                    <h4><i class="bi bi-graph-up-arrow"></i> 操作分布</h4>
                     <p>
-                        股票占比: ${summary.total_stock_proportion?.toFixed(1) || '--'}%<br>
-                        行业集中度: ${summary.top_industry_concentration?.toFixed(1) || '--'}%<br>
-                        重仓股集中度: ${summary.top_stock_concentration?.toFixed(1) || '--'}%
+                        <span class="op-tag buy">${summary.buy_count || buyCount} 买入</span>
+                        <span class="op-tag sell">${summary.sell_count || sellCount} 卖出</span>
+                        <span class="op-tag hold">${summary.hold_count || holdCount} 持有</span>
                     </p>
                 </div>
                 <div class="advice-card">
-                    <h4><i class="bi bi-stars"></i> 投资建议</h4>
-                    <p>${adviceText}</p>
+                    <h4><i class="bi bi-lightbulb"></i> 核心建议</h4>
+                    <p>
+                        ${buyCount > sellCount 
+                            ? '目前市场处于调整阶段，建议适当买入拄底。' 
+                            : sellCount > buyCount 
+                                ? '建议适度止盈，防范回调风险。' 
+                                : '市场走势不明朗，建议持有观望。'}
+                    </p>
                 </div>
             `;
+        }
+
+        // 渲染个性化策略表格
+        function renderPersonalizedStrategyTable(data) {
+            const container = document.getElementById('fund-analysis-dashboard');
+            const funds = data.funds || [];
+            
+            if (funds.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无数据</div>';
+                return;
+            }
+            
+            let html = `
+                <div class="personalized-strategy-section">
+                    <h3 class="section-title">
+                        <i class="bi bi-fingerprint"></i> 个性化策略分析
+                    </h3>
+                    <div class="strategy-table-container">
+                        <table class="strategy-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-code">代码</th>
+                                    <th class="col-name">基金名称</th>
+                                    <th class="col-strategy-type">策略类型</th>
+                                    <th class="col-match">匹配度</th>
+                                    <th class="col-return">今日</th>
+                                    <th class="col-advice">建议</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            funds.forEach(fund => {
+                const todayClass = fund.today_return >= 0 ? 'positive' : 'negative';
+                const actionClass = getActionClass(fund.advice?.action);
+                const optimalStrategy = fund.optimal_strategy || {};
+                const fundProfile = fund.fund_profile || {};
+                
+                html += `
+                    <tr class="strategy-row ${actionClass}">
+                        <td class="col-code">
+                            <span class="fund-code">${fund.fund_code}</span>
+                        </td>
+                        <td class="col-name">
+                            <span class="fund-name" title="${fund.fund_name}">${fund.fund_name}</span>
+                            ${fundProfile.risk_level ? `<span class="risk-tag ${fundProfile.risk_level}">${fundProfile.risk_level === 'high' ? '高' : fundProfile.risk_level === 'medium' ? '中' : '低'}风险</span>` : ''}
+                        </td>
+                        <td class="col-strategy-type">
+                            <div class="strategy-badge">
+                                <span class="strategy-name">${optimalStrategy.name || '-'}</span>
+                                <span class="strategy-reason" title="${optimalStrategy.selection_reason || ''}">${optimalStrategy.selection_reason || ''}</span>
+                            </div>
+                        </td>
+                        <td class="col-match">
+                            <div class="match-indicator">
+                                <div class="match-bar" style="width: ${optimalStrategy.match_score || 0}%"></div>
+                                <span class="match-score">${optimalStrategy.match_score || 0}%</span>
+                            </div>
+                        </td>
+                        <td class="col-return">
+                            <span class="return-value ${todayClass}">${fund.today_return >= 0 ? '+' : ''}${fund.today_return}%</span>
+                        </td>
+                        <td class="col-advice">
+                            <div class="strategy-info">
+                                <div class="strategy-status">
+                                    <span class="status-dot ${actionClass}"></span>
+                                    <span class="status-text">${fund.advice?.status_label || '-'}</span>
+                                </div>
+                                <div class="strategy-action">
+                                    <span class="action-badge ${actionClass}">${fund.advice?.operation_suggestion || '-'}</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        // 渲染策略分布统计
+        function renderStrategyDistribution(data) {
+            const summary = data.summary || {};
+            const strategyDist = summary.strategy_distribution || {};
+            
+            // 如果没有策略分布数据，则不渲染
+            if (Object.keys(strategyDist).length === 0) return;
+            
+            // 查找或创建策略分布容器
+            let container = document.getElementById('strategy-distribution');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'strategy-distribution';
+                container.className = 'content-section';
+                document.getElementById('analysis-result-section').appendChild(container);
+            }
+            
+            const strategyNames = {
+                'take_profit': '大涨止盈',
+                'gentle_rise': '温和上涨',
+                'reversal_up': '反转上涨',
+                'reversal_down': '反转下跌',
+                'gentle_fall': '小跌买入',
+                'bottom_fishing': '大跌抄底',
+                'dual_ma': '双均线策略',
+                'mean_reversion': '均值回归',
+                'grid_trading': '网格交易',
+                'enhanced_rule': '增强规则'
+            };
+            
+            let distHtml = '<div class="strategy-dist-list">';
+            for (const [key, count] of Object.entries(strategyDist)) {
+                const name = strategyNames[key] || key;
+                distHtml += `
+                    <div class="dist-item">
+                        <span class="dist-name">${name}</span>
+                        <span class="dist-count">${count}只</span>
+                    </div>
+                `;
+            }
+            distHtml += '</div>';
+            
+            container.innerHTML = `
+                <h3 class="section-title"><i class="bi bi-diagram-3"></i> 策略分布</h3>
+                ${distHtml}
+            `;
+        }
+
+        // 获取操作类别样式
+        function getActionClass(action) {
+            if (action === 'buy' || action === 'strong_buy') return 'buy';
+            if (action === 'sell' || action === 'redeem') return 'sell';
+            return 'hold';
+        }
+
+        // 保留原有函数以兼容
+        function renderInvestmentAdvice(data, fundCodes) {
+            renderPersonalizedAdvice(data, fundCodes);
+        }
+
+        // 渲染投资建议概览（保留作为后备）
+        function renderAdviceOverview(data) {
+            renderPersonalizedOverview(data);
         }
 
         // 显示加载状态

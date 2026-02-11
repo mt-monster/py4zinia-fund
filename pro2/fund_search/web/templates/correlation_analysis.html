@@ -527,13 +527,30 @@
                 const strengthLabel = getCorrelationStrength(pair.correlation);
                 const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
                 
+                // 如果有基金代码信息，则同时显示代码和名称
+                let fund1Display = escapeHtml(pair.fund1);
+                let fund2Display = escapeHtml(pair.fund2);
+                
+                // 尝试从数据中获取基金代码（如果可用）
+                if (data.fund_codes && data.fund_names) {
+                    const fund1Index = data.fund_names.indexOf(pair.fund1);
+                    const fund2Index = data.fund_names.indexOf(pair.fund2);
+                    
+                    if (fund1Index !== -1 && fund1Index < data.fund_codes.length) {
+                        fund1Display = `${data.fund_codes[fund1Index]} ${escapeHtml(pair.fund1)}`;
+                    }
+                    if (fund2Index !== -1 && fund2Index < data.fund_codes.length) {
+                        fund2Display = `${data.fund_codes[fund2Index]} ${escapeHtml(pair.fund2)}`;
+                    }
+                }
+                
                 html += `
                     <div class="pair-item ${correlationClass}">
                         <div class="pair-rank">${index + 1}</div>
                         <div class="pair-funds">
-                            <span class="fund-name">${escapeHtml(pair.fund1)}</span>
+                            <span class="fund-name">${fund1Display}</span>
                             <span class="pair-arrow">↔</span>
-                            <span class="fund-name">${escapeHtml(pair.fund2)}</span>
+                            <span class="fund-name">${fund2Display}</span>
                         </div>
                         <div class="pair-info">
                             <div class="pair-value">${pair.correlation.toFixed(4)}</div>
@@ -566,16 +583,26 @@
             `;
             
             // 表头
-            data.fund_names.forEach(fundName => {
-                html += `<th>${escapeHtml(fundName)}</th>`;
+            data.fund_names.forEach((fundName, index) => {
+                let displayText = escapeHtml(fundName);
+                // 如果有基金代码，同时显示代码和名称
+                if (data.fund_codes && index < data.fund_codes.length) {
+                    displayText = `${data.fund_codes[index]} ${displayText}`;
+                }
+                html += `<th>${displayText}</th>`;
             });
             
             html += '</tr></thead><tbody>';
             
             // 表格内容
             data.correlation_matrix.forEach((row, rowIndex) => {
+                // 行标签：同时显示基金代码和名称
+                let rowHeader = escapeHtml(data.fund_names[rowIndex]);
+                if (data.fund_codes && rowIndex < data.fund_codes.length) {
+                    rowHeader = `${data.fund_codes[rowIndex]} ${rowHeader}`;
+                }
                 html += `<tr>
-                    <th>${escapeHtml(data.fund_names[rowIndex])}</th>`;
+                    <th>${rowHeader}</th>`;
                 
                 row.forEach(value => {
                     let className = 'corr-cell ';
