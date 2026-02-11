@@ -10,6 +10,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import logging
+import time
 
 from .multi_source_fund_data import MultiSourceFundData
 
@@ -189,6 +190,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
     def _get_yesterday_return(self, fund_code: str, latest_date: str = None) -> float:
         """
         获取昨日收益率（最新净值相对于前一天净值的变化率）
+        带前向追溯功能，当获取到零值时会向前查找非零的历史收益率
         
         计算公式: (nav_latest - nav_yesterday) / nav_yesterday * 100
         
@@ -211,7 +213,7 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             if 'date' in df.columns:
                 df = df.sort_values('date', ascending=False)
             
-            # 获取最新净值和前一天净值
+            # 首先尝试直接计算相邻两天的收益率
             latest_nav = float(df.iloc[0]['nav'])
             yesterday_nav = float(df.iloc[1]['nav'])
             
@@ -221,14 +223,88 @@ class MultiSourceDataAdapter(MultiSourceFundData):
             if yesterday_nav > 0:
                 yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
                 result = round(yesterday_return, 2)
-                logger.debug(f"基金 {fund_code} 昨日收益率计算结果: {result}%")
+                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result}%")
+                
+                # 如果计算结果为0，且是QDII基金，则进行前向追溯
+                if result == 0.0 and self.is_qdii_fund(fund_code):
+                    logger.info(f"QDII基金 {fund_code} 昨日收益率为0，开始前向追溯获取非零值")
+                    traced_return = self._get_previous_nonzero_return(df, fund_code)
+                    if traced_return != 0.0:
+                        logger.info(f"QDII基金 {fund_code} 前向追溯成功，使用收益率: {traced_return}%")
+                        return traced_return
+                
                 return result
             else:
                 logger.warning(f"基金 {fund_code} 昨日净值为0或负数: {yesterday_nav}")
+                # 尝试前向追溯获取有效数据
+                traced_return = self._get_previous_nonzero_return(df, fund_code)
+                if traced_return != 0.0:
+                    logger.info(f"基金 {fund_code} 前向追溯成功获取有效收益率: {traced_return}%")
+                    return traced_return
                 return 0.0
             
         except Exception as e:
             logger.warning(f"获取基金 {fund_code} 昨日收益率失败: {e}")
+            return 0.0
+    
+    def _get_previous_nonzero_return(self, fund_nav: pd.DataFrame, fund_code: str) -> float:
+        """
+        向前追溯获取非零的昨日收益率
+        
+        Args:
+            fund_nav: 基金历史净值数据DataFrame
+            fund_code: 基金代码
+            
+        Returns:
+            float: 非零的昨日收益率，如果找不到则返回0.0
+        """
+        try:
+            # 查找包含daily_return或日增长率的列
+            return_column = None
+            if 'daily_return' in fund_nav.columns:
+                return_column = 'daily_return'
+            elif '日增长率' in fund_nav.columns:
+                return_column = '日增长率'
+            
+            if return_column is None:
+                logger.debug(f"基金 {fund_code} 数据中未找到收益率列")
+                return 0.0
+            
+            # 从较早的数据开始向前查找非零值（避免使用最新数据）
+            # 从倒数第三条开始往前查找（跳过最新的两条）
+            start_index = min(len(fund_nav) - 3, 5)  # 最多向前查找5条数据
+            start_index = max(start_index, 0)
+            
+            for i in range(start_index, -1, -1):
+                data_row = fund_nav.iloc[i]
+                return_raw = data_row.get(return_column, None)
+                
+                if pd.notna(return_raw):
+                    try:
+                        return_value = float(return_raw)
+                        # 格式转换处理（如果是小数格式则乘以100）
+                        if abs(return_value) < 0.1:
+                            return_value = return_value * 100
+                        return_value = round(return_value, 2)
+                        
+                        # 检查是否为有效非零值（在合理范围内）
+                        if return_value != 0.0 and abs(return_value) <= 100:
+                            nav_date = data_row.get('date', data_row.get('净值日期', 'Unknown'))
+                            logger.debug(f"基金 {fund_code} 在 {nav_date} 找到有效收益率: {return_value}%")
+                            return return_value
+                    except (ValueError, TypeError) as parse_error:
+                        logger.debug(f"基金 {fund_code} 解析收益率数据失败: {parse_error}")
+                        continue
+                
+                # 限制追溯范围
+                if start_index - i > 10:
+                    break
+            
+            logger.debug(f"基金 {fund_code} 未找到有效的非零收益率")
+            return 0.0
+            
+        except Exception as e:
+            logger.warning(f"基金 {fund_code} 前向追溯获取收益率时出错: {str(e)}")
             return 0.0
     
     def _get_realtime_estimate(self, fund_code: str) -> Optional[Dict]:
@@ -586,35 +662,462 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 'custody_fee': 0.0
             }
 
+    def get_etf_list(self, max_retries: int = 3, retry_delay: float = 2.0) -> pd.DataFrame:
+        """
+        获取ETF列表数据
+        
+        优先使用akshare获取实时行情，失败时回退到tushare基础数据
+        
+        Args:
+            max_retries: 最大重试次数
+            retry_delay: 初始重试延迟（秒），使用指数退避
+            
+        Returns:
+            DataFrame: ETF列表数据，包含以下列：
+                - etf_code: ETF代码
+                - etf_name: ETF名称
+                - current_price: 当前价格
+                - change: 涨跌额
+                - change_percent: 涨跌幅
+                - volume: 成交量
+                - turnover: 成交额
+                - pe: 市盈率
+                - pb: 市净率
+        """
+        # 第一步：尝试从akshare获取（带重试）
+        etf_df = self._get_etf_list_from_akshare(max_retries, retry_delay)
+        
+        if not etf_df.empty:
+            return etf_df
+        
+        # 第二步：akshare失败，尝试从tushare获取
+        logger.warning("Akshare获取失败，尝试从Tushare获取ETF列表...")
+        etf_df = self._get_etf_list_from_tushare()
+        
+        return etf_df
+    
+    def _get_etf_list_from_akshare(self, max_retries: int = 3, retry_delay: float = 2.0) -> pd.DataFrame:
+        """
+        从akshare获取ETF列表
+        
+        Args:
+            max_retries: 最大重试次数
+            retry_delay: 初始重试延迟（秒）
+            
+        Returns:
+            DataFrame: ETF列表数据
+        """
+        try:
+            import akshare as ak
+        except ImportError:
+            logger.warning("akshare未安装，跳过akshare数据源")
+            return pd.DataFrame()
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"从akshare获取ETF列表... (尝试 {attempt + 1}/{max_retries})")
+                
+                # 使用akshare获取ETF实时行情数据
+                etf_df = ak.fund_etf_spot_em()
+                
+                if etf_df is None or etf_df.empty:
+                    logger.warning("akshare返回空数据")
+                    return pd.DataFrame()
+                
+                # 标准化列名映射
+                column_mapping = {
+                    '代码': 'etf_code',
+                    '名称': 'etf_name',
+                    '最新价': 'current_price',
+                    '涨跌额': 'change',
+                    '涨跌幅': 'change_percent',
+                    '成交量': 'volume',
+                    '成交额': 'turnover',
+                    '市盈率': 'pe',
+                    '市净率': 'pb'
+                }
+                
+                # 只映射存在的列
+                existing_mapping = {k: v for k, v in column_mapping.items() if k in etf_df.columns}
+                etf_df = etf_df.rename(columns=existing_mapping)
+                
+                # 数据类型转换
+                numeric_columns = ['current_price', 'change', 'change_percent', 'volume', 'turnover', 'pe', 'pb']
+                for col in numeric_columns:
+                    if col in etf_df.columns:
+                        etf_df[col] = pd.to_numeric(etf_df[col], errors='coerce')
+                
+                # 添加数据源标识
+                etf_df['data_source'] = 'akshare'
+                
+                logger.info(f"成功从akshare获取ETF列表，共 {len(etf_df)} 只ETF")
+                return etf_df
+                
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    sleep_time = retry_delay * (2 ** attempt)  # 指数退避
+                    logger.warning(f"akshare获取失败 (尝试 {attempt + 1}/{max_retries}): {e}, {sleep_time}秒后重试...")
+                    time.sleep(sleep_time)
+                else:
+                    logger.error(f"akshare获取ETF列表失败，已重试{max_retries}次: {e}")
+        
+        return pd.DataFrame()
+    
+    def _get_etf_list_from_tushare(self) -> pd.DataFrame:
+        """
+        从tushare获取ETF基础列表
+        
+        Returns:
+            DataFrame: ETF列表数据（基础信息，无实时行情）
+        """
+        try:
+            import tushare as ts
+            
+            logger.info("从tushare获取ETF列表...")
+            
+            # 获取tushare pro api（优先使用父类初始化的pro对象）
+            if hasattr(self, 'tushare_pro') and self.tushare_pro is not None:
+                pro = self.tushare_pro
+            else:
+                pro = ts.pro_api()
+            
+            # 获取ETF基础信息（market='E'表示场内，status='L'表示上市）
+            etf_df = pro.fund_basic(market='E', status='L')
+            
+            if etf_df is None or etf_df.empty:
+                logger.warning("tushare返回空数据")
+                return pd.DataFrame()
+            
+            # 标准化列名映射
+            column_mapping = {
+                'ts_code': 'etf_code',
+                'name': 'etf_name',
+                'management': 'management',
+                'custodian': 'custodian',
+                'fund_type': 'fund_type',
+                'found_date': 'found_date',
+            }
+            
+            # 只映射存在的列
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in etf_df.columns}
+            etf_df = etf_df.rename(columns=existing_mapping)
+            
+            # 尝试获取最新行情数据（如果可能）
+            try:
+                from datetime import datetime
+                trade_date = datetime.now().strftime('%Y%m%d')
+                daily_df = pro.fund_daily(trade_date=trade_date)
+                
+                if daily_df is not None and not daily_df.empty:
+                    # 合并行情数据
+                    daily_df = daily_df.rename(columns={
+                        'ts_code': 'etf_code',
+                        'close': 'current_price',
+                        'change': 'change',
+                        'pct_chg': 'change_percent',
+                        'vol': 'volume',
+                        'amount': 'turnover'
+                    })
+                    etf_df = etf_df.merge(
+                        daily_df[['etf_code', 'current_price', 'change', 'change_percent', 'volume', 'turnover']],
+                        on='etf_code',
+                        how='left'
+                    )
+                    logger.info(f"成功合并tushare行情数据")
+            except Exception as e:
+                logger.warning(f"获取tushare行情数据失败: {e}，仅返回基础信息")
+            
+            # 添加数据源标识
+            etf_df['data_source'] = 'tushare'
+            
+            logger.info(f"成功从tushare获取ETF列表，共 {len(etf_df)} 只ETF")
+            return etf_df
+            
+        except Exception as e:
+            logger.error(f"从tushare获取ETF列表失败: {e}")
+            return pd.DataFrame()
+    
+    def get_etf_nav_history(self, etf_code: str, days: int = 30, 
+                           start_date: str = None, end_date: str = None) -> pd.DataFrame:
+        """
+        获取ETF净值历史数据
+        
+        Args:
+            etf_code: ETF代码
+            days: 历史数据天数
+            start_date: 开始日期
+            end_date: 结束日期
+            
+        Returns:
+            DataFrame: ETF净值历史数据
+        """
+        try:
+            import akshare as ak
+            
+            logger.info(f"开始获取ETF {etf_code} 净值历史数据...")
+            
+            # 使用akshare获取ETF历史净值
+            # 注意：ETF基金代码通常需要加后缀，这里假设传入的是纯数字代码
+            fund_code_with_suffix = f"{etf_code}" if etf_code.endswith('.OF') else f"{etf_code}.OF"
+            
+            # 获取历史净值数据
+            df = ak.fund_open_fund_info_em(symbol=etf_code, indicator="单位净值走势", period="最大值")
+            
+            if df is None or df.empty:
+                logger.warning(f"ETF {etf_code} 净值历史数据获取为空")
+                return pd.DataFrame()
+            
+            # 标准化列名
+            column_mapping = {
+                '净值日期': 'date',
+                '单位净值': 'nav',
+                '累计净值': 'accum_nav',
+                '日增长率': 'daily_return'
+            }
+            
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in df.columns}
+            df = df.rename(columns=existing_mapping)
+            
+            # 数据类型转换
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            
+            numeric_columns = ['nav', 'accum_nav', 'daily_return']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 日期过滤
+            if start_date:
+                df = df[df['date'] >= start_date]
+            if end_date:
+                df = df[df['date'] <= end_date]
+            
+            # 天数限制
+            if days and len(df) > days:
+                df = df.tail(days)
+            
+            logger.info(f"成功获取ETF {etf_code} 净值历史数据 {len(df)} 条")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 净值历史数据失败: {e}")
+            return pd.DataFrame()
+    
+    def get_etf_history(self, etf_code: str, days: int = 30) -> pd.DataFrame:
+        """
+        获取ETF行情历史数据
+        
+        Args:
+            etf_code: ETF代码
+            days: 历史数据天数
+            
+        Returns:
+            DataFrame: ETF行情历史数据
+        """
+        try:
+            import akshare as ak
+            
+            logger.info(f"开始获取ETF {etf_code} 行情历史数据...")
+            
+            # 使用akshare获取ETF历史行情
+            df = ak.fund_etf_hist_em(symbol=etf_code, period="daily", start_date="", end_date="", adjust="")
+            
+            if df is None or df.empty:
+                logger.warning(f"ETF {etf_code} 行情历史数据获取为空")
+                return pd.DataFrame()
+            
+            # 标准化列名
+            column_mapping = {
+                '日期': 'date',
+                '开盘': 'open',
+                '最高': 'high',
+                '最低': 'low',
+                '收盘': 'close',
+                '成交量': 'volume',
+                '成交额': 'turnover',
+                '振幅': 'amplitude',
+                '涨跌幅': 'change_percent',
+                '涨跌额': 'change',
+                '换手率': 'turnover_rate'
+            }
+            
+            existing_mapping = {k: v for k, v in column_mapping.items() if k in df.columns}
+            df = df.rename(columns=existing_mapping)
+            
+            # 数据类型转换
+            if 'date' in df.columns:
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            
+            numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'turnover', 
+                             'amplitude', 'change_percent', 'change', 'turnover_rate']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # 天数限制
+            if days and len(df) > days:
+                df = df.tail(days)
+            
+            logger.info(f"成功获取ETF {etf_code} 行情历史数据 {len(df)} 条")
+            return df
+            
+        except Exception as e:
+            logger.error(f"获取ETF {etf_code} 行情历史数据失败: {e}")
+            return pd.DataFrame()
+    
+    # 类级别的QDII基金代码缓存（动态加载）
+    _qdii_cache = None
+    _cache_loaded = False
+    
     @staticmethod
-    def is_qdii_fund(fund_code: str, fund_name: str = None) -> bool:
+    def is_qdii_fund(fund_code: str, fund_name: str = None, use_dynamic: bool = True) -> bool:
         """
-        判断是否为QDII基金（静态方法，兼容 EnhancedFundData）
-        """
-        # QDII基金代码列表
-        QDII_FUND_CODES = {
-            '096001',  # 大成标普500等权重指数(QDII)A人民币
-            '100055',  # 富国全球科技互联网股票(QDII)A
-            '012061',  # 富国全球消费精选混合(QDII)美元现汇
-            '006680',  # 广发道琼斯石油指数(QDII-LOF)C美元现汇
-            '006373',  # 国富全球科技互联混合(QDII)人民币A
-            '006105',  # 宏利印度股票(QDII)A
-            '021540',  # 华安法国CAC40ETF发起式联接(QDII)C
-            '015016',  # 华安国际龙头(DAX)ETF联接C
-            '040047',  # 华安纳斯达克100ETF联接(QDII)A(美元现钞)
-            '007844',  # 华宝油气C
-            '008708',  # 建信富时100指数(QDII)C美元现汇
-            '501225',  # 景顺长城全球半导体芯片股票A(QDII-LOF)(人民币)
-            '162415',  # 美国消费
-            '007721',  # 天弘标普500发起(QDII-FOF)A
-        }
+        判断是否为QDII基金
         
-        # 代码匹配
-        if fund_code in QDII_FUND_CODES:
+        采用多层检测策略：
+        1. 静态代码列表（快速匹配已知QDII）
+        2. 名称关键词匹配（无需网络请求）
+        3. 动态数据源查询（akshare基金类型信息）
+        
+        Args:
+            fund_code: 基金代码
+            fund_name: 基金名称（可选，提高准确性）
+            use_dynamic: 是否使用动态数据源查询（默认True）
+        
+        Returns:
+            bool: 是否为QDII基金
+        """
+        # 第1层：静态代码列表（快速路径）
+        if MultiSourceDataAdapter._is_in_static_qdii_list(fund_code):
             return True
         
-        # 名称匹配
-        if fund_name and 'QDII' in fund_name.upper():
+        # 第2层：名称关键词匹配
+        if fund_name and MultiSourceDataAdapter._is_qdii_by_name_keywords(fund_name):
             return True
+        
+        # 第3层：动态数据源查询
+        if use_dynamic:
+            return MultiSourceDataAdapter._is_qdii_by_data_source(fund_code)
         
         return False
+    
+    @staticmethod
+    def _is_in_static_qdii_list(fund_code: str) -> bool:
+        """静态代码列表检测（快速路径）"""
+        # 常见QDII基金代码前缀/特征
+        QDII_FUND_CODES = {
+            # 大成标普500
+            '096001', '008401', '008402',
+            # 富国全球科技互联网
+            '100055', 
+            # 富国全球消费精选
+            '012061', '012060', '012062',
+            # 广发道琼斯石油
+            '006680', '006679', '006681',
+            # 国富全球科技互联
+            '006373', '006374',
+            # 宏利印度股票
+            '006105', '006106',
+            # 华安法国CAC40
+            '021539', '021540',
+            # 华安国际龙头(DAX)
+            '015015', '015016',
+            # 华安纳斯达克100
+            '040046', '040047', '014978', '014979',
+            # 华宝油气
+            '007844', '007845',
+            # 建信富时100
+            '008708', '008707', '008706',
+            # 景顺长城全球半导体芯片
+            '501225', '501226',
+            # 美国消费
+            '162415', 
+            # 天弘标普500
+            '007721', '007722',
+        }
+        return fund_code in QDII_FUND_CODES
+    
+    @staticmethod
+    def _is_qdii_by_name_keywords(fund_name: str) -> bool:
+        """
+        通过基金名称关键词判断是否为QDII基金
+        
+        检测关键词包括：
+        - QDII标识
+        - 海外市场关键词
+        - 国际指数关键词
+        """
+        if not fund_name:
+            return False
+            
+        fund_name_upper = fund_name.upper()
+        
+        # 直接QDII标识
+        if 'QDII' in fund_name_upper:
+            return True
+        
+        # 海外市场关键词（中英文）
+        overseas_keywords = [
+            # 市场关键词
+            '全球', '国际', '海外', '环球', '世界',
+            'GLOBAL', 'INTERNATIONAL', 'OVERSEAS', 'WORLD', 'WORLDWIDE',
+            # 地区关键词
+            '美国', '美股', '港股', '香港', '日本', '欧洲', '德国', '法国', '英国',
+            'US', 'USA', 'AMERICA', 'HONG KONG', 'JAPAN', 'EUROPE', 'GERMANY', 'FRANCE', 'UK',
+            # 指数关键词
+            '纳斯达克', '标普', '道琼斯', '印度', '越南', '富时', 'CAC40', 'DAX', 'MSCI',
+            'NASDAQ', 'S&P', 'DOW JONES', 'INDIA', 'VIETNAM', 'FTSE', 'MSCI',
+            # 商品/另类投资
+            '原油', '石油', '黄金', '商品', 'REITs',
+            'OIL', 'CRUDE', 'GOLD', 'COMMODITY',
+        ]
+        
+        for keyword in overseas_keywords:
+            if keyword in fund_name_upper:
+                return True
+        
+        return False
+    
+    @staticmethod
+    def _is_qdii_by_data_source(fund_code: str) -> bool:
+        """
+        通过数据源动态查询基金类型
+        
+        使用akshare获取基金基本信息，检查基金类型字段
+        """
+        # 先检查缓存
+        if MultiSourceDataAdapter._qdii_cache is not None:
+            return fund_code in MultiSourceDataAdapter._qdii_cache
+        
+        try:
+            import akshare as ak
+            
+            # 加载基金列表（带缓存）
+            fund_list = ak.fund_name_em()
+            
+            # 检查基金类型列是否包含QDII
+            if '基金类型' in fund_list.columns:
+                qdii_funds = fund_list[fund_list['基金类型'].str.contains('QDII', na=False)]
+                MultiSourceDataAdapter._qdii_cache = set(qdii_funds['基金代码'].tolist())
+                MultiSourceDataAdapter._cache_loaded = True
+                
+                logger.info(f"QDII基金缓存已加载，共 {len(MultiSourceDataAdapter._qdii_cache)} 只基金")
+                return fund_code in MultiSourceDataAdapter._qdii_cache
+                
+        except Exception as e:
+            logger.warning(f"动态获取QDII基金列表失败: {e}")
+        
+        return False
+    
+    @staticmethod
+    def refresh_qdii_cache():
+        """
+        刷新QDII基金缓存
+        
+        手动刷新缓存以获取最新的QDII基金列表
+        """
+        MultiSourceDataAdapter._qdii_cache = None
+        MultiSourceDataAdapter._cache_loaded = False
+        # 触发重新加载
+        return MultiSourceDataAdapter._is_qdii_by_data_source('000000')  # 传入无效代码仅触发缓存加载
