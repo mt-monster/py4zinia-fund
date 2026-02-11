@@ -2627,7 +2627,7 @@ def backtest_holdings():
         
         # Validate strategy_id
         from backtesting.strategy_report_parser import StrategyReportParser
-        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        report_path = 'pro2/fund_search/backtesting/strategy_reports/strategy_comparison_report.md'
         
         try:
             parser = StrategyReportParser(report_path)
@@ -2741,7 +2741,7 @@ def compare_strategies():
         
         # Validate strategy_ids
         from backtesting.strategy_report_parser import StrategyReportParser
-        report_path = 'pro2/fund_backtest/strategy_results/strategy_comparison_report.md'
+        report_path = 'pro2/fund_search/backtesting/strategy_reports/strategy_comparison_report.md'
         
         try:
             parser = StrategyReportParser(report_path)
@@ -3056,7 +3056,7 @@ def get_strategies_metadata():
         # 策略报告路径 - 使用绝对路径
         import os
         base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        report_path = os.path.join(base_path, 'fund_backtest', 'strategy_results', 'strategy_comparison_report.md')
+        report_path = os.path.join(base_path, 'fund_search', 'backtesting', 'strategy_reports', 'strategy_comparison_report.md')
         
         # 解析策略报告
         parser = StrategyReportParser(report_path)

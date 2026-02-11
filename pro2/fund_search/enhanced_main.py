@@ -26,15 +26,6 @@ from backtesting.enhanced_analytics import EnhancedFundAnalytics
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
 from data_retrieval.enhanced_notification import EnhancedNotificationManager
 
-# 导入策略对比分析系统
-STRATEGY_ANALYZER_AVAILABLE = False
-try:
-    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
-    from complete_strategy_analyzer import CompleteStrategyAnalyzer
-    STRATEGY_ANALYZER_AVAILABLE = True
-except ImportError as e:
-    pass  # 静默处理，避免logger未定义错误
-
 # 设置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -61,12 +52,6 @@ class EnhancedFundAnalysisSystem:
         # 配置中文字体显示
         self.setup_chinese_font()
         
-        # 检查策略对比分析系统是否可用
-        if STRATEGY_ANALYZER_AVAILABLE:
-            logger.info("策略对比分析系统已加载")
-        else:
-            logger.warning("策略对比分析系统不可用，将跳过相关功能")
-
         logger.info("增强版基金分析系统初始化完成")
     
     def setup_chinese_font(self):
@@ -117,30 +102,22 @@ class EnhancedFundAnalysisSystem:
         try:
             logger.info("开始检查策略最优性...")
             
-            # 尝试导入策略对比引擎
-            try:
-                sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
-                from strategy_comparison_engine import StrategyComparisonEngine
-            except ImportError:
-                logger.warning("无法导入 StrategyComparisonEngine，跳过策略最优性检查")
-                return
-
-            # 运行策略对比
-            engine = StrategyComparisonEngine(
-                backtest_start_date='2024-01-01',
-                backtest_end_date=datetime.now().strftime('%Y-%m-%d'),
-                base_amount=1000,
-                portfolio_size=6
+            # 使用回测引擎进行策略对比
+            from backtesting.unified_strategy_engine import UnifiedStrategyEngine
+            
+            engine = UnifiedStrategyEngine()
+            results = engine.compare_strategies(
+                fund_codes=['000001', '000002', '000003'],  # 示例基金
+                start_date='2024-01-01',
+                end_date=datetime.now().strftime('%Y-%m-%d'),
+                base_investment=1000
             )
             
-            # 使用所有基金进行对比
-            results = engine.run_strategy_comparison(top_n=0, rank_type='daily')
-            
-            if not results or 'comparison_report' not in results:
+            if not results:
                 logger.warning("策略对比未返回有效结果")
                 return
                 
-            best_backtest_strategy = results['comparison_report'].get('best_strategy', {})
+            best_backtest_strategy = results.get('best_strategy', {})
             best_strategy_name = best_backtest_strategy.get('name', 'Unknown')
             
             # 当前策略信息
@@ -1298,53 +1275,58 @@ class EnhancedFundAnalysisSystem:
         bool: 分析是否成功
         """
         try:
-            if not STRATEGY_ANALYZER_AVAILABLE:
-                logger.error("策略对比分析系统不可用，请检查模块导入")
-                return False
-
             logger.info("开始运行策略对比分析")
             logger.info(f"分析参数: 日期 {start_date} 至 {end_date or '当前'}, 基准金额 {base_amount}, 组合大小 {portfolio_size}")
 
-            # 创建策略分析器
-            analyzer = CompleteStrategyAnalyzer(
-                start_date=start_date,
-                end_date=end_date,
-                base_amount=base_amount,
-                portfolio_size=portfolio_size,
-                risk_profile=risk_profile
-            )
-
-            # 运行完整分析
-            results = analyzer.run_complete_analysis(
-                top_n=top_n,
-                rank_type=rank_type,
-                output_dir=output_dir,
-                generate_report=generate_report,
-                generate_charts=generate_charts
-            )
-
-            if 'error' in results:
-                logger.error(f"策略对比分析失败: {results['error']}")
+            # 使用现有的回测引擎进行策略对比
+            from backtesting.unified_strategy_engine import UnifiedStrategyEngine
+            from backtesting.advanced_strategies import get_all_advanced_strategies
+            
+            engine = UnifiedStrategyEngine()
+            strategies = get_all_advanced_strategies()
+            
+            # 获取示例基金进行回测
+            fund_codes = ['000001', '000002', '000003'][:portfolio_size]
+            
+            logger.info(f"使用 {len(strategies)} 种策略进行对比")
+            
+            # 运行策略对比
+            comparison_results = []
+            for strategy_name, strategy in strategies.items():
+                try:
+                    result = engine.run_backtest(
+                        strategy=strategy,
+                        fund_codes=fund_codes,
+                        start_date=start_date,
+                        end_date=end_date or datetime.now().strftime('%Y-%m-%d'),
+                        base_investment=base_amount
+                    )
+                    comparison_results.append({
+                        'strategy_name': strategy_name,
+                        'result': result
+                    })
+                except Exception as e:
+                    logger.warning(f"策略 {strategy_name} 回测失败: {str(e)}")
+            
+            if not comparison_results:
+                logger.error("所有策略回测均失败")
                 return False
-            else:
-                logger.info("策略对比分析完成")
-                print("\n" + "="*80)
-                print("🎯 策略对比分析结果")
-                print("="*80)
+            
+            # 找出最佳策略
+            best_strategy = max(comparison_results, 
+                              key=lambda x: x['result'].get('total_return', 0))
+            
+            logger.info("策略对比分析完成")
+            print("\n" + "="*80)
+            print("🎯 策略对比分析结果")
+            print("="*80)
+            print(f"🏆 推荐策略: {best_strategy['strategy_name']}")
+            print(f"📊 总收益率: {best_strategy['result'].get('total_return', 0):.2%}")
+            print(f"📈 对比策略数量: {len(comparison_results)}")
+            print(f"📁 结果保存路径: {output_dir}")
+            print("="*80)
 
-                if 'ranking' in results and 'recommendation' in results['ranking']:
-                    rec = results['ranking']['recommendation']
-                    print(f"🏆 推荐策略: {rec.get('recommended_strategy', {}).get('strategy_name', '未知')}")
-                    print(f"🔍 置信度: {rec.get('confidence_level', '中等')}")
-                    print(f"📊 总收益率: {rec.get('recommended_strategy', {}).get('raw_metrics', {}).get('total_return', 0):.2%}")
-
-                if 'comparison' in results and 'strategy_results' in results['comparison']:
-                    print(f"📈 对比策略数量: {len(results['comparison']['strategy_results'])}")
-
-                print(f"📁 结果保存路径: {output_dir}")
-                print("="*80)
-
-                return True
+            return True
 
         except Exception as e:
             logger.error(f"运行策略对比分析失败: {str(e)}")

@@ -2,20 +2,34 @@
 # coding: utf-8
 
 """
-基金组合回测系统主程序
+基金组合回测系统主程序 (已优化)
 
-该程序是整个基金组合回测系统的入口点，允许用户通过命令行配置不同的回测参数。
+该程序使用 fund_search/backtesting 模块中的功能，
+替代了原 fund_backtest 模块的实现。
+
+主要功能：
+1. 单基金回测
+2. 基金组合回测
+3. 策略绩效分析
 """
 
 import argparse
-from top_funds_backtest import TopFundsBacktest
+import sys
+import os
+
+# 添加当前目录到路径
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from backtesting.backtest_engine import FundBacktest
+from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+
 
 def parse_args():
     """
     解析命令行参数
     
     返回：
-    argparse.Namespace, 解析后的命令行参数
+        argparse.Namespace, 解析后的命令行参数
     """
     parser = argparse.ArgumentParser(description='基金组合回测系统')
     
@@ -25,37 +39,18 @@ def parse_args():
     parser.add_argument('--end-date', type=str, default=None,
                         help='回测结束日期，格式为YYYY-MM-DD，默认为当前日期')
     
-    # 相似性分析参数
-    parser.add_argument('--lookback-days', type=int, default=180,
-                        help='相似性分析的回溯天数，默认为180天')
-    parser.add_argument('--n-clusters', type=int, default=4,
-                        help='聚类数量，默认为4')
-    parser.add_argument('--correlation-threshold', type=float, default=0.5,
-                        help='相关性阈值，默认为0.5')
-    
     # 回测参数
     parser.add_argument('--base-amount', type=float, default=100,
                         help='基准定投金额，默认为100元')
-    parser.add_argument('--portfolio-size', type=int, default=8,
-                        help='组合中基金数量，默认为8')
-    
-    # 基金筛选参数
-    parser.add_argument('--top-n', type=int, default=20,
-                        help='获取排名前N的基金，默认为20')
-    parser.add_argument('--rank-type', type=str, default='daily',
-                        choices=['daily', 'weekly', 'monthly'],
-                        help='排名类型，可选值为daily、weekly、monthly，默认为daily')
-    
-    # 组合构建参数
-    parser.add_argument('--portfolio-method', type=str, default='diversified',
-                        choices=['diversified', 'low_corr'],
-                        help='组合构建方法，可选值为diversified、low_corr，默认为diversified')
+    parser.add_argument('--fund-code', type=str, default=None,
+                        help='基金代码，如果不指定则使用示例基金')
     
     # 输出参数
     parser.add_argument('--output-dir', type=str, default='.',
                         help='输出文件保存目录，默认为当前目录')
     
     return parser.parse_args()
+
 
 def main():
     """
@@ -64,45 +59,48 @@ def main():
     # 解析命令行参数
     args = parse_args()
     
-    # 创建回测实例
-    backtest = TopFundsBacktest(
-        backtest_start_date=args.start_date,
-        backtest_end_date=args.end_date,
-        lookback_days=args.lookback_days,
-        base_amount=args.base_amount,
-        portfolio_size=args.portfolio_size,
-        n_clusters=args.n_clusters,
-        correlation_threshold=args.correlation_threshold
-    )
+    # 示例基金代码（如果未指定）
+    fund_code = args.fund_code or '000001'  # 华夏成长混合
     
-    # 运行完整回测流程
-    result, metrics, portfolio = backtest.run_full_backtest_flow(
-        top_n=args.top_n,
-        rank_type=args.rank_type,
-        portfolio_method=args.portfolio_method
-    )
+    print(f"开始回测基金: {fund_code}")
+    print(f"回测区间: {args.start_date} 至 {args.end_date or '今天'}")
+    print(f"基准定投金额: {args.base_amount}元")
     
-    # 保存回测结果
-    if result is not None:
-        result_path = f'{args.output_dir}/top_funds_backtest_result.csv'
-        result.to_csv(result_path, index=False)
-        print(f"回测结果已保存到{result_path}")
-    
-    # 保存绩效指标
-    if metrics:
-        import pandas as pd
-        metrics_df = pd.DataFrame([metrics])
-        metrics_path = f'{args.output_dir}/top_funds_performance_metrics.csv'
-        metrics_df.to_csv(metrics_path, index=False)
-        print(f"绩效指标已保存到{metrics_path}")
-    
-    # 保存基金组合
-    if portfolio:
-        import pandas as pd
-        portfolio_df = pd.DataFrame({'fund_code': portfolio})
-        portfolio_path = f'{args.output_dir}/top_funds_portfolio.csv'
-        portfolio_df.to_csv(portfolio_path, index=False)
-        print(f"基金组合已保存到{portfolio_path}")
+    try:
+        # 创建回测引擎实例
+        backtest = FundBacktest(
+            base_amount=args.base_amount,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            use_unified_strategy=True
+        )
+        
+        # 执行单基金回测
+        result, metrics = backtest.backtest_single_fund(fund_code)
+        
+        if result is not None:
+            # 保存回测结果
+            import pandas as pd
+            
+            result_path = f'{args.output_dir}/backtest_result.csv'
+            result.to_csv(result_path, index=False)
+            print(f"\n✓ 回测结果已保存到: {result_path}")
+            
+            # 显示关键指标
+            print("\n=== 回测绩效指标 ===")
+            for key, value in metrics.items():
+                if isinstance(value, float):
+                    print(f"  {key}: {value:.4f}")
+                else:
+                    print(f"  {key}: {value}")
+        else:
+            print("\n✗ 回测失败，请检查基金代码是否正确")
+            
+    except Exception as e:
+        print(f"\n✗ 回测过程出错: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
