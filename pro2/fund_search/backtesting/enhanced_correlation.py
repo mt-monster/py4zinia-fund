@@ -162,16 +162,30 @@ class EnhancedCorrelationAnalyzer:
             if 'daily_return' not in df.columns:
                 logger.warning(f"基金 {fund_code} 缺少 daily_return 列，跳过")
                 continue
-                
-            df_renamed = df[['date', 'daily_return']].rename(columns={'daily_return': fund_code})
+            
+            # 只保留需要的列，避免数据过大
+            df_clean = df[['date', 'daily_return']].copy()
+            df_clean = df_clean.dropna(subset=['daily_return'])
+            
+            # 确保日期格式正确
+            df_clean['date'] = pd.to_datetime(df_clean['date'])
+            
+            df_renamed = df_clean.rename(columns={'daily_return': fund_code})
             
             if merged_df is None:
                 merged_df = df_renamed
             else:
+                # 使用内连接只保留共同日期，避免数据量爆炸
                 merged_df = pd.merge(merged_df, df_renamed, on='date', how='inner')
         
         if merged_df is None or len(merged_df) == 0:
-            raise ValueError("无法对齐基金数据")
+            raise ValueError("无法对齐基金数据，基金可能没有共同的交易日")
+        
+        # 限制数据点数量，避免内存溢出（最多使用最近500个交易日）
+        max_data_points = 500
+        if len(merged_df) > max_data_points:
+            logger.warning(f"数据点过多({len(merged_df)})，限制为最近{max_data_points}个交易日")
+            merged_df = merged_df.sort_values('date').tail(max_data_points)
         
         # 数据清理
         merged_df = merged_df.dropna()

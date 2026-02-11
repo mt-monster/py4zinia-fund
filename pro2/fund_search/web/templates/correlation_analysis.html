@@ -10,6 +10,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/correlation_analysis.css') }}">
 </head>
 <body>
+    <!-- 加载指示器 -->
+    <div id="loading-indicator" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem; margin-bottom: 1rem;" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+        <div style="color: #333; font-size: 1rem;">正在加载增强分析数据...</div>
+        <div style="color: #666; font-size: 0.85rem; margin-top: 0.5rem;">基金数量较多，请耐心等待</div>
+    </div>
+    
     <div class="page-wrapper">
         <!-- 页面头部 -->
         <header class="page-header">
@@ -192,7 +201,7 @@
             initializePage();
         });
 
-        function initializePage() {
+        async function initializePage() {
             const data = getAnalysisData();
             console.log('从sessionStorage获取的数据:', data);
             
@@ -201,19 +210,105 @@
                 analysisData = data;
                 currentFundCodes = data.fund_codes;
                 
-                // 显示分析内容
+                // 显示分析内容（使用基础数据）
                 showAnalysisContent();
                 
-                // 加载各个模块
-                renderAnalysisResult(data);
-                loadEnhancedCorrelationAnalysis(data.fund_codes);
-                loadCorrelationCharts(data.fund_codes);
+                // 如果有基础数据，先显示
+                if (data.basic_correlation) {
+                    renderAnalysisResult(data);
+                }
+                
+                // 异步加载完整的相关性分析数据（避免sessionStorage超限）
+                // 48只基金产生1128种组合，数据量过大，需要异步加载
+                await loadFullCorrelationData(data.fund_codes);
+                
             } else {
                 console.log('未检测到有效的基金数据，显示空状态');
                 showEmptyState();
             }
             
             console.log('=== 页面加载完成 ===');
+        }
+        
+        // 异步加载完整的相关性分析数据
+        async function loadFullCorrelationData(fundCodes) {
+            console.log('🔄 开始异步加载完整相关性数据...');
+            
+            try {
+                // 显示加载状态
+                showLoadingIndicator();
+                
+                const response = await fetch('/api/holdings/analyze/correlation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        fund_codes: fundCodes,
+                        enhanced_analysis: true 
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('✅ 完整数据加载成功');
+                    
+                    // 更新分析数据
+                    analysisData = {
+                        ...analysisData,
+                        ...result.data,
+                        fund_codes: fundCodes
+                    };
+                    
+                    // 重新渲染所有模块（使用完整数据）
+                    renderAnalysisResult(analysisData);
+                    loadEnhancedCorrelationAnalysis(fundCodes);
+                    loadCorrelationCharts(fundCodes);
+                    
+                    hideLoadingIndicator();
+                } else {
+                    console.error('❌ 加载完整数据失败:', result.error);
+                    showErrorMessage('增强分析数据加载失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('❌ 网络错误:', error);
+                showErrorMessage('网络错误，部分分析数据可能无法显示');
+            }
+        }
+        
+        // 显示加载指示器
+        function showLoadingIndicator() {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.style.display = 'flex';
+            }
+        }
+        
+        // 隐藏加载指示器
+        function hideLoadingIndicator() {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+        
+        // 显示错误消息
+        function showErrorMessage(message) {
+            // 创建一个临时通知
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-warning alert-dismissible fade show';
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+            notification.innerHTML = `
+                <strong>注意</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
         }
 
         // ==================== 数据获取 ====================
