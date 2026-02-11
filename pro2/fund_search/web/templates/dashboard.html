@@ -183,6 +183,26 @@
 
         .stat-card .change.positive { color: var(--success); }
         .stat-card .change.negative { color: var(--danger); }
+        
+        /* 基金涨跌状态描述样式 */
+        .change-description {
+            font-size: 11px;
+            color: #7f8c8d;
+            margin-top: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        /* 实时更新动画效果 */
+        @keyframes pulseUpdate {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        
+        .change.updated {
+            animation: pulseUpdate 0.5s ease;
+        }
+        .stat-card .change.negative { color: var(--danger); }
 
         /* 图表区域 */
         .charts-grid {
@@ -767,6 +787,9 @@
                     updateSystemStatus(data.data.system);
                     updateActivityList(data.data.activities);
                 }
+                
+                // 同时加载基金列表实时涨跌数据
+                loadFundListChanges();
             } catch (error) {
                 console.error('加载仪表盘数据失败:', error);
                 showNotification('数据加载失败，请稍后重试', 'error');
@@ -1307,12 +1330,125 @@
             }, 3000);
         }
 
+        // 加载基金列表实时涨跌数据
+        async function loadFundListChanges() {
+            try {
+                console.log('[实时更新] 开始获取基金列表涨跌数据');
+                
+                // 获取当前用户的持仓基金列表
+                const holdingsResponse = await fetch('/api/holdings/list?user_id=default_user');
+                const holdingsResult = await holdingsResponse.json();
+                
+                if (!holdingsResult.success || !holdingsResult.data || holdingsResult.data.length === 0) {
+                    console.log('[实时更新] 无持仓基金数据');
+                    updateFundListChangeDisplay(0, 0, '无持仓');
+                    return;
+                }
+                
+                const fundCodes = holdingsResult.data.map(fund => fund.fund_code);
+                console.log(`[实时更新] 获取到 ${fundCodes.length} 只基金:`, fundCodes);
+                
+                // 获取这些基金的实时涨跌数据
+                const fundDataPromises = fundCodes.map(code => 
+                    fetch(`/api/fund/${code}/latest`).then(res => res.json()).catch(err => ({ success: false, error: err }))
+                );
+                
+                const fundDataResults = await Promise.all(fundDataPromises);
+                console.log('[实时更新] 基金数据获取结果:', fundDataResults);
+                
+                // 计算整体涨跌情况
+                let totalChange = 0;
+                let validFunds = 0;
+                let positiveFunds = 0;
+                let negativeFunds = 0;
+                
+                fundDataResults.forEach((result, index) => {
+                    if (result.success && result.data && result.data.today_return !== undefined) {
+                        const change = parseFloat(result.data.today_return) || 0;
+                        totalChange += change;
+                        validFunds++;
+                        if (change > 0) positiveFunds++;
+                        else if (change < 0) negativeFunds++;
+                    }
+                });
+                
+                // 计算平均涨跌幅
+                const avgChange = validFunds > 0 ? totalChange / validFunds : 0;
+                
+                console.log(`[实时更新] 统计结果 - 平均涨跌: ${avgChange.toFixed(2)}%, 上涨: ${positiveFunds}只, 下跌: ${negativeFunds}只`);
+                
+                // 更新显示
+                updateFundListChangeDisplay(avgChange, validFunds, `${positiveFunds}涨${negativeFunds}跌`);
+                
+            } catch (error) {
+                console.error('[实时更新] 获取基金涨跌数据失败:', error);
+                updateFundListChangeDisplay(0, 0, '数据获取失败');
+            }
+        }
+        
+        // 更新基金列表涨跌显示
+        function updateFundListChangeDisplay(changePercent, fundCount, statusText) {
+            const changeElement = document.querySelector('.stat-card.info .change'); // 今日收益卡片的变化显示
+            const valueElement = document.getElementById('todayProfit'); // 今日收益数值
+            
+            if (changeElement && valueElement) {
+                // 添加更新动画效果
+                changeElement.classList.add('updated');
+                setTimeout(() => {
+                    changeElement.classList.remove('updated');
+                }, 500);
+                
+                // 更新变化百分比显示
+                const icon = changePercent >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+                const sign = changePercent >= 0 ? '+' : '';
+                
+                changeElement.innerHTML = `
+                    <i class="bi ${icon}"></i> ${sign}${Math.abs(changePercent).toFixed(2)}%
+                `;
+                changeElement.className = `change ${changePercent >= 0 ? 'positive' : 'negative'}`;
+                
+                // 如果有基金数量，也更新状态文本
+                if (fundCount > 0) {
+                    const statusElement = changeElement.parentElement.querySelector('.change-description');
+                    if (statusElement) {
+                        statusElement.textContent = statusText;
+                        // 添加淡入效果
+                        statusElement.style.opacity = '0';
+                        setTimeout(() => {
+                            statusElement.style.transition = 'opacity 0.3s ease';
+                            statusElement.style.opacity = '1';
+                        }, 100);
+                    } else {
+                        // 创建状态描述元素
+                        const descElement = document.createElement('div');
+                        descElement.className = 'change-description';
+                        descElement.style.cssText = 'font-size: 11px; color: #7f8c8d; margin-top: 2px; opacity: 0;';
+                        descElement.textContent = statusText;
+                        changeElement.parentElement.appendChild(descElement);
+                        
+                        // 淡入效果
+                        setTimeout(() => {
+                            descElement.style.transition = 'opacity 0.3s ease';
+                            descElement.style.opacity = '1';
+                        }, 100);
+                    }
+                }
+            }
+            
+            console.log(`[实时更新] 已更新基金涨跌显示: ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}% (${fundCount}只基金)`);
+        }
+
         // 自动刷新
         function startAutoRefresh() {
             // 每30秒刷新一次数据
             setInterval(() => {
                 loadDashboardData();
             }, 30000);
+            
+            // 每15秒单独刷新基金涨跌数据（更频繁）
+            setInterval(() => {
+                loadFundListChanges();
+            }, 15000);
         }
 
     </script>

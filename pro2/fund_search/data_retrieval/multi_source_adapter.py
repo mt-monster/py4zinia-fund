@@ -865,9 +865,9 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 daily_returns = hist_data[daily_growth_col].dropna()
                 # 处理百分比格式
                 daily_returns = pd.to_numeric(daily_returns, errors='coerce')
-                # 如果数值很小，可能是小数格式，需要转换为百分比
-                if abs(daily_returns).mean() < 1:
-                    daily_returns = daily_returns * 100
+                # 如果数值较大，是百分比格式，需要转换为小数
+                if abs(daily_returns).mean() >= 0.01:
+                    daily_returns = daily_returns / 100
             else:
                 daily_returns = pd.Series([0.0])
             
@@ -913,6 +913,10 @@ class MultiSourceDataAdapter(MultiSourceFundData):
         # 获取净值列名
         nav_col = '单位净值' if '单位净值' in hist_data.columns else 'nav'
         date_col = '日期' if '日期' in hist_data.columns else 'date'
+        
+        # 确保数据按日期升序排列（最早的在前）
+        if date_col in hist_data.columns:
+            hist_data = hist_data.sort_values(date_col, ascending=True).reset_index(drop=True)
         
         # 计算总收益率（成立以来）
         if nav_col in hist_data.columns:
