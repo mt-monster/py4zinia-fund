@@ -36,6 +36,15 @@ except ImportError as e:
     print(f"缓存服务不可用: {e}")
     CACHE_SERVICES_AVAILABLE = False
 
+# 预加载服务导入
+try:
+    from services.fund_data_preloader import FundDataPreloader, get_preloader
+    from services.background_updater import BackgroundUpdater, get_background_updater
+    PRELOAD_SERVICES_AVAILABLE = True
+except ImportError as e:
+    print(f"预加载服务不可用: {e}")
+    PRELOAD_SERVICES_AVAILABLE = False
+
 # 设置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -123,6 +132,30 @@ def init_components():
                 components['sync_service']
             )
         
+        # 初始化预加载服务（如果可用）
+        if PRELOAD_SERVICES_AVAILABLE:
+            logger.info("初始化数据预加载服务...")
+            try:
+                # 初始化预加载器
+                preloader = get_preloader()
+                components['preloader'] = preloader
+                
+                # 同步启动预加载（阻塞直到完成）
+                # 确保系统启动时数据已准备就绪
+                logger.info("开始预加载基金数据...")
+                preloader.preload_all(async_mode=False)
+                logger.info("数据预加载完成，系统已准备就绪")
+                
+                # 启动后台更新服务
+                if os.environ.get('ENABLE_BACKGROUND_UPDATE', 'true').lower() == 'true':
+                    updater = get_background_updater()
+                    updater.start()
+                    components['background_updater'] = updater
+                    logger.info("后台数据更新服务已启动")
+                
+            except Exception as e:
+                logger.error(f"预加载服务初始化失败: {e}")
+        
         logger.info("系统组件初始化完成")
         
     except Exception as e:
@@ -182,5 +215,6 @@ if __name__ == '__main__':
     app.run(
         debug=app_config.debug,
         host=app_config.host,
-        port=app_config.port
+        port=app_config.port,
+        use_reloader=False  # 禁用重载器，避免日志重复打印
     )

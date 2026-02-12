@@ -553,13 +553,44 @@ class HoldingRealtimeService:
         results = {}
         missing_codes = []
         
-        # 先查内存缓存
+        # 先查内存缓存（holding_realtime_service 自己的缓存）
         for code in fund_codes:
             cached = self.cache.get_from_memory(f'yesterday:{code}')
             if cached:
                 results[code] = cached
             else:
                 missing_codes.append(code)
+        
+        if not missing_codes:
+            return results
+        
+        # 从预加载的基金数据缓存获取（FundDataPreloader）
+        try:
+            from services.fund_data_preloader import get_preloader
+            preloader = get_preloader()
+            
+            still_missing = []
+            for code in missing_codes:
+                # 尝试从预加载缓存获取最新净值（包含 daily_return）
+                latest_nav = preloader.get_fund_latest_nav(code)
+                if latest_nav and latest_nav.get('daily_return', 0) != 0:
+                    results[code] = {
+                        'yesterday_nav': latest_nav.get('nav'),
+                        'yesterday_return': latest_nav.get('daily_return', 0),
+                        'yesterday_return_date': latest_nav.get('date'),
+                        'yesterday_return_days_diff': 1,
+                        'yesterday_return_is_stale': False
+                    }
+                    # 回填到 holding_service 的缓存
+                    self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
+                    logger.debug(f"从预加载缓存获取 {code} 昨日收益率: {latest_nav.get('daily_return')}%")
+                else:
+                    still_missing.append(code)
+            
+            missing_codes = still_missing
+            
+        except Exception as e:
+            logger.debug(f"从预加载缓存获取昨日数据失败: {e}")
         
         if not missing_codes:
             return results
@@ -659,38 +690,69 @@ class HoldingRealtimeService:
                 # 对于数据库中仍缺失的基金，从 MultiSourceDataAdapter 实时获取
                 still_missing_after_db = [code for code in missing_codes if code not in results]
                 if still_missing_after_db:
-                    logger.info(f"尝试从 MultiSourceDataAdapter 获取 {len(still_missing_after_db)} 只基金的昨日收益率")
+                    logger.info(f"尝试从 MultiSourceDataAdapter 批量获取 {len(still_missing_after_db)} 只基金的昨日收益率")
                     try:
                         from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
                         adapter = MultiSourceDataAdapter()
                         
-                        for code in still_missing_after_db:
+                        # 【优化】使用批量获取替代逐个获取
+                        # 1. 首先尝试批量获取所有基金的历史数据
+                        batch_results = {}
+                        try:
+                            # 使用批量接口获取多只基金的历史数据
+                            batch_nav_data = adapter.batch_get_fund_nav(still_missing_after_db)
+                            for code, df in batch_nav_data.items():
+                                if not df.empty and len(df) >= 2:
+                                    # 计算昨日收益率
+                                    latest_nav = float(df.iloc[-1]['nav'])
+                                    yesterday_nav = float(df.iloc[-2]['nav'])
+                                    yesterday_date = str(df.iloc[-2].get('date', ''))
+                                    
+                                    if yesterday_nav > 0:
+                                        yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
+                                        yesterday_return = round(yesterday_return, 2)
+                                        
+                                        batch_results[code] = {
+                                            'yesterday_nav': yesterday_nav,
+                                            'yesterday_return': yesterday_return,
+                                            'yesterday_return_date': yesterday_date,
+                                            'yesterday_return_days_diff': 1,
+                                            'yesterday_return_is_stale': False
+                                        }
+                        except Exception as batch_error:
+                            logger.warning(f"批量获取昨日数据失败，降级到逐个获取: {batch_error}")
+                        
+                        # 2. 处理批量获取失败的基金，逐个获取
+                        remaining_codes = [c for c in still_missing_after_db if c not in batch_results]
+                        for code in remaining_codes:
                             try:
                                 # 获取基金历史数据来计算昨日收益率
-                                # QDII基金会进行前向追溯获取最近的非零收益率
-                                # 返回包含日期信息的字典
                                 return_result = adapter._get_yesterday_return(code)
                                 
-                                # 保存获取到的值（包括日期信息）
-                                results[code] = {
+                                batch_results[code] = {
                                     'yesterday_nav': None,
                                     'yesterday_return': return_result.get('value'),
                                     'yesterday_return_date': return_result.get('date'),
                                     'yesterday_return_days_diff': return_result.get('days_diff'),
                                     'yesterday_return_is_stale': return_result.get('is_stale', False)
                                 }
-                                # 回填内存缓存
-                                self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
-                                logger.info(f"从 Adapter 获取 {code} 昨日收益率: {return_result.get('value')}% (T-{return_result.get('days_diff')})")
                             except Exception as e:
                                 logger.warning(f"从 Adapter 获取基金 {code} 昨日收益率失败: {e}")
-                                results[code] = {
+                                batch_results[code] = {
                                     'yesterday_nav': None, 
                                     'yesterday_return': None,
                                     'yesterday_return_date': None,
                                     'yesterday_return_days_diff': None,
                                     'yesterday_return_is_stale': False
                                 }
+                        
+                        # 3. 合并结果并回填缓存
+                        for code, data in batch_results.items():
+                            results[code] = data
+                            # 回填内存缓存
+                            self.cache.set_to_memory(f'yesterday:{code}', data, ttl_minutes=15)
+                            logger.info(f"从 Adapter 获取 {code} 昨日收益率: {data.get('yesterday_return')}% (T-{data.get('yesterday_return_days_diff')})")
+                        
                     except Exception as e:
                         logger.error(f"初始化 MultiSourceDataAdapter 失败: {e}")
                         # 所有缺失基金标记为 None

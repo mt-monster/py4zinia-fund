@@ -247,6 +247,29 @@ def get_profit_trend():
         fund_codes = request.args.get('fund_codes', '000001')  # 基金代码，逗号分隔
         weights = request.args.get('weights', '1.0')  # 权重，逗号分隔
         
+        # 优先从预加载器获取（如果已预计算）
+        try:
+            from services.fund_data_preloader import get_preloader
+            preloader = get_preloader()
+            cached_trend = preloader.get_profit_trend(days)
+            if cached_trend and cached_trend.get('labels'):
+                logger.info(f"从预加载缓存获取收益趋势数据（{days}天）")
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'labels': cached_trend['labels'],
+                        'profit': cached_trend['profit'],
+                        'benchmark': cached_trend['benchmark'],
+                        'fund_codes': cached_trend.get('fund_codes', []),
+                        'weights': cached_trend.get('weights', []),
+                        'data_source': 'preloaded_cache',
+                        'benchmark_name': cached_trend.get('benchmark_name', '沪深300'),
+                        'benchmark_description': '以沪深300指数作为业绩比较基准'
+                    }
+                })
+        except Exception as e:
+            logger.debug(f"从预加载器获取收益趋势失败: {e}")
+        
         # 解析基金代码和权重
         fund_code_list = [code.strip() for code in fund_codes.split(',')]
         weight_list = [float(w.strip()) for w in weights.split(',')]
@@ -579,7 +602,21 @@ def get_allocation():
 
 def get_fund_type_for_allocation(fund_code: str) -> str:
     """为资产配置获取基金类型 - 使用证监会标准分类"""
-    # 首先从fund_basic_info获取官方类型
+    
+    # 首先尝试从预加载器缓存获取（优先，因为预加载器已加载所有持仓基金信息）
+    try:
+        from services.fund_data_preloader import get_preloader
+        preloader = get_preloader()
+        basic_info = preloader.get_fund_basic_info(fund_code)
+        if basic_info:
+            fund_name = basic_info.get('fund_name', '')
+            official_type = basic_info.get('fund_type', '')
+            if fund_name or official_type:
+                return classify_fund(fund_name, fund_code, official_type)
+    except:
+        pass
+    
+    # 备选：从fund_basic_info表获取
     try:
         sql = """
         SELECT fund_name, fund_type FROM fund_basic_info 
