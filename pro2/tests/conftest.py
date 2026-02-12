@@ -1,139 +1,216 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Pytest 配置文件
-提供测试固件和共享配置
+提供测试 fixtures 和共享配置
 """
 
 import os
 import sys
+
+# 获取项目根目录（pro2/）
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+# 将 fund_search 目录添加到路径，使 data_retrieval 可以作为顶层模块导入
+fund_search_path = os.path.join(project_root, 'fund_search')
+if fund_search_path not in sys.path:
+    sys.path.insert(0, fund_search_path)
+
+# 同时将项目根目录添加到路径
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 现在可以安全地导入项目模块
 import pytest
-import tempfile
-import shutil
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
-# 添加项目路径
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(PROJECT_ROOT, 'fund_search'))
 
-# 测试数据
-TEST_FUND_CODES = ['000001', '000002', '000003']
-TEST_FUND_DATA = {
-    '000001': {
+# =============================================================================
+# 基础 Fixtures
+# =============================================================================
+
+@pytest.fixture
+def sample_fund_code():
+    """示例基金代码 - 华夏成长混合"""
+    return "000001"
+
+
+@pytest.fixture
+def sample_qdii_fund_code():
+    """示例QDII基金代码 - 景顺长城全球半导体"""
+    return "016667"
+
+
+@pytest.fixture
+def sample_fund_name():
+    """示例基金名称"""
+    return "华夏成长混合"
+
+
+@pytest.fixture
+def test_user_id():
+    """测试用户ID"""
+    return "test_user_001"
+
+
+# =============================================================================
+# 数据 Fixtures
+# =============================================================================
+
+@pytest.fixture
+def sample_historical_data():
+    """
+    示例历史净值数据
+    
+    Returns:
+        pd.DataFrame: 包含日期、净值、日收益率的数据
+    """
+    np.random.seed(42)  # 保证可重复性
+    
+    # 生成一年的交易日数据
+    dates = pd.date_range(start='2023-01-01', end='2023-12-31', freq='B')
+    n_days = len(dates)
+    
+    # 生成随机收益率
+    daily_returns = np.random.normal(0.0005, 0.015, n_days)
+    
+    # 计算净值
+    nav_values = 1.0 * np.cumprod(1 + daily_returns)
+    
+    return pd.DataFrame({
+        'date': dates,
+        'nav': nav_values,
+        'accum_nav': nav_values * 1.05,
+        'daily_return': daily_returns
+    })
+
+
+@pytest.fixture
+def sample_holding_data():
+    """示例持仓数据"""
+    return {
+        'user_id': 'test_user',
         'fund_code': '000001',
-        'fund_name': '测试基金1',
-        'fund_type': '股票型',
-        'nav': 1.2345,
-        'accumulated_nav': 2.3456,
-        'daily_return': 0.0123,
-    },
-    '000002': {
-        'fund_code': '000002',
-        'fund_name': '测试基金2',
-        'fund_type': '混合型',
-        'nav': 0.9876,
-        'accumulated_nav': 1.8765,
-        'daily_return': -0.0056,
-    },
-    '000003': {
-        'fund_code': '000003',
-        'fund_name': '测试基金3',
-        'fund_type': '债券型',
-        'nav': 1.1000,
-        'accumulated_nav': 1.5000,
-        'daily_return': 0.0023,
-    }
-}
-
-
-@pytest.fixture(scope='session')
-def test_data_dir():
-    """测试数据目录"""
-    data_dir = os.path.join(os.path.dirname(__file__), 'test_data')
-    os.makedirs(data_dir, exist_ok=True)
-    return data_dir
-
-
-@pytest.fixture(scope='session')
-def report_dir():
-    """测试报告目录"""
-    report_dir = os.path.join(os.path.dirname(__file__), 'reports')
-    os.makedirs(report_dir, exist_ok=True)
-    return report_dir
-
-
-@pytest.fixture(scope='function')
-def temp_dir():
-    """临时目录，每个测试函数结束后自动清理"""
-    tmpdir = tempfile.mkdtemp()
-    yield tmpdir
-    shutil.rmtree(tmpdir, ignore_errors=True)
-
-
-@pytest.fixture(scope='function')
-def mock_fund_data():
-    """模拟基金数据"""
-    return TEST_FUND_DATA.copy()
-
-
-@pytest.fixture(scope='function')
-def sample_date_range():
-    """样本日期范围"""
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=365)
-    return {
-        'start_date': start_date.strftime('%Y-%m-%d'),
-        'end_date': end_date.strftime('%Y-%m-%d')
+        'fund_name': '华夏成长混合',
+        'holding_shares': 1000.0,
+        'cost_price': 1.5,
+        'holding_amount': 1500.0,
+        'buy_date': '2024-01-15',
+        'notes': '测试持仓'
     }
 
 
-@pytest.fixture(scope='session')
-def test_config():
-    """测试配置"""
-    return {
-        'database': {
-            'host': 'localhost',
-            'port': 3306,
-            'user': 'test_user',
-            'password': 'test_pass',
-            'database': 'fund_test_db',
-        },
-        'api_timeout': 30,
-        'max_retries': 3,
-    }
+@pytest.fixture
+def sample_fund_list():
+    """示例基金列表"""
+    return [
+        {'fund_code': '000001', 'fund_name': '华夏成长混合', 'fund_type': '混合型'},
+        {'fund_code': '000002', 'fund_name': '华夏大盘精选', 'fund_type': '股票型'},
+        {'fund_code': '000003', 'fund_name': '华夏债券', 'fund_type': '债券型'},
+        {'fund_code': '016667', 'fund_name': '景顺长城全球半导体', 'fund_type': 'QDII'},
+        {'fund_code': '006373', 'fund_name': '华安智能生活', 'fund_type': '混合型'},
+    ]
 
 
-@pytest.fixture(scope='function')
-def mock_db_manager(mocker):
+# =============================================================================
+# 项目模块 Fixtures - 使用直接模块导入避免 __init__.py 问题
+# =============================================================================
+
+@pytest.fixture
+def memory_cache():
+    """
+    创建项目中的 MemoryCache 实例
+    
+    直接导入 memory_cache 模块，避免触发 services/__init__.py
+    """
+    import importlib.util
+    
+    # 直接加载 base.py
+    base_path = os.path.join(fund_search_path, 'services', 'cache', 'base.py')
+    spec = importlib.util.spec_from_file_location("cache_base", base_path)
+    base_module = importlib.util.module_from_spec(spec)
+    sys.modules["cache_base"] = base_module
+    spec.loader.exec_module(base_module)
+    
+    # 直接加载 memory_cache.py
+    mem_path = os.path.join(fund_search_path, 'services', 'cache', 'memory_cache.py')
+    spec = importlib.util.spec_from_file_location("memory_cache", mem_path)
+    mem_module = importlib.util.module_from_spec(spec)
+    
+    # 手动注入 base 模块的类
+    mem_module.CacheBackend = base_module.CacheBackend
+    mem_module.CacheEntry = base_module.CacheEntry
+    
+    spec.loader.exec_module(mem_module)
+    
+    # 返回新实例
+    return mem_module.MemoryCache(max_size=100)
+
+
+@pytest.fixture
+def performance_calculator():
+    """创建项目中的 PerformanceCalculator 实例"""
+    from backtesting.performance_metrics import PerformanceCalculator
+    return PerformanceCalculator(risk_free_rate=0.03)
+
+
+# =============================================================================
+# Mock Fixtures
+# =============================================================================
+
+@pytest.fixture
+def mock_db_manager():
     """模拟数据库管理器"""
-    mock = mocker.MagicMock()
-    mock.get_fund_list.return_value = list(TEST_FUND_DATA.values())
-    mock.get_fund_detail.return_value = TEST_FUND_DATA['000001']
-    return mock
+    class MockDBManager:
+        def __init__(self):
+            self._data = {}
+        
+        def execute_query(self, sql, params=None):
+            """模拟查询"""
+            return pd.DataFrame()
+        
+        def execute_sql(self, sql, params=None):
+            """模拟执行SQL"""
+            return True
+        
+        def get_user_holdings(self, user_id):
+            """模拟获取用户持仓"""
+            return []
+    
+    return MockDBManager()
 
+
+# =============================================================================
+# Flask App Fixtures
+# =============================================================================
+
+@pytest.fixture
+def app():
+    """创建Flask应用实例（用于测试）"""
+    # 延迟导入，避免在配置路径前导入
+    from web.app import app
+    app.config.update({
+        'TESTING': True,
+        'DEBUG': False,
+    })
+    yield app
+
+
+@pytest.fixture
+def client(app):
+    """创建测试客户端"""
+    return app.test_client()
+
+
+# =============================================================================
+# Pytest 配置
+# =============================================================================
 
 def pytest_configure(config):
-    """Pytest配置钩子"""
-    config.addinivalue_line(
-        "markers", "integration: 标记为集成测试"
-    )
-    config.addinivalue_line(
-        "markers", "unit: 标记为单元测试"
-    )
-    config.addinivalue_line(
-        "markers", "slow: 标记为慢速测试"
-    )
-    config.addinivalue_line(
-        "markers", "api: 标记为API测试"
-    )
-    config.addinivalue_line(
-        "markers", "database: 标记为数据库测试"
-    )
-
-
-def pytest_collection_modifyitems(config, items):
-    """修改测试项，添加自定义标记"""
-    for item in items:
-        # 自动添加标记
-        if "test_api" in item.nodeid:
-            item.add_marker(pytest.mark.api)
-        if "test_db" in item.nodeid or "database" in item.nodeid:
-            item.add_marker(pytest.mark.database)
+    """Pytest 配置钩子"""
+    config.addinivalue_line("markers", "slow: marks tests as slow")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")
+    config.addinivalue_line("markers", "performance: marks tests as performance tests")

@@ -1,0 +1,29 @@
+# 测试依赖
+# 安装命令: pip install -r requirements-test.txt
+
+# 核心测试框架
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-mock>=3.10.0
+
+# 性能测试
+locust>=2.15.0
+
+# HTTP 测试
+requests>=2.28.0
+responses>=0.23.0
+
+# 端到端测试
+# selenium>=4.0.0
+# playwright>=1.30.0
+
+# 代码质量
+flake8>=6.0.0
+black>=23.0.0
+mypy>=1.0.0
+
+# 测试报告
+coverage>=7.0.0
+pytest-html>=3.2.0
+allure-pytest>=2.13.0

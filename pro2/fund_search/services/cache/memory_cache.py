@@ -10,7 +10,11 @@ import logging
 from typing import Any, Optional
 from datetime import datetime, timedelta
 
-from .base import CacheBackend, CacheEntry
+try:
+    from .base import CacheBackend, CacheEntry
+except ImportError:
+    # 支持直接作为脚本运行或测试时使用
+    from services.cache.base import CacheBackend, CacheEntry
 
 logger = logging.getLogger(__name__)
 

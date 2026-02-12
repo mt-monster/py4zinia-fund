@@ -1,0 +1,117 @@
+{
+  "funds": [
+    {
+      "fund_code": "000001",
+      "fund_name": "华夏成长混合",
+      "fund_type": "混合型",
+      "current_nav": 1.5234,
+      "previous_nav": 1.5123,
+      "today_return": 0.73,
+      "prev_day_return": 0.65,
+      "sharpe_ratio": 0.85,
+      "volatility": 0.152,
+      "annualized_return": 0.085
+    },
+    {
+      "fund_code": "000002",
+      "fund_name": "华夏大盘精选",
+      "fund_type": "股票型",
+      "current_nav": 12.3456,
+      "previous_nav": 12.2345,
+      "today_return": 0.91,
+      "prev_day_return": -0.32,
+      "sharpe_ratio": 0.92,
+      "volatility": 0.185,
+      "annualized_return": 0.112
+    },
+    {
+      "fund_code": "000003",
+      "fund_name": "华夏债券",
+      "fund_type": "债券型",
+      "current_nav": 1.1234,
+      "previous_nav": 1.1223,
+      "today_return": 0.10,
+      "prev_day_return": 0.05,
+      "sharpe_ratio": 1.25,
+      "volatility": 0.035,
+      "annualized_return": 0.045
+    },
+    {
+      "fund_code": "016667",
+      "fund_name": "景顺长城全球半导体芯片股票A(QDII-LOF)",
+      "fund_type": "QDII",
+      "current_nav": 1.8923,
+      "previous_nav": 1.8567,
+      "today_return": 1.92,
+      "prev_day_return": 0.0,
+      "sharpe_ratio": 0.45,
+      "volatility": 0.225,
+      "annualized_return": 0.125
+    },
+    {
+      "fund_code": "006373",
+      "fund_name": "华安智能生活混合",
+      "fund_type": "混合型",
+      "current_nav": 2.3456,
+      "previous_nav": 2.3234,
+      "today_return": 0.96,
+      "prev_day_return": 0.78,
+      "sharpe_ratio": 0.88,
+      "volatility": 0.168,
+      "annualized_return": 0.095
+    }
+  ],
+  "holdings": [
+    {
+      "user_id": "default_user",
+      "fund_code": "000001",
+      "fund_name": "华夏成长混合",
+      "holding_shares": 1000,
+      "cost_price": 1.45,
+      "holding_amount": 1450.0,
+      "buy_date": "2024-01-15"
+    },
+    {
+      "user_id": "default_user",
+      "fund_code": "006373",
+      "fund_name": "华安智能生活混合",
+      "holding_shares": 500,
+      "cost_price": 2.15,
+      "holding_amount": 1075.0,
+      "buy_date": "2024-02-20"
+    },
+    {
+      "user_id": "default_user",
+      "fund_code": "016667",
+      "fund_name": "景顺长城全球半导体芯片股票A(QDII-LOF)",
+      "holding_shares": 800,
+      "cost_price": 1.75,
+      "holding_amount": 1400.0,
+      "buy_date": "2024-03-10"
+    }
+  ],
+  "profit_trend": {
+    "30_days": {
+      "labels": ["2026-01-01", "2026-01-08", "2026-01-15", "2026-01-22", "2026-01-29"],
+      "portfolio": [0.0, 0.5, 1.2, 0.8, 1.5],
+      "benchmark": [0.0, 0.3, 0.8, 0.5, 1.0]
+    },
+    "90_days": {
+      "labels": [
+        "2025-11-01", "2025-11-15", "2025-12-01", 
+        "2025-12-15", "2026-01-01", "2026-01-15"
+      ],
+      "portfolio": [0.0, 1.5, 2.8, 2.2, 3.5, 4.2],
+      "benchmark": [0.0, 1.0, 2.0, 1.8, 2.5, 3.0]
+    }
+  },
+  "fund_types": {
+    "allocation": [
+      {"type": "股票型", "percentage": 35, "count": 15},
+      {"type": "混合型", "percentage": 40, "count": 18},
+      {"type": "债券型", "percentage": 15, "count": 8},
+      {"type": "QDII", "percentage": 8, "count": 4},
+      {"type": "货币型", "percentage": 2, "count": 3}
+    ]
+  }
+}
