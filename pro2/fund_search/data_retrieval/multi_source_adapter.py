@@ -82,6 +82,40 @@ class MultiSourceDataAdapter(OptimizedFundData):
         logger.info("  - Tushare优先级: 启用")
         logger.info("  - 缓存系统: 已启动")
     
+    def warmup_realtime_cache(self, fund_codes: List[str]) -> Dict[str, int]:
+        """
+        预热实时数据缓存
+        
+        批量获取多只基金的实时数据并保存到缓存，避免逐个请求时缓存未命中
+        
+        Args:
+            fund_codes: 基金代码列表
+            
+        Returns:
+            dict: 统计信息 {success_count, fail_count}
+        """
+        logger.info(f"开始预热实时数据缓存，共 {len(fund_codes)} 只基金")
+        
+        success_count = 0
+        fail_count = 0
+        
+        # 使用批量获取方法（内部有缓存优化）
+        try:
+            batch_results = self.get_batch_realtime_data(fund_codes)
+            
+            for code, data in batch_results.items():
+                if data and data.get('current_nav'):
+                    success_count += 1
+                else:
+                    fail_count += 1
+                    
+            logger.info(f"缓存预热完成: 成功 {success_count} 只，失败 {fail_count} 只")
+            return {'success_count': success_count, 'fail_count': fail_count}
+            
+        except Exception as e:
+            logger.error(f"缓存预热失败: {e}")
+            return {'success_count': 0, 'fail_count': len(fund_codes)}
+    
     def get_realtime_data(self, fund_code: str, fund_name: str = None) -> Dict:
         """
         获取基金实时数据（带缓存策略）

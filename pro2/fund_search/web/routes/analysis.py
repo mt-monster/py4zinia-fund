@@ -12,6 +12,8 @@ import json
 import logging
 import pandas as pd
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,6 +24,19 @@ from data_retrieval.enhanced_database import EnhancedDatabaseManager
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# 线程本地存储：每个线程独立的实例
+_thread_local = threading.local()
+
+
+def _get_thread_local_objects():
+    """获取线程本地的数据适配器和策略选择器（避免线程间共享状态）"""
+    if not hasattr(_thread_local, 'fund_data_manager'):
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from backtesting.strategy_selector import get_strategy_selector
+        _thread_local.fund_data_manager = MultiSourceDataAdapter()
+        _thread_local.strategy_selector = get_strategy_selector()
+    return _thread_local.fund_data_manager, _thread_local.strategy_selector
 
 # 初始化数据库管理器
 db_manager = None
@@ -922,4 +937,227 @@ __all__ = [
     'get_strategy_explanation',
     'get_fund_name_from_db',
     'get_personalized_investment_advice',
+    'get_personalized_investment_advice_parallel',  # 新增并行版本
 ]
+
+
+# ==================== 并行处理优化 ====================
+
+def _analyze_single_fund(fund_code: str) -> dict:
+    """
+    分析单只基金（用于并行处理）
+    
+    Args:
+        fund_code: 基金代码
+        
+    Returns:
+        dict: 单只基金的分析结果
+    """
+    try:
+        # 使用线程本地对象
+        fund_data_manager, strategy_selector = _get_thread_local_objects()
+        
+        # 导入akshare数据获取（支持缓存）
+        from backtesting.akshare_data_fetcher import fetch_fund_history_from_akshare
+        
+        # 获取基金名称
+        fund_name = get_fund_name_from_db(fund_code) or fund_code
+        
+        # 获取基金历史数据（使用缓存）
+        historical_data = fetch_fund_history_from_akshare(fund_code, days=252)
+        
+        # 获取实时数据
+        realtime_data = fund_data_manager.get_realtime_data(fund_code, fund_name)
+        performance_metrics = fund_data_manager.get_performance_metrics(fund_code)
+        
+        today_return = float(realtime_data.get('today_return', 0.0))
+        prev_day_return = float(realtime_data.get('prev_day_return', 0.0))
+        
+        # 使用策略选择器选择最优策略
+        if historical_data is not None and not historical_data.empty:
+            match_result = strategy_selector.select_best_strategy(historical_data)
+            fund_profile = strategy_selector.analyze_fund_characteristics(historical_data)
+            all_signals = strategy_selector.get_all_strategy_signals(historical_data)
+        else:
+            from backtesting.advanced_strategies import EnhancedRuleBasedStrategy
+            default_strategy = EnhancedRuleBasedStrategy()
+            match_result = type('obj', (object,), {
+                'strategy_name': '增强规则基准策略',
+                'strategy_type': 'enhanced_rule',
+                'match_score': 50.0,
+                'reason': '历史数据不足，使用默认策略',
+                'signal': default_strategy.generate_signal(
+                    pd.DataFrame({'nav': [1.0, 1.0 + today_return/100]}), 
+                    current_index=1
+                ),
+                'backtest_score': 50.0
+            })()
+            fund_profile = None
+            all_signals = []
+        
+        signal = match_result.signal
+        
+        return {
+            'fund_code': fund_code,
+            'fund_name': fund_name,
+            'today_return': round(today_return, 2),
+            'prev_day_return': round(prev_day_return, 2),
+            'optimal_strategy': {
+                'name': match_result.strategy_name,
+                'type': match_result.strategy_type,
+                'match_score': match_result.match_score,
+                'selection_reason': match_result.reason,
+                'backtest_score': match_result.backtest_score
+            },
+            'fund_profile': {
+                'volatility': round(fund_profile.volatility, 4) if fund_profile else None,
+                'trend_strength': round(fund_profile.trend_strength, 4) if fund_profile else None,
+                'mean_reversion_score': round(fund_profile.mean_reversion_score, 4) if fund_profile else None,
+                'sharpe_ratio': round(fund_profile.sharpe_ratio, 4) if fund_profile else performance_metrics.get('sharpe_ratio', 0),
+                'max_drawdown': round(fund_profile.max_drawdown, 4) if fund_profile else None,
+                'risk_level': fund_profile.risk_level if fund_profile else 'unknown'
+            } if fund_profile else None,
+            'advice': {
+                'action': signal.action,
+                'amount_multiplier': round(signal.amount_multiplier, 2),
+                'reason': signal.reason,
+                'description': signal.description,
+                'suggestion': signal.suggestion if hasattr(signal, 'suggestion') else '',
+                'status_label': _get_status_label(signal.action, signal.reason),
+                'operation_suggestion': _get_operation_suggestion(signal.action, signal.amount_multiplier),
+                'execution_amount': _get_execution_amount(signal.action, signal.amount_multiplier)
+            },
+            'all_strategies_comparison': [
+                {
+                    'strategy_name': s['strategy_name'],
+                    'action': s['action'],
+                    'multiplier': round(s['multiplier'], 2),
+                    'reason': s['reason']
+                }
+                for s in all_signals
+            ] if all_signals else [],
+            'strategy_type': match_result.strategy_type,
+            'success': True
+        }
+        
+    except Exception as e:
+        logger.warning(f"[并行分析] 基金 {fund_code} 分析失败: {e}")
+        return {
+            'fund_code': fund_code,
+            'fund_name': fund_code,
+            'today_return': 0,
+            'prev_day_return': 0,
+            'optimal_strategy': {
+                'name': '分析失败',
+                'type': 'error',
+                'match_score': 0,
+                'selection_reason': str(e),
+                'backtest_score': 0
+            },
+            'advice': {
+                'action': 'hold',
+                'amount_multiplier': 0,
+                'reason': '分析失败',
+                'description': '无法获取数据',
+                'status_label': '数据异常',
+                'operation_suggestion': '暂时持有',
+                'execution_amount': '持有不动'
+            },
+            'strategy_type': 'error',
+            'success': False,
+            'error': str(e)
+        }
+
+
+def get_personalized_investment_advice_parallel(fund_codes: list, max_workers: int = 5) -> dict:
+    """
+    获取个性化投资建议（并行处理版本）
+    
+    使用多线程并行处理多只基金，显著提升分析速度
+    
+    Args:
+        fund_codes: 基金代码列表
+        max_workers: 最大并行线程数，默认5
+        
+    Returns:
+        dict: 包含每只基金的个性化投资建议
+    """
+    import time
+    start_time = time.time()
+    logger.info(f"[并行分析] 开始分析 {len(fund_codes)} 只基金，最大并行数: {max_workers}")
+    
+    results = []
+    strategy_stats = {}
+    
+    try:
+        # 使用线程池并行处理
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交所有任务
+            future_to_code = {
+                executor.submit(_analyze_single_fund, code): code 
+                for code in fund_codes
+            }
+            
+            # 收集结果
+            for future in as_completed(future_to_code):
+                fund_code = future_to_code[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    
+                    # 统计策略使用情况
+                    if result.get('success'):
+                        strategy_type = result.get('strategy_type', 'unknown')
+                        strategy_stats[strategy_type] = strategy_stats.get(strategy_type, 0) + 1
+                        logger.info(f"[并行分析] 基金 {fund_code} 分析完成，策略: {strategy_type}")
+                    else:
+                        logger.warning(f"[并行分析] 基金 {fund_code} 分析失败")
+                        
+                except Exception as e:
+                    logger.error(f"[并行分析] 基金 {fund_code} 执行异常: {e}")
+                    results.append({
+                        'fund_code': fund_code,
+                        'fund_name': fund_code,
+                        'success': False,
+                        'error': str(e)
+                    })
+        
+        # 统计汇总
+        buy_count = sum(1 for r in results if r.get('advice', {}).get('action') in ['buy', 'strong_buy'])
+        sell_count = sum(1 for r in results if r.get('advice', {}).get('action') in ['sell', 'redeem'])
+        hold_count = sum(1 for r in results if r.get('advice', {}).get('action') == 'hold')
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"[并行分析] 分析完成，耗时: {elapsed_time:.2f}秒，平均每只基金: {elapsed_time/len(fund_codes):.2f}秒")
+        
+        return {
+            'success': True,
+            'funds': results,
+            'summary': {
+                'total_count': len(fund_codes),
+                'buy_count': buy_count,
+                'sell_count': sell_count,
+                'hold_count': hold_count,
+                'strategy_distribution': strategy_stats,
+                'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'is_personalized': True,
+                'is_parallel': True,
+                'elapsed_seconds': round(elapsed_time, 2)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"[并行分析] 获取个性化投资建议失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e),
+            'funds': [],
+            'summary': {
+                'total_count': len(fund_codes),
+                'buy_count': 0,
+                'sell_count': 0,
+                'hold_count': 0
+            }
+        }

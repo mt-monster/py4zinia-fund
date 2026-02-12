@@ -1863,7 +1863,11 @@ def analyze_personalized_advice():
     为每只基金选择最优策略并生成个性化建议
     """
     try:
-        from web.routes.analysis import get_personalized_investment_advice
+        # 使用并行处理版本以提升性能
+        from web.routes.analysis import get_personalized_investment_advice_parallel
+        
+        # 导入MultiSourceDataAdapter用于缓存预热
+        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
         
         data = request.get_json()
         fund_codes = data.get('fund_codes', [])
@@ -1871,12 +1875,27 @@ def analyze_personalized_advice():
         if not fund_codes:
             return safe_jsonify({'success': False, 'error': '请选择至少一只基金'}), 400
         
-        logger.info(f"开始个性化投资建议分析，基金: {fund_codes}")
+        logger.info(f"开始个性化投资建议分析（并行模式），基金: {fund_codes}")
         
-        # 调用个性化分析函数
-        result = get_personalized_investment_advice(fund_codes)
+        # 步骤1: 预热实时数据缓存
+        logger.info(f"[缓存预热] 开始预热 {len(fund_codes)} 只基金的实时数据缓存...")
+        try:
+            # 使用线程本地存储获取或创建adapter
+            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+            adapter = MultiSourceDataAdapter()
+            warmup_result = adapter.warmup_realtime_cache(fund_codes)
+            logger.info(f"[缓存预热] 完成: 成功 {warmup_result['success_count']} 只，失败 {warmup_result['fail_count']} 只")
+        except Exception as e:
+            logger.warning(f"[缓存预热] 失败: {e}，将继续执行分析")
+        
+        # 步骤2: 根据基金数量动态设置并行数
+        max_workers = min(5, len(fund_codes)) if len(fund_codes) > 0 else 5
+        
+        # 步骤3: 调用并行分析函数
+        result = get_personalized_investment_advice_parallel(fund_codes, max_workers=max_workers)
         
         if result.get('success'):
+            logger.info(f"分析完成，耗时: {result.get('summary', {}).get('elapsed_seconds', 'N/A')}秒")
             return safe_jsonify(result)
         else:
             return safe_jsonify(result), 500
