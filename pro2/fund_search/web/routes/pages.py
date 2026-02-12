@@ -36,6 +36,7 @@ class Templates:
     ETF_DETAIL = "etf_detail.html"
     CORRELATION_ANALYSIS = "correlation_analysis.html"
     INVESTMENT_ADVICE = "investment_advice.html"
+    STRATEGY_MANAGEMENT = "strategy_management.html"
     MY_HOLDINGS = "my_holdings.html"
     MY_HOLDINGS_REFACTORED = "my_holdings_refactored.html"
     TEST_HOLDING_RECOGNITION = "test_holding_recognition.html"
@@ -227,6 +228,11 @@ class PageRoutes:
         def investment_advice_page() -> str:
             """投资建议分析页面"""
             return render_template(Templates.INVESTMENT_ADVICE)
+        
+        @self._route("/strategy-management")
+        def strategy_management_page() -> str:
+            """策略管理页面 - 回测验证、参数调优、用户反馈"""
+            return render_template(Templates.STRATEGY_MANAGEMENT)
         
         @self._route("/portfolio-analysis")
         def portfolio_analysis() -> str:
