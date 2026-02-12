@@ -608,7 +608,15 @@ class MultiSourceFundData:
             dict: 基金基本信息
         """
         if source == 'auto':
-            source = self.health.get_recommend_source()
+            # 优先尝试akshare（雪球接口更稳定）
+            result = self._get_basic_info_from_akshare(fund_code)
+            if result and result.get('fund_name'):
+                return result
+            # akshare失败则尝试tushare
+            result = self._get_basic_info_from_tushare(fund_code)
+            if result and result.get('fund_name'):
+                return result
+            return None
         
         if source == 'akshare':
             return self._get_basic_info_from_akshare(fund_code)
@@ -619,31 +627,56 @@ class MultiSourceFundData:
     
     def _get_basic_info_from_akshare(self, fund_code: str) -> Optional[Dict]:
         """从akshare获取基本信息"""
+        # 方法1: 使用 fund_open_fund_info_em
         try:
             fund_info = ak.fund_open_fund_info_em(symbol=fund_code, indicator="基本信息")
             
-            if fund_info.empty:
-                return None
+            if not fund_info.empty:
+                info_dict = {}
+                for _, row in fund_info.iterrows():
+                    info_dict[row['项目']] = row['数值']
+                
+                return {
+                    'fund_code': fund_code,
+                    'fund_name': info_dict.get('基金简称', ''),
+                    'fund_type': info_dict.get('基金类型', ''),
+                    'establish_date': info_dict.get('成立日期', ''),
+                    'fund_company': info_dict.get('基金管理人', ''),
+                    'fund_manager': info_dict.get('基金经理', ''),
+                    'management_fee': float(info_dict.get('管理费率', 0)),
+                    'custody_fee': float(info_dict.get('托管费率', 0)),
+                    'source': 'akshare'
+                }
+        except Exception:
+            pass
+        
+        # 方法2: 使用 fund_individual_basic_info_xq（备选）
+        try:
+            fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
             
-            info_dict = {}
-            for _, row in fund_info.iterrows():
-                info_dict[row['项目']] = row['数值']
-            
-            return {
-                'fund_code': fund_code,
-                'fund_name': info_dict.get('基金简称', ''),
-                'fund_type': info_dict.get('基金类型', ''),
-                'establish_date': info_dict.get('成立日期', ''),
-                'fund_company': info_dict.get('基金管理人', ''),
-                'fund_manager': info_dict.get('基金经理', ''),
-                'management_fee': float(info_dict.get('管理费率', 0)),
-                'custody_fee': float(info_dict.get('托管费率', 0)),
-                'source': 'akshare'
-            }
-            
-        except Exception as e:
-            logger.error(f"从akshare获取 {fund_code} 基本信息失败: {e}")
-            return None
+            if not fund_info.empty:
+                info_dict = {}
+                for _, row in fund_info.iterrows():
+                    item = row.get('item', '')
+                    value = row.get('value', '')
+                    if item:
+                        info_dict[item] = value
+                
+                return {
+                    'fund_code': fund_code,
+                    'fund_name': info_dict.get('基金名称', ''),
+                    'fund_type': info_dict.get('基金类型', ''),
+                    'establish_date': info_dict.get('成立日期', ''),
+                    'fund_company': info_dict.get('基金公司', ''),
+                    'fund_manager': info_dict.get('基金经理', ''),
+                    'management_fee': 0.0,  # 雪球接口可能不包含费率
+                    'custody_fee': 0.0,
+                    'source': 'akshare_xq'
+                }
+        except Exception:
+            pass
+        
+        return None
     
     def _get_basic_info_from_tushare(self, fund_code: str) -> Optional[Dict]:
         """从tushare获取基本信息"""

@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-MultiSourceFundData 适配器
-使 MultiSourceFundData 兼容 EnhancedFundData 的接口
+MultiSourceFundData 适配器 (已优化)
+基于 OptimizedFundData 实现，兼容 EnhancedFundData 的接口
+
+优化特性：
+1. 批量数据预加载 - 大幅减少API调用次数
+2. API速率限制 - 避免触发频率限制（80次/分钟）
+3. 多级缓存策略 - 内存缓存+数据库缓存
+4. 智能降级 - 自动切换到备用数据源
 
 缓存策略：
-1. 首次访问：从 Tushare 获取完整数据，存入缓存
+1. 首次访问：从 Tushare 批量获取数据，存入缓存
 2. 非首次访问：优先使用缓存数据，但 today_return 实时计算
 3. prev_day_return 可缓存（1天有效期）
 4. current_nav 可缓存（1小时有效期）
@@ -18,16 +24,21 @@ from typing import Dict, List, Optional, Tuple
 import logging
 import time
 
-from .multi_source_fund_data import MultiSourceFundData
+from .optimized_fund_data import OptimizedFundData
 from .fund_cache_manager import FundDataCache
 
 logger = logging.getLogger(__name__)
 
 
-class MultiSourceDataAdapter(MultiSourceFundData):
+class MultiSourceDataAdapter(OptimizedFundData):
     """
-    MultiSourceFundData 适配器类
-    兼容 EnhancedFundData 的接口方法
+    MultiSourceFundData 适配器类 (已优化版本)
+    基于 OptimizedFundData，兼容 EnhancedFundData 的接口方法
+    
+    优化特性：
+    - 批量数据获取：一次API调用获取多只基金
+    - 速率限制保护：自动控制API调用频率
+    - 多级缓存：内存+数据库双层缓存
     
     缓存策略：
     - prev_day_return: 缓存1天（昨日数据不常变）
@@ -54,12 +65,22 @@ class MultiSourceDataAdapter(MultiSourceFundData):
                 logger.warning("无法导入配置文件，使用默认Tushare token")
                 tushare_token = '5ff19facae0e5b26a407d491d33707a9884a39a714a0d76b6495725b'
         
-        super().__init__(tushare_token, timeout)
+        # 调用 OptimizedFundData 的初始化（启用批量优化和速率限制）
+        super().__init__(
+            tushare_token=tushare_token, 
+            timeout=timeout,
+            enable_batch=True,       # 启用批量获取优化
+            enable_rate_limit=True   # 启用速率限制
+        )
         
-        # 初始化缓存管理器
+        # 初始化缓存管理器（保持原有缓存逻辑兼容）
         self.cache = FundDataCache(db_manager)
         
-        logger.info("MultiSourceDataAdapter 初始化完成，Tushare优先级已启用，缓存系统已启动")
+        logger.info("MultiSourceDataAdapter 初始化完成 (已优化版本)")
+        logger.info("  - 批量数据获取: 启用")
+        logger.info("  - API速率限制: 启用")
+        logger.info("  - Tushare优先级: 启用")
+        logger.info("  - 缓存系统: 已启动")
     
     def get_realtime_data(self, fund_code: str, fund_name: str = None) -> Dict:
         """
