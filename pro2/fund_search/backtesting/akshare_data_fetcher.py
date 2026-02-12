@@ -6,8 +6,55 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import logging
+import threading
+import os
 
 logger = logging.getLogger(__name__)
+
+# ==================== 缓存系统 ====================
+# 内存缓存：线程安全，全局共享
+_fund_history_cache = {}
+_cache_lock = threading.RLock()
+
+# 缓存有效期（秒）：6小时
+CACHE_TTL_SECONDS = 6 * 60 * 60
+
+# 缓存文件目录
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.cache')
+
+
+def _get_cache_key(fund_code: str, days: int) -> str:
+    """生成缓存键"""
+    return f"{fund_code}_{days}"
+
+
+def _get_cached_data(fund_code: str, days: int) -> pd.DataFrame:
+    """从缓存获取数据"""
+    key = _get_cache_key(fund_code, days)
+    
+    with _cache_lock:
+        if key in _fund_history_cache:
+            data, timestamp = _fund_history_cache[key]
+            age_seconds = (datetime.now() - timestamp).total_seconds()
+            
+            if age_seconds < CACHE_TTL_SECONDS:
+                logger.info(f"[缓存命中] 基金 {fund_code} 历史数据（缓存 {int(age_seconds/60)} 分钟）")
+                return data.copy()
+            else:
+                # 缓存过期，删除
+                del _fund_history_cache[key]
+                logger.info(f"[缓存过期] 基金 {fund_code} 历史数据")
+    
+    return None
+
+
+def _save_to_cache(fund_code: str, days: int, data: pd.DataFrame):
+    """保存数据到缓存"""
+    key = _get_cache_key(fund_code, days)
+    
+    with _cache_lock:
+        _fund_history_cache[key] = (data.copy(), datetime.now())
+        logger.info(f"[缓存保存] 基金 {fund_code} {len(data)} 条数据")
 
 
 def fetch_fund_history_from_akshare(fund_code: str, days: int = 90) -> pd.DataFrame:
@@ -21,6 +68,10 @@ def fetch_fund_history_from_akshare(fund_code: str, days: int = 90) -> pd.DataFr
     返回:
         DataFrame: 包含历史数据的DataFrame
     """
+    # ========== 1. 检查缓存 ==========
+    cached_data = _get_cached_data(fund_code, days)
+    if cached_data is not None:
+        return cached_data
     try:
         logger.info(f"从 AkShare 获取基金 {fund_code} 的历史数据...")
         
@@ -80,6 +131,9 @@ def fetch_fund_history_from_akshare(fund_code: str, days: int = 90) -> pd.DataFr
         
         # 移除第一行（因为没有前一日数据）
         result_df = result_df.iloc[1:].reset_index(drop=True)
+        
+        # ========== 2. 保存到缓存 ==========
+        _save_to_cache(fund_code, days, result_df)
         
         logger.info(f"成功获取基金 {fund_code} 的 {len(result_df)} 条历史数据")
         return result_df
