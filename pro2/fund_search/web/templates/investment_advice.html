@@ -682,6 +682,8 @@
                                     <th class="col-strategy-type">策略类型</th>
                                     <th class="col-match">匹配度</th>
                                     <th class="col-return">今日</th>
+                                    <th class="col-return">昨日</th>
+                                    <th class="col-change">变化幅度</th>
                                     <th class="col-advice">建议</th>
                                 </tr>
                             </thead>
@@ -717,6 +719,14 @@
                         </td>
                         <td class="col-return">
                             <span class="return-value ${todayClass}">${fund.today_return >= 0 ? '+' : ''}${fund.today_return}%</span>
+                        </td>
+                        <td class="col-return">
+                            <span class="return-value ${fund.prev_day_return >= 0 ? 'positive' : 'negative'}">${fund.prev_day_return >= 0 ? '+' : ''}${fund.prev_day_return !== undefined ? fund.prev_day_return : '--'}%</span>
+                        </td>
+                        <td class="col-change">
+                            ${fund.today_return !== undefined && fund.prev_day_return !== undefined 
+                                ? `<span class="return-value ${(fund.today_return - fund.prev_day_return) >= 0 ? 'positive' : 'negative'}">${(fund.today_return - fund.prev_day_return) >= 0 ? '+' : ''}${(fund.today_return - fund.prev_day_return).toFixed(2)}%</span>`
+                                : '<span class="return-value">--</span>'}
                         </td>
                         <td class="col-advice">
                             <div class="strategy-info">
