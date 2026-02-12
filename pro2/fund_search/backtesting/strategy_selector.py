@@ -17,6 +17,7 @@ from .advanced_strategies import (
     TargetValueStrategy, GridTradingStrategy, EnhancedRuleBasedStrategy,
     StrategySignal
 )
+from .ml_prediction_strategy import MLPredictionStrategy, get_ml_prediction_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,17 @@ class StrategySelector:
             'best_for': [FundCharacteristics.LOW_VOLATILITY],
             'min_volatility': 0.0,
             'max_volatility': 0.25,
+        },
+        'ml_prediction': {
+            'class': MLPredictionStrategy,
+            'name': '机器学习预测策略',
+            'description': '基于多模型集成的收益率预测策略，适用于数据充足的基金',
+            'best_for': [FundCharacteristics.TRENDING, FundCharacteristics.BREAKOUT, 
+                        FundCharacteristics.MEAN_REVERTING],
+            'min_volatility': 0.10,
+            'max_volatility': 0.40,
+            'min_data_points': 100,  # 需要较多历史数据
+            'requires_ml': True,     # 标记为ML策略
         }
     }
     
@@ -357,6 +369,31 @@ class StrategySelector:
             if profile.max_drawdown > -15:
                 score += 10
                 reasons.append("回撤可控")
+        
+        elif isinstance(strategy, MLPredictionStrategy):
+            # ML预测策略评估
+            score += 10  # 基础分
+            reasons.append("机器学习预测策略")
+            
+            # 数据充足度加分
+            if profile.volatility > 0.15:
+                score += 10
+                reasons.append("波动适中，ML模型可学习")
+            
+            # 趋势特征加分
+            if abs(profile.trend_strength) > 0.2:
+                score += 10
+                reasons.append("趋势特征明显，利于预测")
+            
+            # 夏普比率良好
+            if profile.sharpe_ratio > 0.3:
+                score += 5
+                reasons.append("历史表现稳定")
+            
+            # 高波动数据充足时更适合
+            if profile.volatility > 0.20 and profile.volatility < 0.35:
+                score += 10
+                reasons.append("波动率适合ML模型训练")
         
         # 3. 风险调整
         if profile.sharpe_ratio < 0:
