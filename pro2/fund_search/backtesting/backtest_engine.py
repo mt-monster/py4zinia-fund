@@ -919,26 +919,21 @@ def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.02) ->
     计算夏普比率
     
     参数:
-        returns: 收益率数组
+        returns: 收益率数组（日收益率）
         risk_free_rate: 无风险利率（年化）
         
     返回:
         夏普比率
+        
+    注意:
+        此函数已重构为使用 PerformanceCalculator 的实现
+        保留此函数以维持向后兼容性
     """
-    if len(returns) == 0:
-        return 0.0
+    # 使用 PerformanceCalculator 的实现
+    from .performance_metrics import PerformanceCalculator
     
-    # 年化收益率
-    annual_return = np.mean(returns) * 252
-    
-    # 年化波动率
-    annual_volatility = np.std(returns) * np.sqrt(252)
-    
-    if annual_volatility == 0:
-        return 0.0
-    
-    sharpe = (annual_return - risk_free_rate) / annual_volatility
-    return sharpe
+    calculator = PerformanceCalculator(risk_free_rate=risk_free_rate)
+    return calculator.calculate_sharpe_ratio(returns)
 
 
 def calculate_volatility(returns: np.ndarray) -> float:

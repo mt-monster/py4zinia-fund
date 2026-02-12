@@ -350,11 +350,72 @@ class FundDataAccessor(DatabaseAccessor):
 
 
 # 创建全局访问器实例的工厂函数
-def create_database_accessor(db_manager) -> DatabaseAccessor:
-    """创建数据库访问器"""
+def create_database_accessor(db_manager=None) -> DatabaseAccessor:
+    """
+    创建数据库访问器
+    
+    Args:
+        db_manager: 数据库管理器实例，如果为None则自动创建
+        
+    Returns:
+        DatabaseAccessor: 数据库访问器实例
+    """
+    if db_manager is None:
+        # 自动创建 EnhancedDatabaseManager
+        from data_retrieval.enhanced_database import EnhancedDatabaseManager
+        from shared.enhanced_config import DATABASE_CONFIG
+        db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+    
     return DatabaseAccessor(db_manager)
 
 
-def create_fund_data_accessor(db_manager) -> FundDataAccessor:
-    """创建基金数据访问器"""
+def create_fund_data_accessor(db_manager=None) -> FundDataAccessor:
+    """
+    创建基金数据访问器
+    
+    Args:
+        db_manager: 数据库管理器实例，如果为None则自动创建
+        
+    Returns:
+        FundDataAccessor: 基金数据访问器实例
+    """
+    if db_manager is None:
+        # 自动创建 EnhancedDatabaseManager
+        from data_retrieval.enhanced_database import EnhancedDatabaseManager
+        from shared.enhanced_config import DATABASE_CONFIG
+        db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+    
     return FundDataAccessor(db_manager)
+
+
+# 便捷函数：直接执行查询
+def execute_query(query: str, params=None, return_dataframe: bool = False):
+    """
+    直接执行查询（便捷函数）
+    
+    Args:
+        query: SQL查询语句
+        params: 查询参数
+        return_dataframe: 是否返回DataFrame
+        
+    Returns:
+        查询结果
+    """
+    accessor = create_database_accessor()
+    return accessor.execute_query(query, params, return_dataframe)
+
+
+# 便捷函数：直接执行更新
+def execute_update(query: str, params=None) -> int:
+    """
+    直接执行更新（便捷函数）
+    
+    Args:
+        query: SQL更新语句
+        params: 更新参数
+        
+    Returns:
+        影响的行数
+    """
+    accessor = create_database_accessor()
+    return accessor.execute_update(query, params)
