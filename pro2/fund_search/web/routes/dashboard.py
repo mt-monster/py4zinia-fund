@@ -148,6 +148,7 @@ def get_dashboard_stats():
         
         total_assets = 0  # 总资产 = 持有金额之和
         today_profit = 0
+        yesterday_profit = 0  # 昨日收益（用于计算profitChange）
         total_cost = 0
         total_sharpe = 0
         sharpe_count = 0
@@ -161,6 +162,7 @@ def get_dashboard_stats():
                 current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
                 previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
                 today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
+                prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else None
                 sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
                 
                 # 持有金额（成本）= 持有份额 × 成本价
@@ -172,25 +174,69 @@ def get_dashboard_stats():
                 # 总成本（与总资产相同，用于计算收益率）
                 total_cost += holding_amount
                 
-                # 只有当有分析数据时才计算今日收益
-                if current_nav is not None and previous_nav is not None:
+                # 计算今日收益
+                if current_nav is not None and previous_nav is not None and current_nav != previous_nav:
                     # 当前市值 = 持有份额 × 当前净值（用于计算今日收益）
                     current_value = holding_shares * current_nav
                     previous_value = holding_shares * previous_nav
                     
                     # 今日收益 = (当前市值 - 昨日市值)
                     today_profit += (current_value - previous_value)
+                    
+                    # 昨日收益 = 昨日市值 × 昨日收益率
+                    if prev_day_return is not None:
+                        yesterday_profit += previous_value * (prev_day_return / 100)
+                elif today_return is not None and holding_amount > 0:
+                    # 备选方案：使用今日收益率计算
+                    # 今日收益 = 持仓金额 × 今日收益率
+                    today_profit += holding_amount * (today_return / 100)
+                    
+                    # 昨日收益 = 持仓金额 × 昨日收益率
+                    if prev_day_return is not None:
+                        yesterday_profit += holding_amount * (prev_day_return / 100)
                 
                 if sharpe is not None and sharpe != 0:
                     total_sharpe += sharpe
                     sharpe_count += 1
         
-        # 计算收益率（总资产相对于总成本的变化）
-        # 注意：这里总资产和总成本相同，所以收益率为0
-        # 如果需要显示盈亏率，可以基于当前市值计算
-        assets_change = 0  # 持有金额没有涨跌
-        profit_change = (today_profit / total_assets * 100) if total_assets > 0 else 0
+        # 计算资产变化百分比（今日收益占总资产的比例）
+        # 资产变化基于今日收益占持仓金额的比例
+        assets_change = (today_profit / total_assets * 100) if total_assets > 0 else 0
+        
+        # 计算收益变化百分比（今日收益相对于昨日收益的变化）
+        # profitChange = (今日收益 - 昨日收益) / |昨日收益| × 100%
+        if yesterday_profit != 0:
+            profit_change = ((today_profit - yesterday_profit) / abs(yesterday_profit)) * 100
+        elif yesterday_profit == 0 and today_profit != 0:
+            # 昨日收益为0但今日有收益，视为大幅增长
+            profit_change = 100.0 if today_profit > 0 else -100.0
+        elif yesterday_profit != 0 and today_profit == 0:
+            # 今日收益为0但昨日有收益，显示昨日的收益情况（转为负数）
+            profit_change = -100.0
+        else:
+            # 昨日和今日都没有收益，保持为0
+            profit_change = 0
+        
         avg_sharpe = total_sharpe / sharpe_count if sharpe_count > 0 else 0
+        
+        # 计算本月新增基金数
+        from datetime import datetime
+        today = datetime.now()
+        first_day_of_month = today.replace(day=1).date()
+        new_fund_count = 0
+        if not df.empty and 'buy_date' in df.columns:
+            for _, row in df.iterrows():
+                buy_date = row.get('buy_date')
+                if buy_date:
+                    try:
+                        if isinstance(buy_date, str):
+                            buy_date_obj = datetime.strptime(buy_date.split()[0], '%Y-%m-%d').date()
+                        else:
+                            buy_date_obj = buy_date.date() if hasattr(buy_date, 'date') else buy_date
+                        if buy_date_obj >= first_day_of_month:
+                            new_fund_count += 1
+                    except:
+                        pass
         
         # 获取系统状态 - 从数据库获取最新更新时间
         try:
@@ -220,6 +266,7 @@ def get_dashboard_stats():
                 'todayProfit': today_profit,
                 'profitChange': profit_change,
                 'holdingCount': len(df) if not df.empty else 0,
+                'newFundCount': new_fund_count,
                 'sharpeRatio': avg_sharpe,
                 'system': system_status,
                 'activities': activities,
@@ -815,3 +862,18 @@ def register_routes(app, **kwargs):
     logger.info(f"已注册的dashboard路由: {dashboard_routes}")
     
     logger.info("Dashboard 路由注册完成")
+
+    # 清除缓存的端点（仅用于调试）
+    @app.route('/api/cache/clear', methods=['POST'])
+    def clear_dashboard_cache():
+        """清除仪表盘缓存"""
+        try:
+            from flask import jsonify
+            if _global_cache:
+                _global_cache.clear()
+                logger.info("仪表盘缓存已清除")
+                return jsonify({'success': True, 'message': '缓存已清除'})
+            return jsonify({'success': False, 'error': '缓存未初始化'})
+        except Exception as e:
+            logger.error(f"清除缓存失败: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500

@@ -554,7 +554,7 @@
                 <div class="icon"><i class="bi bi-pie-chart"></i></div>
                 <div class="label">持仓基金数</div>
                 <div class="value" id="holdingCount">--</div>
-                <div class="change positive">
+                <div class="change positive" id="newFundChange">
                     <i class="bi bi-plus-circle"></i> 新增 -- 只
                 </div>
             </div>
@@ -801,23 +801,31 @@
             // 持仓金额
             document.getElementById('totalAssets').textContent = formatCurrency(data.totalAssets);
             const assetsChangeEl = document.getElementById('assetsChange');
+            const assetsChangeValue = data.assetsChange !== undefined && data.assetsChange !== null ? data.assetsChange : 0;
             assetsChangeEl.innerHTML = `
-                <i class="bi bi-arrow-${data.assetsChange >= 0 ? 'up' : 'down'}"></i>
-                ${Math.abs(data.assetsChange).toFixed(2)}%
+                <i class="bi bi-arrow-${assetsChangeValue >= 0 ? 'up' : 'down'}"></i>
+                ${Math.abs(assetsChangeValue).toFixed(2)}%
             `;
-            assetsChangeEl.className = `change ${data.assetsChange >= 0 ? 'positive' : 'negative'}`;
+            assetsChangeEl.className = `change ${assetsChangeValue >= 0 ? 'positive' : 'negative'}`;
 
             // 今日收益
             document.getElementById('todayProfit').textContent = formatCurrency(data.todayProfit);
             const profitChangeEl = document.getElementById('profitChange');
+            const profitChangeValue = data.profitChange !== undefined && data.profitChange !== null ? data.profitChange : 0;
             profitChangeEl.innerHTML = `
-                <i class="bi bi-arrow-${data.profitChange >= 0 ? 'up' : 'down'}"></i>
-                ${Math.abs(data.profitChange).toFixed(2)}%
+                <i class="bi bi-arrow-${profitChangeValue >= 0 ? 'up' : 'down'}"></i>
+                ${Math.abs(profitChangeValue).toFixed(2)}%
             `;
-            profitChangeEl.className = `change ${data.profitChange >= 0 ? 'positive' : 'negative'}`;
+            profitChangeEl.className = `change ${profitChangeValue >= 0 ? 'positive' : 'negative'}`;
 
             // 持仓基金数
             document.getElementById('holdingCount').textContent = data.holdingCount;
+            
+            // 本月新增基金数
+            const newFundChangeEl = document.getElementById('newFundChange');
+            if (data.newFundCount !== undefined) {
+                newFundChangeEl.innerHTML = `<i class="bi bi-plus-circle"></i> 新增 ${data.newFundCount} 只`;
+            }
 
             // 夏普比率
             document.getElementById('sharpeRatio').textContent = data.sharpeRatio.toFixed(2);
@@ -1058,14 +1066,18 @@
                 console.log('资产配置API响应:', data);
 
                 if (data.success && allocationChart) {
-                    console.log('更新图表数据:', data.data.labels, data.data.values);
+                    console.log('更新图表数据:', data.data);
                     
                     // 确保数据不为空
-                    if (data.data.labels && data.data.values && 
-                        data.data.labels.length > 0 && data.data.values.length > 0) {
+                    if (data.data.distribution && data.data.distribution.length > 0) {
+                        // 使用 distribution 中的中文名称作为标签
+                        const labels = data.data.distribution.map(item => item.name);
+                        const values = data.data.distribution.map(item => item.percentage);
+                        const colors = data.data.distribution.map(item => item.color);
                         
-                        allocationChart.data.labels = data.data.labels;
-                        allocationChart.data.datasets[0].data = data.data.values;
+                        allocationChart.data.labels = labels;
+                        allocationChart.data.datasets[0].data = values;
+                        allocationChart.data.datasets[0].backgroundColor = colors;
                         
                         // 强制更新图表
                         allocationChart.update('active');
