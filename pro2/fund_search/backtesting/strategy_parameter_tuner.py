@@ -88,6 +88,12 @@ if PerformanceCalculator is None:
             return max_dd
         
         def calculate_sharpe_ratio(self, daily_returns):
+            # 如果 PerformanceCalculator 可用，使用它
+            if PerformanceCalculator is not None:
+                calculator = PerformanceCalculator(risk_free_rate=self.RISK_FREE_RATE)
+                return calculator.calculate_sharpe_ratio(daily_returns)
+            
+            # 本地回退实现
             if len(daily_returns) < 2:
                 return 0.0
             daily_risk_free = (1 + self.RISK_FREE_RATE) ** (1 / self.TRADING_DAYS_PER_YEAR) - 1

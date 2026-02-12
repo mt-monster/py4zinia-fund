@@ -66,49 +66,27 @@ class PreloadConfig:
 
 class MemoryCacheManager:
     """
-    内存缓存管理器
+    内存缓存管理器 - 兼容层
+    
+    已重构：使用 services.cache.memory_cache 作为后端实现
+    保留此类以维持向后兼容性
     
     高性能内存缓存，支持TTL和LRU淘汰
     """
     
     def __init__(self, max_size: int = 10000):
-        self._cache = {}
-        _cache_metadata = {}
-        self._lock = threading.RLock()
+        # 使用标准缓存作为后端
+        from services.cache.memory_cache import MemoryCache
+        self._backend = MemoryCache(max_size=max_size)
         self._max_size = max_size
-        self._access_count = 0
-        self._hit_count = 0
         
     def get(self, key: str) -> Optional[Any]:
         """获取缓存数据"""
-        with self._lock:
-            self._access_count += 1
-            
-            if key not in self._cache:
-                return None
-            
-            data, expire_time, _ = self._cache[key]
-            
-            # 检查是否过期
-            if expire_time and datetime.now() > expire_time:
-                del self._cache[key]
-                return None
-            
-            # 更新访问时间（用于LRU）
-            self._cache[key] = (data, expire_time, datetime.now())
-            self._hit_count += 1
-            
-            return data
+        return self._backend.get(key)
     
     def set(self, key: str, value: Any, ttl_seconds: int = 3600):
         """设置缓存数据"""
-        with self._lock:
-            # 检查是否需要清理
-            if len(self._cache) >= self._max_size:
-                self._cleanup_lru()
-            
-            expire_time = datetime.now() + timedelta(seconds=ttl_seconds) if ttl_seconds > 0 else None
-            self._cache[key] = (value, expire_time, datetime.now())
+        self._backend.set(key, value, ttl=ttl_seconds)
     
     def mget(self, keys: List[str]) -> Dict[str, Any]:
         """批量获取"""
@@ -124,30 +102,20 @@ class MemoryCacheManager:
         for key, value in data_dict.items():
             self.set(key, value, ttl_seconds)
     
-    def _cleanup_lru(self, count: int = 100):
-        """LRU清理"""
-        # 按访问时间排序，删除最老的
-        items = list(self._cache.items())
-        items.sort(key=lambda x: x[1][2])  # 按访问时间排序
-        
-        for key, _ in items[:count]:
-            del self._cache[key]
-    
     def clear(self):
         """清空缓存"""
-        with self._lock:
-            self._cache.clear()
+        self._backend.clear()
     
     def get_stats(self) -> Dict:
         """获取统计信息"""
-        with self._lock:
-            return {
-                'size': len(self._cache),
-                'max_size': self._max_size,
-                'access_count': self._access_count,
-                'hit_count': self._hit_count,
-                'hit_rate': f"{self._hit_count / max(self._access_count, 1) * 100:.1f}%"
-            }
+        stats = self._backend.get_stats()
+        return {
+            'size': stats.get('size', 0),
+            'max_size': self._max_size,
+            'access_count': stats.get('hits', 0) + stats.get('misses', 0),
+            'hit_count': stats.get('hits', 0),
+            'hit_rate': f"{stats.get('hit_rate', 0) * 100:.1f}%"
+        }
 
 
 class FundDataPreloader:

@@ -1,39 +1,36 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-简单的内存缓存工具
-用于优化仪表盘等频繁访问的接口性能
+缓存工具 - 兼容层
+
+已重构：现在使用 services.cache.memory_cache 作为后端实现
+保留此模块以维持向后兼容性
 """
 
-import time
 import functools
 import logging
 from typing import Any, Dict, Optional, Callable
-from threading import Lock
+
+# 使用标准缓存实现作为后端
+from services.cache.memory_cache import memory_cache
 
 logger = logging.getLogger(__name__)
 
 
 class MemoryCache:
-    """线程安全的内存缓存"""
+    """
+    内存缓存兼容类
+    
+    包装 services.cache.memory_cache，提供兼容的 API
+    新代码应直接使用 services.cache.memory_cache
+    """
     
     def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._lock = Lock()
+        self._backend = memory_cache
     
     def get(self, key: str) -> Optional[Any]:
         """获取缓存值"""
-        with self._lock:
-            if key not in self._cache:
-                return None
-            
-            item = self._cache[key]
-            # 检查是否过期
-            if item['expire_time'] < time.time():
-                del self._cache[key]
-                return None
-            
-            return item['value']
+        return self._backend.get(key)
     
     def set(self, key: str, value: Any, ttl: int = 60) -> None:
         """
@@ -44,39 +41,26 @@ class MemoryCache:
             value: 缓存值
             ttl: 过期时间（秒），默认60秒
         """
-        with self._lock:
-            self._cache[key] = {
-                'value': value,
-                'expire_time': time.time() + ttl
-            }
+        self._backend.set(key, value, ttl=ttl)
     
     def delete(self, key: str) -> None:
         """删除缓存"""
-        with self._lock:
-            if key in self._cache:
-                del self._cache[key]
+        self._backend.delete(key)
     
     def clear(self) -> None:
         """清空所有缓存"""
-        with self._lock:
-            self._cache.clear()
+        self._backend.clear()
     
     def get_stats(self) -> Dict[str, int]:
         """获取缓存统计信息"""
-        with self._lock:
-            # 清理过期项
-            now = time.time()
-            expired_keys = [k for k, v in self._cache.items() if v['expire_time'] < now]
-            for k in expired_keys:
-                del self._cache[k]
-            
-            return {
-                'total_items': len(self._cache),
-                'expired_removed': len(expired_keys)
-            }
+        stats = self._backend.get_stats()
+        return {
+            'total_items': stats.get('size', 0),
+            'expired_removed': 0  # 兼容旧接口
+        }
 
 
-# 全局缓存实例
+# 全局缓存实例（向后兼容）
 _global_cache = MemoryCache()
 
 
@@ -102,7 +86,7 @@ def cached(ttl: int = 60, key_prefix: str = None):
             cache_key = f"{prefix}:{str(args)}:{str(sorted(kwargs.items()))}"
             
             # 尝试从缓存获取
-            cached_value = _global_cache.get(cache_key)
+            cached_value = memory_cache.get(cache_key)
             if cached_value is not None:
                 logger.debug(f"缓存命中: {cache_key}")
                 return cached_value
@@ -111,13 +95,13 @@ def cached(ttl: int = 60, key_prefix: str = None):
             result = func(*args, **kwargs)
             
             # 存入缓存
-            _global_cache.set(cache_key, result, ttl)
+            memory_cache.set(cache_key, result, ttl=ttl)
             logger.debug(f"缓存写入: {cache_key}, ttl={ttl}s")
             
             return result
         
         # 附加缓存控制方法
-        wrapper.cache_clear = lambda: _global_cache.delete(
+        wrapper.cache_clear = lambda: memory_cache.delete(
             f"{key_prefix or func.__name__}:"
         )
         
@@ -132,5 +116,5 @@ def get_cache_stats() -> Dict[str, int]:
 
 def clear_all_cache():
     """清空所有缓存"""
-    _global_cache.clear()
+    memory_cache.clear()
     logger.info("所有缓存已清空")
