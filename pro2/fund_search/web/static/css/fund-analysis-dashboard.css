@@ -1024,6 +1024,11 @@
     text-align: center;
 }
 
+.strategy-table .col-change {
+    width: 100px;
+    text-align: center;
+}
+
 .strategy-table .col-strategy {
     width: 180px;
     min-width: 160px;

@@ -157,6 +157,12 @@ class MultiSourceDataAdapter(OptimizedFundData):
                     fund_code, cached_current_nav, cached_previous_nav
                 )
                 
+                # 昨日收益率从缓存获取，如果缓存值为0则重新计算
+                prev_day_return = cached_prev_return
+                if prev_day_return == 0:
+                    logger.debug(f"基金 {fund_code} 缓存的 prev_day_return 为0，重新计算")
+                    prev_day_return = self._calculate_yesterday_return_from_history(fund_code)
+                
                 result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name or f'基金{fund_code}',
@@ -164,13 +170,13 @@ class MultiSourceDataAdapter(OptimizedFundData):
                     'previous_nav': cached_previous_nav or cached_current_nav,
                     'daily_return': today_return,  # 日涨跌幅使用实时计算的 today_return
                     'today_return': today_return,
-                    'prev_day_return': cached_prev_return,
+                    'prev_day_return': prev_day_return,
                     'nav_date': today_str,
                     'data_source': 'cache_with_realtime',
                     'estimate_nav': cached_current_nav,
                     'estimate_return': today_return
                 }
-                logger.info(f"基金 {fund_code} 缓存数据使用成功: today_return={today_return}%, prev_day_return={cached_prev_return}%")
+                logger.info(f"基金 {fund_code} 缓存数据使用成功: today_return={today_return}%, prev_day_return={prev_day_return}%")
                 return result
             
             # 步骤2：缓存未命中，从数据源获取
@@ -222,6 +228,8 @@ class MultiSourceDataAdapter(OptimizedFundData):
                     return today_return
             
             # 无法获取实时估值，使用缓存净值计算
+            # 注意：这里的 previous_nav 已经是昨日净值，不是前天净值
+            # 所以这个计算实际上计算的是 "今日相对昨日的收益率"，也就是 today_return
             if previous_nav and previous_nav > 0 and current_nav and current_nav > 0:
                 today_return = (current_nav - previous_nav) / previous_nav * 100
                 today_return = round(today_return, 2)
@@ -233,6 +241,49 @@ class MultiSourceDataAdapter(OptimizedFundData):
             
         except Exception as e:
             logger.warning(f"基金 {fund_code} 计算 today_return 失败: {e}")
+            return 0.0
+
+    def _calculate_yesterday_return_from_history(self, fund_code: str) -> float:
+        """
+        从历史净值数据中计算昨日收益率
+        
+        昨日收益率 = (T-1净值 - T-2净值) / T-2净值 * 100
+        
+        Args:
+            fund_code: 基金代码
+            
+        Returns:
+            float: 昨日收益率（百分比）
+        """
+        try:
+            from datetime import timedelta
+            
+            # 获取最近3天的历史数据
+            df = self.get_fund_nav_history(fund_code, days=5)
+            
+            if df is None or df.empty or len(df) < 2:
+                logger.debug(f"基金 {fund_code} 历史数据不足，无法计算昨日收益率")
+                return 0.0
+            
+            # 确保数据按日期排序（最新在前）
+            if 'date' in df.columns:
+                df = df.sort_values('date', ascending=False)
+            
+            # T-1 净值（昨日净值）
+            nav_t1 = float(df.iloc[0]['nav'])
+            # T-2 净值（前天净值）
+            nav_t2 = float(df.iloc[1]['nav']) if len(df) > 1 else nav_t1
+            
+            if nav_t2 > 0:
+                yesterday_return = (nav_t1 - nav_t2) / nav_t2 * 100
+                yesterday_return = round(yesterday_return, 2)
+                logger.debug(f"基金 {fund_code} 从历史数据计算昨日收益率: {yesterday_return}%")
+                return yesterday_return
+            
+            return 0.0
+            
+        except Exception as e:
+            logger.warning(f"基金 {fund_code} 计算昨日收益率失败: {e}")
             return 0.0
     
     def _get_qdii_data_with_cache(self, fund_code: str, fund_name: str, today_str: str) -> Dict:
@@ -318,16 +369,28 @@ class MultiSourceDataAdapter(OptimizedFundData):
         prev_day_return = return_result.get('value', 0.0)
         logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
         
-        # 获取实时估值并计算 today_return
+        # 获取实时估值数据
+        estimate_data = self._get_realtime_estimate(fund_code)
+        
+        # 计算昨日净值：优先使用实时估值的yesterday_nav，否则从daily_return反推
+        if estimate_data and estimate_data.get('yesterday_nav', 0) > 0:
+            previous_nav = estimate_data['yesterday_nav']
+            logger.debug(f"基金 {fund_code} 使用实时估值的昨日净值: {previous_nav}")
+        elif latest_nav.get('daily_return', 0) != 0:
+            # 从daily_return反推昨日净值: previous_nav = nav / (1 + daily_return/100)
+            previous_nav = latest_nav['nav'] / (1 + latest_nav['daily_return'] / 100)
+            logger.debug(f"基金 {fund_code} 从daily_return反推昨日净值: {previous_nav}")
+        else:
+            # 无法计算，使用当前净值（会导致today_return=0，但这是合理的fallback）
+            previous_nav = latest_nav['nav']
+            logger.debug(f"基金 {fund_code} 无法获取昨日净值，使用当前净值: {previous_nav}")
+        
+        # 使用正确的previous_nav计算 today_return
         today_return = self._calculate_today_return_realtime(
             fund_code,
             latest_nav['nav'],
-            latest_nav.get('previous_nav', latest_nav['nav'])
+            previous_nav
         )
-        
-        # 使用新浪实时数据中的昨日净值作为 previous_nav
-        estimate_data = self._get_realtime_estimate(fund_code)
-        previous_nav = estimate_data.get('yesterday_nav', latest_nav['nav']) if estimate_data else latest_nav.get('previous_nav', latest_nav['nav'])
         
         result = {
             'fund_code': fund_code,

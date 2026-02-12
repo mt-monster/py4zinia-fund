@@ -8,6 +8,50 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fund-analysis-dashboard.css') }}">
     <style>
+        /* ==================== CSS变量定义 ==================== */
+        :root {
+            /* 主色调 */
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            
+            /* 状态色 */
+            --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            
+            /* 中性色 */
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-primary: #2c3e50;
+            --text-secondary: #666666;
+            --border-color: #e8ecf1;
+            
+            /* 间距 */
+            --spacing-xs: 8px;
+            --spacing-sm: 12px;
+            --spacing-md: 20px;
+            --spacing-lg: 24px;
+            --spacing-xl: 30px;
+            
+            /* 圆角 */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            
+            /* 阴影 */
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 12px rgba(102, 126, 234, 0.3);
+            
+            /* 过渡 */
+            --transition-fast: 0.2s ease;
+            --transition-normal: 0.3s ease;
+            
+            /* 响应式断点 */
+            --breakpoint-sm: 576px;
+            --breakpoint-md: 768px;
+            --breakpoint-lg: 992px;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -55,35 +99,56 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
-            background: white;
+            background: var(--card-bg);
             padding: 10px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            /* 移动端允许横向滚动 */
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+
+        .nav-tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .nav-tabs::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 2px;
         }
 
         .nav-tab {
-            padding: 12px 24px;
+            padding: var(--spacing-sm) 24px;
             border: none;
             background: transparent;
             cursor: pointer;
-            border-radius: 8px;
+            border-radius: var(--radius-sm);
             font-size: 14px;
             font-weight: 500;
-            color: #666;
-            transition: all 0.3s;
-            display: flex;
+            color: var(--text-secondary);
+            transition: all var(--transition-normal);
+            display: inline-flex;
             align-items: center;
             gap: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .nav-tab:hover {
-            background: #f0f2f5;
-            color: #333;
+            background: var(--bg-color);
+            color: var(--text-primary);
+        }
+
+        .nav-tab:focus {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
         }
 
         .nav-tab.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--primary-gradient);
             color: white;
+            box-shadow: var(--shadow-md);
         }
 
         /* 内容区域 */
@@ -312,15 +377,35 @@
         }
 
         /* 响应式 */
-        @media (max-width: 768px) {
+        @media (max-width: var(--breakpoint-md)) {
             .nav-tabs {
-                flex-wrap: wrap;
+                padding: var(--spacing-xs);
+                gap: var(--spacing-xs);
             }
             
             .nav-tab {
-                flex: 1;
-                min-width: 120px;
-                justify-content: center;
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+            
+            .nav-tab i {
+                font-size: 14px;
+            }
+            
+            .grid-2,
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: var(--breakpoint-sm)) {
+            .nav-tab {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .nav-tab span {
+                display: none;
             }
         }
     </style>
@@ -337,31 +422,31 @@
         </div>
 
         <!-- 导航标签 -->
-        <div class="nav-tabs">
-            <button class="nav-tab active" data-tab="overview">
-                <i class="bi bi-grid-3x3-gap"></i>
-                概览
+        <div class="nav-tabs" role="tablist" aria-label="策略管理功能导航">
+            <button class="nav-tab active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview" id="tab-overview" tabindex="0">
+                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                <span>概览</span>
             </button>
-            <button class="nav-tab" data-tab="backtest">
-                <i class="bi bi-graph-up-arrow"></i>
-                回测验证
+            <button class="nav-tab" data-tab="backtest" role="tab" aria-selected="false" aria-controls="backtest" id="tab-backtest" tabindex="-1">
+                <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+                <span>回测验证</span>
             </button>
-            <button class="nav-tab" data-tab="optimization">
-                <i class="bi bi-sliders"></i>
-                参数调优
+            <button class="nav-tab" data-tab="optimization" role="tab" aria-selected="false" aria-controls="optimization" id="tab-optimization" tabindex="-1">
+                <i class="bi bi-sliders" aria-hidden="true"></i>
+                <span>参数调优</span>
             </button>
-            <button class="nav-tab" data-tab="feedback">
-                <i class="bi bi-chat-square-text"></i>
-                用户反馈
+            <button class="nav-tab" data-tab="feedback" role="tab" aria-selected="false" aria-controls="feedback" id="tab-feedback" tabindex="-1">
+                <i class="bi bi-chat-square-text" aria-hidden="true"></i>
+                <span>用户反馈</span>
             </button>
-            <button class="nav-tab" data-tab="ml-strategy">
-                <i class="bi bi-cpu"></i>
-                ML策略
+            <button class="nav-tab" data-tab="ml-strategy" role="tab" aria-selected="false" aria-controls="ml-strategy" id="tab-ml-strategy" tabindex="-1">
+                <i class="bi bi-cpu" aria-hidden="true"></i>
+                <span>ML策略</span>
             </button>
         </div>
 
         <!-- 概览标签页 -->
-        <div class="tab-content active" id="overview">
+        <div class="tab-content active" id="overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
             <!-- 统计卡片 -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -421,7 +506,7 @@
         </div>
 
         <!-- 回测验证标签页 -->
-        <div class="tab-content" id="backtest">
+        <div class="tab-content" id="backtest" role="tabpanel" aria-labelledby="tab-backtest" tabindex="0">
             <div class="content-section">
                 <div class="section-title">
                     <i class="bi bi-graph-up-arrow"></i>
@@ -479,7 +564,7 @@
         </div>
 
         <!-- 参数调优标签页 -->
-        <div class="tab-content" id="optimization">
+        <div class="tab-content" id="optimization" role="tabpanel" aria-labelledby="tab-optimization" tabindex="0">
             <div class="content-section">
                 <div class="section-title">
                     <i class="bi bi-sliders"></i>
@@ -530,7 +615,7 @@
         </div>
 
         <!-- 用户反馈标签页 -->
-        <div class="tab-content" id="feedback">
+        <div class="tab-content" id="feedback" role="tabpanel" aria-labelledby="tab-feedback" tabindex="0">
             <div class="grid-2">
                 <div class="content-section">
                     <div class="section-title">
@@ -591,7 +676,7 @@
         </div>
 
         <!-- ML策略标签页 -->
-        <div class="tab-content" id="ml-strategy">
+        <div class="tab-content" id="ml-strategy" role="tabpanel" aria-labelledby="tab-ml-strategy" tabindex="0">
             <div class="content-section">
                 <div class="section-title">
                     <i class="bi bi-cpu"></i>
@@ -664,16 +749,112 @@
     </div>
 
     <script>
-        // 标签页切换
-        document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.addEventListener('click', function() {
-                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        // ==================== 标签页管理器 ====================
+        class TabManager {
+            constructor() {
+                this.tabs = document.querySelectorAll('.nav-tab');
+                this.panels = document.querySelectorAll('.tab-content');
+                this.init();
+            }
+            
+            init() {
+                // 绑定点击事件
+                this.tabs.forEach(tab => {
+                    tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
+                    
+                    // 键盘导航支持
+                    tab.addEventListener('keydown', (e) => this.handleKeyboard(e));
+                });
                 
-                this.classList.add('active');
-                document.getElementById(this.dataset.tab).classList.add('active');
-            });
+                // 初始化URL hash
+                this.initFromHash();
+                
+                // 监听hash变化
+                window.addEventListener('hashchange', () => this.initFromHash());
+            }
+            
+            switchTab(tabId) {
+                // 更新标签状态
+                this.tabs.forEach(tab => {
+                    const isActive = tab.dataset.tab === tabId;
+                    tab.classList.toggle('active', isActive);
+                    tab.setAttribute('aria-selected', isActive);
+                    tab.setAttribute('tabindex', isActive ? '0' : '-1');
+                });
+                
+                // 更新面板显示
+                this.panels.forEach(panel => {
+                    const isActive = panel.id === tabId;
+                    panel.classList.toggle('active', isActive);
+                    panel.hidden = !isActive;
+                });
+                
+                // 更新URL hash
+                if (history.pushState) {
+                    history.pushState(null, null, '#' + tabId);
+                } else {
+                    window.location.hash = tabId;
+                }
+                
+                // 聚焦当前面板（便于屏幕阅读器）
+                const activePanel = document.getElementById(tabId);
+                if (activePanel) {
+                    activePanel.focus();
+                }
+            }
+            
+            handleKeyboard(e) {
+                const tabsArray = Array.from(this.tabs);
+                const currentIndex = tabsArray.findIndex(t => t === document.activeElement);
+                let newIndex;
+                
+                switch(e.key) {
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        newIndex = (currentIndex + 1) % tabsArray.length;
+                        tabsArray[newIndex].focus();
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        newIndex = (currentIndex - 1 + tabsArray.length) % tabsArray.length;
+                        tabsArray[newIndex].focus();
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        tabsArray[0].focus();
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        tabsArray[tabsArray.length - 1].focus();
+                        break;
+                    case 'Enter':
+                    case ' ':
+                        e.preventDefault();
+                        document.activeElement.click();
+                        break;
+                }
+            }
+            
+            initFromHash() {
+                const hash = window.location.hash.slice(1);
+                const validTabs = Array.from(this.tabs).map(t => t.dataset.tab);
+                
+                if (hash && validTabs.includes(hash)) {
+                    this.switchTab(hash);
+                }
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            window.tabManager = new TabManager();
         });
+
+        // ==================== 原有功能保持兼容 ====================
+        // 兼容旧的函数调用方式
+        function switchTab(tabId) {
+            window.tabManager?.switchTab(tabId);
+        }
 
         // 初始化日期
         document.getElementById('backtest-end').valueAsDate = new Date();
