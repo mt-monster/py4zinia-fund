@@ -246,19 +246,23 @@ class FundDataPreloader:
             self._update_progress(0.2, "加载QDII标识...")
             self._preload_qdii_flags(fund_codes)
             
-            # 4. 预加载最新净值（批量）
-            self._update_progress(0.3, "加载最新净值...")
+            # 4. 检查并同步基金历史净值数据到数据库
+            self._update_progress(0.3, "检查数据库数据完整性...")
+            self._sync_fund_nav_data_if_needed(fund_codes)
+            
+            # 5. 预加载最新净值（批量）
+            self._update_progress(0.35, "加载最新净值...")
             self._preload_latest_nav(fund_codes)
             
-            # 5. 预加载历史净值（分批）
+            # 6. 预加载历史净值（分批）
             self._update_progress(0.5, "加载历史净值...")
             self._preload_nav_history(fund_codes)
             
-            # 6. 预计算绩效指标
+            # 7. 预计算绩效指标
             self._update_progress(0.85, "计算绩效指标...")
             self._preload_performance(fund_codes)
             
-            # 7. 预计算收益趋势数据
+            # 8. 预计算收益趋势数据
             self._update_progress(0.95, "计算收益趋势...")
             self._preload_profit_trend()
             
@@ -369,6 +373,144 @@ class FundDataPreloader:
         
         logger.info("未发现用户持仓基金")
         return []
+    
+    def _sync_fund_nav_data_if_needed(self, fund_codes: List[str]) -> bool:
+        """
+        检查并同步基金历史净值数据到数据库
+        
+        当检测到 fund_analysis_results 表中没有足够的数据时，
+        自动调用 sync_fund_nav_data.py 中的同步功能从 akshare 获取数据。
+        这样相关性分析页面首次加载就能从数据库快速读取（<2秒），
+        而不需要实时从 akshare 获取（30-60秒）。
+        
+        Args:
+            fund_codes: 需要检查的基金代码列表
+            
+        Returns:
+            bool: 是否进行了数据同步
+        """
+        if not fund_codes:
+            return False
+            
+        try:
+            # 检查数据库连接
+            db_config = self._get_db_config()
+            if not db_config:
+                logger.warning("无法获取数据库配置，跳过数据同步检查")
+                return False
+            
+            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            db = EnhancedDatabaseManager(db_config)
+            
+            try:
+                # 检查这些基金在数据库中是否已有数据
+                # 取前5只基金作为样本检查
+                sample_codes = fund_codes[:5] if len(fund_codes) > 5 else fund_codes
+                placeholders = ','.join(['%s'] * len(sample_codes))
+                
+                sql = f"""
+                SELECT fund_code, COUNT(*) as data_count, 
+                       MAX(analysis_date) as latest_date
+                FROM fund_analysis_results 
+                WHERE fund_code IN ({placeholders})
+                GROUP BY fund_code
+                """
+                
+                with db.engine.connect() as conn:
+                    result = pd.read_sql(sql, conn, params=tuple(sample_codes))
+                
+                # 判断是否需要同步
+                need_sync = False
+                if result.empty:
+                    # 完全没有数据
+                    logger.warning(f"数据库中未找到基金 {sample_codes} 的历史净值数据")
+                    need_sync = True
+                else:
+                    # 检查数据完整性和时效性
+                    missing_funds = set(sample_codes) - set(result['fund_code'].tolist())
+                    if missing_funds:
+                        logger.warning(f"数据库中缺少 {len(missing_funds)} 只基金的数据: {missing_funds}")
+                        need_sync = True
+                    else:
+                        # 检查数据时效性（最后更新日期是否在一周内）
+                        latest_dates = pd.to_datetime(result['latest_date'])
+                        oldest_latest = latest_dates.min()
+                        days_since_update = (datetime.now() - oldest_latest).days
+                        
+                        if days_since_update > 7:
+                            logger.warning(f"数据库数据较旧，最后更新: {oldest_latest.date()} ({days_since_update}天前)")
+                            need_sync = True
+                        else:
+                            avg_records = result['data_count'].mean()
+                            if avg_records < 100:  # 平均少于100条记录
+                                logger.warning(f"数据库数据量不足，平均仅 {avg_records:.0f} 条记录/基金")
+                                need_sync = True
+                
+                if not need_sync:
+                    logger.info(f"数据库数据检查通过: {len(result)} 只基金数据完整且较新")
+                    return False
+                
+                # 需要同步，调用 sync_fund_nav_data
+                logger.info("=" * 60)
+                logger.info("开始自动同步基金历史净值数据到数据库...")
+                logger.info("=" * 60)
+                
+                try:
+                    # 动态导入 sync_fund_nav_data 模块
+                    import sys
+                    import importlib.util
+                    
+                    sync_script_path = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'sync_fund_nav_data.py'
+                    )
+                    
+                    if os.path.exists(sync_script_path):
+                        # 使用模块方式导入
+                        spec = importlib.util.spec_from_file_location("sync_fund_nav", sync_script_path)
+                        sync_module = importlib.util.module_from_spec(spec)
+                        sys.modules["sync_fund_nav"] = sync_module
+                        spec.loader.exec_module(sync_module)
+                        
+                        # 创建同步器并执行同步
+                        syncer = sync_module.FundNavDataSync()
+                        
+                        # 过滤出需要同步的基金（数据库中缺少的或数据不足的）
+                        codes_to_sync = fund_codes
+                        if not result.empty:
+                            existing_codes = result[result['data_count'] >= 100]['fund_code'].tolist()
+                            codes_to_sync = [c for c in fund_codes if c not in existing_codes]
+                        
+                        if codes_to_sync:
+                            logger.info(f"需要同步 {len(codes_to_sync)} 只基金: {codes_to_sync}")
+                            syncer.sync_multiple_funds(codes_to_sync, full_update=False)
+                            
+                            # 输出同步统计
+                            stats = syncer.stats
+                            logger.info(f"同步完成: 成功 {stats['success']}, 失败 {stats['failed']}, "
+                                      f"跳过 {stats['skipped']}, 插入 {stats['inserted']}, 更新 {stats['updated']}")
+                            return True
+                        else:
+                            logger.info("所有基金数据都已是最新，无需同步")
+                            return False
+                    else:
+                        logger.warning(f"同步脚本不存在: {sync_script_path}")
+                        return False
+                        
+                except Exception as e:
+                    logger.error(f"执行数据同步失败: {e}", exc_info=True)
+                    return False
+                    
+            finally:
+                try:
+                    db.close()
+                except Exception:
+                    pass
+                    
+        except Exception as e:
+            logger.error(f"检查/同步基金数据失败: {e}", exc_info=True)
+            return False
+    
     def _get_db_config(self) -> Optional[Dict]:
         """获取数据库配置"""
         try:
