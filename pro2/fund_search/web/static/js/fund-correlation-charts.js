@@ -375,15 +375,11 @@ function initCorrelationCharts(container, chartData) {
 }
 
 /**
- * 创建图表包装器
+ * 创建图表包装器（使用可折叠版本）
  */
 function createChartWrapper(canvasId, title) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'chart-wrapper';
-    wrapper.innerHTML = `
-        <canvas id="${canvasId}" class="chart-canvas"></canvas>
-    `;
-    return wrapper;
+    // 使用 CollapsibleChartManager 创建可折叠包装器
+    return collapsibleChartManager.createCollapsibleWrapper(canvasId, title);
 }
 
 /**
@@ -523,6 +519,13 @@ function initScatterChart(scatterData) {
                 pointHoverRadius: 6
             }]
         },
+        plugins: [{
+            id: 'registerChart',
+            afterInit: (chart) => {
+                collapsibleChartManager.registerChart('scatter-correlation-chart', chart);
+                collapsibleChartManager.updateCounter('scatter-correlation-chart', `${scatterData.points.length} 个数据点`);
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -813,6 +816,14 @@ function initLineChart(lineData) {
             labels: labels,
             datasets: datasets
         },
+        plugins: [{
+            id: 'registerChart',
+            afterInit: (chart) => {
+                collapsibleChartManager.registerChart('nav-comparison-chart', chart);
+                const totalPoints = labels ? labels.length : 0;
+                collapsibleChartManager.updateCounter('nav-comparison-chart', `${totalPoints} 个数据点`);
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -955,6 +966,14 @@ function initRollingChart(rollingData) {
                 backgroundColor: 'rgba(147, 51, 234, 0.1)',
                 borderWidth: 2,
                 pointRadius: 0,
+                plugins: [{
+                    id: 'registerChart',
+                    afterInit: (chart) => {
+                        collapsibleChartManager.registerChart('rolling-correlation-chart', chart);
+                        const totalPoints = rollingData.dates ? rollingData.dates.length : 0;
+                        collapsibleChartManager.updateCounter('rolling-correlation-chart', `${totalPoints} 个数据点`);
+                    }
+                }],
                 pointHoverRadius: 4,
                 tension: 0.1,
                 fill: true
@@ -1081,6 +1100,8 @@ function initDistributionChart(distributionData) {
     
     let labels = [];
     let datasets = [];
+    let fund1_counts = null; // 声明在函数作用域，供后续日志使用
+    let fund2_counts = null;
     
     // 检查是否是新的多基金数据结构 (all_funds_distribution)
     if (distributionData.funds && Array.isArray(distributionData.funds)) {
@@ -1106,8 +1127,8 @@ function initDistributionChart(distributionData) {
         // 兼容旧的双基金数据结构
         console.log('📊 使用传统双基金收益率分布数据');
         labels = distributionData.bins || distributionData.labels;
-        const fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
-        const fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
+        fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
+        fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
         
         if (!labels || !fund1_counts || !fund2_counts) {
             console.error('❌ 收益率分布数据字段不完整:', {
@@ -1156,6 +1177,13 @@ function initDistributionChart(distributionData) {
                 labels: labels,
                 datasets: datasets
             },
+            plugins: [{
+                id: 'registerChart',
+                afterInit: (chart) => {
+                    collapsibleChartManager.registerChart('distribution-chart', chart);
+                    collapsibleChartManager.updateCounter('distribution-chart', `${datasets.length} 组数据`);
+                }
+            }],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -1255,9 +1283,13 @@ function initDistributionChart(distributionData) {
         
         console.log('✅ 收益率分布图创建成功');
         console.log('📊 图表数据统计:');
-        console.log('- 总数据点数:', fund1_counts.reduce((a,b) => a+b, 0) + fund2_counts.reduce((a,b) => a+b, 0));
-        console.log('- 基金1总计数:', fund1_counts.reduce((a,b) => a+b, 0));
-        console.log('- 基金2总计数:', fund2_counts.reduce((a,b) => a+b, 0));
+        if (fund1_counts && fund2_counts) {
+            console.log('- 总数据点数:', fund1_counts.reduce((a,b) => a+b, 0) + fund2_counts.reduce((a,b) => a+b, 0));
+            console.log('- 基金1总计数:', fund1_counts.reduce((a,b) => a+b, 0));
+            console.log('- 基金2总计数:', fund2_counts.reduce((a,b) => a+b, 0));
+        } else {
+            console.log('- 多基金模式，各基金数据请查看数据集');
+        }
         
     } catch (error) {
         console.error('❌ 收益率分布图创建失败:', error);

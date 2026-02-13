@@ -9,16 +9,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/correlation_analysis.css') }}">
+    <!-- 图表加载进度指示器样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chart-loading.css') }}">
+    <!-- 图表折叠/展开功能样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chart-collapsible.css') }}">
 </head>
 <body>
-    <!-- 加载指示器 -->
-    <div id="loading-indicator" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.9); z-index: 9999; justify-content: center; align-items: center; flex-direction: column;">
-        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem; margin-bottom: 1rem;" role="status">
-            <span class="visually-hidden">加载中...</span>
-        </div>
-        <div style="color: #333; font-size: 1rem;">正在加载增强分析数据...</div>
-        <div style="color: #666; font-size: 0.85rem; margin-top: 0.5rem;">基金数量较多，请耐心等待</div>
-    </div>
+    <!-- 加载指示器（由JS动态创建） -->
     
     <div class="page-wrapper">
         <!-- 页面头部 -->
@@ -135,24 +132,6 @@
                 </div>
             </section>
 
-            <!-- 增强相关性分析 -->
-            <section class="content-section" id="enhanced-analysis-section" style="display: none;">
-                <div class="section-header">
-                    <div class="section-title">
-                        <i class="bi bi-graph-up-arrow"></i>
-                        <h2>深度相关性分析</h2>
-                    </div>
-                </div>
-                <div class="section-body">
-                    <div id="enhanced-content">
-                        <div class="loading-state">
-                            <i class="bi bi-arrow-repeat"></i>
-                            <span>加载中...</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <!-- 交互式相关性图表 -->
             <section class="content-section" id="interactive-charts-section" style="display: none;">
                 <div class="section-header">
@@ -214,24 +193,20 @@
                 // 显示分析内容（页面结构立即显示）
                 showAnalysisContent();
                 
-                // 更新状态栏显示正在加载
-                const statusText = document.getElementById('status-text');
-                if (statusText) {
-                    statusText.innerHTML = `正在分析 ${data.fund_codes.length} 只基金的相关性 <span class="loading-dots">...</span>`;
-                }
+                // 初始化进度指示器
+                chartLoadingManager.init();
                 
-                // 如果有基础数据，先快速显示基础结果
-                if (data.basic_correlation) {
-                    console.log('📊 先显示基础数据...');
-                    renderAnalysisResult(data);
-                }
-                
-                // 使用 setTimeout 让页面先渲染，然后再加载交互式数据
-                // 这样用户不会看到白屏或loading，而是先看到页面结构
-                setTimeout(() => {
-                    console.log('🔄 开始异步加载交互式图表数据...');
-                    loadInteractiveCorrelationData(data.fund_codes);
-                }, 100);
+                // 使用进度指示器加载数据
+                await chartLoadingManager.loadWithProgress(async () => {
+                    // 如果有基础数据，先快速显示基础结果
+                    if (data.basic_correlation) {
+                        console.log('📊 先显示基础数据...');
+                        renderAnalysisResult(data);
+                    }
+                    
+                    // 加载交互式数据
+                    await loadInteractiveCorrelationData(data.fund_codes);
+                });
                 
             } else {
                 console.log('未检测到有效的基金数据，显示空状态');
@@ -249,8 +224,9 @@
             const requestStartTime = performance.now();
             
             try {
-                // 先显示基础页面结构，让用户看到正在加载的状态
-                hideLoadingIndicator();
+                // 更新进度到API请求阶段
+                chartLoadingManager.setStage(2);
+                chartLoadingManager.updateProgress(70, '正在请求服务器数据...');
                 
                 // 更新状态栏显示正在加载
                 const statusText = document.getElementById('status-text');
@@ -271,6 +247,8 @@
                 const requestEndTime = performance.now();
                 const requestDuration = requestEndTime - requestStartTime;
                 console.log(`[Performance] API响应时间: ${requestDuration.toFixed(2)} ms`);
+                
+                chartLoadingManager.updateProgress(80, '正在处理数据...');
                 
                 const result = await response.json();
                 
@@ -293,26 +271,35 @@
                     
                     // 依次渲染各个部分，让用户逐步看到内容
                     console.log('📊 开始渲染页面组件...');
+                    chartLoadingManager.updateProgress(85, '正在渲染概览...');
                     
                     // 1. 先渲染概览（最快）
                     if (responseData.all_combinations_summary) {
                         updateOverviewFromCombinations(responseData.all_combinations_summary, fundCodes.length);
                     }
                     
+                    chartLoadingManager.updateProgress(88, '正在渲染相关性矩阵...');
+                    
                     // 2. 渲染相关性矩阵
                     if (responseData.all_combinations_summary) {
                         renderCorrelationMatrixFromSummary(responseData.all_combinations_summary, fundCodes);
                     }
+                    
+                    chartLoadingManager.updateProgress(91, '正在渲染组合列表...');
                     
                     // 3. 渲染组合列表
                     if (responseData.all_combinations_summary) {
                         renderCombinationsList(responseData.all_combinations_summary);
                     }
                     
+                    chartLoadingManager.updateProgress(94, '正在渲染交互式图表...');
+                    
                     // 4. 最后渲染图表（最耗时）
                     if (responseData.primary_combination) {
                         renderInteractiveCharts(responseData);
                     }
+                    
+                    chartLoadingManager.updateProgress(98, '正在完成...');
                     
                     const renderEndTime = performance.now();
                     console.log(`[Performance] 前端渲染时间: ${(renderEndTime - renderStartTime).toFixed(2)} ms`);
@@ -328,6 +315,7 @@
                         showLazyLoadHint(responseData.all_combinations_summary.length);
                     }
                     
+                    chartLoadingManager.updateProgress(100, '分析完成！');
                     console.log('✅ 页面渲染完成');
                 } else {
                     console.error('❌ 加载数据失败:', result.error);
@@ -624,7 +612,6 @@
             document.getElementById('overview-cards').style.display = 'none';
             document.getElementById('top-pairs-section').style.display = 'none';
             document.getElementById('matrix-section').style.display = 'none';
-            document.getElementById('enhanced-analysis-section').style.display = 'none';
             document.getElementById('interactive-charts-section').style.display = 'none';
         }
 
@@ -634,7 +621,6 @@
             document.getElementById('overview-cards').style.display = 'grid';
             document.getElementById('top-pairs-section').style.display = 'block';
             document.getElementById('matrix-section').style.display = 'block';
-            document.getElementById('enhanced-analysis-section').style.display = 'block';
             document.getElementById('interactive-charts-section').style.display = 'block';
             
             // 更新状态栏
@@ -1227,6 +1213,20 @@
         }
     </script>
     
+    <!-- 图表加载进度指示器 -->
+    <script src="{{ url_for('static', filename='js/chart-loading.js') }}"></script>
+    <!-- 图表折叠/展开功能 -->
+    <script src="{{ url_for('static', filename='js/chart-collapsible.js') }}"></script>
+    <!-- 图表联动交互 -->
+    <script src="{{ url_for('static', filename='js/chart-interaction.js') }}"></script>
+    <!-- 增强相关性矩阵 -->
+    <script src="{{ url_for('static', filename='js/enhanced-matrix.js') }}"></script>
+    <!-- 图表工具箱 -->
+    <script src="{{ url_for('static', filename='js/chart-toolbox.js') }}"></script>
+    <!-- 模块化核心组件 -->
+    <script src="{{ url_for('static', filename='js/modules/correlation-core.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modules/chart-renderers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modules/chart-instance-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fund-correlation-charts.js') }}"></script>
 </body>
 </html>
