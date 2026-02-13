@@ -269,8 +269,20 @@ function initCorrelationCharts(container, chartData) {
     console.log('图表数据:', chartData);
     console.log('数据结构类型:', chartData.primary_combination ? '多基金组合' : '传统双基金');
     
-    // 清空容器
-    container.innerHTML = '';
+    // 优化DOM操作：只在需要时清空容器
+    if (container && container.innerHTML && container.innerHTML.trim() !== '') {
+        // 检查是否已有图表，避免重复渲染
+        const existingCharts = container.querySelectorAll('canvas');
+        if (existingCharts.length > 0) {
+            console.log('🔄 检测到已有图表，先销毁旧图表...');
+            Object.values(correlationCharts).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+        }
+        container.innerHTML = '';
+    }
     
     // 动态注入样式
     injectChartStyles();
@@ -1217,10 +1229,11 @@ function initDistributionChart(distributionData) {
                         position: 'top',
                         labels: {
                             font: {
-                                size: 14
+                                size: 11
                             },
-                            padding: 15,
-                            usePointStyle: true
+                            padding: 10,
+                            usePointStyle: true,
+                            boxWidth: 8
                         }
                     },
                     tooltip: {
@@ -1357,6 +1370,61 @@ function getLTTBIndices(dataLength, threshold) {
             }
         }
         
+        sampled[sampledIndex++] = maxAreaPointIndex;
+        pointIndex = maxAreaPointIndex;
+    }
+    
+    // 添加最后一个点
+    sampled[sampledIndex++] = dataLength - 1;
+    
+    return sampled.slice(0, sampledIndex);
+}
+
+// 导出全局函数
+window.initCorrelationCharts = initCorrelationCharts;
+
+console.log('✅ fund-correlation-charts.js 模块加载完成（含LTTB采样优化）');
+        pointIndex = maxAreaPointIndex;
+    }
+    
+    // 添加最后一个点
+    sampled[sampledIndex++] = dataLength - 1;
+    
+    return sampled.slice(0, sampledIndex);
+}
+
+// 导出全局函数
+window.initCorrelationCharts = initCorrelationCharts;
+
+console.log('✅ fund-correlation-charts.js 模块加载完成（含LTTB采样优化）');
+        sampled[sampledIndex++] = maxAreaPointIndex;
+        pointIndex = maxAreaPointIndex;
+    }
+    
+    // 添加最后一个点
+    sampled[sampledIndex++] = dataLength - 1;
+    
+    return sampled.slice(0, sampledIndex);
+}
+
+// 导出全局函数
+window.initCorrelationCharts = initCorrelationCharts;
+
+console.log('✅ fund-correlation-charts.js 模块加载完成（含LTTB采样优化）');
+        sampled[sampledIndex++] = maxAreaPointIndex;
+        pointIndex = maxAreaPointIndex;
+    }
+    
+    // 添加最后一个点
+    sampled[sampledIndex++] = dataLength - 1;
+    
+    return sampled.slice(0, sampledIndex);
+}
+
+// 导出全局函数
+window.initCorrelationCharts = initCorrelationCharts;
+
+console.log('✅ fund-correlation-charts.js 模块加载完成（含LTTB采样优化）');
         sampled[sampledIndex++] = maxAreaPointIndex;
         pointIndex = maxAreaPointIndex;
     }
