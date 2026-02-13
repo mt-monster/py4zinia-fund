@@ -954,6 +954,78 @@ def _register_fund_routes(app):
         except Exception as e:
             logger.error(f"获取基金资产配置失败: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/fund/<fund_code>/latest', methods=['GET'])
+    def get_fund_latest(fund_code):
+        """获取基金最新实时数据（简化版，用于实时更新）"""
+        try:
+            # 优先从实时数据获取
+            try:
+                fund_data = fund_data_manager.get_realtime_data(fund_code)
+                if fund_data:
+                    # 获取真实的基金名称
+                    real_fund_name = fund_code
+                    try:
+                        import akshare as ak
+                        fund_list = ak.fund_name_em()
+                        fund_info = fund_list[fund_list['基金代码'] == fund_code]
+                        if not fund_info.empty:
+                            real_fund_name = fund_info.iloc[0]['基金简称']
+                    except Exception as e:
+                        logger.warning(f"获取基金 {fund_code} 真实名称失败: {e}")
+                    
+                    # 获取前一日涨跌幅
+                    prev_return = 0.0
+                    try:
+                        return_result = fund_data_manager._get_yesterday_return(fund_code)
+                        prev_return = return_result.get('value', 0.0) if isinstance(return_result, dict) else return_result
+                    except Exception as e:
+                        logger.debug(f"获取基金 {fund_code} prev_day_return 失败: {e}")
+                    
+                    result = {
+                        'fund_code': fund_code,
+                        'fund_name': real_fund_name,
+                        'today_return': round(float(fund_data.get('today_return', 0)), 2),
+                        'prev_day_return': round(float(prev_return), 2),
+                        'current_nav': fund_data.get('current_nav'),
+                        'previous_nav': fund_data.get('previous_nav'),
+                        'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'data_source': fund_data.get('data_source', 'unknown')
+                    }
+                    return safe_jsonify({'success': True, 'data': result})
+            except Exception as e:
+                logger.warning(f"获取实时数据失败: {str(e)}, 使用缓存数据")
+            
+            # 如果实时数据获取失败，回退到数据库缓存数据
+            sql = f"SELECT * FROM fund_analysis_results WHERE fund_code = '{fund_code}' ORDER BY analysis_date DESC LIMIT 1"
+            df = db_manager.execute_query(sql)
+            
+            if df.empty:
+                return jsonify({'success': False, 'error': '基金不存在'}), 404
+            
+            fund = df.iloc[0].to_dict()
+            
+            # 清理NaN值
+            for key in fund:
+                if pd.isna(fund[key]):
+                    fund[key] = None
+            
+            result = {
+                'fund_code': fund_code,
+                'fund_name': fund.get('fund_name', fund_code),
+                'today_return': round(float(fund.get('today_return', 0)), 2) if fund.get('today_return') is not None else 0,
+                'prev_day_return': round(float(fund.get('prev_day_return', 0)), 2) if fund.get('prev_day_return') is not None else 0,
+                'current_nav': fund.get('current_estimate'),
+                'previous_nav': fund.get('yesterday_nav'),
+                'update_time': fund.get('analysis_date'),
+                'data_source': 'database'
+            }
+            
+            return safe_jsonify({'success': True, 'data': result})
+            
+        except Exception as e:
+            logger.error(f"获取基金最新数据失败: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def get_fund_holdings_original(fund_code):

@@ -246,6 +246,7 @@ def register_routes(app, **kwargs):
     app.route('/api/user-holdings', methods=['GET'])(get_user_holdings)
     app.route('/api/strategies/metadata', methods=['GET'])(get_strategies_metadata)
     app.route('/api/holdings', methods=['GET'])(get_holdings)
+    app.route('/api/holdings/list', methods=['GET'])(get_holdings)  # 兼容 dashboard.html 的调用
     app.route('/api/holdings/import/screenshot', methods=['POST'])(import_holding_screenshot)
     app.route('/api/holdings/import/confirm', methods=['POST'])(import_holding_confirm)
     app.route('/api/holdings', methods=['POST'])(add_holding)
