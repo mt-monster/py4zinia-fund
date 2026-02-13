@@ -152,28 +152,48 @@ class MultiSourceDataAdapter(OptimizedFundData):
             
             if cache_hit:
                 logger.info(f"基金 {fund_code} 缓存命中，使用缓存数据并实时计算 today_return")
-                # 使用缓存数据，但 today_return 需要实时计算
-                today_return = self._calculate_today_return_realtime(
-                    fund_code, cached_current_nav, cached_previous_nav
-                )
+                
+                # 获取实时估值数据
+                estimate_data = self._get_realtime_estimate(fund_code)
+                
+                # 优先使用实时估值数据
+                if estimate_data and estimate_data.get('estimate_nav', 0) > 0 and estimate_data.get('yesterday_nav', 0) > 0:
+                    current_nav = estimate_data['estimate_nav']
+                    previous_nav = estimate_data['yesterday_nav']
+                    today_return = estimate_data.get('daily_return', 0)
+                    if today_return == 0:
+                        today_return = round((current_nav - previous_nav) / previous_nav * 100, 2)
+                    logger.info(f"基金 {fund_code} 缓存命中时使用实时估值: current={current_nav}, previous={previous_nav}, today_return={today_return}%")
+                else:
+                    # 无实时估值，使用缓存数据
+                    # 注意：cached_current_nav 实际上是昨日净值
+                    current_nav = cached_current_nav
+                    if cached_previous_nav and cached_previous_nav != cached_current_nav:
+                        previous_nav = cached_previous_nav
+                    elif cached_prev_return and cached_prev_return != 0:
+                        previous_nav = cached_current_nav / (1 + cached_prev_return / 100)
+                    else:
+                        previous_nav = cached_current_nav
+                    today_return = round((current_nav - previous_nav) / previous_nav * 100, 2) if previous_nav > 0 else 0.0
+                    logger.info(f"基金 {fund_code} 缓存命中时使用缓存数据: current={current_nav}, previous={previous_nav}, today_return={today_return}%")
                 
                 # 昨日收益率从缓存获取，如果缓存值为0则重新计算
                 prev_day_return = cached_prev_return
-                if prev_day_return == 0:
+                if prev_day_return == 0 or prev_day_return is None:
                     logger.debug(f"基金 {fund_code} 缓存的 prev_day_return 为0，重新计算")
                     prev_day_return = self._calculate_yesterday_return_from_history(fund_code)
                 
                 result = {
                     'fund_code': fund_code,
                     'fund_name': fund_name or f'基金{fund_code}',
-                    'current_nav': cached_current_nav,
-                    'previous_nav': cached_previous_nav or cached_current_nav,
-                    'daily_return': today_return,  # 日涨跌幅使用实时计算的 today_return
+                    'current_nav': current_nav,
+                    'previous_nav': previous_nav,
+                    'daily_return': today_return,
                     'today_return': today_return,
                     'prev_day_return': prev_day_return,
                     'nav_date': today_str,
                     'data_source': 'cache_with_realtime',
-                    'estimate_nav': cached_current_nav,
+                    'estimate_nav': estimate_data.get('estimate_nav', current_nav) if estimate_data else current_nav,
                     'estimate_return': today_return
                 }
                 logger.info(f"基金 {fund_code} 缓存数据使用成功: today_return={today_return}%, prev_day_return={prev_day_return}%")
@@ -364,7 +384,7 @@ class MultiSourceDataAdapter(OptimizedFundData):
         
         logger.debug(f"基金 {fund_code} 最新净值数据获取成功: {latest_nav}")
         
-        # 获取昨日收益率
+        # 获取昨日收益率（从历史数据计算 T-1 相对 T-2 的变化）
         return_result = self._get_yesterday_return(fund_code, latest_nav.get('date'))
         prev_day_return = return_result.get('value', 0.0)
         logger.debug(f"基金 {fund_code} 昨日收益率: {prev_day_return}%")
@@ -372,37 +392,39 @@ class MultiSourceDataAdapter(OptimizedFundData):
         # 获取实时估值数据
         estimate_data = self._get_realtime_estimate(fund_code)
         
-        # 计算昨日净值：优先使用实时估值的yesterday_nav，否则从daily_return反推
-        if estimate_data and estimate_data.get('yesterday_nav', 0) > 0:
+        # 优先使用实时估值数据计算今日收益
+        if estimate_data and estimate_data.get('estimate_nav', 0) > 0 and estimate_data.get('yesterday_nav', 0) > 0:
+            # 有实时估值：current=estimate_nav, previous=yesterday_nav
+            current_nav = estimate_data['estimate_nav']
             previous_nav = estimate_data['yesterday_nav']
-            logger.debug(f"基金 {fund_code} 使用实时估值的昨日净值: {previous_nav}")
-        elif latest_nav.get('daily_return', 0) != 0:
-            # 从daily_return反推昨日净值: previous_nav = nav / (1 + daily_return/100)
-            previous_nav = latest_nav['nav'] / (1 + latest_nav['daily_return'] / 100)
-            logger.debug(f"基金 {fund_code} 从daily_return反推昨日净值: {previous_nav}")
+            today_return = estimate_data.get('daily_return', 0)  # 新浪已经计算好了
+            if today_return == 0:
+                today_return = round((current_nav - previous_nav) / previous_nav * 100, 2)
+            logger.info(f"基金 {fund_code} 使用实时估值: current={current_nav}, previous={previous_nav}, today_return={today_return}%")
         else:
-            # 无法计算，使用当前净值（会导致today_return=0，但这是合理的fallback）
-            previous_nav = latest_nav['nav']
-            logger.debug(f"基金 {fund_code} 无法获取昨日净值，使用当前净值: {previous_nav}")
-        
-        # 使用正确的previous_nav计算 today_return
-        today_return = self._calculate_today_return_realtime(
-            fund_code,
-            latest_nav['nav'],
-            previous_nav
-        )
+            # 无实时估值：使用 Tushare 数据
+            # Tushare 的 nav 是昨日已确认净值，daily_return 是昨日收益率
+            current_nav = latest_nav['nav']
+            if latest_nav.get('daily_return', 0) != 0:
+                # 从昨日收益率反推前日净值
+                previous_nav = current_nav / (1 + latest_nav['daily_return'] / 100)
+                today_return = round(latest_nav['daily_return'], 2)
+            else:
+                previous_nav = current_nav
+                today_return = 0.0
+            logger.info(f"基金 {fund_code} 使用Tushare数据: current={current_nav}, previous={previous_nav}, today_return={today_return}%")
         
         result = {
             'fund_code': fund_code,
             'fund_name': fund_name or f'基金{fund_code}',
-            'current_nav': latest_nav['nav'],
+            'current_nav': current_nav,
             'previous_nav': previous_nav,
             'daily_return': today_return,
             'today_return': today_return,
             'prev_day_return': prev_day_return,
             'nav_date': latest_nav.get('date', today_str),
             'data_source': f"tushare_{latest_nav.get('source', 'unknown')}",
-            'estimate_nav': estimate_data.get('estimate_nav', latest_nav['nav']) if estimate_data else latest_nav['nav'],
+            'estimate_nav': estimate_data.get('estimate_nav', current_nav) if estimate_data else current_nav,
             'estimate_return': today_return
         }
         

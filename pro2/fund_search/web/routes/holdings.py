@@ -1196,84 +1196,27 @@ def clear_holdings():
 
 def analyze_fund_correlation_interactive():
     """
-    分析基金相关性（交互式图表版本）
+    分析基金相关性（交互式图表版本 - 优化版，支持懒加载）
     """
     try:
         data = request.get_json()
         fund_codes = data.get('fund_codes', [])
+        # 支持指定要查看详情的基金对（懒加载模式）
+        detail_pair = data.get('detail_pair')  # {'fund1': 'code1', 'fund2': 'code2'}
         
         if len(fund_codes) < 2:
             return jsonify({'success': False, 'error': '至少需要2只基金进行相关性分析'})
         
-        # 获取基金名称映射
-        fund_names = {}
-        for code in fund_codes:
-            fund_name = None
-            
-            # 首先尝试从 fund_basic_info 表获取
-            try:
-                fund_info = db_manager.get_fund_detail(code)
-                if fund_info and 'fund_name' in fund_info:
-                    fund_name = fund_info['fund_name']
-            except Exception as e:
-                logger.warning(f"从fund_basic_info获取基金 {code} 信息失败: {e}")
-            
-            # 如果fund_basic_info中没有，尝试从fund_analysis_results表获取
-            if not fund_name:
-                try:
-                    sql = """
-                    SELECT fund_name FROM fund_analysis_results 
-                    WHERE fund_code = %(fund_code)s 
-                    LIMIT 1
-                    """
-                    df = pd.read_sql(sql, db_manager.engine, params={'fund_code': code})
-                    if not df.empty and pd.notna(df.iloc[0]['fund_name']):
-                        fund_name = df.iloc[0]['fund_name']
-                except Exception as e:
-                    logger.warning(f"从fund_analysis_results获取基金 {code} 名称失败: {e}")
-            
-            # 如果都没有找到，使用基金代码作为名称
-            fund_names[code] = fund_name if fund_name else code
-            
-            logger.info(f"基金 {code} 的名称: {fund_names[code]}")
+        # 批量获取基金名称 - 优化：一次查询所有基金
+        fund_names = _batch_get_fund_names(fund_codes)
         
-        # 获取基金历史数据
-        fund_data_dict = {}
-        for code in fund_codes:
-            # 直接查询数据库获取净值历史数据
-            try:
-                from datetime import datetime, timedelta
-                end_date = datetime.now().date()
-                start_date = end_date - timedelta(days=365)
-                
-                sql = """
-                SELECT nav_date as date, current_nav as nav 
-                FROM fund_analysis_results 
-                WHERE fund_code = %(fund_code)s 
-                AND nav_date BETWEEN %(start_date)s AND %(end_date)s
-                ORDER BY nav_date
-                """
-                
-                df = pd.read_sql(sql, db_manager.engine, params={
-                    'fund_code': code,
-                    'start_date': start_date,
-                    'end_date': end_date
-                })
-                
-                if not df.empty:
-                    df['date'] = pd.to_datetime(df['date'])
-                    df = df.sort_values('date')
-                    # 计算日收益率
-                    df['daily_return'] = df['nav'].pct_change() * 100
-                    fund_data_dict[code] = df
-            except Exception as e:
-                logger.warning(f"获取基金 {code} 历史数据失败: {e}")
-                continue
+        # 批量获取基金历史数据 - 优化：一次查询所有基金
+        fund_data_dict = _batch_get_fund_historical_data(fund_codes)
         
         if len(fund_data_dict) < 2:
-            # 如果没有足够的真实数据，尝试从akshare获取
+            # 如果没有足够的真实数据，尝试从akshare获取（异步优化）
             logger.warning("数据库数据不足，尝试从akshare获取")
-            fund_data_dict = _fetch_fund_data_from_akshare(fund_codes, fund_names)
+            fund_data_dict = _fetch_fund_data_from_akshare_optimized(fund_codes, fund_names)
         
         if len(fund_data_dict) < 2:
             return jsonify({'success': False, 'error': '数据不足，无法进行相关性分析'})
@@ -1284,9 +1227,29 @@ def analyze_fund_correlation_interactive():
         # 创建分析器实例
         analyzer = EnhancedCorrelationAnalyzer()
         
-        # 生成交互式图表数据
+        # 如果请求了特定基金对的详情，则只返回该基金对的数据
+        if detail_pair and detail_pair.get('fund1') and detail_pair.get('fund2'):
+            fund1_code = detail_pair['fund1']
+            fund2_code = detail_pair['fund2']
+            
+            pair_detail = analyzer.generate_pair_detail_data(
+                fund_data_dict, fund_names, fund1_code, fund2_code
+            )
+            
+            if not pair_detail:
+                return jsonify({'success': False, 'error': '无法生成指定基金对的详细数据'})
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'pair_detail': pair_detail,
+                    'is_lazy_load': True
+                }
+            })
+        
+        # 否则返回懒加载格式的数据（主组合+精简列表）
         interactive_data = analyzer.generate_interactive_correlation_data(
-            fund_data_dict, fund_names
+            fund_data_dict, fund_names, lazy_load=True
         )
         
         if not interactive_data:
@@ -1299,7 +1262,200 @@ def analyze_fund_correlation_interactive():
         
     except Exception as e:
         logger.error(f"交互式相关性分析失败: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
+
+
+def _batch_get_fund_names(fund_codes: list) -> dict:
+    """
+    批量获取基金名称 - 优化版，减少数据库查询次数
+    修复SQL参数格式问题
+    
+    参数:
+    fund_codes: 基金代码列表
+    
+    返回:
+    dict: 基金代码到名称的映射
+    """
+    fund_names = {}
+    
+    if not fund_codes:
+        return fund_names
+    
+    try:
+        # 使用%s占位符（与SQLAlchemy兼容）
+        placeholders = ','.join(['%s'] * len(fund_codes))
+        
+        # 批量从 fund_basic_info 获取
+        sql_basic = f"""
+        SELECT fund_code, fund_name 
+        FROM fund_basic_info 
+        WHERE fund_code IN ({placeholders})
+        """
+        
+        with db_manager.engine.connect() as conn:
+            df_basic = pd.read_sql(sql_basic, conn, params=tuple(fund_codes))
+        
+        for _, row in df_basic.iterrows():
+            if pd.notna(row['fund_name']):
+                fund_names[row['fund_code']] = row['fund_name']
+        
+        # 对于没有找到的，从 fund_analysis_results 获取
+        missing_codes = [code for code in fund_codes if code not in fund_names]
+        if missing_codes:
+            placeholders2 = ','.join(['%s'] * len(missing_codes))
+            
+            sql_analysis = f"""
+            SELECT t1.fund_code, t1.fund_name 
+            FROM fund_analysis_results t1
+            INNER JOIN (
+                SELECT fund_code, MAX(analysis_date) as max_date
+                FROM fund_analysis_results 
+                WHERE fund_code IN ({placeholders2})
+                GROUP BY fund_code
+            ) t2 ON t1.fund_code = t2.fund_code AND t1.analysis_date = t2.max_date
+            """
+            
+            with db_manager.engine.connect() as conn:
+                df_analysis = pd.read_sql(sql_analysis, conn, params=tuple(missing_codes))
+            
+            for _, row in df_analysis.iterrows():
+                if pd.notna(row['fund_name']):
+                    fund_names[row['fund_code']] = row['fund_name']
+        
+        # 剩下的使用代码作为名称
+        for code in fund_codes:
+            if code not in fund_names:
+                fund_names[code] = code
+        
+        logger.info(f"批量获取基金名称成功: {len(fund_names)} 只基金")
+        return fund_names
+        
+    except Exception as e:
+        logger.error(f"批量获取基金名称失败: {e}")
+        import traceback
+        traceback.print_exc()
+        # 降级：返回代码作为名称
+        return {code: code for code in fund_codes}
+
+
+def _batch_get_fund_historical_data(fund_codes: list) -> dict:
+    """
+    批量获取基金历史数据 - 优化版，一次查询所有基金
+    修复SQL参数格式和列名问题
+    
+    参数:
+    fund_codes: 基金代码列表
+    
+    返回:
+    dict: 基金代码到DataFrame的映射
+    """
+    fund_data_dict = {}
+    
+    if len(fund_codes) < 2:
+        return fund_data_dict
+    
+    try:
+        from datetime import datetime, timedelta
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=365)
+        
+        # 使用%s占位符（与SQLAlchemy兼容）
+        placeholders = ','.join(['%s'] * len(fund_codes))
+        params = tuple(fund_codes) + (start_date, end_date)
+        
+        # 使用正确的列名: analysis_date 和 current_estimate
+        sql = f"""
+        SELECT fund_code, analysis_date as date, current_estimate as nav 
+        FROM fund_analysis_results 
+        WHERE fund_code IN ({placeholders})
+        AND analysis_date BETWEEN %s AND %s
+        ORDER BY fund_code, analysis_date
+        """
+        
+        with db_manager.engine.connect() as conn:
+            df = pd.read_sql(sql, conn, params=params)
+        
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date'])
+            
+            # 按基金代码分组处理
+            for fund_code in fund_codes:
+                fund_df = df[df['fund_code'] == fund_code].copy()
+                if len(fund_df) >= 10:  # 至少要有10条记录
+                    fund_df = fund_df.sort_values('date')
+                    fund_df['daily_return'] = fund_df['nav'].pct_change() * 100
+                    fund_df = fund_df.dropna()
+                    if len(fund_df) >= 10:
+                        fund_data_dict[fund_code] = fund_df
+        
+        logger.info(f"批量获取基金历史数据成功: {len(fund_data_dict)} 只基金")
+        return fund_data_dict
+        
+    except Exception as e:
+        logger.error(f"批量获取基金历史数据失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return fund_data_dict
+
+
+def _fetch_fund_data_from_akshare_optimized(fund_codes: list, fund_names: dict) -> dict:
+    """
+    从akshare获取基金历史数据 - 优化版（使用线程池并发获取）
+    
+    参数:
+    fund_codes: 基金代码列表
+    fund_names: 基金名称映射
+    
+    返回:
+    dict: 基金代码到DataFrame的映射
+    """
+    import concurrent.futures
+    import akshare as ak
+    from datetime import datetime, timedelta
+    
+    fund_data_dict = {}
+    
+    def fetch_single_fund(code):
+        """获取单只基金数据"""
+        try:
+            nav_df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
+            
+            if nav_df is not None and not nav_df.empty and len(nav_df) >= 30:
+                nav_df = nav_df.rename(columns={
+                    '净值日期': 'date',
+                    '单位净值': 'nav'
+                })
+                nav_df['date'] = pd.to_datetime(nav_df['date'])
+                nav_df = nav_df.sort_values('date')
+                
+                # 只取最近一年的数据
+                one_year_ago = datetime.now() - timedelta(days=365)
+                nav_df = nav_df[nav_df['date'] >= one_year_ago]
+                
+                nav_df['nav'] = pd.to_numeric(nav_df['nav'], errors='coerce')
+                nav_df = nav_df.dropna(subset=['nav'])
+                nav_df['daily_return'] = nav_df['nav'].pct_change() * 100
+                nav_df = nav_df.dropna()
+                
+                if len(nav_df) >= 10:
+                    return code, nav_df
+        except Exception as e:
+            logger.warning(f"从akshare获取基金 {code} 数据失败: {str(e)}")
+        return code, None
+    
+    # 使用线程池并发获取
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_code = {executor.submit(fetch_single_fund, code): code for code in fund_codes}
+        for future in concurrent.futures.as_completed(future_to_code):
+            code, df = future.result()
+            if df is not None:
+                fund_data_dict[code] = df
+                logger.info(f"从akshare获取基金 {code} 数据成功: {len(df)} 条记录")
+    
+    logger.info(f"akshare数据获取完成: {len(fund_data_dict)} 只基金")
+    return fund_data_dict
 
 
 def _fetch_fund_data_from_akshare(fund_codes: list, fund_names: dict) -> dict:
