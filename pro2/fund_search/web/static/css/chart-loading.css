@@ -1,0 +1,271 @@
+/* ==================== 图表加载进度指示器 ==================== */
+
+/* 进度条容器 */
+.loading-progress-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 1rem 1.5rem;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+}
+
+.loading-progress-container.active {
+    transform: translateY(0);
+}
+
+.loading-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.loading-progress-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.loading-progress-title i {
+    color: var(--primary-color);
+    animation: spin 1s linear infinite;
+}
+
+.loading-progress-percent {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    font-family: 'SF Mono', monospace;
+}
+
+/* 进度条 */
+.loading-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.loading-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-color), #60a5fa);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.loading-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,0.3),
+        transparent
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* 加载阶段列表 */
+.loading-stages {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.8125rem;
+}
+
+.loading-stage {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--gray-400);
+    transition: color 0.3s ease;
+}
+
+.loading-stage.active {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.loading-stage.completed {
+    color: var(--success-color);
+}
+
+.loading-stage i {
+    font-size: 0.875rem;
+}
+
+/* ==================== 骨架屏样式 ==================== */
+
+.chart-skeleton-wrapper {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-100);
+    overflow: hidden;
+}
+
+.chart-skeleton-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--gray-100);
+    background: linear-gradient(to right, var(--gray-50), white);
+}
+
+.chart-skeleton-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    background: var(--gray-200);
+    border-radius: var(--radius-sm);
+    animation: skeleton-pulse 1.5s infinite;
+}
+
+.chart-skeleton-title {
+    width: 120px;
+    height: 1rem;
+    background: var(--gray-200);
+    border-radius: var(--radius-sm);
+    animation: skeleton-pulse 1.5s infinite;
+}
+
+.chart-skeleton-body {
+    padding: 1.5rem;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.chart-skeleton-chart {
+    flex: 1;
+    background: linear-gradient(
+        90deg,
+        var(--gray-100) 25%,
+        var(--gray-200) 50%,
+        var(--gray-100) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: var(--radius);
+}
+
+.chart-skeleton-legend {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.chart-skeleton-legend-item {
+    width: 80px;
+    height: 0.75rem;
+    background: var(--gray-200);
+    border-radius: var(--radius-sm);
+    animation: skeleton-pulse 1.5s infinite;
+}
+
+@keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ==================== 图表区域加载状态 ==================== */
+
+.charts-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 10;
+    backdrop-filter: blur(2px);
+}
+
+.charts-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid var(--gray-200);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.charts-loading-text {
+    font-size: 0.9375rem;
+    color: var(--gray-600);
+}
+
+.charts-loading-detail {
+    font-size: 0.8125rem;
+    color: var(--gray-400);
+}
+
+/* ==================== 矩阵骨架屏 ==================== */
+
+.matrix-skeleton {
+    padding: 1.5rem;
+}
+
+.matrix-skeleton-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.matrix-skeleton-cell {
+    width: 60px;
+    height: 40px;
+    background: var(--gray-100);
+    border-radius: var(--radius-sm);
+    animation: skeleton-pulse 1.5s infinite;
+}
+
+.matrix-skeleton-cell.header {
+    background: var(--gray-200);
+}
+
+/* ==================== 响应式 ==================== */
+
+@media (max-width: 768px) {
+    .loading-progress-container {
+        padding: 0.75rem 1rem;
+    }
+    
+    .loading-stages {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    
+    .chart-skeleton-body {
+        height: 250px;
+    }
+}
