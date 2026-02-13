@@ -1196,35 +1196,48 @@ def clear_holdings():
 
 def analyze_fund_correlation_interactive():
     """
-    分析基金相关性（交互式图表版本 - 优化版，支持懒加载）
+    分析基金相关性（交互式图表版本 - 优化版，支持懒加载和详细性能监控）
     """
+    import time
+    api_start_time = time.perf_counter()
+    
     try:
         data = request.get_json()
         fund_codes = data.get('fund_codes', [])
         # 支持指定要查看详情的基金对（懒加载模式）
         detail_pair = data.get('detail_pair')  # {'fund1': 'code1', 'fund2': 'code2'}
         
+        logger.info(f"[API Performance] 收到相关性分析请求，基金数量: {len(fund_codes)}")
+        
         if len(fund_codes) < 2:
             return jsonify({'success': False, 'error': '至少需要2只基金进行相关性分析'})
         
-        # 批量获取基金名称 - 优化：一次查询所有基金
+        # 步骤1: 批量获取基金名称
+        step_start = time.perf_counter()
         fund_names = _batch_get_fund_names(fund_codes)
+        step_elapsed = (time.perf_counter() - step_start) * 1000
+        logger.info(f"[API Performance] 步骤1-获取基金名称: {step_elapsed:.2f} ms, 成功: {len(fund_names)}只")
         
-        # 批量获取基金历史数据 - 优化：一次查询所有基金
+        # 步骤2: 批量获取基金历史数据
+        step_start = time.perf_counter()
         fund_data_dict = _batch_get_fund_historical_data(fund_codes)
+        step_elapsed = (time.perf_counter() - step_start) * 1000
+        logger.info(f"[API Performance] 步骤2-数据库获取数据: {step_elapsed:.2f} ms, 成功: {len(fund_data_dict)}只")
         
+        # 步骤3: 如果数据库数据不足，从akshare获取
         if len(fund_data_dict) < 2:
-            # 如果没有足够的真实数据，尝试从akshare获取（异步优化）
-            logger.warning("数据库数据不足，尝试从akshare获取")
+            logger.warning(f"[API Performance] 数据库数据不足({len(fund_data_dict)}只)，开始从akshare获取...")
+            step_start = time.perf_counter()
             fund_data_dict = _fetch_fund_data_from_akshare_optimized(fund_codes, fund_names)
+            step_elapsed = (time.perf_counter() - step_start) * 1000
+            logger.info(f"[API Performance] 步骤3-akshare获取数据: {step_elapsed:.2f} ms, 成功: {len(fund_data_dict)}只")
         
         if len(fund_data_dict) < 2:
             return jsonify({'success': False, 'error': '数据不足，无法进行相关性分析'})
 
-        # 导入相关性分析模块
+        # 步骤4: 执行相关性分析
+        step_start = time.perf_counter()
         from backtesting.enhanced_correlation import EnhancedCorrelationAnalyzer
-        
-        # 创建分析器实例
         analyzer = EnhancedCorrelationAnalyzer()
         
         # 如果请求了特定基金对的详情，则只返回该基金对的数据
@@ -1239,6 +1252,11 @@ def analyze_fund_correlation_interactive():
             if not pair_detail:
                 return jsonify({'success': False, 'error': '无法生成指定基金对的详细数据'})
             
+            step_elapsed = (time.perf_counter() - step_start) * 1000
+            api_elapsed = (time.perf_counter() - api_start_time) * 1000
+            logger.info(f"[API Performance] 步骤4-生成详情数据: {step_elapsed:.2f} ms")
+            logger.info(f"[API Performance] API总耗时（单对详情）: {api_elapsed:.2f} ms")
+            
             return jsonify({
                 'success': True,
                 'data': {
@@ -1252,8 +1270,21 @@ def analyze_fund_correlation_interactive():
             fund_data_dict, fund_names, lazy_load=True
         )
         
+        step_elapsed = (time.perf_counter() - step_start) * 1000
+        logger.info(f"[API Performance] 步骤4-相关性分析计算: {step_elapsed:.2f} ms")
+        
         if not interactive_data:
             return jsonify({'success': False, 'error': '无法生成相关性分析数据'})
+        
+        api_elapsed = (time.perf_counter() - api_start_time) * 1000
+        logger.info(f"[API Performance] API总耗时（懒加载模式）: {api_elapsed:.2f} ms ({api_elapsed/1000:.3f} s)")
+        
+        # 添加性能数据到响应
+        interactive_data['_api_performance'] = {
+            'total_time_ms': api_elapsed,
+            'fund_count': len(fund_codes),
+            'data_source': 'akshare' if len(fund_data_dict) > len(_batch_get_fund_historical_data(fund_codes)) else 'database'
+        }
         
         return jsonify({
             'success': True,
@@ -1261,7 +1292,8 @@ def analyze_fund_correlation_interactive():
         })
         
     except Exception as e:
-        logger.error(f"交互式相关性分析失败: {e}")
+        api_elapsed = (time.perf_counter() - api_start_time) * 1000
+        logger.error(f"[API Performance] 交互式相关性分析失败，耗时: {api_elapsed:.2f} ms, 错误: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
@@ -1402,7 +1434,7 @@ def _batch_get_fund_historical_data(fund_codes: list) -> dict:
 
 def _fetch_fund_data_from_akshare_optimized(fund_codes: list, fund_names: dict) -> dict:
     """
-    从akshare获取基金历史数据 - 优化版（使用线程池并发获取）
+    从akshare获取基金历史数据 - 优化版（使用线程池并发获取，增加并发数）
     
     参数:
     fund_codes: 基金代码列表
@@ -1414,11 +1446,14 @@ def _fetch_fund_data_from_akshare_optimized(fund_codes: list, fund_names: dict) 
     import concurrent.futures
     import akshare as ak
     from datetime import datetime, timedelta
+    import time
     
     fund_data_dict = {}
+    start_time = time.perf_counter()
     
     def fetch_single_fund(code):
         """获取单只基金数据"""
+        fund_start = time.perf_counter()
         try:
             nav_df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
             
@@ -1440,21 +1475,28 @@ def _fetch_fund_data_from_akshare_optimized(fund_codes: list, fund_names: dict) 
                 nav_df = nav_df.dropna()
                 
                 if len(nav_df) >= 10:
+                    elapsed = (time.perf_counter() - fund_start) * 1000
+                    logger.info(f"[AKShare] 基金 {code} 获取成功: {len(nav_df)}条, 耗时: {elapsed:.2f}ms")
                     return code, nav_df
         except Exception as e:
-            logger.warning(f"从akshare获取基金 {code} 数据失败: {str(e)}")
+            elapsed = (time.perf_counter() - fund_start) * 1000
+            logger.warning(f"[AKShare] 基金 {code} 获取失败: {str(e)}, 耗时: {elapsed:.2f}ms")
         return code, None
     
-    # 使用线程池并发获取
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # 使用线程池并发获取 - 增加并发数以加快获取速度
+    # 对于14只基金，10个并发可以在2轮内完成
+    max_workers = min(10, len(fund_codes))
+    logger.info(f"[AKShare] 开始并发获取 {len(fund_codes)} 只基金数据，并发数: {max_workers}")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_code = {executor.submit(fetch_single_fund, code): code for code in fund_codes}
         for future in concurrent.futures.as_completed(future_to_code):
             code, df = future.result()
             if df is not None:
                 fund_data_dict[code] = df
-                logger.info(f"从akshare获取基金 {code} 数据成功: {len(df)} 条记录")
     
-    logger.info(f"akshare数据获取完成: {len(fund_data_dict)} 只基金")
+    total_elapsed = (time.perf_counter() - start_time) * 1000
+    logger.info(f"[AKShare] 数据获取完成: {len(fund_data_dict)}/{len(fund_codes)} 只基金, 总耗时: {total_elapsed:.2f}ms")
     return fund_data_dict
 
 
@@ -1832,8 +1874,11 @@ def normalize_fund_type(fund_type: str) -> str:
 
 def analyze_fund_correlation():
     """
-    分析基金相关性（增强版）
+    分析基金相关性（增强版）- 优化版本，带超时控制
     """
+    import time
+    start_time = time.time()
+    
     try:
         data = request.get_json()
         if not data or 'fund_codes' not in data:
@@ -1846,13 +1891,15 @@ def analyze_fund_correlation():
         # 获取增强分析选项
         enhanced_analysis = data.get('enhanced_analysis', True)
         
+        logger.info(f"[Correlation] 开始分析 {len(fund_codes)} 只基金的相关性")
+        
         # 导入相关性分析模块
         from data_retrieval.fund_analyzer import FundAnalyzer
         from backtesting.enhanced_correlation import EnhancedCorrelationAnalyzer
         
-        # 基础相关性分析
+        # 基础相关性分析 - 优先使用数据库
         analyzer = FundAnalyzer()
-        basic_result = analyzer.analyze_correlation(fund_codes, use_cache=False)
+        basic_result = analyzer.analyze_correlation(fund_codes, use_cache=True)
         
         result = {
             'success': True,
@@ -1861,33 +1908,38 @@ def analyze_fund_correlation():
             }
         }
         
+        logger.info(f"[Correlation] 基础分析完成，耗时: {time.time() - start_time:.2f}s")
+        
         # 增强相关性分析
         if enhanced_analysis:
             try:
-                # 获取基金详细数据用于增强分析
-                from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
-                fund_data_manager = MultiSourceDataAdapter()
-                
+                # 优先从数据库获取数据
                 fund_data_dict = {}
                 fund_names = {}
+                
+                # 使用批量查询从数据库获取数据
+                db_fund_data = _batch_get_fund_historical_data(fund_codes)
                 
                 for fund_code in fund_codes:
                     try:
                         # 获取基金名称
                         fund_name = analyzer._get_fund_name(fund_code)
                         if not fund_name:
-                            fund_info = fund_data_manager.get_fund_basic_info(fund_code)
-                            fund_name = fund_info.get('fund_name', fund_code)
+                            fund_name = fund_code
                         fund_names[fund_code] = fund_name
                         
-                        # 获取历史数据
-                        nav_data = fund_data_manager.get_historical_data(fund_code, days=365)
-                        if not nav_data.empty and 'daily_return' in nav_data.columns:
-                            fund_data_dict[fund_code] = nav_data
+                        # 优先使用数据库数据
+                        if fund_code in db_fund_data and not db_fund_data[fund_code].empty:
+                            fund_data_dict[fund_code] = db_fund_data[fund_code]
+                            logger.debug(f"[Correlation] 基金 {fund_code} 使用数据库数据")
+                        else:
+                            logger.warning(f"[Correlation] 基金 {fund_code} 数据库数据缺失")
                             
                     except Exception as e:
-                        logger.warning(f"获取基金 {fund_code} 数据失败: {e}")
+                        logger.warning(f"[Correlation] 获取基金 {fund_code} 数据失败: {e}")
                         continue
+                
+                logger.info(f"[Correlation] 数据准备完成，有效基金: {len(fund_data_dict)}/{len(fund_codes)}")
                 
                 if len(fund_data_dict) >= 2:
                     enhanced_analyzer = EnhancedCorrelationAnalyzer()
@@ -1903,17 +1955,101 @@ def analyze_fund_correlation():
                     result['data']['enhanced_analysis'] = enhanced_result
                     if chart_data:
                         result['data']['charts'] = chart_data
+                else:
+                    logger.warning(f"[Correlation] 有效基金数量不足: {len(fund_data_dict)}")
+                    result['data']['enhanced_error'] = f"有效基金数量不足 ({len(fund_data_dict)} < 2)，无法进行分析"
                     
             except Exception as e:
-                logger.error(f"增强相关性分析失败: {e}")
-                # 即使增强分析失败，也要返回基础分析结果
+                logger.error(f"[Correlation] 增强相关性分析失败: {e}")
                 result['data']['enhanced_error'] = str(e)
+        
+        total_time = time.time() - start_time
+        logger.info(f"[Correlation] 分析完成，总耗时: {total_time:.2f}s")
         
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"分析基金相关性失败: {e}")
+        logger.error(f"[Correlation] 分析基金相关性失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _batch_get_fund_historical_data(fund_codes: list, min_records: int = 100) -> dict:
+    """
+    批量从数据库获取基金历史数据
+    如果数据不足，自动从akshare获取补充
+    
+    Args:
+        fund_codes: 基金代码列表
+        min_records: 每只基金最少需要的记录数，默认100条
+        
+    Returns:
+        dict: 基金代码 -> DataFrame 的映射
+    """
+    result = {}
+    funds_needing_update = []
+    
+    try:
+        db = EnhancedDatabaseManager(DATABASE_CONFIG)
+        
+        # 构建批量查询 - 使用命名参数
+        placeholders = ','.join([f':code_{i}' for i in range(len(fund_codes))])
+        sql = f"""
+            SELECT 
+                fund_code,
+                analysis_date as date,
+                current_estimate as nav,
+                today_return as daily_return
+            FROM fund_analysis_results
+            WHERE fund_code IN ({placeholders})
+              AND analysis_date >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
+            ORDER BY fund_code, analysis_date
+        """
+        
+        # 构建参数字典
+        params = {f'code_{i}': code for i, code in enumerate(fund_codes)}
+        df = db.execute_query(sql, params)
+        
+        if df.empty:
+            logger.warning("[Correlation] 数据库中没有找到基金历史数据")
+            funds_needing_update = fund_codes
+        else:
+            # 按基金代码分组
+            for fund_code in fund_codes:
+                fund_df = df[df['fund_code'] == fund_code].copy()
+                if not fund_df.empty:
+                    # 转换日期格式
+                    fund_df['date'] = pd.to_datetime(fund_df['date'])
+                    # 按日期排序
+                    fund_df = fund_df.sort_values('date', ascending=True)
+                    
+                    # 检查数据量是否充足
+                    if len(fund_df) >= min_records:
+                        result[fund_code] = fund_df
+                        logger.info(f"[Correlation] 基金 {fund_code}: {len(fund_df)} 条记录（充足）")
+                    else:
+                        logger.warning(f"[Correlation] 基金 {fund_code}: 仅 {len(fund_df)} 条记录（不足{min_records}），需要从akshare获取")
+                        funds_needing_update.append(fund_code)
+                else:
+                    logger.warning(f"[Correlation] 基金 {fund_code}: 数据库中无数据")
+                    funds_needing_update.append(fund_code)
+        
+        logger.info(f"[Correlation] 数据库数据充足: {len(result)}/{len(fund_codes)} 只，需要从akshare获取: {len(funds_needing_update)} 只")
+        
+        # 对于数据不足的基金，从akshare获取
+        if funds_needing_update:
+            logger.info(f"[Correlation] 开始从akshare获取 {len(funds_needing_update)} 只基金数据...")
+            akshare_data = _fetch_fund_data_from_akshare_optimized(funds_needing_update, {})
+            
+            # 合并结果
+            for fund_code, fund_df in akshare_data.items():
+                if fund_df is not None and not fund_df.empty:
+                    result[fund_code] = fund_df
+                    logger.info(f"[Correlation] 基金 {fund_code}: 从akshare获取 {len(fund_df)} 条记录")
+        
+    except Exception as e:
+        logger.error(f"[Correlation] 批量获取基金数据失败: {e}")
+    
+    return result
 
 
 def analyze_comprehensive():

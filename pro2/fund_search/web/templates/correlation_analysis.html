@@ -211,32 +211,52 @@
                 analysisData = data;
                 currentFundCodes = data.fund_codes;
                 
-                // 显示分析内容（使用基础数据）
+                // 显示分析内容（页面结构立即显示）
                 showAnalysisContent();
                 
-                // 如果有基础数据，先显示
+                // 更新状态栏显示正在加载
+                const statusText = document.getElementById('status-text');
+                if (statusText) {
+                    statusText.innerHTML = `正在分析 ${data.fund_codes.length} 只基金的相关性 <span class="loading-dots">...</span>`;
+                }
+                
+                // 如果有基础数据，先快速显示基础结果
                 if (data.basic_correlation) {
+                    console.log('📊 先显示基础数据...');
                     renderAnalysisResult(data);
                 }
                 
-                // 异步加载交互式图表数据（懒加载模式）
-                await loadInteractiveCorrelationData(data.fund_codes);
+                // 使用 setTimeout 让页面先渲染，然后再加载交互式数据
+                // 这样用户不会看到白屏或loading，而是先看到页面结构
+                setTimeout(() => {
+                    console.log('🔄 开始异步加载交互式图表数据...');
+                    loadInteractiveCorrelationData(data.fund_codes);
+                }, 100);
                 
             } else {
                 console.log('未检测到有效的基金数据，显示空状态');
                 showEmptyState();
             }
             
-            console.log('=== 页面加载完成 ===');
+            console.log('=== 页面初始化完成，数据加载中... ===');
         }
         
-        // 加载交互式相关性数据（懒加载优化版）
+        // 加载交互式相关性数据（懒加载优化版 - 分阶段显示）
         async function loadInteractiveCorrelationData(fundCodes) {
             console.log('🔄 开始加载交互式相关性数据（懒加载模式）...');
+            console.log(`[Performance] 开始API请求时间: ${new Date().toISOString()}`);
+            
+            const requestStartTime = performance.now();
             
             try {
-                // 显示加载状态
-                showLoadingIndicator();
+                // 先显示基础页面结构，让用户看到正在加载的状态
+                hideLoadingIndicator();
+                
+                // 更新状态栏显示正在加载
+                const statusText = document.getElementById('status-text');
+                if (statusText) {
+                    statusText.innerHTML = `正在分析 ${fundCodes.length} 只基金的相关性 <span class="loading-dots">...</span>`;
+                }
                 
                 const response = await fetch('/api/holdings/analyze/correlation-interactive', {
                     method: 'POST',
@@ -248,12 +268,19 @@
                     })
                 });
                 
+                const requestEndTime = performance.now();
+                const requestDuration = requestEndTime - requestStartTime;
+                console.log(`[Performance] API响应时间: ${requestDuration.toFixed(2)} ms`);
+                
                 const result = await response.json();
                 
                 if (result.success) {
-                    console.log('✅ 交互式数据加载成功（懒加载模式）');
-                    
                     const responseData = result.data;
+                    
+                    // 记录后端性能数据
+                    if (responseData._api_performance) {
+                        console.log('[Performance] 后端性能数据:', responseData._api_performance);
+                    }
                     
                     // 更新分析数据
                     analysisData = {
@@ -262,30 +289,53 @@
                         fund_codes: fundCodes
                     };
                     
-                    // 渲染主组合的图表（立即可见）
-                    renderInteractiveCharts(responseData);
+                    const renderStartTime = performance.now();
                     
-                    // 渲染组合列表（支持点击切换）
-                    renderCombinationsList(responseData.all_combinations_summary);
+                    // 依次渲染各个部分，让用户逐步看到内容
+                    console.log('📊 开始渲染页面组件...');
                     
-                    // 更新概览信息
-                    updateOverviewFromCombinations(responseData.all_combinations_summary, fundCodes.length);
+                    // 1. 先渲染概览（最快）
+                    if (responseData.all_combinations_summary) {
+                        updateOverviewFromCombinations(responseData.all_combinations_summary, fundCodes.length);
+                    }
                     
-                    // 渲染相关性矩阵
-                    renderCorrelationMatrixFromSummary(responseData.all_combinations_summary, fundCodes);
+                    // 2. 渲染相关性矩阵
+                    if (responseData.all_combinations_summary) {
+                        renderCorrelationMatrixFromSummary(responseData.all_combinations_summary, fundCodes);
+                    }
                     
-                    hideLoadingIndicator();
+                    // 3. 渲染组合列表
+                    if (responseData.all_combinations_summary) {
+                        renderCombinationsList(responseData.all_combinations_summary);
+                    }
+                    
+                    // 4. 最后渲染图表（最耗时）
+                    if (responseData.primary_combination) {
+                        renderInteractiveCharts(responseData);
+                    }
+                    
+                    const renderEndTime = performance.now();
+                    console.log(`[Performance] 前端渲染时间: ${(renderEndTime - renderStartTime).toFixed(2)} ms`);
+                    console.log(`[Performance] 总耗时: ${(renderEndTime - requestStartTime).toFixed(2)} ms`);
+                    
+                    // 更新状态栏
+                    if (statusText) {
+                        statusText.textContent = `已完成 ${fundCodes.length} 只基金的相关性分析`;
+                    }
                     
                     // 显示懒加载提示
                     if (responseData.lazy_load_enabled && responseData.all_combinations_summary && responseData.all_combinations_summary.length > 1) {
                         showLazyLoadHint(responseData.all_combinations_summary.length);
                     }
+                    
+                    console.log('✅ 页面渲染完成');
                 } else {
                     console.error('❌ 加载数据失败:', result.error);
                     showErrorMessage('分析数据加载失败: ' + (result.error || '未知错误'));
                 }
             } catch (error) {
-                console.error('❌ 网络错误:', error);
+                const requestEndTime = performance.now();
+                console.error(`❌ 网络错误，耗时: ${(requestEndTime - requestStartTime).toFixed(2)} ms, 错误:`, error);
                 showErrorMessage('网络错误，部分分析数据可能无法显示');
             }
         }
@@ -853,7 +903,13 @@
 
         // ==================== 增强分析功能 ====================
         async function loadEnhancedCorrelationAnalysis(fundCodes) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+            
             try {
+                console.log(`[Enhanced] 开始加载相关性分析，基金数量: ${fundCodes.length}`);
+                const startTime = Date.now();
+                
                 const response = await fetch('/api/holdings/analyze/correlation', {
                     method: 'POST',
                     headers: {
@@ -862,11 +918,22 @@
                     body: JSON.stringify({ 
                         fund_codes: fundCodes,
                         enhanced_analysis: true
-                    })
+                    }),
+                    signal: controller.signal
                 });
                 
+                clearTimeout(timeoutId);
+                
+                const elapsed = Date.now() - startTime;
+                console.log(`[Enhanced] API响应时间: ${elapsed}ms`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
-                console.log('📊 API /api/holdings/analyze/correlation 返回:', result);
+                console.log('[Enhanced] API返回:', result);
+                
                 if (result.success) {
                     renderEnhancedAnalysis(result.data);
                     // 使用增强分析数据更新所有组件
@@ -875,8 +942,15 @@
                     showEnhancedError(result.error || '加载失败');
                 }
             } catch (error) {
-                console.error('加载增强分析失败:', error);
-                showEnhancedError('网络错误');
+                clearTimeout(timeoutId);
+                
+                if (error.name === 'AbortError') {
+                    console.error('[Enhanced] 请求超时');
+                    showEnhancedError('请求超时，请稍后重试');
+                } else {
+                    console.error('[Enhanced] 加载失败:', error);
+                    showEnhancedError('加载失败: ' + error.message);
+                }
             }
         }
 
@@ -999,12 +1073,35 @@
         }
 
         function showEnhancedError(message) {
-            document.getElementById('enhanced-content').innerHTML = `
-                <div class="error-message">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span>加载失败: ${message}</span>
+            const container = document.getElementById('enhanced-content');
+            container.innerHTML = `
+                <div class="error-message" style="padding: 20px; text-align: center;">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem; color: #dc3545; margin-bottom: 10px; display: block;"></i>
+                    <div style="margin-bottom: 15px;">${message}</div>
+                    <button onclick="retryEnhancedAnalysis()" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> 重新加载
+                    </button>
                 </div>
             `;
+        }
+        
+        // 重试增强分析
+        async function retryEnhancedAnalysis() {
+            // 显示加载状态
+            document.getElementById('enhanced-content').innerHTML = `
+                <div class="loading-state">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span>重新加载中...</span>
+                </div>
+            `;
+            
+            // 重新加载
+            const fundCodes = getSelectedFundCodes();
+            if (fundCodes.length >= 2) {
+                await loadEnhancedCorrelationAnalysis(fundCodes);
+            } else {
+                showEnhancedError('请先选择至少2只基金');
+            }
         }
 
         // ==================== 图表功能 ====================

@@ -686,13 +686,14 @@ function initLineChart(lineData) {
         // 检查数据量是否需要采样
         const dataPoints = labels ? labels.length : 0;
         const needsSampling = dataPoints > CHART_CONFIG.sampling.lineChart;
+        let sampleIndices = null; // 声明在函数作用域中，供后续使用
         
         if (needsSampling) {
             console.log(`📊 数据点过多(${dataPoints})，启用LTTB采样至${CHART_CONFIG.sampling.lineChart}点`);
             isLargeDataset = true;
             
             // 对标签和数据进行采样
-            const sampleIndices = getLTTBIndices(dataPoints, CHART_CONFIG.sampling.lineChart);
+            sampleIndices = getLTTBIndices(dataPoints, CHART_CONFIG.sampling.lineChart);
             labels = sampleIndices.map(idx => lineData.dates[idx]);
         }
         
@@ -702,7 +703,7 @@ function initLineChart(lineData) {
             
             // 采样数据（如果需要）
             let sampledValues = fund.values;
-            if (needsSampling && fund.values) {
+            if (needsSampling && fund.values && sampleIndices) {
                 sampledValues = sampleIndices.map(idx => fund.values[idx]);
             }
             

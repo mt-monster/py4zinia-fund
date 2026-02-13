@@ -103,38 +103,38 @@ class MultiSourceFundDataFetcher:
         """
         logger.info(f"获取基金 {fund_code} 基本信息")
         
-        # 方法1: 使用 akshare fund_individual_basic_info_xq
-        try:
-            logger.info("尝试 akshare fund_individual_basic_info_xq")
-            fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
-            
-            if not fund_info.empty:
-                info_dict = {}
-                for _, row in fund_info.iterrows():
-                    item = row.get('item', '')
-                    value = row.get('value', '')
-                    if pd.notna(value):
-                        info_dict[item] = str(value).strip()
-                    else:
-                        info_dict[item] = None
-                
-                result = {
-                    'fund_code': fund_code,
-                    'fund_name': info_dict.get('基金名称', f'基金{fund_code}'),
-                    'fund_type': info_dict.get('基金类型', '未知'),
-                    'establish_date': info_dict.get('成立日期', None),
-                    'fund_company': info_dict.get('基金公司', '未知'),
-                    'fund_manager': info_dict.get('基金经理', '未知'),
-                    'management_fee': info_dict.get('管理费率', '未知'),
-                    'custody_fee': info_dict.get('托管费率', '未知'),
-                    'data_source': 'akshare_xq',
-                    'raw_info': info_dict
-                }
-                
-                logger.info(f"✓ akshare 获取成功: {result['fund_name']}")
-                return result
-        except Exception as e:
-            logger.warning(f"akshare fund_individual_basic_info_xq 失败: {e}")
+        # 方法1: 使用 akshare fund_individual_basic_info_xq (已弃用，因为会报错)
+        # try:
+        #     logger.info("尝试 akshare fund_individual_basic_info_xq")
+        #     fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
+        #     
+        #     if not fund_info.empty:
+        #         info_dict = {}
+        #         for _, row in fund_info.iterrows():
+        #             item = row.get('item', '')
+        #             value = row.get('value', '')
+        #             if pd.notna(value):
+        #                 info_dict[item] = str(value).strip()
+        #             else:
+        #                 info_dict[item] = None
+        #         
+        #         result = {
+        #             'fund_code': fund_code,
+        #             'fund_name': info_dict.get('基金名称', f'基金{fund_code}'),
+        #             'fund_type': info_dict.get('基金类型', '未知'),
+        #             'establish_date': info_dict.get('成立日期', None),
+        #             'fund_company': info_dict.get('基金公司', '未知'),
+        #             'fund_manager': info_dict.get('基金经理', '未知'),
+        #             'management_fee': info_dict.get('管理费率', '未知'),
+        #             'custody_fee': info_dict.get('托管费率', '未知'),
+        #             'data_source': 'akshare_xq',
+        #             'raw_info': info_dict
+        #         }
+        #         
+        #         logger.info(f"✓ akshare 获取成功: {result['fund_name']}")
+        #         return result
+        # except Exception as e:
+        #     logger.warning(f"akshare fund_individual_basic_info_xq 失败: {e}")
         
         # 方法2: 使用 akshare fund_open_fund_info_em
         try:

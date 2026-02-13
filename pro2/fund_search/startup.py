@@ -212,8 +212,8 @@ class FundAnalysisSystem:
                     today = datetime.now().strftime('%Y-%m-%d')
                     
                     # 删除今天的缓存数据
-                    conn.execute(text("DELETE FROM fund_data_cache WHERE cache_date = :today"), {'today': today})
-                    deleted = conn.rowcount
+                    result = conn.execute(text("DELETE FROM fund_data_cache WHERE cache_date = :today"), {'today': today})
+                    deleted = result.rowcount
                     conn.commit()
                     logger.info(f"✓ 数据库缓存已清除: {deleted} 条今日记录")
             else:

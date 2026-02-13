@@ -1962,3 +1962,37 @@ if __name__ == "__main__":
     
     # 关闭连接
     db_manager.close_connection()
+
+
+def get_database_manager(silent=False) -> EnhancedDatabaseManager:
+    """
+    获取数据库管理器实例
+    
+    参数:
+        silent: 是否静默模式（不输出日志）
+        
+    返回:
+        EnhancedDatabaseManager: 数据库管理器实例
+    """
+    from shared.enhanced_config import DATABASE_CONFIG
+    
+    # 如果是静默模式，临时调整日志级别
+    if silent:
+        import logging
+        original_level = logging.getLogger().level
+        logging.getLogger().setLevel(logging.WARNING)
+    
+    try:
+        db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+        return db_manager
+    finally:
+        # 恢复原始日志级别
+        if silent:
+            import logging
+            logging.getLogger().setLevel(original_level)
+
+
+# 为了向后兼容，也提供不带参数的版本
+def get_database_manager_old():
+    """向后兼容的数据库管理器获取函数"""
+    return get_database_manager()

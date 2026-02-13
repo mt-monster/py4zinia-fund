@@ -70,15 +70,30 @@ def setup_chinese_font():
                 break
     
     if selected_font:
-        plt.rcParams['font.sans-serif'] = [selected_font] + plt.rcParams['font.sans-serif']
+        # 设置主要中文字体
+        plt.rcParams['font.sans-serif'] = [selected_font, 'DejaVu Sans', 'Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'sans-serif']
         logger.info(f"已设置中文字体: {selected_font}")
+        
+        # 强制设置所有文本元素的字体
+        plt.rcParams['font.family'] = 'sans-serif'
+        
+        # 针对Windows系统额外优化
+        if system == 'Windows':
+            # 确保使用系统默认的高质量中文字体
+            plt.rcParams['font.serif'] = ['Times New Roman', 'SimSun', selected_font]
+            plt.rcParams['font.monospace'] = ['Courier New', 'FangSong', selected_font]
     else:
         # 如果没有找到中文字体，使用默认字体并记录警告
         logger.warning("未找到合适的中文字体，图表中文可能显示为方块")
         # 设置fallback字体以尽量减少乱码
         plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Bitstream Vera Sans', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'sans-serif']
+        plt.rcParams['font.family'] = 'sans-serif'
     
     plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+    
+    # 抑制字体警告信息
+    import warnings
+    warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
 # 初始化字体配置
 setup_chinese_font()
@@ -233,7 +248,17 @@ class EnhancedCorrelationAnalyzer:
         for col in numeric_columns:
             merged_df = merged_df[merged_df[col].abs() <= 100]
         
-        logger.info(f"数据对齐完成，共{len(merged_df)}个数据点")
+        # 检查是否有足够的数据点
+        if len(merged_df) < 2:
+            logger.error(f"数据对齐后数据点不足: {len(merged_df)}，需要至少2个")
+            # 输出每只基金的数据情况以便调试
+            for fund_code, df in fund_data_dict.items():
+                date_count = len(df) if 'date' in df.columns else 0
+                return_count = len(df.dropna(subset=['daily_return'])) if 'daily_return' in df.columns else 0
+                logger.info(f"基金 {fund_code}: 总记录 {date_count}, 有效收益率记录 {return_count}")
+            raise ValueError(f"数据对齐后只有 {len(merged_df)} 个数据点，无法计算相关性")
+        
+        logger.info(f"数据对齐完成，共{len(merged_df)}个数据点，{len(numeric_columns)}只基金")
         return merged_df
     
     def _calculate_basic_correlation(self, aligned_data: pd.DataFrame) -> Dict:
@@ -504,6 +529,11 @@ class EnhancedCorrelationAnalyzer:
                 aligned_data = self._align_fund_data(fund_data_dict)
             
             if len(aligned_data.columns) < 3:  # 至少需要两列基金数据加日期列
+                logger.warning(f"对齐后数据列不足: {len(aligned_data.columns)} 列")
+                return {}
+            
+            if len(aligned_data) < 2:  # 至少需要2个数据点
+                logger.warning(f"对齐后数据点不足: {len(aligned_data)} 行")
                 return {}
                 
             fund_columns = [col for col in aligned_data.columns if col != 'date']
@@ -782,6 +812,15 @@ class EnhancedCorrelationAnalyzer:
 
     def _generate_scatter_data(self, returns1: pd.Series, returns2: pd.Series) -> Dict:
         """生成散点图数据"""
+        # 检查数据点数量
+        if len(returns1) < 2 or len(returns2) < 2:
+            logger.warning(f"[Performance] 散点图数据点不足: fund1={len(returns1)}, fund2={len(returns2)}")
+            return {
+                'points': [],
+                'correlation': 0.0,
+                'trend_line': {'slope': 0, 'intercept': 0, 'equation': 'y = 0'}
+            }
+        
         # 限制数据点数量以提高性能
         max_points = 500
         if len(returns1) > max_points:
@@ -801,8 +840,17 @@ class EnhancedCorrelationAnalyzer:
                 'y': float(returns1_sampled.iloc[i])
             })
             
-        correlation = returns1_sampled.corr(returns2_sampled)
-        
+        # 计算相关系数时也要检查数据点数量
+        try:
+            if len(returns1_sampled) >= 2 and len(returns2_sampled) >= 2:
+                correlation = returns1_sampled.corr(returns2_sampled)
+            else:
+                correlation = 0.0
+                logger.warning(f"[Performance] 相关系数计算数据点不足: {len(returns1_sampled)} vs {len(returns2_sampled)}")
+        except Exception as e:
+            logger.warning(f"[Performance] 相关系数计算失败: {e}")
+            correlation = 0.0
+            
         return {
             'points': scatter_points,
             'correlation': float(correlation),
@@ -812,13 +860,19 @@ class EnhancedCorrelationAnalyzer:
     def _calculate_trend_line(self, x_data: pd.Series, y_data: pd.Series) -> Dict:
         """计算趋势线参数"""
         try:
+            # 检查数据点数量，至少需要2个点才能计算趋势线
+            if len(x_data) < 2 or len(y_data) < 2:
+                logger.warning(f"[Performance] 数据点不足，无法计算趋势线: x={len(x_data)}, y={len(y_data)}")
+                return {'slope': 0, 'intercept': 0, 'equation': 'y = 0'}
+            
             slope, intercept = np.polyfit(x_data, y_data, 1)
             return {
                 'slope': float(slope),
                 'intercept': float(intercept),
                 'equation': f'y = {slope:.3f}x + {intercept:.3f}'
             }
-        except:
+        except Exception as e:
+            logger.warning(f"[Performance] 计算趋势线失败: {e}")
             return {'slope': 0, 'intercept': 0, 'equation': 'y = 0'}
 
     def _generate_nav_comparison_data(self, returns1: pd.Series, returns2: pd.Series, 
