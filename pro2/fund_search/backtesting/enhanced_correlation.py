@@ -4,9 +4,12 @@
 """
 增强版基金相关性分析模块
 基于tools目录的fund_correlation_analysis.py功能，提供更全面的相关性分析
+
+时间统计功能：记录各阶段耗时并输出优化状态报告
 """
 
 import logging
+import time
 import numpy as np
 import pandas as pd
 from typing import List, Dict, Optional, Tuple
@@ -21,6 +24,13 @@ from matplotlib import font_manager
 import base64
 from io import BytesIO
 import platform
+
+# 导入性能监控工具
+from .correlation_performance_monitor import (
+    CorrelationPerformanceMonitor, 
+    StageTimer,
+    timed_correlation_analysis
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,42 +96,58 @@ class EnhancedCorrelationAnalyzer:
     def analyze_enhanced_correlation(self, fund_data_dict: Dict[str, pd.DataFrame], 
                                    fund_names: Dict[str, str]) -> Dict:
         """
-        执行增强版相关性分析
+        执行增强版相关性分析（含时间统计）
         
         参数:
         fund_data_dict: 基金代码到历史数据DataFrame的映射
         fund_names: 基金代码到基金名称的映射
         
         返回:
-        dict: 增强的相关性分析结果
+        dict: 增强的相关性分析结果（包含性能数据）
         """
+        # 初始化性能监控
+        monitor = CorrelationPerformanceMonitor()
+        monitor.start("total")
+        
         try:
             fund_codes = list(fund_data_dict.keys())
             if len(fund_codes) < 2:
                 raise ValueError("至少需要2只基金进行相关性分析")
             
+            logger.info(f"[Performance] 开始增强相关性分析，基金数量: {len(fund_codes)}")
+            
             # 1. 数据预处理和对齐
-            aligned_data = self._align_fund_data(fund_data_dict)
+            with StageTimer("数据预处理和对齐", monitor):
+                aligned_data = self._align_fund_data(fund_data_dict)
             
             # 2. 计算基础相关性矩阵
-            basic_correlation = self._calculate_basic_correlation(aligned_data)
+            with StageTimer("基础相关性矩阵计算", monitor):
+                basic_correlation = self._calculate_basic_correlation(aligned_data)
             
             # 3. 计算多种相关系数
-            enhanced_correlation = self._calculate_enhanced_correlation(aligned_data)
+            with StageTimer("多种相关系数计算", monitor):
+                enhanced_correlation = self._calculate_enhanced_correlation(aligned_data)
             
             # 4. 计算滚动相关性
-            rolling_correlation = self._calculate_rolling_correlation(aligned_data)
+            with StageTimer("滚动相关性计算", monitor):
+                rolling_correlation = self._calculate_rolling_correlation(aligned_data)
             
             # 5. 计算不同周期相关性
-            period_correlation = self._calculate_period_correlation(aligned_data)
+            with StageTimer("不同周期相关性计算", monitor):
+                period_correlation = self._calculate_period_correlation(aligned_data)
             
             # 6. 识别高相关性基金组合
-            high_correlation_pairs = self._identify_high_correlation_pairs(
-                fund_codes, fund_names, basic_correlation['correlation_matrix']
-            )
+            with StageTimer("高相关性组合识别", monitor):
+                high_correlation_pairs = self._identify_high_correlation_pairs(
+                    fund_codes, fund_names, basic_correlation['correlation_matrix']
+                )
             
             # 7. 生成相关性解读
-            interpretation = self._interpret_correlation_results(basic_correlation, enhanced_correlation)
+            with StageTimer("相关性解读生成", monitor):
+                interpretation = self._interpret_correlation_results(basic_correlation, enhanced_correlation)
+            
+            # 记录总耗时
+            total_time = monitor.end("total")
             
             result = {
                 'basic_correlation': basic_correlation,
@@ -136,14 +162,24 @@ class EnhancedCorrelationAnalyzer:
                     'analysis_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                     'data_points': len(aligned_data),
                     'fund_count': len(fund_codes)
+                },
+                '_performance': {
+                    'total_time_ms': total_time,
+                    'stage_timings': monitor.timings,
+                    'optimization_status': monitor.check_optimizations(),
+                    'timestamp': datetime.now().isoformat()
                 }
             }
             
-            logger.info(f"增强相关性分析完成，分析了{len(fund_codes)}只基金")
+            # 输出性能报告
+            logger.info(f"[Performance] 增强相关性分析完成，基金数量: {len(fund_codes)}, 总耗时: {total_time:.2f} ms")
+            monitor.log_report()
+            
             return result
             
         except Exception as e:
-            logger.error(f"增强相关性分析失败: {e}")
+            elapsed = monitor.end("total")
+            logger.error(f"[Performance] 增强相关性分析失败，耗时: {elapsed:.2f} ms, 错误: {e}")
             raise
     
     def _align_fund_data(self, fund_data_dict: Dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -443,20 +479,29 @@ class EnhancedCorrelationAnalyzer:
             return "相关性分析完成"
 
     def generate_interactive_correlation_data(self, fund_data_dict: Dict[str, pd.DataFrame], 
-                                            fund_names: Dict[str, str]) -> Dict:
+                                            fund_names: Dict[str, str],
+                                            lazy_load: bool = True) -> Dict:
         """
-        生成用于交互式图表的详细相关性数据
+        生成用于交互式图表的详细相关性数据（优化版，支持懒加载和时间统计）
         
         参数:
         fund_data_dict: 基金代码到历史数据DataFrame的映射
         fund_names: 基金代码到基金名称的映射
+        lazy_load: 是否启用懒加载模式，默认True
         
         返回:
-        dict: 包含散点图、净值对比、滚动相关性、分布图等详细数据
+        dict: 包含散点图、净值对比、滚动相关性、分布图等详细数据（含性能数据）
         """
+        # 初始化性能监控
+        monitor = CorrelationPerformanceMonitor()
+        monitor.start("total")
+        
         try:
+            logger.info(f"[Performance] 开始生成交互式相关性数据，基金数量: {len(fund_data_dict)}")
+            
             # 数据对齐
-            aligned_data = self._align_fund_data(fund_data_dict)
+            with StageTimer("数据对齐", monitor):
+                aligned_data = self._align_fund_data(fund_data_dict)
             
             if len(aligned_data.columns) < 3:  # 至少需要两列基金数据加日期列
                 return {}
@@ -465,72 +510,181 @@ class EnhancedCorrelationAnalyzer:
             
             # 分析所有基金组合（如果有多只基金）
             if len(fund_columns) >= 2:
-                # 生成所有基金组合的分析数据
-                all_combinations_data = []
                 
-                # 对于每一对基金组合进行分析
-                for i in range(len(fund_columns)):
-                    for j in range(i + 1, len(fund_columns)):
-                        fund1_col, fund2_col = fund_columns[i], fund_columns[j]
-                        fund1_name = fund_names.get(fund1_col, fund1_col)
-                        fund2_name = fund_names.get(fund2_col, fund2_col)
-                        
-                        # 计算相关系数
-                        returns1 = aligned_data[fund1_col]
-                        returns2 = aligned_data[fund2_col]
-                        corr_results = self._calculate_single_pair_correlation(returns1, returns2)
-                        
-                        # 生成各类图表数据
-                        scatter_data = self._generate_scatter_data(returns1, returns2)
-                        nav_comparison_data = self._generate_nav_comparison_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name)
-                        rolling_data = self._generate_rolling_correlation_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name)
-                        distribution_data = self._generate_distribution_data(returns1, returns2, fund1_name, fund2_name)
-                        
-                        combination_data = {
-                            'fund1_name': fund1_name,
-                            'fund2_name': fund2_name,
-                            'correlation_results': corr_results,
-                            'scatter_data': scatter_data,
-                            'nav_comparison_data': nav_comparison_data,
-                            'rolling_correlation_data': rolling_data,
-                            'distribution_data': distribution_data
-                        }
-                        
-                        all_combinations_data.append(combination_data)
+                # 找到相关性最高的组合作为主组合显示
+                with StageTimer("主组合查找", monitor):
+                    primary_pair = self._find_primary_pair(aligned_data, fund_columns, fund_names)
+                    fund1_col, fund2_col = primary_pair['fund1_col'], primary_pair['fund2_col']
+                    fund1_name, fund2_name = primary_pair['fund1_name'], primary_pair['fund2_name']
                 
-                # 返回第一个组合的数据作为主数据显示，同时包含所有组合信息
-                primary_data = all_combinations_data[0] if all_combinations_data else {}
+                # 只生成主组合的完整图表数据
+                returns1 = aligned_data[fund1_col]
+                returns2 = aligned_data[fund2_col]
                 
-                # 生成所有基金的净值对比数据（支持多只基金同时显示）
-                all_funds_nav_data = self._generate_all_funds_nav_comparison(
-                    aligned_data, fund_columns, fund_names
-                )
+                with StageTimer("主组合图表数据生成", monitor):
+                    primary_data = {
+                        'fund1_code': fund1_col,
+                        'fund2_code': fund2_col,
+                        'fund1_name': fund1_name,
+                        'fund2_name': fund2_name,
+                        'correlation_results': self._calculate_single_pair_correlation(returns1, returns2),
+                        'scatter_data': self._generate_scatter_data(returns1, returns2),
+                        'nav_comparison_data': self._generate_nav_comparison_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name),
+                        'rolling_correlation_data': self._generate_rolling_correlation_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name),
+                        'distribution_data': self._generate_distribution_data(returns1, returns2, fund1_name, fund2_name)
+                    }
                 
-                # 生成所有基金的收益率分布数据（支持多只基金同时显示）
-                all_funds_distribution = self._generate_all_funds_distribution(
-                    aligned_data, fund_columns, fund_names
-                )
+                # 生成所有基金的净值对比和分布数据（这些是必需的，且计算量不大）
+                with StageTimer("净值对比和分布数据生成", monitor):
+                    all_funds_nav_data = self._generate_all_funds_nav_comparison(
+                        aligned_data, fund_columns, fund_names
+                    )
+                    all_funds_distribution = self._generate_all_funds_distribution(
+                        aligned_data, fund_columns, fund_names
+                    )
                 
-                return {
+                # 生成所有组合的精简信息（只包含基本信息，不包含详细图表数据）
+                with StageTimer("组合摘要生成", monitor):
+                    all_combinations_summary = []
+                    for i in range(len(fund_columns)):
+                        for j in range(i + 1, len(fund_columns)):
+                            f1_col, f2_col = fund_columns[i], fund_columns[j]
+                            f1_name = fund_names.get(f1_col, f1_col)
+                            f2_name = fund_names.get(f2_col, f2_col)
+                            
+                            # 只计算相关系数，不生成图表数据
+                            corr = aligned_data[f1_col].corr(aligned_data[f2_col])
+                            
+                            all_combinations_summary.append({
+                                'fund1_code': f1_col,
+                                'fund2_code': f2_col,
+                                'fund1_name': f1_name,
+                                'fund2_name': f2_name,
+                                'correlation': float(corr) if not pd.isna(corr) else 0.0,
+                                'has_detail': (f1_col == fund1_col and f2_col == fund2_col) or 
+                                             (f1_col == fund2_col and f2_col == fund1_col)
+                            })
+                    
+                    # 按相关性绝对值排序
+                    all_combinations_summary.sort(key=lambda x: abs(x['correlation']), reverse=True)
+                
+                # 记录总耗时
+                total_time = monitor.end("total")
+                
+                result = {
                     'primary_combination': primary_data,
-                    'all_combinations': all_combinations_data,
-                    'all_funds_nav_comparison': all_funds_nav_data,  # 新增：所有基金的净值对比数据
-                    'all_funds_distribution': all_funds_distribution,  # 新增：所有基金的收益率分布数据
+                    'all_combinations_summary': all_combinations_summary,  # 精简版组合列表
+                    'all_funds_nav_comparison': all_funds_nav_data,
+                    'all_funds_distribution': all_funds_distribution,
+                    'lazy_load_enabled': lazy_load,
                     'metadata': {
                         'data_points': len(aligned_data),
                         'fund_count': len(fund_columns),
-                        'combination_count': len(all_combinations_data),
+                        'combination_count': len(all_combinations_summary),
                         'date_range': {
                             'start': aligned_data['date'].min().strftime('%Y-%m-%d'),
                             'end': aligned_data['date'].max().strftime('%Y-%m-%d')
                         }
+                    },
+                    '_performance': {
+                        'total_time_ms': total_time,
+                        'stage_timings': monitor.timings,
+                        'optimization_status': monitor.check_optimizations(),
+                        'timestamp': datetime.now().isoformat()
                     }
                 }
+                
+                # 输出性能报告
+                logger.info(f"[Performance] 交互式数据生成完成，基金数量: {len(fund_columns)}, 总耗时: {total_time:.2f} ms")
+                monitor.log_report()
+                
+                return result
                 
             return {}
             
         except Exception as e:
-            logger.error(f"生成交互式相关性数据失败: {e}")
+            elapsed = monitor.end("total")
+            logger.error(f"[Performance] 生成交互式相关性数据失败，耗时: {elapsed:.2f} ms, 错误: {e}")
+            return {}
+    
+    def _find_primary_pair(self, aligned_data: pd.DataFrame, fund_columns: List[str], 
+                           fund_names: Dict[str, str]) -> Dict:
+        """
+        找出相关性最高（或最具代表性）的基金对作为主显示
+        
+        参数:
+        aligned_data: 对齐后的数据
+        fund_columns: 基金代码列表
+        fund_names: 基金名称映射
+        
+        返回:
+        dict: 主基金对信息
+        """
+        # 默认使用第一对
+        fund1_col, fund2_col = fund_columns[0], fund_columns[1]
+        max_correlation = 0
+        
+        # 遍历找到绝对相关性最高的对（关注高相关性组合）
+        for i in range(len(fund_columns)):
+            for j in range(i + 1, len(fund_columns)):
+                corr = aligned_data[fund_columns[i]].corr(aligned_data[fund_columns[j]])
+                if not pd.isna(corr) and abs(corr) > abs(max_correlation):
+                    max_correlation = corr
+                    fund1_col, fund2_col = fund_columns[i], fund_columns[j]
+        
+        return {
+            'fund1_col': fund1_col,
+            'fund2_col': fund2_col,
+            'fund1_name': fund_names.get(fund1_col, fund1_col),
+            'fund2_name': fund_names.get(fund2_col, fund2_col),
+            'correlation': max_correlation
+        }
+    
+    def generate_pair_detail_data(self, fund_data_dict: Dict[str, pd.DataFrame],
+                                  fund_names: Dict[str, str],
+                                  fund1_code: str, 
+                                  fund2_code: str) -> Dict:
+        """
+        按需生成单个基金对的详细分析数据（懒加载API使用）
+        
+        参数:
+        fund_data_dict: 基金数据字典
+        fund_names: 基金名称映射
+        fund1_code: 基金1代码
+        fund2_code: 基金2代码
+        
+        返回:
+        dict: 该基金对的完整分析数据
+        """
+        try:
+            if fund1_code not in fund_data_dict or fund2_code not in fund_data_dict:
+                return {}
+            
+            # 数据对齐（复用已有方法）
+            aligned_data = self._align_fund_data(fund_data_dict)
+            
+            if fund1_code not in aligned_data.columns or fund2_code not in aligned_data.columns:
+                return {}
+            
+            returns1 = aligned_data[fund1_code]
+            returns2 = aligned_data[fund2_code]
+            fund1_name = fund_names.get(fund1_code, fund1_code)
+            fund2_name = fund_names.get(fund2_code, fund2_code)
+            
+            return {
+                'fund1_code': fund1_code,
+                'fund2_code': fund2_code,
+                'fund1_name': fund1_name,
+                'fund2_name': fund2_name,
+                'correlation_results': self._calculate_single_pair_correlation(returns1, returns2),
+                'scatter_data': self._generate_scatter_data(returns1, returns2),
+                'nav_comparison_data': self._generate_nav_comparison_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name),
+                'rolling_correlation_data': self._generate_rolling_correlation_data(returns1, returns2, aligned_data['date'], fund1_name, fund2_name),
+                'distribution_data': self._generate_distribution_data(returns1, returns2, fund1_name, fund2_name)
+            }
+            
+        except Exception as e:
+            logger.error(f"生成基金对详细数据失败: {e}")
             return {}
 
     def _generate_all_funds_nav_comparison(self, aligned_data: pd.DataFrame, 

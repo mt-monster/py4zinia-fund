@@ -940,3 +940,84 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--gray-500);
 }
+
+/* ==================== 懒加载优化样式 ==================== */
+
+/* 懒加载列表样式 */
+.lazy-load-list .pair-item {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.lazy-load-list .pair-item.clickable {
+    cursor: pointer;
+}
+
+.lazy-load-list .pair-item.clickable:hover {
+    background: var(--primary-light);
+    transform: translateX(4px);
+}
+
+.lazy-load-list .pair-item.active {
+    background: var(--primary-light);
+    border-left: 3px solid var(--primary-color);
+}
+
+.lazy-load-list .pair-hint {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.lazy-load-list .pair-item.clickable:hover .pair-hint {
+    opacity: 1;
+}
+
+/* 懒加载提示框 */
+.lazy-load-hint {
+    margin-bottom: 15px;
+}
+
+/* 加载动画 */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* 大数据集优化提示 */
+.dataset-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--info-light);
+    color: var(--info-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.dataset-info i {
+    font-size: 14px;
+}
+
+/* 性能优化: 减少重绘 */
+.chart-canvas {
+    will-change: transform;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .lazy-load-list .pair-hint {
+        display: none;
+    }
+}

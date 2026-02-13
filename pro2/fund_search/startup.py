@@ -33,6 +33,7 @@ import signal
 import logging
 import argparse
 from datetime import datetime
+from sqlalchemy import text
 
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -171,6 +172,57 @@ class FundAnalysisSystem:
         
         logger.info("系统已关闭")
     
+    def _clear_cache_on_startup(self):
+        """启动时清除缓存"""
+        logger.info("=" * 60)
+        logger.info("启动时清除缓存")
+        logger.info("=" * 60)
+        
+        try:
+            # 1. 清除内存缓存
+            from data_retrieval.fund_cache_manager import FundDataCache
+            cache = FundDataCache()
+            with cache._cache_lock:
+                count = len(cache._memory_cache)
+                cache._memory_cache.clear()
+                logger.info(f"✓ 内存缓存已清除: {count} 项")
+        except Exception as e:
+            logger.warning(f"清除内存缓存失败: {e}")
+        
+        try:
+            # 2. 清除数据库缓存
+            # 获取数据库配置
+            from shared.config_manager import ConfigManager
+            config_manager = ConfigManager()
+            db_config = config_manager.get_database_config()
+            
+            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            db = EnhancedDatabaseManager({
+                'host': db_config.host,
+                'user': db_config.user,
+                'password': db_config.password,
+                'database': db_config.database,
+                'port': db_config.port,
+                'charset': db_config.charset
+            })
+            
+            if db and db.engine:
+                with db.engine.connect() as conn:
+                    from datetime import datetime
+                    today = datetime.now().strftime('%Y-%m-%d')
+                    
+                    # 删除今天的缓存数据
+                    conn.execute(text("DELETE FROM fund_data_cache WHERE cache_date = :today"), {'today': today})
+                    deleted = conn.rowcount
+                    conn.commit()
+                    logger.info(f"✓ 数据库缓存已清除: {deleted} 条今日记录")
+            else:
+                logger.warning("无法连接数据库，数据库缓存未清除")
+        except Exception as e:
+            logger.warning(f"清除数据库缓存失败: {e}")
+        
+        logger.info("=" * 60)
+    
     def run(self, args):
         """
         运行系统
@@ -181,6 +233,10 @@ class FundAnalysisSystem:
         print("\n" + "=" * 60)
         print("基金分析系统 v2.0")
         print("=" * 60 + "\n")
+        
+        # 0. 启动时清除缓存（除非跳过）
+        if not getattr(args, 'skip_clear_cache', False):
+            self._clear_cache_on_startup()
         
         # 1. 预加载数据（除非跳过）
         if not args.skip_preload:
@@ -226,6 +282,8 @@ def main():
                        help='指定预加载的基金代码，逗号分隔')
     parser.add_argument('--skip-preload', action='store_true',
                        help='跳过预加载步骤')
+    parser.add_argument('--skip-clear-cache', action='store_true',
+                       help='跳过启动时清除缓存')
     parser.add_argument('--preload-only', action='store_true',
                        help='仅执行预加载，不启动Web服务')
     parser.add_argument('--preload-required', action='store_true',
