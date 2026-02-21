@@ -134,6 +134,17 @@ function createChartWrapper(canvasId, title) {
     const wrapper = document.createElement('div');
     wrapper.className = 'chart-wrapper';
     wrapper.innerHTML = `
+        <div class="chart-toolbar">
+            <span class="chart-title-text">${title}</span>
+            <div class="chart-actions">
+                <button class="chart-action-btn" onclick="resetZoom('${canvasId}')" title="重置缩放">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <button class="chart-action-btn" onclick="toggleFullscreen(this.closest('.chart-wrapper'))" title="全屏显示">
+                    <i class="bi bi-fullscreen"></i>
+                </button>
+            </div>
+        </div>
         <canvas id="${canvasId}" class="chart-canvas"></canvas>
     `;
     return wrapper;
@@ -166,7 +177,7 @@ function injectChartStyles() {
         .chart-wrapper {
             background: white;
             border-radius: 10px;
-            padding: 30px;
+            padding: 20px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
             border: 1px solid #e2e8f0;
@@ -187,7 +198,62 @@ function injectChartStyles() {
         
         .chart-wrapper canvas {
             width: 100% !important;
-            height: 500px !important;
+            height: 460px !important;
+        }
+        
+        .chart-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .chart-title-text {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .chart-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chart-action-btn {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #4b5563;
+            font-size: 14px;
+        }
+        
+        .chart-action-btn:hover {
+            background: #e0e7ff;
+            border-color: #818cf8;
+            color: #4f46e5;
+        }
+        
+        .chart-wrapper.fullscreen-mode {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            border-radius: 0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            animation: none;
+        }
+        
+        .chart-wrapper.fullscreen-mode canvas {
+            height: calc(100vh - 80px) !important;
         }
         
         /* 响应式设计 */
@@ -198,12 +264,16 @@ function injectChartStyles() {
             }
             
             .chart-wrapper {
-                padding: 25px;
+                padding: 15px;
                 min-height: 450px;
             }
             
             .chart-wrapper canvas {
-                height: 400px !important;
+                height: 380px !important;
+            }
+            
+            .chart-title-text {
+                font-size: 14px;
             }
         }
         
@@ -214,12 +284,22 @@ function injectChartStyles() {
             }
             
             .chart-wrapper {
-                padding: 20px;
+                padding: 12px;
                 min-height: 400px;
             }
             
             .chart-wrapper canvas {
-                height: 350px !important;
+                height: 330px !important;
+            }
+            
+            .chart-toolbar {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .chart-title-text {
+                font-size: 13px;
             }
         }
         
@@ -283,24 +363,13 @@ function initScatterChart(scatterData) {
                 padding: {
                     left: 80,
                     right: 40,
-                    top: 50,
+                    top: 20,
                     bottom: 80
                 }
             },
             plugins: {
                 title: {
-                    display: true,
-                    text: scatterData.fund1_name && scatterData.fund2_name
-                        ? `${formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code})} vs ${formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code})} 日收益率散点图 (r=${scatterData.correlation.toFixed(4)})`
-                        : `日收益率散点图 (相关系数: ${scatterData.correlation.toFixed(4)})`,
-                    font: {
-                        size: 18,
-                        weight: 'bold'
-                    },
-                    padding: {
-                        top: 10,
-                        bottom: 25
-                    }
+                    display: false
                 },
                 legend: {
                     display: false
@@ -494,36 +563,26 @@ function initLineChart(lineData) {
                 padding: {
                     left: 80,
                     right: 40,
-                    top: 50,
+                    top: 20,
                     bottom: 80
                 }
             },
             plugins: {
                 title: {
-                    display: true,
-                    text: lineData.funds && lineData.funds.length > 2 
-                        ? `${lineData.funds.length}只基金净值走势对比`
-                        : (lineData.funds && lineData.funds.length === 2 
-                            ? `${formatFundName(lineData.funds[0])} vs ${formatFundName(lineData.funds[1])} 净值走势`
-                            : '净值走势对比图'),
-                    font: {
-                        size: 18,
-                        weight: 'bold'
-                    },
-                    padding: {
-                        top: 10,
-                        bottom: 25
-                    }
+                    display: false
                 },
                 legend: {
                     display: true,
                     position: 'top',
                     labels: {
                         font: {
-                            size: 14
+                            size: 12
                         },
-                        padding: 15,
-                        usePointStyle: true
+                        padding: 12,
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        boxWidth: 6,
+                        boxHeight: 6
                     }
                 },
                 tooltip: {
@@ -534,6 +593,21 @@ function initLineChart(lineData) {
                     },
                     titleFont: {
                         size: 14
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'x'
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
                     }
                 }
             },
@@ -625,24 +699,13 @@ function initRollingChart(rollingData) {
                 padding: {
                     left: 80,
                     right: 40,
-                    top: 50,
+                    top: 20,
                     bottom: 80
                 }
             },
             plugins: {
                 title: {
-                    display: true,
-                    text: rollingData.fund1_name && rollingData.fund2_name 
-                        ? `${formatFundName({fund_name: rollingData.fund1_name, fund_code: rollingData.fund1_code})} vs ${formatFundName({fund_name: rollingData.fund2_name, fund_code: rollingData.fund2_code})} 滚动相关性 (窗口: ${rollingData.window}天)`
-                        : `滚动相关性变化图 (窗口: ${rollingData.window}天)`,
-                    font: {
-                        size: 18,
-                        weight: 'bold'
-                    },
-                    padding: {
-                        top: 10,
-                        bottom: 25
-                    }
+                    display: false
                 },
                 legend: {
                     display: false
@@ -658,6 +721,21 @@ function initRollingChart(rollingData) {
                         label: function(context) {
                             return `相关系数: ${context.parsed.y.toFixed(4)}`;
                         }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'x'
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
                     }
                 }
             },
@@ -821,36 +899,26 @@ function initDistributionChart(distributionData) {
                     padding: {
                         left: 80,
                         right: 40,
-                        top: 50,
+                        top: 20,
                         bottom: 80
                     }
                 },
                 plugins: {
                     title: {
-                        display: true,
-                        text: distributionData.funds && distributionData.funds.length > 2
-                            ? `${distributionData.funds.length}只基金收益率分布对比`
-                            : (distributionData.funds && distributionData.funds.length === 2
-                                ? `${formatFundName(distributionData.funds[0])} vs ${formatFundName(distributionData.funds[1])} 收益率分布`
-                                : '收益率分布对比图'),
-                        font: {
-                            size: 18,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            top: 10,
-                            bottom: 25
-                        }
+                        display: false
                     },
                     legend: {
                         display: true,
                         position: 'top',
                         labels: {
                             font: {
-                                size: 14
+                                size: 12
                             },
-                            padding: 15,
-                            usePointStyle: true
+                            padding: 12,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            boxWidth: 6,
+                            boxHeight: 6
                         }
                     },
                     tooltip: {
@@ -867,6 +935,21 @@ function initDistributionChart(distributionData) {
                             label: function(context) {
                                 return `${context.dataset.label}: ${context.parsed.y} 天`;
                             }
+                        }
+                    },
+                    zoom: {
+                        zoom: {
+                            wheel: {
+                                enabled: true
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x'
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x'
                         }
                     }
                 },
@@ -913,9 +996,15 @@ function initDistributionChart(distributionData) {
         
         console.log('✅ 收益率分布图创建成功');
         console.log('📊 图表数据统计:');
-        console.log('- 总数据点数:', fund1_counts.reduce((a,b) => a+b, 0) + fund2_counts.reduce((a,b) => a+b, 0));
-        console.log('- 基金1总计数:', fund1_counts.reduce((a,b) => a+b, 0));
-        console.log('- 基金2总计数:', fund2_counts.reduce((a,b) => a+b, 0));
+        let totalCount = 0;
+        datasets.forEach(dataset => {
+            if (dataset.data && dataset.data.reduce) {
+                const sum = dataset.data.reduce((a,b) => a+b, 0);
+                totalCount += sum;
+                console.log(`- ${dataset.label} 总计数:`, sum);
+            }
+        });
+        console.log('- 总数据点数:', totalCount);
         
     } catch (error) {
         console.error('❌ 收益率分布图创建失败:', error);
@@ -923,7 +1012,77 @@ function initDistributionChart(distributionData) {
     }
 }
 
+/**
+ * 重置图表缩放
+ * @param {string} canvasId - Canvas元素ID
+ */
+function resetZoom(canvasId) {
+    let chart = null;
+    if (canvasId === 'scatter-correlation-chart') {
+        chart = correlationCharts.scatter;
+    } else if (canvasId === 'nav-comparison-chart') {
+        chart = correlationCharts.line;
+    } else if (canvasId === 'rolling-correlation-chart') {
+        chart = correlationCharts.rolling;
+    } else if (canvasId === 'distribution-chart') {
+        chart = correlationCharts.distribution;
+    }
+    
+    if (chart && chart.resetZoom) {
+        chart.resetZoom();
+    } else if (chart) {
+        console.log('图表不支持缩放重置');
+    }
+}
+
+/**
+ * 切换全屏模式
+ * @param {HTMLElement} wrapper - 图表包装器元素
+ */
+function toggleFullscreen(wrapper) {
+    if (!wrapper) return;
+    
+    wrapper.classList.toggle('fullscreen-mode');
+    
+    const btn = wrapper.querySelector('.chart-action-btn:last-child i');
+    if (btn) {
+        if (wrapper.classList.contains('fullscreen-mode')) {
+            btn.className = 'bi bi-fullscreen-exit';
+        } else {
+            btn.className = 'bi bi-fullscreen';
+        }
+    }
+    
+    const canvas = wrapper.querySelector('canvas');
+    if (canvas) {
+        const chartId = canvas.id;
+        let chart = null;
+        if (chartId === 'scatter-correlation-chart') {
+            chart = correlationCharts.scatter;
+        } else if (chartId === 'nav-comparison-chart') {
+            chart = correlationCharts.line;
+        } else if (chartId === 'rolling-correlation-chart') {
+            chart = correlationCharts.rolling;
+        } else if (chartId === 'distribution-chart') {
+            chart = correlationCharts.distribution;
+        }
+        
+        if (chart) {
+            setTimeout(() => {
+                chart.resize();
+            }, 100);
+        }
+    }
+}
+
+// 注册插件
+if (window.Chart && window.ChartZoom) {
+    Chart.register(ChartZoom);
+}
+
 // 导出全局函数
 window.initCorrelationCharts = initCorrelationCharts;
+window.resetZoom = resetZoom;
+window.toggleFullscreen = toggleFullscreen;
 
 console.log('✅ fund-correlation-charts.js 模块加载完成');
