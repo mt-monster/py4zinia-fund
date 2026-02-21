@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易详情功能测试</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="mb-4">交易详情功能测试</h2>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">交易记录表格示例</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>操作</th>
+                                <th>金额</th>
+                                <th>余额</th>
+                                <th>持仓</th>
+                                <th>倍数</th>
+                                <th>趋势</th>
+                                <th>优化指标</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2024-01-15</td>
+                                <td class="positive">买入</td>
+                                <td>¥10,000.00</td>
+                                <td>¥85,000.00</td>
+                                <td>¥115,000.00</td>
+                                <td>1.2×</td>
+                                <td>📈</td>
+                                <td class="text-center">🔴 📊</td>
+                                <td class="text-center">
+                                    <button class="btn btn-outline-primary btn-sm trade-detail-btn" 
+                                            data-trade='{"date":"2024-01-15","action":"buy","amount":10000,"balance":85000,"holdings":115000,"multiplier":1.2,"trend":"uptrend","adx_value":45.6,"market_adjusted":true}'
+                                            onclick="showTradeDetail(this)">
+                                        <i class="bi bi-eye"></i> 详情
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2024-01-20</td>
+                                <td class="negative">卖出</td>
+                                <td>¥8,500.00</td>
+                                <td>¥93,500.00</td>
+                                <td>¥106,500.00</td>
+                                <td>1.0×</td>
+                                <td>📉</td>
+                                <td class="text-center">🟡 📈</td>
+                                <td class="text-center">
+                                    <button class="btn btn-outline-primary btn-sm trade-detail-btn" 
+                                            data-trade='{"date":"2024-01-20","action":"sell","amount":8500,"balance":93500,"holdings":106500,"multiplier":1.0,"trend":"downtrend","adx_value":28.3,"volume_confirmed":true}'
+                                            onclick="showTradeDetail(this)">
+                                        <i class="bi bi-eye"></i> 详情
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2024-02-01</td>
+                                <td class="text-danger fw-bold">止损</td>
+                                <td>¥12,000.00</td>
+                                <td>¥81,500.00</td>
+                                <td>¥94,500.00</td>
+                                <td>1.5×</td>
+                                <td>➡️</td>
+                                <td class="text-center">🚫</td>
+                                <td class="text-center">
+                                    <button class="btn btn-outline-primary btn-sm trade-detail-btn" 
+                                            data-trade='{"date":"2024-02-01","action":"stop_loss","amount":12000,"balance":81500,"holdings":94500,"multiplier":1.5,"trend":"sideways","trend_filtered":true}'
+                                            onclick="showTradeDetail(this)">
+                                        <i class="bi bi-eye"></i> 详情
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        /**
+         * 显示交易详情弹窗
+         * @param {HTMLElement} button - 触发按钮元素
+         */
+        function showTradeDetail(button) {
+            // 获取交易数据
+            const tradeData = JSON.parse(button.getAttribute('data-trade'));
+            
+            // 构建详情HTML
+            const detailHtml = `
+                <div class="modal fade" id="tradeDetailModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-receipt me-2"></i>交易详情
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-calendar me-2"></i>基本信息</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易日期:</span>
+                                                <span class="detail-value">${tradeData.date}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易类型:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${tradeData.action === 'buy' ? 'bg-success' : 'bg-danger'}">
+                                                        ${tradeData.action === 'buy' ? '买入' : tradeData.action === 'stop_loss' ? '止损' : '卖出'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易金额:</span>
+                                                <span class="detail-value">¥${tradeData.amount.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-wallet2 me-2"></i>账户状态</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易后余额:</span>
+                                                <span class="detail-value">¥${tradeData.balance.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">持仓价值:</span>
+                                                <span class="detail-value">¥${tradeData.holdings.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">杠杆倍数:</span>
+                                                <span class="detail-value">${tradeData.multiplier ? tradeData.multiplier.toFixed(2) + '×' : '无'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${(tradeData.trend || tradeData.adx_value !== undefined || tradeData.market_adjusted || tradeData.volume_confirmed || tradeData.trend_filtered) ? `
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-gear me-2"></i>策略指标</h6>
+                                            ${tradeData.trend ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场趋势:</span>
+                                                <span class="detail-value">
+                                                    ${tradeData.trend === 'uptrend' ? '📈 上升趋势' : 
+                                                      tradeData.trend === 'downtrend' ? '📉 下降趋势' : 
+                                                      '➡️ 震荡趋势'}
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.adx_value !== undefined ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">ADX值:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${tradeData.adx_value > 40 ? 'bg-danger' : tradeData.adx_value > 25 ? 'bg-warning text-dark' : tradeData.adx_value > 15 ? 'bg-info' : 'bg-secondary'}">
+                                                        ${tradeData.adx_value.toFixed(2)}
+                                                        ${tradeData.adx_value > 40 ? '(强趋势)' : 
+                                                          tradeData.adx_value > 25 ? '(中等趋势)' : 
+                                                          tradeData.adx_value > 15 ? '(弱趋势)' : '(无趋势)'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.market_adjusted ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场调整:</span>
+                                                <span class="detail-value text-success">已应用</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.volume_confirmed ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">成交量确认:</span>
+                                                <span class="detail-value text-success">已确认</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.trend_filtered ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">趋势过滤:</span>
+                                                <span class="detail-value text-warning">已触发</span>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <div class="mt-4">
+                                    <div class="alert alert-info">
+                                        <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>交易说明</h6>
+                                        <p class="mb-0">
+                                            ${tradeData.action === 'buy' ? '本次买入操作基于策略信号执行，增加了相应持仓。' : 
+                                              tradeData.action === 'stop_loss' ? '本次止损操作旨在控制风险，及时止损。' : 
+                                              '本次卖出操作基于策略信号执行，减少了相应持仓。'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <button type="button" class="btn btn-primary" onclick="exportTradeDetail(${JSON.stringify(tradeData).replace(/"/g, '&quot;')})">
+                                    <i class="bi bi-download me-2"></i>导出详情
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            const existingDetailModal = document.getElementById('tradeDetailModal');
+            if (existingDetailModal) {
+                existingDetailModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', detailHtml);
+            
+            // 显示模态框
+            const detailModal = new bootstrap.Modal(document.getElementById('tradeDetailModal'));
+            detailModal.show();
+        }
+        
+        /**
+         * 导出交易详情
+         * @param {Object} tradeData - 交易数据
+         */
+        function exportTradeDetail(tradeData) {
+            // 创建CSV内容
+            const csvContent = [
+                ['字段', '值'],
+                ['交易日期', tradeData.date],
+                ['交易类型', tradeData.action === 'buy' ? '买入' : tradeData.action === 'stop_loss' ? '止损' : '卖出'],
+                ['交易金额', `¥${tradeData.amount.toFixed(2)}`],
+                ['交易后余额', `¥${tradeData.balance.toFixed(2)}`],
+                ['持仓价值', `¥${tradeData.holdings.toFixed(2)}`],
+                ['杠杆倍数', tradeData.multiplier ? `${tradeData.multiplier.toFixed(2)}×` : '无'],
+                ['市场趋势', tradeData.trend || '未记录'],
+                ['ADX值', tradeData.adx_value !== undefined ? tradeData.adx_value.toFixed(2) : '未记录'],
+                ['市场调整', tradeData.market_adjusted ? '是' : '否'],
+                ['成交量确认', tradeData.volume_confirmed ? '是' : '否'],
+                ['趋势过滤', tradeData.trend_filtered ? '是' : '否']
+            ].map(row => row.join(',')).join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `交易详情_${tradeData.date}_${tradeData.action}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示提示
+            alert('交易详情已导出！');
+        }
+    </script>
+    
+    <style>
+        /* 交易详情按钮样式 */
+        .trade-detail-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .trade-detail-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* 交易详情模态框样式 */
+        .detail-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #0d6efd;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            color: #6c757d;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #212529;
+        }
+        
+        .positive { color: #198754; }
+        .negative { color: #dc3545; }
+    </style>
+</body>
+</html>

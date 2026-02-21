@@ -3,17 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>投资账本 - 基金分析系统</title>
+    <title>基金分析系统</title>
     
     <!-- 外部资源 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/my-holdings-refactored.css') }}">
 </head>
 <body>
     <!-- 顶部导航 -->
     <nav class="top-nav">
-        <a href="/dashboard" class="brand">投资账本</a>
+        <a href="/dashboard" class="brand">基金分析系统</a>
         <div class="nav-links">
             <a href="/dashboard"><i class="bi bi-speedometer2"></i> 仪表盘</a>
             <a href="/my-holdings-new" class="active"><i class="bi bi-wallet2"></i> 我的持仓</a>
@@ -37,7 +38,7 @@
             </div>
             
             <div class="quick-actions">
-                <button class="btn btn-primary" onclick="openFilterModal()">
+                <button class="btn btn-primary" id="filter-toggle-btn">
                     <i class="bi bi-funnel"></i> 高级筛选
                 </button>
                 <button class="btn btn-primary" onclick="openScreenshotModal()">
@@ -66,7 +67,7 @@
         </header>
 
         <!-- 筛选标签展示 -->
-        <div class="filter-tags" id="active-filters" style="display: none;"></div>
+        <div class="active-filter-tags" id="active-filter-tags" style="display: none;"></div>
 
         <!-- 表格区域 -->
         <div class="table-container">
@@ -90,116 +91,30 @@
         </div>
     </main>
 
-    <!-- 筛选模态框 -->
-    <div class="modal-overlay" id="filter-modal" onclick="handleModalBackdrop(event)">
-        <div class="modal" onclick="event.stopPropagation()">
-            <header class="modal-header">
-                <h3 class="modal-title">基金筛选</h3>
-                <button class="modal-close" onclick="closeFilterModal()">
-                    <i class="bi bi-x-lg"></i>
-                </button>
-            </header>
-            
-            <div class="modal-body">
-                <nav class="tabs">
-                    <button class="tab-btn active" data-tab="basic" onclick="switchTab('basic')">基本信息</button>
-                    <button class="tab-btn" data-tab="performance" onclick="switchTab('performance')">业绩指标</button>
-                    <button class="tab-btn" data-tab="risk" onclick="switchTab('risk')">风险指标</button>
-                    <button class="tab-btn" data-tab="type" onclick="switchTab('type')">基金类型</button>
-                </nav>
-                
-                <!-- 基本信息 -->
-                <div class="tab-content active" id="tab-basic">
-                    <div class="form-group">
-                        <label class="form-label">基金代码</label>
-                        <input type="text" class="form-control" id="filter-code" placeholder="输入基金代码">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">基金名称</label>
-                        <input type="text" class="form-control" id="filter-name" placeholder="输入基金名称">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">购买日期范围</label>
-                        <div class="form-row">
-                            <input type="date" class="form-control" id="filter-date-start">
-                            <input type="date" class="form-control" id="filter-date-end">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 业绩指标 -->
-                <div class="tab-content" id="tab-performance">
-                    <div class="form-group">
-                        <label class="form-label">今日收益范围 (%)</label>
-                        <div class="form-row">
-                            <input type="number" class="form-control" id="filter-today-min" placeholder="最小值" step="0.01">
-                            <input type="number" class="form-control" id="filter-today-max" placeholder="最大值" step="0.01">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">年化收益范围 (%)</label>
-                        <div class="form-row">
-                            <input type="number" class="form-control" id="filter-annual-min" placeholder="最小值" step="0.01">
-                            <input type="number" class="form-control" id="filter-annual-max" placeholder="最大值" step="0.01">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">持有金额范围 (元)</label>
-                        <div class="form-row">
-                            <input type="number" class="form-control" id="filter-amount-min" placeholder="最小值">
-                            <input type="number" class="form-control" id="filter-amount-max" placeholder="最大值">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 风险指标 -->
-                <div class="tab-content" id="tab-risk">
-                    <div class="form-group">
-                        <label class="form-label">最大回撤范围 (%)</label>
-                        <div class="form-row">
-                            <input type="number" class="form-control" id="filter-drawdown-min" placeholder="最小值" step="0.01">
-                            <input type="number" class="form-control" id="filter-drawdown-max" placeholder="最大值" step="0.01">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">夏普比率范围</label>
-                        <div class="form-row">
-                            <input type="number" class="form-control" id="filter-sharpe-min" placeholder="最小值" step="0.01">
-                            <input type="number" class="form-control" id="filter-sharpe-max" placeholder="最大值" step="0.01">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 基金类型 -->
-                <div class="tab-content" id="tab-type">
-                    <div class="form-group">
-                        <label class="form-label">基金类型</label>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="filter-odii" value="odii">
-                            <label class="form-check-label" for="filter-odii">QDII/海外基金</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="filter-etf" value="etf">
-                            <label class="form-check-label" for="filter-etf">ETF基金</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="filter-index" value="index">
-                            <label class="form-check-label" for="filter-index">指数基金</label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="filter-active" value="active">
-                            <label class="form-check-label" for="filter-active">主动基金</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <footer class="modal-footer">
-                <button class="btn btn-secondary" onclick="resetFilters()">重置</button>
-                <button class="btn btn-primary" onclick="applyFilters()">应用筛选</button>
-            </footer>
+    <!-- 高级筛选侧边面板 -->
+    <div class="filter-panel-overlay" id="filter-panel-overlay"></div>
+    <aside class="filter-panel" id="filter-panel">
+        <header class="filter-panel-header">
+            <h3 class="filter-panel-title"><i class="bi bi-funnel-fill"></i> 高级筛选</h3>
+            <button class="filter-panel-close" onclick="FundFilters.closePanel()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </header>
+        <div class="filter-panel-content" id="filter-panel-content">
+            <!-- 筛选条件由JS动态渲染 -->
         </div>
-    </div>
+        <footer class="filter-panel-footer">
+            <span class="filter-result-count" id="filter-result-count">显示全部</span>
+            <div class="filter-panel-actions">
+                <button class="btn btn-secondary" onclick="FundFilters.clearAll()">
+                    <i class="bi bi-arrow-counterclockwise"></i> 重置
+                </button>
+                <button class="btn btn-primary" onclick="FundFilters.closePanel()">
+                    <i class="bi bi-check-lg"></i> 完成
+                </button>
+            </div>
+        </footer>
+    </aside>
 
     <!-- 截图导入模态框 -->
     <div class="modal-overlay" id="screenshot-modal" onclick="handleModalBackdrop(event)">

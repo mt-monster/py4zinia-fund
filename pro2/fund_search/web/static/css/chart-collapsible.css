@@ -1,0 +1,306 @@
+/* ==================== 图表折叠/展开功能 ==================== */
+
+/* 图表包装器 - 可折叠 */
+.chart-wrapper.collapsible {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-100);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.chart-wrapper.collapsible:hover {
+    box-shadow: var(--shadow-md);
+}
+
+/* 图表头部 */
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(to right, var(--gray-50), white);
+    border-bottom: 1px solid var(--gray-100);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+
+.chart-header:hover {
+    background: linear-gradient(to right, var(--gray-100), var(--gray-50));
+}
+
+.chart-header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.chart-header-title i {
+    color: var(--primary-color);
+    font-size: 1.125rem;
+}
+
+.chart-header-title h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    margin: 0;
+}
+
+/* 图表工具栏 */
+.chart-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* 工具按钮 */
+.chart-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius);
+    color: var(--gray-500);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+}
+
+.chart-tool-btn:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+
+.chart-tool-btn:active {
+    transform: scale(0.95);
+}
+
+/* 折叠按钮 */
+.chart-collapse-btn {
+    transition: transform 0.3s ease;
+}
+
+.chart-collapse-btn.collapsed {
+    transform: rotate(-90deg);
+}
+
+/* 图表主体 */
+.chart-body {
+    padding: 1.5rem;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    max-height: 500px;
+    opacity: 1;
+}
+
+.chart-body.collapsed {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+/* 图表画布 */
+.chart-canvas {
+    width: 100% !important;
+    height: 300px !important;
+}
+
+/* 全屏模式 */
+.chart-wrapper.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-wrapper.fullscreen .chart-header {
+    padding: 1rem 1.5rem;
+    border-radius: 0;
+}
+
+.chart-wrapper.fullscreen .chart-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.chart-wrapper.fullscreen .chart-canvas {
+    height: 100% !important;
+    max-height: none;
+}
+
+/* 关闭全屏按钮 */
+.chart-exit-fullscreen {
+    display: none;
+}
+
+.chart-wrapper.fullscreen .chart-exit-fullscreen {
+    display: inline-flex;
+}
+
+.chart-wrapper.fullscreen .chart-enter-fullscreen {
+    display: none;
+}
+
+/* 图表网格布局优化 */
+.charts-container.grid-layout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+/* 跨列显示的大图表 */
+.chart-wrapper.span-full {
+    grid-column: span 2;
+}
+
+/* 图表预览（折叠状态显示） */
+.chart-preview {
+    display: none;
+    padding: 1rem 1.25rem;
+    background: var(--gray-50);
+    text-align: center;
+}
+
+.chart-body.collapsed + .chart-preview {
+    display: block;
+}
+
+.chart-preview-text {
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+/* 图表状态标签 */
+.chart-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    background: var(--primary-light);
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    margin-left: 0.5rem;
+}
+
+/* 图表计数器 */
+.chart-counter {
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-left: auto;
+    margin-right: 0.5rem;
+}
+
+/* 图表操作菜单 */
+.chart-menu {
+    position: relative;
+}
+
+.chart-menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    min-width: 160px;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: all 0.2s ease;
+}
+
+.chart-menu.active .chart-menu-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.chart-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.chart-menu-item:hover {
+    background: var(--gray-50);
+}
+
+.chart-menu-item i {
+    font-size: 1rem;
+    color: var(--gray-500);
+}
+
+.chart-menu-divider {
+    height: 1px;
+    background: var(--gray-200);
+    margin: 0.25rem 0;
+}
+
+/* 响应式 */
+@media (max-width: 992px) {
+    .charts-container.grid-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .chart-wrapper.span-full {
+        grid-column: span 1;
+    }
+    
+    .chart-body {
+        max-height: 400px;
+    }
+    
+    .chart-canvas {
+        height: 250px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-header {
+        padding: 0.875rem 1rem;
+    }
+    
+    .chart-header-title h3 {
+        font-size: 0.9375rem;
+    }
+    
+    .chart-body {
+        padding: 1rem;
+        max-height: 350px;
+    }
+    
+    .chart-canvas {
+        height: 220px !important;
+    }
+    
+    .chart-tool-btn {
+        width: 1.75rem;
+        height: 1.75rem;
+        font-size: 0.875rem;
+    }
+}

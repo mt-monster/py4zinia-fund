@@ -371,6 +371,7 @@ class FundAnalysisDashboard {
                     <thead>
                         <tr>
                             <th>基金代码</th>
+                            <th>基金名称</th>
                             <th>持仓占比</th>
                         </tr>
                     </thead>
@@ -381,6 +382,7 @@ class FundAnalysisDashboard {
                                     <span class="fund-color-dot" style="background: ${this.colors[index % this.colors.length]}"></span>
                                     ${fund.fund_code}
                                 </td>
+                                <td class="fund-name-cell">${fund.fund_name || '-'}</td>
                                 <td class="fund-proportion-cell">${fund.proportion}%</td>
                             </tr>
                         `).join('')}
@@ -653,6 +655,11 @@ class FundAnalysisDashboard {
      * 渲染环形图
      */
     renderDonutChart(canvas, data) {
+        if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+            console.warn('⚠️ 环形图 canvas 不存在或不支持 getBoundingClientRect，跳过渲染');
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
         const dpr = window.devicePixelRatio || 1;
         
@@ -768,9 +775,7 @@ class FundAnalysisDashboard {
                                 <th class="col-name">基金名称</th>
                                 <th class="col-return">今日</th>
                                 <th class="col-return">昨日</th>
-                                <th class="col-status">趋势状态</th>
-                                <th class="col-action">操作建议</th>
-                                <th class="col-amount">执行金额</th>
+                                <th class="col-strategy">策略建议</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -819,14 +824,20 @@ class FundAnalysisDashboard {
                 <td class="col-return">
                     <span class="return-value ${yesterdayClass}">${this.formatReturn(fund.prev_day_return)}</span>
                 </td>
-                <td class="col-status">
-                    <span class="status-label">${fund.status_label}</span>
-                </td>
-                <td class="col-action">
-                    <span class="action-badge ${actionClass}">${fund.operation_suggestion}</span>
-                </td>
-                <td class="col-amount">
-                    <span class="execution-amount ${actionClass}">${fund.execution_amount}</span>
+                <td class="col-strategy">
+                    <div class="strategy-info">
+                        <div class="strategy-status">
+                            <span class="status-dot ${actionClass}"></span>
+                            <span class="status-text">${fund.status_label}</span>
+                        </div>
+                        <div class="strategy-action">
+                            <span class="action-badge ${actionClass}">${fund.operation_suggestion}</span>
+                        </div>
+                        <div class="strategy-amount">
+                            <span class="amount-label">执行:</span>
+                            <span class="amount-value ${actionClass}">${fund.execution_amount}</span>
+                        </div>
+                    </div>
                 </td>
             </tr>
         `;

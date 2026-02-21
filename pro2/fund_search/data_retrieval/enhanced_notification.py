@@ -917,7 +917,7 @@ class EnhancedNotificationManager:
                 value = row[col] if col in row else "N/A"
                 
                 # 根据列类型格式化值
-                if col in ['today_return', 'prev_day_return', 'yesterday_return', 
+                if col in ['today_return', 'prev_day_return', 
                            'annualized_return', 'total_return',
                            'volatility', 'win_rate']:
                     # 百分比格式的收益率和波动率
@@ -1164,7 +1164,7 @@ class EnhancedNotificationManager:
         
         # 选择要显示的列（与参考图片一致的顺序）
         display_columns = [
-            'fund_code', 'fund_name', 'today_return', 'yesterday_return', 
+            'fund_code', 'fund_name', 'today_return', 'prev_day_return', 
             'status_label', 'operation_suggestion', 'execution_amount',
             'holding_amount', 'cumulative_profit_loss'
         ]
@@ -1204,7 +1204,7 @@ class EnhancedNotificationManager:
                 value = row[col] if col in row else "N/A"
                 
                 # 根据列类型格式化值
-                if col in ['today_return', 'yesterday_return']:
+                if col in ['today_return', 'prev_day_return']:
                     if pd.notna(value):
                         formatted_value = f"{value:.2f}%"
                         color = '#e74c3c' if value > 0 else '#27ae60' if value < 0 else 'black'
@@ -1375,7 +1375,7 @@ class EnhancedNotificationManager:
             # 收益率相关字段
             'today_return': '今日收益率',
             'prev_day_return': '前一日收益率',
-            'yesterday_return': '昨日收益率',
+            'prev_day_return': '昨日收益率',
             'annualized_return': '年化收益率',
             
             # 绩效分析字段

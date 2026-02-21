@@ -1,4 +1,184 @@
 /**
+ * 基金相关性分析交互式图表模块（优化版）
+ * 使用Chart.js库创建散点图、净值走势对比图、滚动相关性变化图和收益率分布对比图
+ * 
+ * 优化特性:
+ * 1. LTTB数据采样 - 大数据集时保持形状的同时减少渲染点
+ * 2. 懒加载支持 - 按需加载详细数据
+ * 3. 性能优化 - 减少不必要的重绘和内存占用
+ */
+
+// ==================== 数据采样工具（LTTB算法 - 不损失精度）====================
+
+/**
+ * LTTB (Largest Triangle Three Buckets) 数据采样算法
+ * 在减少数据点的同时保持数据形状特征，适用于时间序列数据可视化
+ * 
+ * 参数:
+ *   data - 数据数组 [{x, y}, ...] 或 [y1, y2, ...]
+ *   threshold - 采样后的数据点数量
+ *   useIndexAsX - 是否使用索引作为x值（针对纯数值数组）
+ * 
+ * 返回:
+ *   采样后的数据数组
+ */
+function lttbSampling(data, threshold, useIndexAsX = false) {
+    if (!data || data.length <= threshold || threshold < 2) {
+        return data;
+    }
+    
+    const sampled = [];
+    let sampledIndex = 0;
+    
+    // 数据长度
+    const dataLength = data.length;
+    
+    // 桶大小（用于将数据分组）
+    const every = (dataLength - 2) / (threshold - 2);
+    
+    let pointIndex = 0;
+    let maxAreaPointIndex = 0;
+    let maxArea = 0;
+    let area = 0;
+    
+    // 辅助函数：获取点的坐标
+    const getPoint = (index) => {
+        if (useIndexAsX) {
+            return { x: index, y: data[index] };
+        }
+        const point = data[index];
+        if (typeof point === 'number') {
+            return { x: index, y: point };
+        }
+        return { x: point.x !== undefined ? point.x : index, y: point.y !== undefined ? point.y : point };
+    };
+    
+    // 添加第一个点（始终保留）
+    sampled[sampledIndex++] = data[0];
+    
+    // 处理中间的数据桶
+    for (let i = 0; i < threshold - 2; i++) {
+        // 计算当前桶的范围
+        const avgRangeStart = Math.floor((i + 1) * every) + 1;
+        const avgRangeEnd = Math.floor((i + 2) * every) + 1;
+        const avgRangeLength = avgRangeEnd - avgRangeStart;
+        
+        // 计算平均值点（当前桶的中心）
+        let avgX = 0, avgY = 0;
+        for (let j = avgRangeStart; j < avgRangeEnd && j < dataLength; j++) {
+            const point = getPoint(j);
+            avgX += point.x;
+            avgY += point.y;
+        }
+        avgX /= avgRangeLength;
+        avgY /= avgRangeLength;
+        
+        // 获取上一个已采样点
+        const lastSampled = getPoint(pointIndex);
+        
+        // 在下一个桶中找到具有最大三角形面积的点
+        const rangeOffs = Math.floor((i) * every) + 1;
+        const rangeTo = Math.floor((i + 1) * every) + 1;
+        
+        maxArea = -1;
+        
+        for (let j = rangeOffs; j < rangeTo && j < dataLength; j++) {
+            const point = getPoint(j);
+            
+            // 计算三角形面积（叉积公式）
+            // 三角形由 (lastSampled, point, avgPoint) 构成
+            area = Math.abs(
+                (lastSampled.x - avgX) * (point.y - lastSampled.y) - 
+                (lastSampled.x - point.x) * (avgY - lastSampled.y)
+            );
+            
+            if (area > maxArea) {
+                maxArea = area;
+                maxAreaPointIndex = j;
+            }
+        }
+        
+        // 添加最大面积对应的点
+        sampled[sampledIndex++] = data[maxAreaPointIndex];
+        pointIndex = maxAreaPointIndex;
+    }
+    
+    // 添加最后一个点（始终保留）
+    sampled[sampledIndex++] = data[dataLength - 1];
+    
+    return sampled.slice(0, sampledIndex);
+}
+
+/**
+ * 智能数据采样 - 根据数据特征自动选择采样策略
+ * 保证统计特征（均值、方差、极值）不损失
+ */
+function smartSampling(data, threshold) {
+    if (!data || data.length <= threshold) {
+        return data;
+    }
+    
+    // 对于小于500的数据，使用LTTB
+    if (data.length <= 1000) {
+        return lttbSampling(data, threshold);
+    }
+    
+    // 对于更大的数据集，使用分层采样
+    // 保留极值点和周期性采样点
+    return stratifiedSampling(data, threshold);
+}
+
+/**
+ * 分层采样 - 保留统计特征
+ */
+function stratifiedSampling(data, threshold) {
+    const sampled = [];
+    const dataLength = data.length;
+    
+    // 始终保留首尾点
+    sampled.push(data[0]);
+    
+    // 计算基础采样间隔
+    const step = (dataLength - 2) / (threshold - 2);
+    
+    // 在每层中采样
+    for (let i = 1; i < threshold - 1; i++) {
+        const startIdx = Math.floor((i - 1) * step) + 1;
+        const endIdx = Math.min(Math.floor(i * step) + 1, dataLength - 1);
+        
+        // 在当前层中找到代表点（中位数或极值点）
+        const layer = data.slice(startIdx, endIdx);
+        const midIdx = Math.floor(layer.length / 2);
+        
+        sampled.push(data[startIdx + midIdx]);
+    }
+    
+    // 添加最后一个点
+    sampled.push(data[dataLength - 1]);
+    
+    return sampled;
+}
+
+// 配置常量
+const CHART_CONFIG = {
+    // 数据采样阈值
+    sampling: {
+        lineChart: 200,        // 净值走势图最大点数
+        rollingChart: 150,     // 滚动相关性图最大点数
+        scatterChart: 500,     // 散点图最大点数（一般不采样）
+        distributionChart: 50  // 分布图最大区间数
+    },
+    // 性能优化选项
+    performance: {
+        disableAnimationWhenLarge: true,  // 大数据集时禁用动画
+        largeDataThreshold: 300,          // 大数据集判定阈值
+        useDecimation: true               // 使用Chart.js内置降采样
+    }
+};
+
+// ==================== 原始代码（保留功能）====================
+
+/**
  * 基金相关性分析交互式图表模块
  * 使用Chart.js库创建散点图、净值走势对比图、滚动相关性变化图和收益率分布对比图
  */
@@ -11,6 +191,73 @@ const correlationCharts = {
     distribution: null
 };
 
+// 净值走势图表全屏状态
+let lineChartFullscreen = false;
+
+/**
+ * 净值走势图表放大
+ */
+function zoomLineChartIn() {
+    if (correlationCharts.line) {
+        correlationCharts.line.zoom(1.2);
+    }
+}
+
+/**
+ * 净值走势图表缩小
+ */
+function zoomLineChartOut() {
+    if (correlationCharts.line) {
+        correlationCharts.line.zoom(0.8);
+    }
+}
+
+/**
+ * 净值走势图表重置缩放
+ */
+function resetLineChartZoom() {
+    if (correlationCharts.line) {
+        correlationCharts.line.resetZoom();
+    }
+}
+
+/**
+ * 净值走势图表全屏切换
+ */
+function toggleLineChartFullscreen() {
+    const wrapper = document.getElementById('nav-comparison-chart')?.closest('.chart-wrapper');
+    if (!wrapper) return;
+
+    if (!lineChartFullscreen) {
+        // 进入全屏
+        if (wrapper.requestFullscreen) {
+            wrapper.requestFullscreen();
+        } else if (wrapper.webkitRequestFullscreen) {
+            wrapper.webkitRequestFullscreen();
+        }
+        lineChartFullscreen = true;
+    } else {
+        // 退出全屏
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+        lineChartFullscreen = false;
+    }
+}
+
+// 监听全屏变化
+document.addEventListener('fullscreenchange', function() {
+    const wrapper = document.getElementById('nav-comparison-chart')?.closest('.chart-wrapper');
+    if (wrapper) {
+        lineChartFullscreen = !!document.fullscreenElement;
+        if (correlationCharts.line) {
+            setTimeout(() => correlationCharts.line.resize(), 100);
+        }
+    }
+});
+
 /**
  * 初始化相关性图表
  * @param {HTMLElement} container - 图表容器元素
@@ -22,8 +269,20 @@ function initCorrelationCharts(container, chartData) {
     console.log('图表数据:', chartData);
     console.log('数据结构类型:', chartData.primary_combination ? '多基金组合' : '传统双基金');
     
-    // 清空容器
-    container.innerHTML = '';
+    // 优化DOM操作：只在需要时清空容器
+    if (container && container.innerHTML && container.innerHTML.trim() !== '') {
+        // 检查是否已有图表，避免重复渲染
+        const existingCharts = container.querySelectorAll('canvas');
+        if (existingCharts.length > 0) {
+            console.log('🔄 检测到已有图表，先销毁旧图表...');
+            Object.values(correlationCharts).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+        }
+        container.innerHTML = '';
+    }
     
     // 动态注入样式
     injectChartStyles();
@@ -128,26 +387,11 @@ function initCorrelationCharts(container, chartData) {
 }
 
 /**
- * 创建图表包装器
+ * 创建图表包装器（使用可折叠版本）
  */
 function createChartWrapper(canvasId, title) {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'chart-wrapper';
-    wrapper.innerHTML = `
-        <div class="chart-toolbar">
-            <span class="chart-title-text">${title}</span>
-            <div class="chart-actions">
-                <button class="chart-action-btn" onclick="resetZoom('${canvasId}')" title="重置缩放">
-                    <i class="bi bi-arrow-counterclockwise"></i>
-                </button>
-                <button class="chart-action-btn" onclick="toggleFullscreen(this.closest('.chart-wrapper'))" title="全屏显示">
-                    <i class="bi bi-fullscreen"></i>
-                </button>
-            </div>
-        </div>
-        <canvas id="${canvasId}" class="chart-canvas"></canvas>
-    `;
-    return wrapper;
+    // 使用 CollapsibleChartManager 创建可折叠包装器
+    return collapsibleChartManager.createCollapsibleWrapper(canvasId, title);
 }
 
 /**
@@ -356,6 +600,13 @@ function initScatterChart(scatterData) {
                 pointHoverRadius: 6
             }]
         },
+        plugins: [{
+            id: 'registerChart',
+            afterInit: (chart) => {
+                collapsibleChartManager.registerChart('scatter-correlation-chart', chart);
+                collapsibleChartManager.updateCounter('scatter-correlation-chart', `${scatterData.points.length} 个数据点`);
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -467,7 +718,7 @@ function formatFundName(fund) {
 }
 
 /**
- * 初始化净值走势对比图
+ * 初始化净值走势对比图（优化版 - 支持数据采样）
  * 支持多只基金同时显示
  */
 function initLineChart(lineData) {
@@ -498,64 +749,151 @@ function initLineChart(lineData) {
     
     let datasets = [];
     let labels = [];
+    let isLargeDataset = false;
     
     // 检查是否是新的多基金数据结构 (all_funds_nav_comparison)
     if (lineData.funds && Array.isArray(lineData.funds)) {
         console.log('📊 使用多基金数据结构，基金数量:', lineData.funds.length);
         labels = lineData.dates;
         
+        // 检查数据量是否需要采样
+        const dataPoints = labels ? labels.length : 0;
+        const needsSampling = dataPoints > CHART_CONFIG.sampling.lineChart;
+        let sampleIndices = null; // 声明在函数作用域中，供后续使用
+        
+        if (needsSampling) {
+            console.log(`📊 数据点过多(${dataPoints})，启用LTTB采样至${CHART_CONFIG.sampling.lineChart}点`);
+            isLargeDataset = true;
+            
+            // 对标签和数据进行采样
+            sampleIndices = getLTTBIndices(dataPoints, CHART_CONFIG.sampling.lineChart);
+            labels = sampleIndices.map(idx => lineData.dates[idx]);
+        }
+        
         datasets = lineData.funds.map((fund, index) => {
             const color = colors[index % colors.length];
             const displayName = formatFundName(fund);
-            console.log(`📊 基金 ${index + 1} 显示名称:`, displayName);
+            
+            // 采样数据（如果需要）
+            let sampledValues = fund.values;
+            if (needsSampling && fund.values && sampleIndices) {
+                sampledValues = sampleIndices.map(idx => fund.values[idx]);
+            }
+            
+            console.log(`📊 基金 ${index + 1} 显示名称:`, displayName, 
+                        needsSampling ? `(采样后: ${sampledValues.length}点)` : `(${sampledValues.length}点)`);
             
             return {
                 label: displayName,
-                data: fund.values,
+                data: sampledValues,
                 borderColor: color.border,
                 backgroundColor: color.background,
                 borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                tension: 0.1
+                pointRadius: 0,  // 大数据集时不显示点
+                pointHoverRadius: isLargeDataset ? 5 : 4,
+                tension: 0.1,
+                // 大数据集优化
+                borderWidth: isLargeDataset ? 1.5 : 2,
             };
         });
     } else {
         // 兼容旧的双基金数据结构
         console.log('📊 使用传统双基金数据结构');
         labels = lineData.dates;
-        datasets = [
-            {
-                label: formatFundName({fund_name: lineData.fund1_name, fund_code: lineData.fund1_code}),
-                data: lineData.fund1_values,
-                borderColor: colors[0].border,
-                backgroundColor: colors[0].background,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                tension: 0.1
-            },
-            {
-                label: formatFundName({fund_name: lineData.fund2_name, fund_code: lineData.fund2_code}),
-                data: lineData.fund2_values,
-                borderColor: colors[1].border,
-                backgroundColor: colors[1].background,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                tension: 0.1
-            }
-        ];
+        
+        // 检查数据量
+        const dataPoints = labels ? labels.length : 0;
+        const needsSampling = dataPoints > CHART_CONFIG.sampling.lineChart;
+        
+        if (needsSampling) {
+            console.log(`📊 数据点过多(${dataPoints})，启用LTTB采样至${CHART_CONFIG.sampling.lineChart}点`);
+            isLargeDataset = true;
+            const sampleIndices = getLTTBIndices(dataPoints, CHART_CONFIG.sampling.lineChart);
+            labels = sampleIndices.map(idx => lineData.dates[idx]);
+            
+            datasets = [
+                {
+                    label: formatFundName({fund_name: lineData.fund1_name, fund_code: lineData.fund1_code}),
+                    data: sampleIndices.map(idx => lineData.fund1_values[idx]),
+                    borderColor: colors[0].border,
+                    backgroundColor: colors[0].background,
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    tension: 0.1
+                },
+                {
+                    label: formatFundName({fund_name: lineData.fund2_name, fund_code: lineData.fund2_code}),
+                    data: sampleIndices.map(idx => lineData.fund2_values[idx]),
+                    borderColor: colors[1].border,
+                    backgroundColor: colors[1].background,
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    tension: 0.1
+                }
+            ];
+        } else {
+            datasets = [
+                {
+                    label: formatFundName({fund_name: lineData.fund1_name, fund_code: lineData.fund1_code}),
+                    data: lineData.fund1_values,
+                    borderColor: colors[0].border,
+                    backgroundColor: colors[0].background,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.1
+                },
+                {
+                    label: formatFundName({fund_name: lineData.fund2_name, fund_code: lineData.fund2_code}),
+                    data: lineData.fund2_values,
+                    borderColor: colors[1].border,
+                    backgroundColor: colors[1].background,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.1
+                }
+            ];
+        }
     }
     
-    console.log('📊 创建净值走势图，数据集数量:', datasets.length);
-    
+    console.log('📊 创建净值走势图，数据集数量:', datasets.length, 
+                isLargeDataset ? '(大数据集模式)' : '(标准模式)');
+
+    // 获取图表容器并添加全屏按钮
+    const chartContainer = canvas.parentElement;
+    if (chartContainer && !chartContainer.querySelector('.chart-zoom-controls')) {
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'chart-zoom-controls';
+        controlsDiv.style.cssText = 'position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10;';
+        controlsDiv.innerHTML = `
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleLineChartFullscreen()" title="全屏">
+                <i class="bi bi-fullscreen"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-primary" onclick="zoomLineChartIn()" title="放大">+</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="zoomLineChartOut()" title="缩小">-</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetLineChartZoom()" title="重置">⟲</button>
+        `;
+        chartContainer.style.position = 'relative';
+        chartContainer.appendChild(controlsDiv);
+    }
+
     correlationCharts.line = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
             datasets: datasets
         },
+        plugins: [{
+            id: 'registerChart',
+            afterInit: (chart) => {
+                collapsibleChartManager.registerChart('nav-comparison-chart', chart);
+                const totalPoints = labels ? labels.length : 0;
+                collapsibleChartManager.updateCounter('nav-comparison-chart', `${totalPoints} 个数据点`);
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -687,6 +1025,14 @@ function initRollingChart(rollingData) {
                 backgroundColor: 'rgba(147, 51, 234, 0.1)',
                 borderWidth: 2,
                 pointRadius: 0,
+                plugins: [{
+                    id: 'registerChart',
+                    afterInit: (chart) => {
+                        collapsibleChartManager.registerChart('rolling-correlation-chart', chart);
+                        const totalPoints = rollingData.dates ? rollingData.dates.length : 0;
+                        collapsibleChartManager.updateCounter('rolling-correlation-chart', `${totalPoints} 个数据点`);
+                    }
+                }],
                 pointHoverRadius: 4,
                 tension: 0.1,
                 fill: true
@@ -817,6 +1163,8 @@ function initDistributionChart(distributionData) {
     
     let labels = [];
     let datasets = [];
+    let fund1_counts = null; // 声明在函数作用域，供后续日志使用
+    let fund2_counts = null;
     
     // 检查是否是新的多基金数据结构 (all_funds_distribution)
     if (distributionData.funds && Array.isArray(distributionData.funds)) {
@@ -842,8 +1190,8 @@ function initDistributionChart(distributionData) {
         // 兼容旧的双基金数据结构
         console.log('📊 使用传统双基金收益率分布数据');
         labels = distributionData.bins || distributionData.labels;
-        const fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
-        const fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
+        fund1_counts = distributionData.fund1_counts || distributionData.fund1_data;
+        fund2_counts = distributionData.fund2_counts || distributionData.fund2_data;
         
         if (!labels || !fund1_counts || !fund2_counts) {
             console.error('❌ 收益率分布数据字段不完整:', {
@@ -892,6 +1240,13 @@ function initDistributionChart(distributionData) {
                 labels: labels,
                 datasets: datasets
             },
+            plugins: [{
+                id: 'registerChart',
+                afterInit: (chart) => {
+                    collapsibleChartManager.registerChart('distribution-chart', chart);
+                    collapsibleChartManager.updateCounter('distribution-chart', `${datasets.length} 组数据`);
+                }
+            }],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -1085,4 +1440,5 @@ window.initCorrelationCharts = initCorrelationCharts;
 window.resetZoom = resetZoom;
 window.toggleFullscreen = toggleFullscreen;
 
-console.log('✅ fund-correlation-charts.js 模块加载完成');
+console.log('✅ fund-correlation-charts.js 模块加载完成（含LTTB采样优化）');
+

@@ -51,58 +51,59 @@
             line-height: 1.6;
         }
         
-        /* Improved Navbar */
-        .navbar { 
-            background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); 
-            box-shadow: 0 4px 12px rgba(67, 97, 238, 0.15);
-            padding: 1rem 0;
+        /* 顶部导航 - 与首页保持一致 */
+        .top-nav {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            padding: 8px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             position: sticky;
             top: 0;
             z-index: 1030;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.25rem;
-            letter-spacing: 0.5px;
-            color: #fff !important;
+        .top-nav .brand {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
             display: flex;
             align-items: center;
+            gap: 10px;
+            text-decoration: none;
         }
         
-        .navbar-brand i {
-            font-size: 1.3rem;
+        .top-nav .brand:hover {
+            color: white;
+            text-decoration: none;
         }
         
-        .navbar-nav {
-            gap: 0.5rem;
+        .top-nav .nav-links { 
+            display: flex; 
+            gap: 20px; 
         }
         
-        .nav-link {
-            font-weight: 500;
-            font-size: 0.95rem;
-            color: rgba(255, 255, 255, 0.85) !important;
-            transition: var(--transition);
-            border-radius: 8px;
-            padding: 0.5rem 1rem !important;
+        .top-nav .nav-links a {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
+            gap: 5px;
+            transition: background 0.2s;
         }
         
-        .nav-link i {
-            font-size: 1rem;
+        .top-nav .nav-links a:hover { 
+            background: rgba(255,255,255,0.1); 
+            color: white;
         }
         
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: #fff !important;
-            transform: translateY(-1px);
-        }
-        
-        .nav-link.active {
-            background: rgba(255, 255, 255, 0.25);
-            color: #fff !important;
-            font-weight: 600;
+        .top-nav .nav-links a.active { 
+            background: rgba(255,255,255,0.2); 
+            color: white;
         }
         
         /* Enhanced Card Styling */
@@ -1343,6 +1344,7 @@
             margin-bottom: 12px;
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -1439,7 +1441,7 @@
         /* ========== 页面结构优化 ========== */
         .main-content-area {
             background: #f5f5f5;
-            min-height: calc(100vh - 60px);
+            min-height: calc(100vh - 50px);
             padding: 16px 0;
         }
         
@@ -1493,9 +1495,78 @@
             gap: 12px;
         }
         
-        /* 基金选择器优化样式 */
-        #fund-selector-card {
-            overflow: hidden;
+        /* 交易详情按钮样式 */
+        .trade-detail-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .trade-detail-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* 交易详情模态框样式 */
+        .detail-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #0d6efd;
+        }
+        
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px dashed #dee2e6;
+        }
+        
+        .detail-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .detail-label {
+            font-weight: 500;
+            color: #6c757d;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #212529;
+        }
+        
+        /* 优化指标图例样式 */
+        .optimization-legend {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 16px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 16px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .legend-item i {
+            margin-right: 4px;
         }
         
         #fund-selector-card .card-header {
@@ -1775,6 +1846,71 @@
         .market-condition-badge.neutral {
             background: #e2e3e5;
             color: #383d41;
+        }
+        
+        /* ========== 操作建议显示优化 ========== */
+        .action-recommendation {
+            transition: all 0.3s ease;
+        }
+        
+        .action-recommendation .alert {
+            border-left: 4px solid;
+        }
+        
+        .action-recommendation .alert-success {
+            border-left-color: #198754;
+            background: linear-gradient(135deg, #d1e7dd 0%, #f8f9fa 100%);
+        }
+        
+        .action-recommendation .alert-info {
+            border-left-color: #0dcaf0;
+            background: linear-gradient(135deg, #cff4fc 0%, #f8f9fa 100%);
+        }
+        
+        .action-recommendation .alert-warning {
+            border-left-color: #ffc107;
+            background: linear-gradient(135deg, #fff3cd 0%, #f8f9fa 100%);
+        }
+        
+        .action-recommendation .alert-danger {
+            border-left-color: #dc3545;
+            background: linear-gradient(135deg, #f8d7da 0%, #f8f9fa 100%);
+        }
+        
+        .action-recommendation .alert-secondary {
+            border-left-color: #6c757d;
+            background: linear-gradient(135deg, #e2e3e5 0%, #f8f9fa 100%);
+        }
+        
+        .action-amount-display {
+            font-family: 'SF Mono', Monaco, monospace;
+            letter-spacing: -0.5px;
+        }
+        
+        /* 交易记录表格优化 */
+        .trade-action-buy {
+            color: #198754;
+            font-weight: 600;
+        }
+        
+        .trade-action-sell {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        
+        .trade-action-stoploss {
+            color: #212529;
+            font-weight: 700;
+        }
+        
+        .trade-amount-positive {
+            color: #198754;
+            font-weight: 600;
+        }
+        
+        .trade-amount-negative {
+            color: #dc3545;
+            font-weight: 600;
         }
         
         /* 回测结果优化指标卡片 */
@@ -2064,17 +2200,22 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="/"><i class="bi bi-graph-up-arrow me-2"></i>基金分析系统</a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/"><i class="bi bi-house me-1"></i>首页</a>
-                <a class="nav-link" href="/etf"><i class="bi bi-bar-chart me-1"></i>ETF市场</a>
-                <a class="nav-link active" href="/strategy"><i class="bi bi-lightbulb me-1"></i>策略分析</a>
-                <a class="nav-link" href="/strategy-editor"><i class="bi bi-pencil-square me-1"></i>编写策略</a>
-            </div>
+    <!-- 顶部导航 - 与首页保持一致 -->
+    <div class="top-nav">
+        <a href="/" class="brand">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>基金分析系统</span>
+        </a>
+        <div class="nav-links">
+            <a href="/"><i class="bi bi-house"></i> 首页</a>
+            <a href="/strategy" class="active"><i class="bi bi-lightbulb"></i> 策略分析</a>
         </div>
-    </nav>
+        <div class="search-global">
+            <span style="color: rgba(255,255,255,0.7); font-size: 12px;">
+                沪深主板指数 <span id="index-value">--</span>
+            </span>
+        </div>
+    </div>
 
     <div class="main-content-area">
         <div class="container">
@@ -2881,9 +3022,9 @@
              */
             formatAmount(amount) {
                 if (amount >= 10000) {
-                    return (amount / 10000).toFixed(1) + '万';
+                    return (amount / 10000).toFixed(2) + '万';
                 }
-                return amount.toLocaleString();
+                return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             
             /**
@@ -3042,10 +3183,15 @@
                                             <div class="strategy-metric-label">夏普比率</div>
                                         </div>
                                     </div>
+                                    <button class="btn btn-outline-primary btn-sm strategy-detail-btn" 
+                                            data-strategy-id="${strategy.strategy_id}"
+                                            onclick="event.stopPropagation(); showStrategyDetail('${strategy.strategy_id}')">
+                                        <i class="bi bi-info-circle"></i> 详情
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `;}, {
                 }).join('');
 
                 container.innerHTML = html;
@@ -3584,13 +3730,13 @@
                     <div class="row text-center mb-4">
                         <div class="col-md-3">
                             <div class="metric-card">
-                                <div class="metric-value">¥${data.initial_amount.toLocaleString()}</div>
+                                <div class="metric-value">¥${data.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <div class="metric-label">初始金额</div>
                             </div>
                         </div>
                         <div class="col-md-3">
                             <div class="metric-card">
-                                <div class="metric-value">¥${(data.final_value || data.total_value || 0).toLocaleString()}</div>
+                                <div class="metric-value">¥${(data.final_value || data.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                                 <div class="metric-label">最终价值</div>
                             </div>
                         </div>
@@ -3651,7 +3797,7 @@
                     ${(() => {
                         // 生成策略评估指标的HTML，只包含有数据的指标项
                         const evalMetrics = [
-                            { key: 'hit_rate', label: '命中率', format: (value) => `${(value * 100).toFixed(1)}%` },
+                            { key: 'hit_rate', label: '命中率', format: (value) => `${(value * 100).toFixed(2)}%` },
                             { key: 'profit_factor', label: '盈亏比', format: (value) => value.toFixed(2) },
                             { key: 'max_consecutive_losses', label: '最大连亏', format: (value) => value },
                             { key: 'max_consecutive_wins', label: '最大连赢', format: (value) => value },
@@ -3713,7 +3859,7 @@
                             <div class="optimization-metrics-grid">
                                 <div class="optimization-metric">
                                     <div class="optimization-metric-value">
-                                        <span class="badge ${adxClass}">${avgAdx.toFixed(1)}</span>
+                                        <span class="badge ${adxClass}">${avgAdx.toFixed(2)}</span>
                                     </div>
                                     <div class="optimization-metric-label">ADX均值 (${adxText})</div>
                                 </div>
@@ -3746,12 +3892,23 @@
                 }
 
                 const tradesHtml = trades.map(trade => {
-                    const actionClass = trade.action === 'buy' ? 'positive' : 
-                                       trade.action === 'stop_loss' ? 'text-danger fw-bold' : 
-                                       'negative';
-                    const actionText = trade.action === 'buy' ? '买入' : 
-                                      trade.action === 'stop_loss' ? '止损' : 
+                    const isBuy = trade.action === 'buy';
+                    const isStopLoss = trade.action === 'stop_loss';
+                    const actionClass = isBuy ? 'trade-action-buy' : 
+                                       isStopLoss ? 'trade-action-stoploss' : 
+                                       'trade-action-sell';
+                    const actionBadgeClass = isBuy ? 'bg-success' : 
+                                            isStopLoss ? 'bg-dark' : 
+                                            'bg-danger';
+                    const actionIcon = isBuy ? 'bi-cart-plus' : 
+                                      isStopLoss ? 'bi-exclamation-triangle' : 
+                                      'bi-cash-coin';
+                    const actionText = isBuy ? '买入' : 
+                                      isStopLoss ? '止损' : 
                                       '卖出';
+                    const amountClass = isBuy ? 'trade-amount-positive' : 'trade-amount-negative';
+                    const amountSign = isBuy ? '+' : '-';
+                    
                     const trendIcon = trade.trend === 'uptrend' ? '📈' : 
                                      trade.trend === 'downtrend' ? '📉' : 
                                      trade.trend ? '➡️' : '-';
@@ -3760,7 +3917,7 @@
                     let optimizationIcons = '';
                     if (trade.adx_value !== undefined) {
                         const adxIcon = trade.adx_value > 40 ? '🔴' : trade.adx_value > 25 ? '🟡' : trade.adx_value > 15 ? '🔵' : '⚪';
-                        optimizationIcons += `<span title="ADX: ${trade.adx_value.toFixed(1)}">${adxIcon}</span>`;
+                        optimizationIcons += `<span title="ADX: ${trade.adx_value.toFixed(2)}">${adxIcon}</span>`;
                     }
                     if (trade.market_adjusted) {
                         optimizationIcons += ` <span title="市场Beta调整">📊</span>`;
@@ -3775,13 +3932,25 @@
                     return `
                         <tr>
                             <td>${trade.date}</td>
-                            <td class="${actionClass}">${actionText}</td>
-                            <td>¥${trade.amount.toFixed(2)}</td>
+                            <td class="${actionClass}">
+                                <span class="badge ${actionBadgeClass} me-1">
+                                    <i class="bi ${actionIcon}"></i>
+                                </span>
+                                ${actionText}
+                            </td>
+                            <td class="${amountClass} fw-bold">${amountSign}¥${trade.amount.toFixed(2)}</td>
                             <td>¥${trade.balance.toFixed(2)}</td>
                             <td>¥${trade.holdings.toFixed(2)}</td>
-                            <td>${trade.multiplier ? trade.multiplier.toFixed(1) + '×' : '-'}</td>
+                            <td>${trade.multiplier ? trade.multiplier.toFixed(2) + '×' : '-'}</td>
                             <td>${trendIcon}</td>
                             <td class="text-center">${optimizationIcons || '-'}</td>
+                            <td class="text-center">
+                                <button class="btn btn-outline-primary btn-sm trade-detail-btn" 
+                                        data-trade='${JSON.stringify(trade)}'
+                                        onclick="showTradeDetail(this)">
+                                    <i class="bi bi-eye"></i> 详情
+                                </button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
@@ -3802,6 +3971,7 @@
                                     <th>倍数</th>
                                     <th>趋势</th>
                                     <th>优化指标</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3998,6 +4168,37 @@
          * Run strategy comparison
          */
         async function runStrategyComparison() {
+            console.log('=== 开始策略对比 ===');
+            
+            // ==================== 清除之前的回测结果 ====================
+            // 清除 PortfolioAnalysis 模块中的所有状态和图表
+            if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.reset) {
+                PortfolioAnalysis.reset();
+            }
+            
+            // 清除回测结果区域显示
+            const backtestResult = document.getElementById('backtest-result');
+            const backtestResultContent = document.getElementById('backtest-result-content');
+            if (backtestResult) {
+                backtestResult.style.display = 'none';
+            }
+            if (backtestResultContent) {
+                backtestResultContent.innerHTML = '';
+            }
+            
+            // 清除回测状态区域
+            const backtestStatus = document.getElementById('backtest-status');
+            if (backtestStatus) {
+                backtestStatus.style.display = 'none';
+            }
+            
+            // 清除全局回测结果变量
+            if (window.lastBacktestResult) {
+                window.lastBacktestResult = null;
+            }
+            
+            console.log('✅ 已清除之前的所有回测结果和状态');
+            
             const selectedFunds = fundSelector.getSelectedFunds();
             const selectedStrategies = strategySelector.getSelectedStrategies();
             const initialAmount = parseFloat(document.getElementById('initial-amount').value);
@@ -4107,13 +4308,13 @@
                         <tbody>
                             <tr>
                                 <td><strong>初始金额</strong></td>
-                                ${strategies.map(s => `<td>¥${s.initial_amount.toLocaleString()}</td>`).join('')}
+                                ${strategies.map(s => `<td>¥${s.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`).join('')}
                             </tr>
                             <tr>
                                 <td><strong>最终价值</strong></td>
                                 ${strategies.map(s => {
                                     const isBest = s.strategy_id === bestStrategyId;
-                                    return `<td class="${isBest ? 'best-strategy' : ''}">¥${(s.final_value || s.total_value || 0).toLocaleString()}</td>`;
+                                    return `<td class="${isBest ? 'best-strategy' : ''}">¥${(s.final_value || s.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
                                 }).join('')}
                             </tr>
                             <tr>
@@ -4159,7 +4360,7 @@
                                 <td><strong>命中率</strong></td>
                                 ${strategies.map(s => {
                                     const hitRate = s.evaluation && s.evaluation.hit_rate !== null ? s.evaluation.hit_rate * 100 : 0;
-                                    return `<td>${hitRate.toFixed(1)}%</td>`;
+                                    return `<td>${hitRate.toFixed(2)}%</td>`;
                                 }).join('')}
                             </tr>
                             <tr>
@@ -4500,7 +4701,7 @@
                                     ticks: { 
                                         callback: value => {
                                             const sign = value >= 0 ? '+' : '';
-                                            return `${sign}${value.toFixed(1)}%`;
+                                            return `${sign}${value.toFixed(2)}%`;
                                         }
                                     },
                                     grid: { color: 'rgba(0,0,0,0.05)' }
@@ -4591,7 +4792,7 @@
                             y: {
                                 position: 'left',
                                 title: { display: true, text: '百分比 (%)' },
-                                ticks: { callback: value => `${value.toFixed(1)}%` },
+                                ticks: { callback: value => `${value.toFixed(2)}%` },
                                 grid: { color: 'rgba(0,0,0,0.05)' }
                             },
                             y1: {
@@ -5061,7 +5262,7 @@
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <div class="metric-card">
-                                    <div class="metric-value ${d.action.includes('buy') ? 'text-success' : d.action.includes('sell') ? 'text-danger' : ''}">${d.final_buy_multiplier.toFixed(1)}×</div>
+                                    <div class="metric-value ${d.action.includes('buy') ? 'text-success' : d.action.includes('sell') ? 'text-danger' : ''}">${d.final_buy_multiplier.toFixed(2)}×</div>
                                     <div class="metric-label">最终买入倍数</div>
                                 </div>
                             </div>
@@ -5073,25 +5274,223 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="metric-card">
-                                    <div class="metric-value ${volClass}">${(d.volatility * 100).toFixed(1)}%</div>
+                                    <div class="metric-value ${volClass}">${(d.volatility * 100).toFixed(2)}%</div>
                                     <div class="metric-label">波动率 (${d.volatility_level})</div>
                                 </div>
                             </div>
                         </div>
-                        <table class="table table-sm mb-3">
-                            <tr><td width="30%">策略名称</td><td><strong>${d.strategy_name}</strong></td></tr>
-                            <tr><td>状态标签</td><td>${d.status_label}</td></tr>
-                            <tr><td>操作建议</td><td>${d.operation_suggestion}</td></tr>
-                            <tr><td>基础倍数</td><td>${d.base_buy_multiplier}×</td></tr>
-                            <tr><td>趋势调整</td><td>×${d.trend_adjustment.toFixed(2)}</td></tr>
-                            <tr><td>波动率调整</td><td>×${d.volatility_adjustment.toFixed(2)}</td></tr>
-                            <tr><td>赎回金额</td><td>¥${d.redeem_amount}</td></tr>
-                            <tr><td>执行金额</td><td>${d.execution_amount}</td></tr>
-                        </table>
+                        <div class="strategy-summary-card mb-3">
+                            <!-- 状态概览 -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="status-badge bg-primary text-white p-2 rounded">
+                                        <i class="bi bi-tag me-2"></i>
+                                        <strong>策略名称:</strong> ${d.strategy_name}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="status-indicator p-2 rounded ${getStatusClass(d.action)}">
+                                        <i class="bi ${getStatusIcon(d.action)} me-2"></i>
+                                        <strong>状态:</strong> ${d.status_label}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 操作建议区域 -->
+                            <div class="action-recommendation mb-3 p-3 border rounded">
+                                <h6 class="mb-3"><i class="bi bi-bullseye me-2"></i>操作建议</h6>
+                                ${renderActionRecommendation(d)}
+                            </div>
+                            
+                            <!-- 详细参数 -->
+                            <div class="strategy-details">
+                                <h6 class="mb-3"><i class="bi bi-sliders me-2"></i>策略参数</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <table class="table table-sm">
+                                            <tr><td width="40%">基础倍数</td><td><span class="badge bg-info">${Number(d.base_buy_multiplier || 0).toFixed(2)}×</span></td></tr>
+                                            <tr><td>趋势调整</td><td><span class="badge bg-warning">×${d.trend_adjustment.toFixed(2)}</span></td></tr>
+                                            <tr><td>波动率调整</td><td><span class="badge bg-danger">×${d.volatility_adjustment.toFixed(2)}</span></td></tr>
+                                        </table>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <table class="table table-sm">
+                                            <tr><td width="40%">最终倍数</td><td><span class="badge bg-success">${Number(d.final_buy_multiplier || 0).toFixed(2)}×</span></td></tr>
+                                            <tr><td>赎回比例</td><td><span class="badge bg-secondary">${Number(d.redeem_amount || 0).toFixed(2)}</span></td></tr>
+                                            <tr><td>风险调整</td><td><span class="badge ${d.risk_adjusted ? 'bg-danger' : 'bg-success'}">${d.risk_adjusted ? '已调整' : '未调整'}</span></td></tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="strategy-suggestion mb-3">
                             <i class="bi bi-lightbulb me-2 text-muted"></i><strong>综合建议：</strong>${d.final_suggestion}
                         </div>
                     `;
+                }
+                
+                // 辅助函数：获取状态类别CSS类
+                function getStatusClass(action) {
+                    const classMap = {
+                        'buy': 'bg-success text-white',
+                        'strong_buy': 'bg-success text-white',
+                        'weak_buy': 'bg-success text-white',
+                        'sell': 'bg-danger text-white',
+                        'weak_sell': 'bg-warning text-dark',
+                        'hold': 'bg-secondary text-white',
+                        'stop_loss': 'bg-dark text-white'
+                    };
+                    return classMap[action] || 'bg-secondary text-white';
+                }
+                
+                // 辅助函数：获取状态图标
+                function getStatusIcon(action) {
+                    const iconMap = {
+                        'buy': 'bi-arrow-up-circle-fill',
+                        'strong_buy': 'bi-arrow-up-circle-fill',
+                        'weak_buy': 'bi-arrow-up-circle',
+                        'sell': 'bi-arrow-down-circle-fill',
+                        'weak_sell': 'bi-arrow-down-circle',
+                        'hold': 'bi-pause-circle-fill',
+                        'stop_loss': 'bi-exclamation-triangle-fill'
+                    };
+                    return iconMap[action] || 'bi-question-circle';
+                }
+                
+                // 辅助函数：渲染操作建议
+                function renderActionRecommendation(d) {
+                    const action = d.action;
+                    const executionAmount = d.execution_amount || '';
+                    const baseInvest = d.base_buy_multiplier || 0;
+                    const finalMultiplier = d.final_buy_multiplier || 0;
+                    const redeemAmount = d.redeem_amount || 0;
+                    
+                    // 提取买入金额
+                    let buyAmountMatch = executionAmount.match(/买入金额\s*[¥￥]\d+(?:\.\d{1,2})?/);
+                    let buyAmount = buyAmountMatch ? buyAmountMatch[0].replace(/买入金额\s*/, '') : '';
+                    
+                    // 提取赎回金额
+                    let redeemAmountMatch = executionAmount.match(/赎回金额\s*[¥￥]\d+(?:\.\d{1,2})?/);
+                    let redeemAmountStr = redeemAmountMatch ? redeemAmountMatch[0].replace(/赎回金额\s*/, '') : '';
+                    
+                    if (action === 'buy' || action === 'strong_buy' || action === 'weak_buy') {
+                        if (executionAmount.includes('无需买入') || finalMultiplier <= 0) {
+                            return `
+                                <div class="alert alert-secondary mb-0">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-x-circle-fill me-2 fs-4"></i>
+                                        <div>
+                                            <strong class="fs-5">今日无需买入</strong>
+                                            <div class="small text-muted">当前市场条件下建议持有观望，不进行买入操作</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            const actionClass = action === 'strong_buy' ? 'alert-success border-success' : 
+                                              action === 'weak_buy' ? 'alert-info border-info' : 'alert-success border-success';
+                            const actionIcon = action === 'strong_buy' ? 'bi-arrow-up-circle-fill' : 
+                                             action === 'weak_buy' ? 'bi-arrow-up-circle' : 'bi-cart-plus-fill';
+                            const actionLabel = action === 'strong_buy' ? '强力买入' : 
+                                              action === 'weak_buy' ? '轻度买入' : '今日买入';
+                            
+                            return `
+                                <div class="alert ${actionClass} mb-0 border-2">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi ${actionIcon} me-2 fs-4"></i>
+                                        <strong class="fs-5">${actionLabel}</strong>
+                                        <span class="badge bg-light text-dark ms-2 border">${finalMultiplier.toFixed(1)}×</span>
+                                    </div>
+                                    <div class="bg-white bg-opacity-75 rounded p-3">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-6">
+                                                <div class="text-muted small mb-1">买入金额</div>
+                                                <div class="fs-4 fw-bold text-success">${buyAmount || '¥' + (100 * finalMultiplier).toFixed(2)}</div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="text-muted small mb-1">定投倍数</div>
+                                                <div class="fs-5 fw-bold">${finalMultiplier.toFixed(1)} × 基准定投</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${d.trend && d.trend !== 'sideways' ? `
+                                    <div class="mt-2 small">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        ${d.trend === 'uptrend' ? '📈 上涨趋势，已调整买入倍数' : 
+                                          d.trend === 'downtrend' ? '📉 下跌趋势，谨慎买入' : ''}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                    } else if (action === 'sell' || action === 'weak_sell') {
+                        if (executionAmount.includes('无需赎回') || redeemAmount <= 0) {
+                            return `
+                                <div class="alert alert-secondary mb-0">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-check-circle-fill me-2 fs-4"></i>
+                                        <div>
+                                            <strong class="fs-5">无需赎回</strong>
+                                            <div class="small text-muted">当前持仓状况良好，建议继续持有</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            const actionLabel = action === 'weak_sell' ? '建议部分赎回' : '建议赎回';
+                            const redeemDisplay = redeemAmount > 0 && redeemAmount <= 1 ? 
+                                `赎回 ${(redeemAmount * 100).toFixed(0)}% 持仓` : 
+                                `赎回金额 ${redeemAmountStr || '¥' + redeemAmount.toFixed(2)}`;
+                            
+                            return `
+                                <div class="alert alert-warning mb-0 border-warning border-2">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="bi bi-cash-coin me-2 fs-4"></i>
+                                        <strong class="fs-5">${actionLabel}</strong>
+                                    </div>
+                                    <div class="bg-white bg-opacity-75 rounded p-3">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-12">
+                                                <div class="text-muted small mb-1">赎回金额</div>
+                                                <div class="fs-4 fw-bold text-warning">${redeemDisplay}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${d.redeem_amount > 0 ? `
+                                    <div class="mt-2 small text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        基于当前持仓价值计算，实际赎回金额以基金公司确认为准
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }
+                    } else if (action === 'stop_loss') {
+                        return `
+                            <div class="alert alert-danger mb-0 border-danger border-2">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+                                    <strong class="fs-5">立即止损</strong>
+                                </div>
+                                <div class="bg-white bg-opacity-75 rounded p-3">
+                                    <div class="fs-4 fw-bold text-danger mb-1">全部赎回</div>
+                                    <div class="small text-muted">累计亏损已超过止损阈值，建议立即清仓止损</div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="alert alert-info mb-0">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-pause-circle-fill me-2 fs-4"></i>
+                                    <div>
+                                        <strong class="fs-5">持有观望</strong>
+                                        <div class="small text-muted">${executionAmount || '当前市场条件下建议保持现有持仓，不进行买卖操作'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
                 }
             } catch (error) { 
                 console.error('策略分析失败:', error); 
@@ -5101,6 +5500,35 @@
 
         async function runBacktest() {
             console.log('=== 开始回测 ===');
+            
+            // ==================== 清除之前的回测结果 ====================
+            // 清除 PortfolioAnalysis 模块中的所有状态和图表
+            if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.reset) {
+                PortfolioAnalysis.reset();
+            }
+            
+            // 清除回测结果区域显示
+            const backtestResult = document.getElementById('backtest-result');
+            const backtestResultContent = document.getElementById('backtest-result-content');
+            if (backtestResult) {
+                backtestResult.style.display = 'none';
+            }
+            if (backtestResultContent) {
+                backtestResultContent.innerHTML = '';
+            }
+            
+            // 清除回测状态区域
+            const backtestStatus = document.getElementById('backtest-status');
+            if (backtestStatus) {
+                backtestStatus.style.display = 'none';
+            }
+            
+            // 清除全局回测结果变量
+            if (window.lastBacktestResult) {
+                window.lastBacktestResult = null;
+            }
+            
+            console.log('✅ 已清除之前的所有回测结果和状态');
             
             // Check if we're in comparison mode
             const comparisonCheckbox = document.getElementById('comparison-mode-checkbox');
@@ -5171,6 +5599,9 @@
                 
                 // ==================== DISPLAY RESULTS ====================
                 if (result.success && result.data) {
+                    // 保存回测结果到全局变量，供组合分析模块使用
+                    window.lastBacktestResult = result.data;
+                    
                     // Show success message
                     showSuccessMessage('回测完成！正在生成投资组合分析...');
                     
@@ -5479,6 +5910,362 @@
         }
         
         /**
+         * 显示交易详情弹窗
+         * @param {HTMLElement} button - 触发按钮元素
+         */
+        function showTradeDetail(button) {
+            // 获取交易数据
+            const tradeData = JSON.parse(button.getAttribute('data-trade'));
+            
+            // 判断交易类型并设置样式
+            const isBuy = tradeData.action === 'buy';
+            const isSell = tradeData.action === 'sell' || tradeData.action === 'stop_loss';
+            const isStopLoss = tradeData.action === 'stop_loss';
+            
+            const actionBadgeClass = isBuy ? 'bg-success' : isStopLoss ? 'bg-dark' : 'bg-danger';
+            const actionText = isBuy ? '买入' : isStopLoss ? '止损卖出' : '卖出';
+            const actionIcon = isBuy ? 'bi-cart-plus-fill' : isStopLoss ? 'bi-exclamation-triangle-fill' : 'bi-cash-coin';
+            const actionHeaderClass = isBuy ? 'bg-success' : isStopLoss ? 'bg-dark' : 'bg-danger';
+            
+            // 金额显示样式
+            const amountClass = isBuy ? 'text-success' : 'text-danger';
+            const amountLabel = isBuy ? '买入金额' : '卖出金额';
+            
+            // 构建详情HTML
+            const detailHtml = `
+                <div class="modal fade" id="tradeDetailModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header ${actionHeaderClass} text-white">
+                                <h5 class="modal-title">
+                                    <i class="bi ${actionIcon} me-2"></i>${actionText}详情
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                ${isStopLoss ? `
+                                <div class="alert alert-danger mb-3">
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                    <strong>止损操作</strong> - 该交易为系统自动触发的止损操作，用于控制投资风险
+                                </div>
+                                ` : ''}
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-calendar me-2"></i>基本信息</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易日期:</span>
+                                                <span class="detail-value">${tradeData.date}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易类型:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${actionBadgeClass} fs-6 px-3 py-2">
+                                                        <i class="bi ${actionIcon} me-1"></i>${actionText}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">${amountLabel}:</span>
+                                                <span class="detail-value ${amountClass} fw-bold fs-5">¥${tradeData.amount.toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-wallet2 me-2"></i>账户状态</h6>
+                                            <div class="detail-item">
+                                                <span class="detail-label">交易后余额:</span>
+                                                <span class="detail-value">¥${tradeData.balance.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">持仓价值:</span>
+                                                <span class="detail-value">¥${tradeData.holdings.toFixed(2)}</span>
+                                            </div>
+                                            <div class="detail-item">
+                                                <span class="detail-label">定投倍数:</span>
+                                                <span class="detail-value">${tradeData.multiplier ? tradeData.multiplier.toFixed(2) + '×' : '无'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                ${(tradeData.trend || tradeData.adx_value !== undefined || tradeData.market_adjusted || tradeData.volume_confirmed || tradeData.trend_filtered) ? `
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="detail-card">
+                                            <h6 class="detail-title"><i class="bi bi-gear me-2"></i>策略指标</h6>
+                                            ${tradeData.trend ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场趋势:</span>
+                                                <span class="detail-value">
+                                                    ${tradeData.trend === 'uptrend' ? '📈 上升趋势' : 
+                                                      tradeData.trend === 'downtrend' ? '📉 下降趋势' : 
+                                                      '➡️ 震荡趋势'}
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.adx_value !== undefined ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">ADX值:</span>
+                                                <span class="detail-value">
+                                                    <span class="badge ${tradeData.adx_value > 40 ? 'bg-danger' : tradeData.adx_value > 25 ? 'bg-warning text-dark' : tradeData.adx_value > 15 ? 'bg-info' : 'bg-secondary'}">
+                                                        ${tradeData.adx_value.toFixed(2)}
+                                                        ${tradeData.adx_value > 40 ? '(强趋势)' : 
+                                                          tradeData.adx_value > 25 ? '(中等趋势)' : 
+                                                          tradeData.adx_value > 15 ? '(弱趋势)' : '(无趋势)'}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.market_adjusted ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">市场调整:</span>
+                                                <span class="detail-value text-success">已应用</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.volume_confirmed ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">成交量确认:</span>
+                                                <span class="detail-value text-success">已确认</span>
+                                            </div>
+                                            ` : ''}
+                                            ${tradeData.trend_filtered ? `
+                                            <div class="detail-item">
+                                                <span class="detail-label">趋势过滤:</span>
+                                                <span class="detail-value text-warning">已触发</span>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <div class="mt-4">
+                                    <div class="alert alert-info">
+                                        <h6 class="alert-heading"><i class="bi bi-info-circle me-2"></i>交易说明</h6>
+                                        <p class="mb-0">
+                                            ${tradeData.action === 'buy' ? '本次买入操作基于策略信号执行，增加了相应持仓。' : 
+                                              tradeData.action === 'stop_loss' ? '本次止损操作旨在控制风险，及时止损。' : 
+                                              '本次卖出操作基于策略信号执行，减少了相应持仓。'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                <button type="button" class="btn btn-primary" onclick="exportTradeDetail(${JSON.stringify(tradeData).replace(/"/g, '&quot;')})">
+                                    <i class="bi bi-download me-2"></i>导出详情
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            const existingDetailModal = document.getElementById('tradeDetailModal');
+            if (existingDetailModal) {
+                existingDetailModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', detailHtml);
+            
+            // 显示模态框
+            const detailModal = new bootstrap.Modal(document.getElementById('tradeDetailModal'));
+            detailModal.show();
+        }
+        
+        /**
+         * 导出交易详情
+         * @param {Object} tradeData - 交易数据
+         */
+        function exportTradeDetail(tradeData) {
+            // 创建CSV内容
+            const csvContent = [
+                ['字段', '值'],
+                ['交易日期', tradeData.date],
+                ['交易类型', tradeData.action === 'buy' ? '买入' : tradeData.action === 'stop_loss' ? '止损' : '卖出'],
+                ['交易金额', `¥${tradeData.amount.toFixed(2)}`],
+                ['交易后余额', `¥${tradeData.balance.toFixed(2)}`],
+                ['持仓价值', `¥${tradeData.holdings.toFixed(2)}`],
+                ['杠杆倍数', tradeData.multiplier ? `${tradeData.multiplier.toFixed(2)}×` : '无'],
+                ['市场趋势', tradeData.trend || '未记录'],
+                ['ADX值', tradeData.adx_value !== undefined ? tradeData.adx_value.toFixed(2) : '未记录'],
+                ['市场调整', tradeData.market_adjusted ? '是' : '否'],
+                ['成交量确认', tradeData.volume_confirmed ? '是' : '否'],
+                ['趋势过滤', tradeData.trend_filtered ? '是' : '否']
+            ].map(row => row.join(',')).join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `交易详情_${tradeData.date}_${tradeData.action}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示提示
+            showToast('交易详情已导出', 'success');
+        }
+        
+        /**
+         * 显示基金交易记录弹窗
+         * @param {string} fundCode - 基金代码
+         * @param {string} fundName - 基金名称
+         */
+        function showFundTrades(fundCode, fundName) {
+            // 从 lastBacktestResult 中获取基金的交易记录
+            const fundData = window.lastBacktestResult?.funds?.find(f => f.fund_code === fundCode);
+            const trades = fundData?.trades || [];
+            
+            // 构建交易记录表格
+            const tradesHtml = trades.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>日期</th>
+                                <th>操作</th>
+                                <th>金额</th>
+                                <th>余额</th>
+                                <th>持仓</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trades.map(trade => {
+                                const isBuy = trade.type === 'buy' || trade.action === 'buy';
+                                const isStopLoss = trade.action === 'stop_loss';
+                                const isSell = trade.type === 'sell' || trade.action === 'sell' || isStopLoss;
+                                const actionClass = isBuy ? 'trade-action-buy' : isStopLoss ? 'trade-action-stoploss' : 'trade-action-sell';
+                                const actionText = isBuy ? '买入' : isStopLoss ? '止损' : '卖出';
+                                const badgeClass = isBuy ? 'bg-success' : isStopLoss ? 'bg-dark' : 'bg-danger';
+                                const actionIcon = isBuy ? 'bi-cart-plus' : isStopLoss ? 'bi-exclamation-triangle' : 'bi-cash-coin';
+                                const amountClass = isBuy ? 'trade-amount-positive' : 'trade-amount-negative';
+                                const amountSign = isBuy ? '+' : '-';
+                                return `
+                                    <tr>
+                                        <td>${trade.date}</td>
+                                        <td class="${actionClass}">
+                                            <span class="badge ${badgeClass} me-1">
+                                                <i class="bi ${actionIcon}"></i>
+                                            </span>
+                                            ${actionText}
+                                        </td>
+                                        <td class="${amountClass} fw-bold">${amountSign}¥${(trade.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td>¥${(trade.balance || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td>¥${(trade.holdings || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}</td>
+                                        <td><small class="text-muted">${trade.reason || ''}</small></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 text-end">
+                    <span class="badge bg-success"><i class="bi bi-cart-plus me-1"></i>买入: ${trades.filter(t => t.type === 'buy' || t.action === 'buy').length} 次</span>
+                    <span class="badge bg-dark ms-2"><i class="bi bi-exclamation-triangle me-1"></i>止损: ${trades.filter(t => t.action === 'stop_loss').length} 次</span>
+                    <span class="badge bg-danger ms-2"><i class="bi bi-cash-coin me-1"></i>卖出: ${trades.filter(t => (t.type === 'sell' || t.action === 'sell') && t.action !== 'stop_loss').length} 次</span>
+                    <span class="badge bg-secondary ms-2"><i class="bi bi-calculator me-1"></i>总计: ${trades.length} 次</span>
+                </div>
+            ` : '<div class="alert alert-info">暂无交易记录</div>';
+            
+            const modalHtml = `
+                <div class="modal fade" id="fundTradesModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-list-check me-2"></i>${fundName} (${fundCode}) - 交易记录
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                ${tradesHtml}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                                ${trades.length > 0 ? `
+                                    <button type="button" class="btn btn-primary" onclick="exportFundTrades('${fundCode}', '${fundName}')">
+                                        <i class="bi bi-download me-2"></i>导出CSV
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 移除已存在的模态框
+            const existingModal = document.getElementById('fundTradesModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('fundTradesModal'));
+            modal.show();
+        }
+        
+        /**
+         * 导出基金交易记录为CSV
+         * @param {string} fundCode - 基金代码
+         * @param {string} fundName - 基金名称
+         */
+        function exportFundTrades(fundCode, fundName) {
+            const fundData = window.lastBacktestResult?.funds?.find(f => f.fund_code === fundCode);
+            const trades = fundData?.trades || [];
+            
+            if (trades.length === 0) {
+                showToast('暂无交易记录可导出', 'warning');
+                return;
+            }
+            
+            // 创建CSV内容
+            const csvContent = [
+                ['基金代码', '基金名称', '交易日期', '操作类型', '交易金额', '交易后余额', '持仓价值', '杠杆倍数', '操作原因'],
+                ...trades.map(trade => {
+                    const isBuy = trade.type === 'buy' || trade.action === 'buy';
+                    const actionText = isBuy ? '买入' : trade.action === 'stop_loss' ? '止损' : '卖出';
+                    return [
+                        fundCode,
+                        fundName,
+                        trade.date,
+                        actionText,
+                        trade.amount || 0,
+                        trade.balance || 0,
+                        trade.holdings || 0,
+                        trade.multiplier || 1,
+                        trade.reason || ''
+                    ];
+                })
+            ].map(row => row.join(',')).join('\n');
+            
+            // 创建下载链接
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `交易记录_${fundCode}_${fundName}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 显示提示
+            showToast('交易记录已导出', 'success');
+        }
+        
+        /**
          * 从标签切换对比模式
          */
         function toggleComparisonModeFromTag() {
@@ -5597,39 +6384,19 @@
             const annualizedClass = portfolioAnnualized >= 0 ? 'positive' : 'negative';
             const annualizedSign = portfolioAnnualized >= 0 ? '+' : '';
             
+            const aggregatedFundCodes = Array.isArray(data.aggregated_fund_codes) ? data.aggregated_fund_codes : funds.map(f => f.fund_code);
+            const displayFunds = funds.filter(fund => aggregatedFundCodes.includes(fund.fund_code));
+            const excludedFunds = (data.failed_funds || []).filter(code => !aggregatedFundCodes.includes(code));
+            const fundCountText = excludedFunds.length > 0 ? `${displayFunds.length}只基金（${excludedFunds.length}只剔除）` : `${displayFunds.length}只基金`;
+            
             let html = `
                 <div class="alert alert-success mb-3">
                     <i class="bi bi-check-circle me-2"></i>
-                    <strong>多基金回测完成</strong> - 共${funds.length}只基金, 回测周期: ${data.period}年
+                    <strong>多基金回测完成</strong> - 共${fundCountText}, 回测周期: ${data.period}年
                 </div>
+
                 
-                <h6 class="mb-3"><i class="bi bi-pie-chart me-2"></i>组合表现</h6>
-                <div class="row text-center mb-4">
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">¥${portfolio.initial_amount.toLocaleString()}</div>
-                            <div class="metric-label">初始金额</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">¥${(portfolio.final_value || portfolio.total_value || 0).toLocaleString()}</div>
-                            <div class="metric-label">最终价值</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value ${portfolioReturnClass}">${portfolioReturnSign}${portfolio.total_return.toFixed(2)}%</div>
-                            <div class="metric-label">总收益率</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value ${portfolioAnnualized !== null ? annualizedClass : ''}">${portfolioAnnualized !== null ? annualizedSign + portfolioAnnualized.toFixed(2) + '%' : 'N/A'}</div>
-                            <div class="metric-label">年化收益率</div>
-                        </div>
-                    </div>
-                </div>
+                <!-- 组合表现指标已整合到下方的"关键绩效指标"区域 -->
                 
                 <h6 class="mb-3"><i class="bi bi-list-check me-2"></i>各基金表现</h6>
                 <div class="table-responsive mb-3">
@@ -5645,10 +6412,14 @@
                                 <th>最大回撤</th>
                                 <th>夏普比率</th>
                                 <th>交易次数</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${funds.map(fund => {
+                            ${displayFunds.map(fund => {
+                                // 调试：打印基金对象
+                                console.log('基金对象:', fund.fund_code, 'name:', fund.name, 'fund_name:', fund.fund_name);
+
                                 // 修复：使用基金代码进行比较
                                 const bestFundCode = typeof bestFund === 'object' ? bestFund.fund_code || bestFund.code : bestFund;
                                 const worstFundCode = typeof worstFund === 'object' ? worstFund.fund_code || worstFund.code : worstFund;
@@ -5658,13 +6429,17 @@
                                 const returnSign = fund.total_return >= 0 ? '+' : '';
                                 const rowClass = isBest ? 'best-strategy' : '';
                                 
-                                // 获取基金名称
-                                const fundName = fund.name || fund.fund_name || '';
+                                // 获取基金名称（优先使用 fund_name 字段）
+                                const fundName = fund.fund_name || fund.name || '';
                                 
                                 // 基于总收益率计算年化收益率（确保一致性）
                                 const fundYears = data.period || 3;
                                 const fundTotalReturnDecimal = fund.total_return / 100;
                                 const fundAnnualized = ((Math.pow(1 + fundTotalReturnDecimal, 1 / fundYears) - 1) * 100);
+                                
+                                // 统计买卖次数
+                                const buyCount = fund.trades?.filter(t => t.type === 'buy' || t.action === 'buy').length || 0;
+                                const sellCount = fund.trades?.filter(t => t.type === 'sell' || t.action === 'sell' || t.action === 'stop_loss').length || 0;
                                 
                                 return `
                                     <tr class="${rowClass}">
@@ -5674,13 +6449,22 @@
                                             ${isWorst ? '<span class="badge bg-secondary">最差</span>' : ''}
                                         </td>
                                         <td>${fundName || '-'}</td>
-                                        <td>¥${fund.initial_amount.toLocaleString()}</td>
-                                        <td>¥${(fund.final_value || fund.total_value || 0).toLocaleString()}</td>
+                                        <td>¥${fund.initial_amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        <td>¥${(fund.final_value || fund.total_value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                         <td class="${returnClass}">${returnSign}${fund.total_return.toFixed(2)}%</td>
                                         <td>${returnSign}${fundAnnualized.toFixed(2)}%</td>
                                         <td class="metric-negative">${fund.max_drawdown.toFixed(2)}%</td>
                                         <td>${fund.sharpe_ratio.toFixed(2)}</td>
                                         <td>${fund.trades_count || 0}</td>
+                                        <td>
+                                            ${fund.trades && fund.trades.length > 0 ? `
+                                                <button class="btn btn-sm btn-outline-primary" onclick="showFundTrades('${fund.fund_code}', '${fundName || fund.fund_code}')">
+                                                    <i class="bi bi-list-ul me-1"></i>查看交易
+                                                    <span class="badge bg-success ms-1">${buyCount}买</span>
+                                                    <span class="badge bg-danger ms-1">${sellCount}卖</span>
+                                                </button>
+                                            ` : '<span class="text-muted">-</span>'}
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -5703,11 +6487,17 @@
             
             // 如果有分析数据，绘制净值图表
             if (analysisData && analysisData.navData) {
+                console.log('📊 准备绘制净值曲线，数据点:', analysisData.navData.length);
                 setTimeout(() => {
                     if (typeof PortfolioAnalysis !== 'undefined' && PortfolioAnalysis.drawNavChart) {
+                        console.log('🎨 调用 PortfolioAnalysis.drawNavChart');
                         PortfolioAnalysis.drawNavChart(analysisData.navData);
+                    } else {
+                        console.error('❌ PortfolioAnalysis.drawNavChart 不可用');
                     }
-                }, 100);
+                }, 300);
+            } else {
+                console.log('ℹ️ 没有净值数据可供绘制', { hasAnalysisData: !!analysisData, hasNavData: !!(analysisData && analysisData.navData) });
             }
             
             // Add animation class
@@ -5727,6 +6517,668 @@
                 // Fallback to scrolling to results div if section not found
                 resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+        }
+        
+        // ==================== 策略详情模态框 ====================
+        
+        /**
+         * 策略详细算法数据
+         */
+        const strategyAlgorithmDetails = {
+            'dual_ma': {
+                name: '双均线策略',
+                type: '趋势跟踪',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>双均线策略是最经典的趋势跟踪策略之一。它通过比较不同周期的移动平均线来判断市场趋势的改变，从而产生交易信号。</p>
+                        <ul>
+                            <li><strong>黄金交叉（Golden Cross）</strong>：短期均线上穿长期均线，产生买入信号</li>
+                            <li><strong>死亡交叉（Death Cross）</strong>：短期均线下穿长期均线，产生卖出信号</li>
+                        </ul>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>短期均线周期</td><td>5日 / 10日</td><td>捕捉短期价格变动</td></tr>
+                            <tr><td>长期均线周期</td><td>20日 / 60日</td><td>过滤短期噪音</td></tr>
+                            <tr><td>ADX强趋势阈值</td><td>40</td><td>确认趋势强度</td></tr>
+                            <tr><td>ADX中等趋势阈值</td><td>25</td><td>识别趋势形成</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入条件</h6>
+                            <ol>
+                                <li>短期均线 > 长期均线（多头排列）</li>
+                                <li>ADX > 25（存在趋势）</li>
+                                <li>价格突破短期均线上方</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出/止损条件</h6>
+                            <ol>
+                                <li>短期均线 < 长期均线（空头排列）</li>
+                                <li>价格下跌超过预设比例</li>
+                                <li>趋势反转确认（ADX下降）</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>避免在无趋势市场中频繁交易</li>
+                            <li><span class="badge bg-info me-2">市场Beta调整</span>根据大盘走势调整买入倍数</li>
+                            <li><span class="badge bg-info me-2">熊市保护</span>大盘大跌时降低买入频率</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'mean_reversion': {
+                name: '均值回归策略',
+                type: '均值回归',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>均值回归策略基于统计学原理：价格总是倾向于回归到其历史均值附近。当价格明显偏离均值时，建立反向头寸，预期价格将回归。</p>
+                        <div class="formula-box">
+                            <strong>偏离度公式：</strong><br>
+                            <code>偏离度 = (P - MA) / MA × 100%</code><br>
+                            <small class="text-muted">P = 当前价格，MA = 移动平均价</small>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>均值窗口周期</td><td>60/120/250日</td><td>计算均值的历史长度</td></tr>
+                            <tr><td>买入偏离阈值</td><td>-5% / -8%</td><td>价格低于均值多少时买入</td></tr>
+                            <tr><td>卖出偏离阈值</td><td>+5% / +8%</td><td>价格高于均值多少时卖出</td></tr>
+                            <tr><td>趋势过滤器</td><td>启用/禁用</td><td>避免强趋势中错误交易</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入条件</h6>
+                            <ol>
+                                <li>当前价格 < 均值 × (1 - 买入偏离阈值)</li>
+                                <li>ADX < 40（非强趋势市场）</li>
+                                <li>连续下跌日数 < 阈值（避底）</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出条件</h6>
+                            <ol>
+                                <li>当前价格 > 均值 × (1 + 卖出偏离阈值)</li>
+                                <li>持仓盈利达到预期目标</li>
+                                <li>均值上移且价格跟随（趋势转化）</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-success me-2">高估卖出修正</span>修复了超贫卖出逻辑缺陷</li>
+                            <li><span class="badge bg-success me-2">趋势过滤器</span>强趋势中暂停均值回归操作</li>
+                            <li><span class="badge bg-success me-2">ADX确认</span>趋势强度确认避免趋势市场损失</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'target_value': {
+                name: '目标市值策略',
+                type: '价值投资',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>目标市值策略是一种被动型投资策略，通过设定目标持仓市值，定期调整实际持仓使其接近目标值，实现"低买高卖"的效果。</p>
+                        <ul>
+                            <li>价格下跌 → 市值低于目标 → 自动加仓</li>
+                            <li>价格上涨 → 市值高于目标 → 自动减仓</li>
+                        </ul>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>目标市值</td><td>可配置</td><td>期望的持仓市值目标</td></tr>
+                            <tr><td>调整周期</td><td>每日/每周</td><td>检查并调整的频率</td></tr>
+                            <tr><td>最小调整金额</td><td>100元</td><td>避免过于频繁的小额交易</td></tr>
+                            <tr><td>最大偏离比例</td><td>20%</td><td>触发调整的阈值</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>加仓条件</h6>
+                            <ol>
+                                <li>当前市值 < 目标市值 × (1 - 触发阈值)</li>
+                                <li>偏离金额 >= 最小调整金额</li>
+                                <li>账户余额充足</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>减仓条件</h6>
+                            <ol>
+                                <li>当前市值 > 目标市值 × (1 + 触发阈值)</li>
+                                <li>持仓盈利为正</li>
+                                <li>可卖出份额 >= 最小调整金额</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>在强趋势中动态调整目标市值</li>
+                            <li><span class="badge bg-info me-2">波动率适配</span>根据历史波动率调整调整幅度</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'grid': {
+                name: '网格交易策略',
+                type: '量化网格',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>网格交易策略在预设的价格区间内设置多个买卖网格。价格每触及一个网格线，就执行对应的交易操作，赚取网格区间内的波动收益。</p>
+                        <div class="diagram-box">
+                            <pre>
+    价格上限 ──────────────────── ← 卖出网格
+      │    ↓ 价格上涨 → 减仓
+      │    ↑ 价格下跌 → 加仓
+    中心价 ──────────────────── ─ 基准价格
+      │    ↓ 价格下跌 → 加仓
+      │    ↑ 价格上涨 → 减仓
+    价格下限 ──────────────────── ← 买入网格
+                            </pre>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>价格上限</td><td>可配置</td><td>网格区间的最高价</td></tr>
+                            <tr><td>价格下限</td><td>可配置</td><td>网格区间的最低价</td></tr>
+                            <tr><td>网格数量</td><td>5-20个</td><td>区间内的网格划分</td></tr>
+                            <tr><td>每格投入</td><td>固定金额</td><td>每个网格的交易金额</td></tr>
+                            <tr><td>止损网格</td><td>价格下限以下</td><td>突破时全部止损</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>买入触发</h6>
+                            <ol>
+                                <li>价格下跌触及某个买入网格线</li>
+                                <li>该网格尚未建仓或已清仓</li>
+                                <li>价格仍在网格区间内</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>卖出触发</h6>
+                            <ol>
+                                <li>价格上涨触及某个卖出网格线</li>
+                                <li>该网格已建仓</li>
+                                <li>持仓盈利为正</li>
+                            </ol>
+                        </div>
+                        <div class="alert alert-warning mt-2">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>止损规则：</strong>价格突破下限时，立即清仓止损，网格失效。
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-info me-2">ADX趋势确认</span>检测突破行情，及时暂停网格</li>
+                            <li><span class="badge bg-info me-2">动态网格</span>根据波动率自适应调整网格密度</li>
+                            <li><span class="badge bg-info me-2">金额分配</span>低位重仓，高位轻仓的金字塔分配</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'enhanced_rule_based': {
+                name: '增强型规则策略',
+                type: '多因子',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>增强型规则策略是一个复合式策略，综合多种技术指标和市场因子，通过规则引擎动态调整仓位和交易时机。</p>
+                        <div class="factor-box">
+                            <h6><i class="bi bi-diagram-3 me-2"></i>综合因子</h6>
+                            <ul>
+                                <li><strong>趋势因子：</strong>ADX趋势强度、移动均线排列</li>
+                                <li><strong>动量因子：</strong>RSI超买超卖、MACD柱状线</li>
+                                <li><strong>成交量因子：</strong>成交量放大确认突破</li>
+                                <li><strong>市场因子：</strong>大盘Beta、行情阶段</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>趋势确认周期</td><td>14日</td><td>ADX计算周期</td></tr>
+                            <tr><td>强趋势阈值</td><td>ADX > 40</td><td>确认强趋势形成</td></tr>
+                            <tr><td>持续下跌判定</td><td>5日</td><td>连续下跌触发加大买入</td></tr>
+                            <tr><td>熊市买入倍数</td><td>0.7x</td><td>大盘大跌时降低买入</td></tr>
+                            <tr><td>止盈比例</td><td>5% / 8%</td><td>目标止盈水平</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>多因子买入</h6>
+                            <ol>
+                                <li>价格突破短期支撑且ADX确认</li>
+                                <li>或：连续下跌8%以上触发加大买入</li>
+                                <li>成交量放大确认（可选）</li>
+                                <li>熊市降低买入倍数防茎护盘</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>多因子卖出</h6>
+                            <ol>
+                                <li>达到目标止盈水平且ADX确认趋势未强</li>
+                                <li>或：RSI进入超买区域且量价背离</li>
+                                <li>或：趋势反转信号出现（多空分岐）</li>
+                                <li>牛市中可暂停止盈让利润奔跑</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>优化特性</h6>
+                        <ul class="feature-list">
+                            <li><span class="badge bg-primary me-2">持续下跌优化</span>修复连续下跌判定逻辑</li>
+                            <li><span class="badge bg-primary me-2">ADX趋势确认</span>趋势强度确认避免早期退出</li>
+                            <li><span class="badge bg-primary me-2">市场Beta调整</span>根据大盘走势调整交易策略</li>
+                            <li><span class="badge bg-primary me-2">成交量确认</span>成交量放大确认突破有效性</li>
+                        </ul>
+                    </div>
+                `
+            },
+            'mean_reversion_optimized': {
+                name: '均值回归-优化版',
+                type: '均值回归',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>在标准均值回归策略基础上，应用了完整的优化套件，是目前推荐的均值回归策略。</p>
+                        <div class="highlight-box">
+                            <strong>优化亮点：</strong>
+                            <ul>
+                                <li>修复高估卖出逻辑缺陷，确保正确判定超贫状态</li>
+                                <li>添加趋势过滤器，避免强趋势中的错误交易</li>
+                                <li>ADX趋势强度确认，提高交易成功率</li>
+                                <li>市场Beta调整，适配不同市场环境</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>均值窗口</td><td>250日</td><td>长期均值更稳健</td></tr>
+                            <tr><td>买入偏离</td><td>-5%</td><td>中等敏感度</td></tr>
+                            <tr><td>卖出偏离</td><td>+5%</td><td>对称止盈</td></tr>
+                            <tr><td>趋势过滤</td><td>强制开启</td><td>ADX > 40时暂停</td></tr>
+                            <tr><td>熊市倍数</td><td>0.7x</td><td>大盘跌2%+时降低</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>与标准均值回归策略相比，优化版有以下改进：</strong>
+                        </div>
+                        <ul>
+                            <li>高估判定使用市值与成本比较，更准确</li>
+                            <li>趋势过滤器强制检查，禁止在ADX > 40时开仓</li>
+                            <li>连续下跌判定加入成交量确认</li>
+                            <li>熊市中自动降低买入倍数保护资金</li>
+                        </ul>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>完整优化特性</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-success">高估卖出修正</h6>
+                                    <p class="small mb-0">修复了按份额判断超贫的逻辑错误，改用市值/成本比较</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-primary">趋势过滤器</h6>
+                                    <p class="small mb-0">强趋势市场中暂停均值回归操作，避免趋势贯穿损失</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-info">ADX趋势确认</h6>
+                                    <p class="small mb-0">趋势强度确认后才执行交易，提高成功率</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded">
+                                    <h6 class="text-warning">市场Beta调整</h6>
+                                    <p class="small mb-0">根据大盘走势调整买入策略，适配市场环境</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            'enhanced_rule_based_optimized': {
+                name: '增强规则-优化版',
+                type: '多因子',
+                coreLogic: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-lightbulb me-2"></i>核心逻辑</h6>
+                        <p>基于增强型规则策略的全面优化版本，集成了所有优化特性，是目前最推荐的复合策略。</p>
+                        <div class="highlight-box bg-primary-light">
+                            <strong>全面优化：</strong>
+                            <ul>
+                                <li>持续下跌判定优化：更精确地识别真实的持续下跌</li>
+                                <li>ADX趋势确认：确保趋势有效性后才交易</li>
+                                <li>市场Beta调整：根据大盘走势调整策略参数</li>
+                                <li>成交量确认：确认突破信号的有效性</li>
+                            </ul>
+                        </div>
+                    </div>
+                `,
+                parameters: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-sliders me-2"></i>参数设置</h6>
+                        <table class="table table-sm">
+                            <tr><td>持续下跌判定日数</td><td>5日</td><td>连续下跌触发加大买入</td></tr>
+                            <tr><td>下跌累计幅度</td><td>8%</td><td>5日内累计跌幅触发</td></tr>
+                            <tr><td>ADX强趋势阈值</td><td>40</td><td>确认趋势强度</td></tr>
+                            <tr><td>成交量确认倍数</td><td>1.5x</td><td>均量的1.5倍确认放大</td></tr>
+                            <tr><td>熊市买入倍数</td><td>0.7x</td><td>大盘跌2%+时降低</td></tr>
+                            <tr><td>牛市暂停止盈</td><td>开启</td><td>让利润奔跑</td></tr>
+                        </table>
+                    </div>
+                `,
+                tradingRules: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-list-check me-2"></i>交易规则</h6>
+                        <div class="rule-box buy-rule">
+                            <h6 class="text-success"><i class="bi bi-arrow-up-circle me-2"></i>优化买入</h6>
+                            <ol>
+                                <li>基础买入：价格突破 + ADX确认</li>
+                                <li>加大买入：连续5日下跌8%以上</li>
+                                <li>成交量确认：当日成交量 > 1.5×均量</li>
+                                <li>熊市保护：大盘跌2%+时降低买入倍数</li>
+                            </ol>
+                        </div>
+                        <div class="rule-box sell-rule">
+                            <h6 class="text-danger"><i class="bi bi-arrow-down-circle me-2"></i>优化卖出</h6>
+                            <ol>
+                                <li>达标卖出：目标止盈 + 趋势未强</li>
+                                <li>趋势反转：多空因子分岖信号</li>
+                                <li>牛市保护：大盘涨2%+时可暂停止盈</li>
+                                <li>成交量确认：放量下跌时执行</li>
+                            </ol>
+                        </div>
+                    </div>
+                `,
+                optimization: `
+                    <div class="detail-section">
+                        <h6><i class="bi bi-magic me-2"></i>完整优化特性</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded border-primary">
+                                    <h6 class="text-primary"><i class="bi bi-check-circle me-1"></i>持续下跌优化</h6>
+                                    <p class="small mb-0">更精确的持续下跌判定逻辑，避免震荡中的误判</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-card p-2 border rounded border-info">
+                                    <h6 class="text-info"><i class="bi bi-check-circle me-1"></i>ADX趋势确认</h6>
+                                    <p class="small mb-0">趋势强度确认后才执行交易</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded border-warning">
+                                    <h6 class="text-warning"><i class="bi bi-check-circle me-1"></i>市场Beta调整</h6>
+                                    <p class="small mb-0">根据大盘走势动态调整策略参数</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mt-2">
+                                <div class="feature-card p-2 border rounded border-success">
+                                    <h6 class="text-success"><i class="bi bi-check-circle me-1"></i>成交量确认</h6>
+                                    <p class="small mb-0">成交量放大确认突破的真实性</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `
+            }
+        };
+        
+        /**
+         * 显示策略详情模态框
+         * @param {string} strategyId - 策略ID
+         */
+        function showStrategyDetail(strategyId) {
+            const details = strategyAlgorithmDetails[strategyId];
+            if (!details) {
+                alert('暂无该策略的详细信息');
+                return;
+            }
+            
+            const detailHtml = `
+                <div class="modal fade" id="strategyDetailModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header" style="background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);">
+                                <h5 class="modal-title text-white">
+                                    <i class="bi bi-cpu me-2"></i>${details.name} - 算法实现详情
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-0">
+                                <div class="strategy-detail-tabs">
+                                    <ul class="nav nav-tabs nav-fill" id="strategyDetailTabs" role="tablist" style="background: #f8f9fa;">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="logic-tab" data-bs-toggle="tab" data-bs-target="#logic" type="button" role="tab">
+                                                <i class="bi bi-lightbulb me-1"></i>核心逻辑
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab">
+                                                <i class="bi bi-sliders me-1"></i>参数设置
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="rules-tab" data-bs-toggle="tab" data-bs-target="#rules" type="button" role="tab">
+                                                <i class="bi bi-list-check me-1"></i>交易规则
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="optimize-tab" data-bs-toggle="tab" data-bs-target="#optimize" type="button" role="tab">
+                                                <i class="bi bi-magic me-1"></i>优化特性
+                                            </button>
+                                        </li>
+                                    </ul>
+                                    <div class="tab-content p-4" id="strategyDetailContent">
+                                        <div class="tab-pane fade show active" id="logic" role="tabpanel">
+                                            ${details.coreLogic}
+                                        </div>
+                                        <div class="tab-pane fade" id="params" role="tabpanel">
+                                            ${details.parameters}
+                                        </div>
+                                        <div class="tab-pane fade" id="rules" role="tabpanel">
+                                            ${details.tradingRules}
+                                        </div>
+                                        <div class="tab-pane fade" id="optimize" role="tabpanel">
+                                            ${details.optimization}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light">
+                                <span class="badge bg-primary me-2">${details.type}</span>
+                                <span class="text-muted small">查看完整策略代码请访问策略编辑器</span>
+                                <button type="button" class="btn btn-secondary ms-auto" data-bs-dismiss="modal">关闭</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <style>
+                    .strategy-detail-tabs .nav-link {
+                        color: #666;
+                        font-weight: 500;
+                        padding: 12px 16px;
+                        border: none;
+                        border-bottom: 3px solid transparent;
+                    }
+                    .strategy-detail-tabs .nav-link:hover {
+                        color: #4361ee;
+                        background: rgba(67, 97, 238, 0.05);
+                    }
+                    .strategy-detail-tabs .nav-link.active {
+                        color: #4361ee;
+                        background: white;
+                        border-bottom-color: #4361ee;
+                    }
+                    .detail-section {
+                        margin-bottom: 24px;
+                    }
+                    .detail-section h6 {
+                        color: #333;
+                        font-weight: 600;
+                        margin-bottom: 12px;
+                        padding-bottom: 8px;
+                        border-bottom: 2px solid #e9ecef;
+                    }
+                    .rule-box {
+                        background: #f8f9fa;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                        border-left: 4px solid #dee2e6;
+                    }
+                    .rule-box.buy-rule {
+                        border-left-color: #06d6a0;
+                        background: linear-gradient(135deg, #e8fcf3 0%, #f8f9fa 100%);
+                    }
+                    .rule-box.sell-rule {
+                        border-left-color: #ef476f;
+                        background: linear-gradient(135deg, #fceced 0%, #f8f9fa 100%);
+                    }
+                    .rule-box h6 {
+                        border-bottom: none;
+                        margin-bottom: 12px;
+                    }
+                    .formula-box {
+                        background: #e3f2fd;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #2196f3;
+                    }
+                    .diagram-box {
+                        background: #f5f5f5;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        overflow-x: auto;
+                    }
+                    .diagram-box pre {
+                        margin: 0;
+                        font-family: 'SF Mono', Monaco, monospace;
+                        font-size: 13px;
+                        line-height: 1.6;
+                    }
+                    .highlight-box {
+                        background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #4caf50;
+                    }
+                    .highlight-box.bg-primary-light {
+                        background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
+                        border-left-color: #2196f3;
+                    }
+                    .factor-box {
+                        background: #fff3e0;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 12px 0;
+                        border-left: 4px solid #ff9800;
+                    }
+                    .feature-list {
+                        list-style: none;
+                        padding: 0;
+                    }
+                    .feature-list li {
+                        padding: 8px 0;
+                        border-bottom: 1px dashed #e0e0e0;
+                    }
+                    .feature-list li:last-child {
+                        border-bottom: none;
+                    }
+                    .feature-card {
+                        background: white;
+                        transition: all 0.2s;
+                    }
+                    .feature-card:hover {
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                        transform: translateY(-2px);
+                    }
+                </style>
+            `;
+            
+            // 移除已存在的模态框
+            const existingModal = document.getElementById('strategyDetailModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // 添加新的模态框到页面
+            document.body.insertAdjacentHTML('beforeend', detailHtml);
+            
+            // 显示模态框
+            const modal = new bootstrap.Modal(document.getElementById('strategyDetailModal'));
+            modal.show();
         }
     </script>
     

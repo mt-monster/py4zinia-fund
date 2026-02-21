@@ -1,0 +1,193 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # 单元测试
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Run unit tests
+        run: |
+          pytest tests/unit -v \
+            --cov=fund_search \
+            --cov-report=xml \
+            --cov-report=html \
+            -m "not slow" \
+            --tb=short
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+
+  # 集成测试
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testroot
+          MYSQL_DATABASE: fund_test
+          MYSQL_USER: testuser
+          MYSQL_PASSWORD: testpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Initialize test database
+        run: |
+          python scripts/init_test_db.py
+        env:
+          DB_HOST: localhost
+          DB_PORT: 3306
+          DB_USER: testuser
+          DB_PASSWORD: testpass
+          DB_NAME: fund_test
+      
+      - name: Run integration tests
+        run: |
+          pytest tests/integration -v \
+            -m "not slow" \
+            --tb=short
+        env:
+          TESTING: true
+          DB_HOST: localhost
+          DB_PORT: 3306
+          DB_USER: testuser
+          DB_PASSWORD: testpass
+          DB_NAME: fund_test
+
+  # 代码质量检查
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install linting tools
+        run: |
+          pip install flake8 black mypy
+      
+      - name: Run flake8
+        run: |
+          flake8 fund_search --count --select=E9,F63,F7,F82 \
+            --show-source --statistics
+      
+      - name: Run black check
+        run: |
+          black --check fund_search || true
+      
+      - name: Run mypy
+        run: |
+          mypy fund_search --ignore-missing-imports || true
+
+  # 性能测试（仅 main 分支）
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+      
+      - name: Start application
+        run: |
+          python fund_search/web/app.py &
+          sleep 5
+      
+      - name: Run Locust tests
+        run: |
+          locust -f tests/performance/locustfile.py \
+            --headless \
+            --users 50 \
+            --spawn-rate 5 \
+            --run-time 2m \
+            --host=http://localhost:5001 \
+            --html=locust_report.html
+      
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: locust_report.html

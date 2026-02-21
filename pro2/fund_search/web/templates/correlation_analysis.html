@@ -9,8 +9,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/correlation_analysis.css') }}">
+    <!-- 图表加载进度指示器样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chart-loading.css') }}">
+    <!-- 图表折叠/展开功能样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chart-collapsible.css') }}">
 </head>
 <body>
+    <!-- 加载指示器（由JS动态创建） -->
+    
     <div class="page-wrapper">
         <!-- 页面头部 -->
         <header class="page-header">
@@ -126,24 +132,6 @@
                 </div>
             </section>
 
-            <!-- 增强相关性分析 -->
-            <section class="content-section" id="enhanced-analysis-section" style="display: none;">
-                <div class="section-header">
-                    <div class="section-title">
-                        <i class="bi bi-graph-up-arrow"></i>
-                        <h2>深度相关性分析</h2>
-                    </div>
-                </div>
-                <div class="section-body">
-                    <div id="enhanced-content">
-                        <div class="loading-state">
-                            <i class="bi bi-arrow-repeat"></i>
-                            <span>加载中...</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <!-- 交互式相关性图表 -->
             <section class="content-section" id="interactive-charts-section" style="display: none;">
                 <div class="section-header">
@@ -189,11 +177,11 @@
 
         // ==================== 初始化 ====================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('=== 相关性分析页面加载开始 ===');
+            console.log('=== 相关性分析页面加载开始（优化版 - 支持懒加载）===');
             initializePage();
         });
 
-        function initializePage() {
+        async function initializePage() {
             const data = getAnalysisData();
             console.log('从sessionStorage获取的数据:', data);
             
@@ -202,19 +190,388 @@
                 analysisData = data;
                 currentFundCodes = data.fund_codes;
                 
-                // 显示分析内容
+                // 显示分析内容（页面结构立即显示）
                 showAnalysisContent();
                 
-                // 加载各个模块
-                renderAnalysisResult(data);
-                loadEnhancedCorrelationAnalysis(data.fund_codes);
-                loadCorrelationCharts(data.fund_codes);
+                // 初始化进度指示器
+                chartLoadingManager.init();
+                
+                // 使用进度指示器加载数据
+                await chartLoadingManager.loadWithProgress(async () => {
+                    // 如果有基础数据，先快速显示基础结果
+                    if (data.basic_correlation) {
+                        console.log('📊 先显示基础数据...');
+                        renderAnalysisResult(data);
+                    }
+                    
+                    // 加载交互式数据
+                    await loadInteractiveCorrelationData(data.fund_codes);
+                });
+                
             } else {
                 console.log('未检测到有效的基金数据，显示空状态');
                 showEmptyState();
             }
             
-            console.log('=== 页面加载完成 ===');
+            console.log('=== 页面初始化完成，数据加载中... ===');
+        }
+        
+        // 加载交互式相关性数据（懒加载优化版 - 分阶段显示）
+        async function loadInteractiveCorrelationData(fundCodes) {
+            console.log('🔄 开始加载交互式相关性数据（懒加载模式）...');
+            console.log(`[Performance] 开始API请求时间: ${new Date().toISOString()}`);
+            
+            const requestStartTime = performance.now();
+            
+            try {
+                // 更新进度到API请求阶段
+                chartLoadingManager.setStage(2);
+                chartLoadingManager.updateProgress(70, '正在请求服务器数据...');
+                
+                // 更新状态栏显示正在加载
+                const statusText = document.getElementById('status-text');
+                if (statusText) {
+                    statusText.innerHTML = `正在分析 ${fundCodes.length} 只基金的相关性 <span class="loading-dots">...</span>`;
+                }
+                
+                const response = await fetch('/api/holdings/analyze/correlation-interactive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        fund_codes: fundCodes
+                    })
+                });
+                
+                const requestEndTime = performance.now();
+                const requestDuration = requestEndTime - requestStartTime;
+                console.log(`[Performance] API响应时间: ${requestDuration.toFixed(2)} ms`);
+                
+                chartLoadingManager.updateProgress(80, '正在处理数据...');
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const responseData = result.data;
+                    
+                    // 记录后端性能数据
+                    if (responseData._api_performance) {
+                        console.log('[Performance] 后端性能数据:', responseData._api_performance);
+                    }
+                    
+                    // 更新分析数据
+                    analysisData = {
+                        ...analysisData,
+                        ...responseData,
+                        fund_codes: fundCodes
+                    };
+                    
+                    const renderStartTime = performance.now();
+                    
+                    // 依次渲染各个部分，让用户逐步看到内容
+                    console.log('📊 开始渲染页面组件...');
+                    chartLoadingManager.updateProgress(85, '正在渲染概览...');
+                    
+                    // 1. 先渲染概览（最快）
+                    if (responseData.all_combinations_summary) {
+                        updateOverviewFromCombinations(responseData.all_combinations_summary, fundCodes.length);
+                    }
+                    
+                    chartLoadingManager.updateProgress(88, '正在渲染相关性矩阵...');
+                    
+                    // 2. 渲染相关性矩阵
+                    if (responseData.all_combinations_summary) {
+                        renderCorrelationMatrixFromSummary(responseData.all_combinations_summary, fundCodes);
+                    }
+                    
+                    chartLoadingManager.updateProgress(91, '正在渲染组合列表...');
+                    
+                    // 3. 渲染组合列表
+                    if (responseData.all_combinations_summary) {
+                        renderCombinationsList(responseData.all_combinations_summary);
+                    }
+                    
+                    chartLoadingManager.updateProgress(94, '正在渲染交互式图表...');
+                    
+                    // 4. 最后渲染图表（最耗时）
+                    if (responseData.primary_combination) {
+                        renderInteractiveCharts(responseData);
+                    }
+                    
+                    chartLoadingManager.updateProgress(98, '正在完成...');
+                    
+                    const renderEndTime = performance.now();
+                    console.log(`[Performance] 前端渲染时间: ${(renderEndTime - renderStartTime).toFixed(2)} ms`);
+                    console.log(`[Performance] 总耗时: ${(renderEndTime - requestStartTime).toFixed(2)} ms`);
+                    
+                    // 更新状态栏
+                    if (statusText) {
+                        statusText.textContent = `已完成 ${fundCodes.length} 只基金的相关性分析`;
+                    }
+                    
+                    // 显示懒加载提示
+                    if (responseData.lazy_load_enabled && responseData.all_combinations_summary && responseData.all_combinations_summary.length > 1) {
+                        showLazyLoadHint(responseData.all_combinations_summary.length);
+                    }
+                    
+                    chartLoadingManager.updateProgress(100, '分析完成！');
+                    console.log('✅ 页面渲染完成');
+                } else {
+                    console.error('❌ 加载数据失败:', result.error);
+                    showErrorMessage('分析数据加载失败: ' + (result.error || '未知错误'));
+                }
+            } catch (error) {
+                const requestEndTime = performance.now();
+                console.error(`❌ 网络错误，耗时: ${(requestEndTime - requestStartTime).toFixed(2)} ms, 错误:`, error);
+                showErrorMessage('网络错误，部分分析数据可能无法显示');
+            }
+        }
+        
+        // 按需加载单个基金对的详细数据
+        async function loadPairDetail(fund1Code, fund2Code) {
+            console.log(`🔄 懒加载: 加载 ${fund1Code} vs ${fund2Code} 的详细数据`);
+            
+            try {
+                // 显示加载状态
+                const chartsContainer = document.getElementById('interactive-charts-content');
+                chartsContainer.innerHTML = `
+                    <div class="loading-state">
+                        <i class="bi bi-arrow-repeat spin"></i>
+                        <span>正在加载图表数据...</span>
+                    </div>
+                `;
+                
+                const response = await fetch('/api/holdings/analyze/correlation-interactive', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        fund_codes: currentFundCodes,
+                        detail_pair: {
+                            fund1: fund1Code,
+                            fund2: fund2Code
+                        }
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.data.pair_detail) {
+                    console.log('✅ 详细数据加载成功');
+                    
+                    // 更新主组合显示
+                    const detail = result.data.pair_detail;
+                    
+                    // 构造与之前兼容的数据格式
+                    const chartData = {
+                        primary_combination: detail,
+                        all_funds_nav_comparison: analysisData.all_funds_nav_comparison,
+                        all_funds_distribution: analysisData.all_funds_distribution
+                    };
+                    
+                    renderInteractiveCharts(chartData);
+                    
+                    // 更新组合列表中的激活状态
+                    updateActiveCombination(fund1Code, fund2Code);
+                } else {
+                    showChartsError('加载详细数据失败');
+                }
+            } catch (error) {
+                console.error('❌ 加载详细数据失败:', error);
+                showChartsError('网络错误');
+            }
+        }
+        
+        // 渲染组合列表（支持点击切换）
+        function renderCombinationsList(combinations) {
+            const container = document.getElementById('top-pairs-content');
+            
+            if (!combinations || combinations.length === 0) {
+                container.innerHTML = '<div class="empty-data">暂无组合数据</div>';
+                return;
+            }
+            
+            // 取相关性最高的前10个组合
+            const topCombinations = combinations.slice(0, 10);
+            
+            let html = '<div class="pairs-list lazy-load-list">';
+            topCombinations.forEach((pair, index) => {
+                const correlationClass = getCorrelationClass(pair.correlation);
+                const strengthLabel = getCorrelationStrength(pair.correlation);
+                const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
+                const isActive = pair.has_detail ? 'active' : '';
+                const canClick = !pair.has_detail; // 主组合不需要点击
+                
+                html += `
+                    <div class="pair-item ${correlationClass} ${isActive} ${canClick ? 'clickable' : ''}" 
+                         ${canClick ? `onclick="loadPairDetail('${pair.fund1_code}', '${pair.fund2_code}')"` : ''}
+                         style="${canClick ? 'cursor: pointer;' : ''}">
+                        <div class="pair-rank">${index + 1}</div>
+                        <div class="pair-funds">
+                            <span class="fund-name">${escapeHtml(pair.fund1_name)}</span>
+                            <span class="pair-arrow">↔</span>
+                            <span class="fund-name">${escapeHtml(pair.fund2_name)}</span>
+                        </div>
+                        <div class="pair-info">
+                            <div class="pair-value">${pair.correlation.toFixed(4)}</div>
+                            <div class="pair-strength">${strengthLabel}</div>
+                        </div>
+                        <div class="pair-bar">
+                            <div class="correlation-bar" style="width: ${barWidth}"></div>
+                        </div>
+                        ${canClick ? '<div class="pair-hint"><i class="bi bi-arrow-right-circle"></i> 点击查看详情</div>' : ''}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        // 从组合摘要更新概览
+        function updateOverviewFromCombinations(combinations, fundCount) {
+            document.getElementById('fund-count').textContent = fundCount;
+            
+            // 计算高相关性组合数量
+            let highCorrCount = 0;
+            combinations.forEach(pair => {
+                if (pair.correlation > 0.7) {
+                    highCorrCount++;
+                }
+            });
+            document.getElementById('high-correlation-count').textContent = highCorrCount;
+            
+            // 计算分散度评分
+            let diversificationScore = '优秀';
+            const totalPairs = combinations.length;
+            if (totalPairs > 0) {
+                const ratio = highCorrCount / totalPairs;
+                if (ratio > 0.5) diversificationScore = '较差';
+                else if (ratio > 0.3) diversificationScore = '一般';
+                else if (ratio > 0.1) diversificationScore = '良好';
+            }
+            document.getElementById('diversification-score').textContent = diversificationScore;
+        }
+        
+        // 从组合摘要渲染相关性矩阵
+        function renderCorrelationMatrixFromSummary(combinations, fundCodes) {
+            const container = document.getElementById('matrix-content');
+            
+            if (!combinations || combinations.length === 0) {
+                container.innerHTML = '<div class="empty-data">暂无相关性矩阵数据</div>';
+                return;
+            }
+            
+            // 构建基金名称列表
+            const fundNames = {};
+            combinations.forEach(pair => {
+                fundNames[pair.fund1_code] = pair.fund1_name;
+                fundNames[pair.fund2_code] = pair.fund2_name;
+            });
+            
+            const uniqueFunds = fundCodes.filter(code => fundNames[code]).map(code => ({
+                code: code,
+                name: fundNames[code] || code
+            }));
+            
+            // 构建相关性矩阵
+            const matrix = {};
+            combinations.forEach(pair => {
+                if (!matrix[pair.fund1_code]) matrix[pair.fund1_code] = {};
+                if (!matrix[pair.fund2_code]) matrix[pair.fund2_code] = {};
+                matrix[pair.fund1_code][pair.fund2_code] = pair.correlation;
+                matrix[pair.fund2_code][pair.fund1_code] = pair.correlation;
+            });
+            
+            // 渲染矩阵（简化版）
+            let html = '<table class="correlation-matrix">';
+            html += '<thead><tr><th class="corner-cell"></th>';
+            uniqueFunds.forEach(fund => {
+                html += `<th>${escapeHtml(fund.name)}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            uniqueFunds.forEach((rowFund, rowIndex) => {
+                html += `<tr><th>${escapeHtml(rowFund.name)}</th>`;
+                uniqueFunds.forEach((colFund, colIndex) => {
+                    if (rowIndex === colIndex) {
+                        html += '<td class="corr-cell correlation-1">1.0000</td>';
+                    } else {
+                        const value = matrix[rowFund.code]?.[colFund.code] || 0;
+                        let className = 'corr-cell ';
+                        if (value > 0.7) className += 'correlation-high';
+                        else if (value > 0.3) className += 'correlation-medium';
+                        else className += 'correlation-low';
+                        html += `<td class="${className}">${value.toFixed(4)}</td>`;
+                    }
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+        
+        // 显示懒加载提示
+        function showLazyLoadHint(combinationCount) {
+            const container = document.getElementById('interactive-charts-section');
+            const hint = document.createElement('div');
+            hint.className = 'lazy-load-hint';
+            hint.innerHTML = `
+                <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 12px 16px; margin: 10px 0; border-radius: 4px;">
+                    <i class="bi bi-info-circle" style="color: #2196f3; margin-right: 8px;"></i>
+                    <span style="color: #1976d2;">
+                        当前显示相关性最高的组合。点击上方"高相关性基金组合"列表中的其他组合可查看详情。
+                        共 ${combinationCount} 个组合。
+                    </span>
+                </div>
+            `;
+            container.querySelector('.section-body').insertBefore(hint, container.querySelector('.section-body').firstChild);
+        }
+        
+        // 更新激活的组合状态
+        function updateActiveCombination(fund1Code, fund2Code) {
+            document.querySelectorAll('.pair-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // 找到对应的元素并标记为激活
+            // 这里可以根据实际情况实现
+        }
+        
+        // 显示加载指示器
+        function showLoadingIndicator() {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.style.display = 'flex';
+            }
+        }
+        
+        // 隐藏加载指示器
+        function hideLoadingIndicator() {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+        
+        // 显示错误消息
+        function showErrorMessage(message) {
+            // 创建一个临时通知
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-warning alert-dismissible fade show';
+            notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+            notification.innerHTML = `
+                <strong>注意</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(notification);
+            
+            // 5秒后自动移除
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
         }
 
         // ==================== 数据获取 ====================
@@ -255,7 +612,6 @@
             document.getElementById('overview-cards').style.display = 'none';
             document.getElementById('top-pairs-section').style.display = 'none';
             document.getElementById('matrix-section').style.display = 'none';
-            document.getElementById('enhanced-analysis-section').style.display = 'none';
             document.getElementById('interactive-charts-section').style.display = 'none';
         }
 
@@ -265,7 +621,6 @@
             document.getElementById('overview-cards').style.display = 'grid';
             document.getElementById('top-pairs-section').style.display = 'block';
             document.getElementById('matrix-section').style.display = 'block';
-            document.getElementById('enhanced-analysis-section').style.display = 'block';
             document.getElementById('interactive-charts-section').style.display = 'block';
             
             // 更新状态栏
@@ -433,13 +788,30 @@
                 const strengthLabel = getCorrelationStrength(pair.correlation);
                 const barWidth = `${(Math.abs(pair.correlation) * 100).toFixed(0)}%`;
                 
+                // 如果有基金代码信息，则同时显示代码和名称
+                let fund1Display = escapeHtml(pair.fund1);
+                let fund2Display = escapeHtml(pair.fund2);
+                
+                // 尝试从数据中获取基金代码（如果可用）
+                if (data.fund_codes && data.fund_names) {
+                    const fund1Index = data.fund_names.indexOf(pair.fund1);
+                    const fund2Index = data.fund_names.indexOf(pair.fund2);
+                    
+                    if (fund1Index !== -1 && fund1Index < data.fund_codes.length) {
+                        fund1Display = `${data.fund_codes[fund1Index]} ${escapeHtml(pair.fund1)}`;
+                    }
+                    if (fund2Index !== -1 && fund2Index < data.fund_codes.length) {
+                        fund2Display = `${data.fund_codes[fund2Index]} ${escapeHtml(pair.fund2)}`;
+                    }
+                }
+                
                 html += `
                     <div class="pair-item ${correlationClass}">
                         <div class="pair-rank">${index + 1}</div>
                         <div class="pair-funds">
-                            <span class="fund-name">${escapeHtml(pair.fund1)}</span>
+                            <span class="fund-name">${fund1Display}</span>
                             <span class="pair-arrow">↔</span>
-                            <span class="fund-name">${escapeHtml(pair.fund2)}</span>
+                            <span class="fund-name">${fund2Display}</span>
                         </div>
                         <div class="pair-info">
                             <div class="pair-value">${pair.correlation.toFixed(4)}</div>
@@ -472,16 +844,26 @@
             `;
             
             // 表头
-            data.fund_names.forEach(fundName => {
-                html += `<th>${escapeHtml(fundName)}</th>`;
+            data.fund_names.forEach((fundName, index) => {
+                let displayText = escapeHtml(fundName);
+                // 如果有基金代码，同时显示代码和名称
+                if (data.fund_codes && index < data.fund_codes.length) {
+                    displayText = `${data.fund_codes[index]} ${displayText}`;
+                }
+                html += `<th>${displayText}</th>`;
             });
             
             html += '</tr></thead><tbody>';
             
             // 表格内容
             data.correlation_matrix.forEach((row, rowIndex) => {
+                // 行标签：同时显示基金代码和名称
+                let rowHeader = escapeHtml(data.fund_names[rowIndex]);
+                if (data.fund_codes && rowIndex < data.fund_codes.length) {
+                    rowHeader = `${data.fund_codes[rowIndex]} ${rowHeader}`;
+                }
                 html += `<tr>
-                    <th>${escapeHtml(data.fund_names[rowIndex])}</th>`;
+                    <th>${rowHeader}</th>`;
                 
                 row.forEach(value => {
                     let className = 'corr-cell ';
@@ -507,7 +889,13 @@
 
         // ==================== 增强分析功能 ====================
         async function loadEnhancedCorrelationAnalysis(fundCodes) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+            
             try {
+                console.log(`[Enhanced] 开始加载相关性分析，基金数量: ${fundCodes.length}`);
+                const startTime = Date.now();
+                
                 const response = await fetch('/api/holdings/analyze/correlation', {
                     method: 'POST',
                     headers: {
@@ -516,11 +904,22 @@
                     body: JSON.stringify({ 
                         fund_codes: fundCodes,
                         enhanced_analysis: true
-                    })
+                    }),
+                    signal: controller.signal
                 });
                 
+                clearTimeout(timeoutId);
+                
+                const elapsed = Date.now() - startTime;
+                console.log(`[Enhanced] API响应时间: ${elapsed}ms`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const result = await response.json();
-                console.log('📊 API /api/holdings/analyze/correlation 返回:', result);
+                console.log('[Enhanced] API返回:', result);
+                
                 if (result.success) {
                     renderEnhancedAnalysis(result.data);
                     // 使用增强分析数据更新所有组件
@@ -529,8 +928,15 @@
                     showEnhancedError(result.error || '加载失败');
                 }
             } catch (error) {
-                console.error('加载增强分析失败:', error);
-                showEnhancedError('网络错误');
+                clearTimeout(timeoutId);
+                
+                if (error.name === 'AbortError') {
+                    console.error('[Enhanced] 请求超时');
+                    showEnhancedError('请求超时，请稍后重试');
+                } else {
+                    console.error('[Enhanced] 加载失败:', error);
+                    showEnhancedError('加载失败: ' + error.message);
+                }
             }
         }
 
@@ -653,12 +1059,35 @@
         }
 
         function showEnhancedError(message) {
-            document.getElementById('enhanced-content').innerHTML = `
-                <div class="error-message">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <span>加载失败: ${message}</span>
+            const container = document.getElementById('enhanced-content');
+            container.innerHTML = `
+                <div class="error-message" style="padding: 20px; text-align: center;">
+                    <i class="bi bi-exclamation-triangle-fill" style="font-size: 2rem; color: #dc3545; margin-bottom: 10px; display: block;"></i>
+                    <div style="margin-bottom: 15px;">${message}</div>
+                    <button onclick="retryEnhancedAnalysis()" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> 重新加载
+                    </button>
                 </div>
             `;
+        }
+        
+        // 重试增强分析
+        async function retryEnhancedAnalysis() {
+            // 显示加载状态
+            document.getElementById('enhanced-content').innerHTML = `
+                <div class="loading-state">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span>重新加载中...</span>
+                </div>
+            `;
+            
+            // 重新加载
+            const fundCodes = getSelectedFundCodes();
+            if (fundCodes.length >= 2) {
+                await loadEnhancedCorrelationAnalysis(fundCodes);
+            } else {
+                showEnhancedError('请先选择至少2只基金');
+            }
         }
 
         // ==================== 图表功能 ====================
@@ -784,6 +1213,20 @@
         }
     </script>
     
+    <!-- 图表加载进度指示器 -->
+    <script src="{{ url_for('static', filename='js/chart-loading.js') }}"></script>
+    <!-- 图表折叠/展开功能 -->
+    <script src="{{ url_for('static', filename='js/chart-collapsible.js') }}"></script>
+    <!-- 图表联动交互 -->
+    <script src="{{ url_for('static', filename='js/chart-interaction.js') }}"></script>
+    <!-- 增强相关性矩阵 -->
+    <script src="{{ url_for('static', filename='js/enhanced-matrix.js') }}"></script>
+    <!-- 图表工具箱 -->
+    <script src="{{ url_for('static', filename='js/chart-toolbox.js') }}"></script>
+    <!-- 模块化核心组件 -->
+    <script src="{{ url_for('static', filename='js/modules/correlation-core.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modules/chart-renderers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modules/chart-instance-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fund-correlation-charts.js') }}"></script>
 </body>
 </html>
