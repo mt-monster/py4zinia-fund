@@ -511,6 +511,26 @@ class EnhancedDatabaseManager:
             logger.error(f"执行查询失败: {str(e)}")
             return pd.DataFrame()
     
+    def fetch_one(self, sql: str, params: Optional[Dict] = None):
+        """
+        执行查询并返回单条结果
+        
+        参数：
+        sql: 查询SQL语句
+        params: 参数字典（用于命名参数）或None
+        
+        返回：
+        单条查询结果或None
+        """
+        try:
+            result = self.execute_query_raw(sql, params)
+            if result and len(result) > 0:
+                return result[0]
+            return None
+        except Exception as e:
+            logger.error(f"fetch_one 执行失败: {str(e)}")
+            return None
+    
 
 
     def insert_fund_basic_info(self, fund_info: Dict) -> bool:

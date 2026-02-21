@@ -413,7 +413,7 @@ class HeavyweightStocksFetcher:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # 提交所有任务
                 future_to_fund = {
-                    executor.submit(self._fetch_single_fund_with_timeout, fund_code, date): fund_code 
+                    executor.submit(self._fetch_single_fund_with_timeout, fund_code, date, 15): fund_code 
                     for fund_code in missing_funds
                 }
                 
@@ -421,7 +421,7 @@ class HeavyweightStocksFetcher:
                 for future in as_completed(future_to_fund):
                     fund_code = future_to_fund[future]
                     try:
-                        result = future.result(timeout=30)  # 30秒超时
+                        result = future.result(timeout=20)  # 20秒超时（内部已设置15秒）
                         results[fund_code] = result
                         
                         # 更新缓存
@@ -443,29 +443,55 @@ class HeavyweightStocksFetcher:
         
         return results
     
-    def _fetch_single_fund_with_timeout(self, fund_code: str, date: Optional[str] = None) -> Dict[str, Any]:
+    def _fetch_single_fund_with_timeout(self, fund_code: str, date: Optional[str] = None, timeout: int = 15) -> Dict[str, Any]:
         """
         带超时的单只基金重仓股获取
         
         Args:
             fund_code: 基金代码
             date: 报告期日期（可选）
+            timeout: 超时时间（秒），默认15秒
             
         Returns:
             Dict: 重仓股数据结果
         """
-        try:
-            result = self.fetch_heavyweight_stocks(fund_code, date, use_cache=True)
-            return result
-        except Exception as e:
-            logger.error(f"获取基金 {fund_code} 重仓股失败: {e}")
+        import threading
+        
+        result_container = {'result': None, 'error': None}
+        
+        def fetch_task():
+            try:
+                result = self.fetch_heavyweight_stocks(fund_code, date, use_cache=True)
+                result_container['result'] = result
+            except Exception as e:
+                result_container['error'] = e
+        
+        thread = threading.Thread(target=fetch_task)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=timeout)
+        
+        if thread.is_alive():
+            logger.warning(f"获取基金 {fund_code} 重仓股超时（{timeout}秒）")
             return {
                 'success': False,
                 'data': [],
                 'source': 'none',
-                'error': str(e),
+                'error': f'请求超时（{timeout}秒）',
                 'timestamp': datetime.now().isoformat()
             }
+        
+        if result_container['error']:
+            logger.error(f"获取基金 {fund_code} 重仓股失败: {result_container['error']}")
+            return {
+                'success': False,
+                'data': [],
+                'source': 'none',
+                'error': str(result_container['error']),
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        return result_container['result']
     
     def clear_cache(self, fund_code: Optional[str] = None):
         """清除缓存"""

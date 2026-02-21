@@ -802,7 +802,7 @@ class FundAnalysisDashboard {
      */
     renderStrategyRow(fund) {
         const todayClass = fund.today_return >= 0 ? 'positive' : 'negative';
-        const yesterdayClass = fund.yesterday_return >= 0 ? 'positive' : 'negative';
+        const yesterdayClass = fund.prev_day_return >= 0 ? 'positive' : 'negative';
         const actionClass = this.getActionClass(fund.action);
         
         return `
@@ -817,7 +817,7 @@ class FundAnalysisDashboard {
                     <span class="return-value ${todayClass}">${this.formatReturn(fund.today_return)}</span>
                 </td>
                 <td class="col-return">
-                    <span class="return-value ${yesterdayClass}">${this.formatReturn(fund.yesterday_return)}</span>
+                    <span class="return-value ${yesterdayClass}">${this.formatReturn(fund.prev_day_return)}</span>
                 </td>
                 <td class="col-status">
                     <span class="status-label">${fund.status_label}</span>
@@ -853,7 +853,7 @@ class FundAnalysisDashboard {
                         <span class="return-arrow">→</span>
                         <span class="return-item">
                             <label>昨日</label>
-                            <value class="${fund.yesterday_return >= 0 ? 'positive' : 'negative'}">${this.formatReturn(fund.yesterday_return)}</value>
+                            <value class="${fund.prev_day_return >= 0 ? 'positive' : 'negative'}">${this.formatReturn(fund.prev_day_return)}</value>
                         </span>
                         <span class="return-diff">
                             <label>差值</label>

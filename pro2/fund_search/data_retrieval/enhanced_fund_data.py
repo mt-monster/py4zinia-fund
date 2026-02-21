@@ -285,7 +285,7 @@ class EnhancedFundData:
                     'previous_nav': 0.0,
                     'daily_return': 0.0,
                     'today_return': 0.0,
-                    'yesterday_return': 0.0,
+                    'prev_day_return': 0.0,
                     'nav_date': datetime.now().strftime('%Y-%m-%d'),
                     'estimate_nav': 0.0,
                     'estimate_return': 0.0,
@@ -329,19 +329,19 @@ class EnhancedFundData:
             # 获取昨日盈亏率（从前一条数据的日增长率获取）
             # 注意：akshare返回的日增长率已经是百分数格式（如-0.41），不需要再乘以100
             if len(fund_nav) > 1:
-                yesterday_return_raw = previous_data.get('日增长率', 0)
-                if pd.notna(yesterday_return_raw):
-                    yesterday_return = float(yesterday_return_raw)
+                prev_day_return_raw = previous_data.get('日增长率', 0)
+                if pd.notna(prev_day_return_raw):
+                    prev_day_return = float(prev_day_return_raw)
                     # 判断格式
-                    if abs(yesterday_return) < 0.1:
-                        yesterday_return = yesterday_return * 100
-                    yesterday_return = round(yesterday_return, 2)
+                    if abs(prev_day_return) < 0.1:
+                        prev_day_return = prev_day_return * 100
+                    prev_day_return = round(prev_day_return, 2)
                 else:
-                    yesterday_return = 0.0
+                    prev_day_return = 0.0
             else:
-                yesterday_return = 0.0
+                prev_day_return = 0.0
             
-            logger.info(f"QDII基金 {fund_code} 使用AKShare数据: 当日净值={current_nav}, 当日盈亏={daily_return}%, 昨日盈亏={yesterday_return}% (AKShare日增长率直接使用，不进行格式转换)")
+            logger.info(f"QDII基金 {fund_code} 使用AKShare数据: 当日净值={current_nav}, 当日盈亏={daily_return}%, 昨日盈亏={prev_day_return}% (AKShare日增长率直接使用，不进行格式转换)")
             
             return {
                 'fund_code': fund_code,
@@ -349,7 +349,7 @@ class EnhancedFundData:
                 'previous_nav': previous_nav,
                 'daily_return': daily_return,
                 'today_return': daily_return,  # 添加别名，与 enhanced_main.py 保持一致
-                'yesterday_return': yesterday_return,
+                'prev_day_return': prev_day_return,
                 'nav_date': nav_date,
                 'estimate_nav': current_nav,  # QDII基金没有实时估算，使用当日净值
                 'estimate_return': daily_return,
@@ -380,7 +380,7 @@ class EnhancedFundData:
                 'previous_nav': 0.0,
                 'daily_return': 0.0,
                 'today_return': 0.0,
-                'yesterday_return': 0.0,
+                'prev_day_return': 0.0,
                 'nav_date': datetime.now().strftime('%Y-%m-%d'),
                 'estimate_nav': 0.0,
                 'estimate_return': 0.0,
@@ -423,7 +423,7 @@ class EnhancedFundData:
             SELECT current_estimate as current_nav, 
                    yesterday_nav as previous_nav, 
                    today_return, 
-                   prev_day_return as yesterday_return,
+                   prev_day_return,
                    analysis_date as nav_date
             FROM fund_analysis_results
             WHERE fund_code = :fund_code
@@ -438,10 +438,10 @@ class EnhancedFundData:
                 current_nav = float(row.get('current_nav', 0))
                 previous_nav = float(row.get('previous_nav', 0))
                 today_return = float(row.get('today_return', 0))
-                yesterday_return = float(row.get('yesterday_return', 0))
+                prev_day_return = float(row.get('prev_day_return', 0))
                 nav_date = str(row.get('nav_date', datetime.now().strftime('%Y-%m-%d')))
                 
-                logger.info(f"从数据库获取QDII基金 {fund_code} 历史数据: 当日净值={current_nav}, 当日盈亏={today_return}%, 昨日盈亏={yesterday_return}%")
+                logger.info(f"从数据库获取QDII基金 {fund_code} 历史数据: 当日净值={current_nav}, 当日盈亏={today_return}%, 昨日盈亏={prev_day_return}%")
                 
                 return {
                     'fund_code': fund_code,
@@ -449,7 +449,7 @@ class EnhancedFundData:
                     'previous_nav': previous_nav,
                     'daily_return': today_return,
                     'today_return': today_return,
-                    'yesterday_return': yesterday_return,
+                    'prev_day_return': prev_day_return,
                     'nav_date': nav_date,
                     'estimate_nav': current_nav,
                     'estimate_return': today_return,
@@ -510,27 +510,27 @@ class EnhancedFundData:
                         
                         # 获取昨日盈亏率（直接从最新一条数据的日增长率获取）
                         # 注意：akshare返回的日增长率已经是百分数格式（如-0.94），不需要再乘以100
-                        yesterday_return_raw = latest_data.get('日增长率', 0)
-                        if pd.notna(yesterday_return_raw):
-                            yesterday_return = float(yesterday_return_raw)
+                        prev_day_return_raw = latest_data.get('日增长率', 0)
+                        if pd.notna(prev_day_return_raw):
+                            prev_day_return = float(prev_day_return_raw)
                             # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
-                            if abs(yesterday_return) < 0.1:
-                                yesterday_return = yesterday_return * 100
-                            yesterday_return = round(yesterday_return, 2)
+                            if abs(prev_day_return) < 0.1:
+                                prev_day_return = prev_day_return * 100
+                            prev_day_return = round(prev_day_return, 2)
                         else:
-                            yesterday_return = 0.0
+                            prev_day_return = 0.0
                     else:
                         # AKShare数据为空，使用新浪数据作为默认值
                         nav_date = datetime.now().strftime('%Y-%m-%d')
                         current_nav = sina_previous_nav
                         previous_nav = sina_previous_nav
-                        yesterday_return = 0.0
+                        prev_day_return = 0.0
                 except Exception as e:
                     logger.warning(f"获取基金 {fund_code} AKShare补充数据失败: {e}，使用新浪数据")
                     nav_date = datetime.now().strftime('%Y-%m-%d')
                     current_nav = sina_previous_nav
                     previous_nav = sina_previous_nav
-                    yesterday_return = 0.0
+                    prev_day_return = 0.0
                 
                 return {
                     'fund_code': fund_code,
@@ -538,7 +538,7 @@ class EnhancedFundData:
                     'previous_nav': previous_nav,
                     'daily_return': round(daily_return, 2),
                     'today_return': round(daily_return, 2),  # 添加别名，与 enhanced_main.py 保持一致
-                    'yesterday_return': yesterday_return,
+                    'prev_day_return': prev_day_return,
                     'nav_date': nav_date,
                     'estimate_nav': estimate_nav,
                     'estimate_return': round(daily_return, 2),
@@ -566,7 +566,7 @@ class EnhancedFundData:
                             'previous_nav': 0.0,
                             'daily_return': 0.0,
                             'today_return': 0.0,
-                            'yesterday_return': 0.0,
+                            'prev_day_return': 0.0,
                             'nav_date': datetime.now().strftime('%Y-%m-%d'),
                             'estimate_nav': 0.0,
                             'estimate_return': 0.0,
@@ -606,16 +606,16 @@ class EnhancedFundData:
                             daily_return = 0.0
                     
                     # 获取昨日盈亏率（倒数第二个记录的日增长率，如果存在）
-                    yesterday_return = 0.0
+                    prev_day_return = 0.0
                     if len(fund_nav) > 1:
                         second_latest_data = fund_nav.iloc[-2]
-                        yesterday_return_raw = second_latest_data.get('日增长率', 0)
-                        if pd.notna(yesterday_return_raw):
-                            yesterday_return = float(yesterday_return_raw)
+                        prev_day_return_raw = second_latest_data.get('日增长率', 0)
+                        if pd.notna(prev_day_return_raw):
+                            prev_day_return = float(prev_day_return_raw)
                             # 判断格式：如果绝对值 < 0.1，说明是小数格式（如0.0475），需要乘100
-                            if abs(yesterday_return) < 0.1:
-                                yesterday_return = yesterday_return * 100
-                            yesterday_return = round(yesterday_return, 2)
+                            if abs(prev_day_return) < 0.1:
+                                prev_day_return = prev_day_return * 100
+                            prev_day_return = round(prev_day_return, 2)
                 except Exception as akshare_e:
                     logger.warning(f"AKShare接口异常，基金 {fund_code} 尝试从数据库获取: {akshare_e}")
                     # 尝试从数据库获取历史数据
@@ -630,7 +630,7 @@ class EnhancedFundData:
                         'previous_nav': 0.0,
                         'daily_return': 0.0,
                         'today_return': 0.0,
-                        'yesterday_return': 0.0,
+                        'prev_day_return': 0.0,
                         'nav_date': datetime.now().strftime('%Y-%m-%d'),
                         'estimate_nav': 0.0,
                         'estimate_return': 0.0,
@@ -646,7 +646,7 @@ class EnhancedFundData:
                     'previous_nav': previous_nav,
                     'daily_return': daily_return,
                     'today_return': daily_return,  # 添加别名，与 enhanced_main.py 保持一致
-                    'yesterday_return': yesterday_return,
+                    'prev_day_return': prev_day_return,
                     'nav_date': nav_date,
                     'estimate_nav': current_nav,  # 使用当前净值作为估算净值
                     'estimate_return': daily_return,  # 使用当前日涨跌幅作为估算收益率
@@ -675,7 +675,7 @@ class EnhancedFundData:
                 'previous_nav': 0.0,
                 'daily_return': 0.0,
                 'today_return': 0.0,
-                'yesterday_return': 0.0,
+                'prev_day_return': 0.0,
                 'nav_date': datetime.now().strftime('%Y-%m-%d'),
                 'estimate_nav': 0.0,
                 'estimate_return': 0.0,
