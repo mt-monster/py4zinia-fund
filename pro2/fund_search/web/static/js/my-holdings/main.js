@@ -24,6 +24,9 @@ const FundApp = {
             // 更新市场指数
             this.updateMarketIndex();
             
+            // 启动市场指数定时更新（每分钟更新一次）
+            this.startMarketIndexTimer();
+            
             // 页面加载完成（不显示提示）
         } catch (error) {
             console.error('App initialization error:', error);
@@ -53,7 +56,7 @@ const FundApp = {
             // Ctrl+F 打开筛选
             if (e.ctrlKey && e.key === 'f') {
                 e.preventDefault();
-                FundFilters.openModal();
+                FundFilters.togglePanel();
             }
             
             // Escape 关闭模态框
@@ -88,7 +91,9 @@ const FundApp = {
                 FundState.funds = response.data;
                 FundState.filteredFunds = [...response.data];
                 FundTable.renderData();
-                FundFilters.updateCount();
+                FundFilters.updateResultCount();
+                // 更新顶部基金总数显示
+                this.updateTotalCount();
             } else {
                 // 数据加载失败（静默处理）
                 console.warn('数据加载失败:', response.error);
@@ -108,14 +113,65 @@ const FundApp = {
      */
     async updateMarketIndex() {
         try {
+            console.log('[FundApp] 开始更新市场指数');
             const response = await FundAPI.getMarketIndex();
+            console.log('[FundApp] API响应:', response);
             if (response.success) {
                 const indexElement = document.getElementById('index-value');
-                indexElement.textContent = `${response.data.value} ${response.data.changePercent}`;
-                indexElement.className = response.data.change > 0 ? 'cell-positive' : 'cell-negative';
+                console.log('[FundApp] indexElement:', indexElement);
+                const value = Number(response.data.value);
+                const change = Number(response.data.change);
+                const changePercent = Number(response.data.changePercent);
+                const formattedValue = Number.isNaN(value) ? '--' : value.toFixed(2);
+                const formattedChangePercent = Number.isNaN(changePercent)
+                    ? '--'
+                    : `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%`;
+                
+                console.log('[FundApp] 更新前文本:', indexElement.textContent);
+                indexElement.textContent = `${formattedValue} ${formattedChangePercent}`;
+                indexElement.className = change >= 0 ? 'cell-positive' : 'cell-negative';
+                console.log('[FundApp] 更新后文本:', indexElement.textContent);
+            } else {
+                console.error('[FundApp] API调用失败:', response.error);
             }
         } catch (error) {
             console.error('Update market index error:', error);
+        }
+    },
+    
+    /**
+     * 启动市场指数定时更新
+     */
+    startMarketIndexTimer() {
+        // 清除已存在的定时器
+        if (this.marketIndexTimer) {
+            clearInterval(this.marketIndexTimer);
+        }
+        
+        console.log('[FundApp] 启动市场指数定时更新，每分钟更新一次');
+        
+        // 立即执行一次更新（正确处理Promise）
+        this.updateMarketIndex().catch(err => {
+            console.error('[FundApp] 初始市场指数更新失败:', err);
+        });
+        
+        // 设置定时器，每60秒更新一次
+        this.marketIndexTimer = setInterval(() => {
+            console.log('[FundApp] 定时更新市场指数');
+            this.updateMarketIndex().catch(err => {
+                console.error('[FundApp] 定时市场指数更新失败:', err);
+            });
+        }, 60000); // 60000毫秒 = 1分钟
+    },
+    
+    /**
+     * 停止市场指数定时更新
+     */
+    stopMarketIndexTimer() {
+        if (this.marketIndexTimer) {
+            clearInterval(this.marketIndexTimer);
+            this.marketIndexTimer = null;
+            console.log('[FundApp] 停止市场指数定时更新');
         }
     },
 
@@ -150,7 +206,9 @@ const FundApp = {
                 FundState.selectedFunds.clear();
                 
                 FundTable.renderData();
-                FundFilters.updateCount();
+                FundFilters.updateResultCount();
+                // 更新顶部基金总数显示
+                this.updateTotalCount();
                 
                 FundUtils.showNotification('基金列表已清空', 'success');
             } else {
@@ -203,13 +261,18 @@ const FundApp = {
             console.log('📊 API响应结果:', result);
             
             if (result.success) {
-                // 添加基金代码到数据中
-                result.data.fund_codes = fundCodes;
+                // 只存储基金代码，避免sessionStorage超限（48只基金产生1128种组合，数据量过大）
+                // 详细数据将在correlation-analysis页面通过API异步加载
+                const storageData = {
+                    fund_codes: fundCodes,
+                    // 只存储基础数据用于快速显示
+                    basic_correlation: result.data.basic_correlation
+                };
                 
-                console.log('💾 准备存储到sessionStorage的数据:', result.data);
+                console.log('💾 存储到sessionStorage:', storageData);
                 
-                // 使用 sessionStorage 存储数据，避免URL过长
-                sessionStorage.setItem('correlationAnalysisData', JSON.stringify(result.data));
+                // 使用 sessionStorage 存储精简数据
+                sessionStorage.setItem('correlationAnalysisData', JSON.stringify(storageData));
                 console.log('✅ 数据已存储到sessionStorage');
                 
                 window.location.href = '/correlation-analysis';
@@ -308,6 +371,16 @@ const FundApp = {
             if (btnIcon) {
                 btnIcon.className = 'bi bi-chart-line';
             }
+        }
+    },
+
+    /**
+     * 更新顶部基金总数显示
+     */
+    updateTotalCount() {
+        const totalCountElement = document.getElementById('total-count');
+        if (totalCountElement) {
+            totalCountElement.textContent = FundState.funds.length;
         }
     },
 
@@ -630,6 +703,13 @@ function switchManualImportTab(tabName) {
         content.classList.remove('active');
     });
     document.getElementById(`tab-${tabName}`).classList.add('active');
+    
+    // 页面卸载时清理资源
+    window.addEventListener('beforeunload', () => {
+        if (FundApp && typeof FundApp.stopMarketIndexTimer === 'function') {
+            FundApp.stopMarketIndexTimer();
+        }
+    });
     
     // 如果切换到历史标签，重新加载历史
     if (tabName === 'history') {

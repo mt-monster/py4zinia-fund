@@ -4,364 +4,186 @@
 """
 基金分析系统 Web 应用
 提供前端界面和 API 接口
+
+重构版本：使用自动化路由注册和统一配置管理
 """
 
 import os
 import sys
-import json
-from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
-import pandas as pd
-from datetime import datetime, timedelta
 import logging
+from flask import Flask
+from flask_cors import CORS
 
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
+# 使用新的配置管理系统
+from shared.config_manager import config_manager
+from shared.exceptions import with_error_handling
+
+# 核心组件导入
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
-from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.enhanced_fund_data import EnhancedFundData
-from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
-from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
+from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+
+# 缓存服务导入
+try:
+    from services import FundNavCacheManager, HoldingRealtimeService, FundDataSyncService
+    from services.cache_api_routes import init_cache_routes
+    CACHE_SERVICES_AVAILABLE = True
+except ImportError as e:
+    print(f"缓存服务不可用: {e}")
+    CACHE_SERVICES_AVAILABLE = False
+
+# 预加载服务导入
+try:
+    from services.fund_data_preloader import FundDataPreloader, get_preloader
+    from services.background_updater import BackgroundUpdater, get_background_updater
+    PRELOAD_SERVICES_AVAILABLE = True
+except ImportError as e:
+    print(f"预加载服务不可用: {e}")
+    PRELOAD_SERVICES_AVAILABLE = False
 
 # 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('fund_analysis.log', encoding='utf-8')
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # 创建 Flask 应用
+app_config = config_manager.get_app_config()
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = app_config.secret_key
+
+# 配置 JSON 编码器以处理 NaN 和 Infinity
+from shared.json_utils import SafeJSONEncoder
+app.json_encoder = SafeJSONEncoder
+
 CORS(app)
 
 # 初始化组件
-db_manager = None
-strategy_engine = None
-unified_strategy_engine = None
-strategy_evaluator = None
-fund_data_manager = None
+components = {}
+
 
 def init_components():
     """初始化系统组件"""
-    global db_manager, strategy_engine, unified_strategy_engine, strategy_evaluator, fund_data_manager
+    global components
+    
     try:
-        db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
-        strategy_engine = EnhancedInvestmentStrategy()
-        unified_strategy_engine = UnifiedStrategyEngine()
-        strategy_evaluator = StrategyEvaluator()
-        fund_data_manager = EnhancedFundData()
+        # 获取配置
+        db_config = config_manager.get_database_config()
+        system_config = config_manager.get_system_config()
         
-        # 初始化重仓股数据获取器的数据库连接
+        # 初始化数据库管理器
+        components['db_manager'] = EnhancedDatabaseManager({
+            'host': db_config.host,
+            'user': db_config.user,
+            'password': db_config.password,
+            'database': db_config.database,
+            'port': db_config.port,
+            'charset': db_config.charset
+        })
+        
+        # 初始化策略引擎
+        components['strategy_engine'] = UnifiedStrategyEngine()
+        components['strategy_evaluator'] = StrategyEvaluator()
+        
+        # 初始化数据管理器
+        components['fund_data_manager'] = MultiSourceDataAdapter(
+            timeout=system_config.request_timeout
+        )
+        
+        # 初始化重仓股数据获取器
         from data_retrieval.heavyweight_stocks_fetcher import init_fetcher
-        init_fetcher(db_manager)
+        init_fetcher(components['db_manager'])
         
-        logger.info("系统组件初始化完成（含统一策略引擎）")
-        logger.info(f"db_manager: {db_manager is not None}")
-        logger.info(f"strategy_engine: {strategy_engine is not None}")
-        logger.info(f"fund_data_manager: {fund_data_manager is not None}")
+        # 初始化缓存服务（如果可用）
+        if CACHE_SERVICES_AVAILABLE:
+            cache_config = config_manager.get_cache_config()
+            components['cache_manager'] = FundNavCacheManager(
+                components['db_manager'], 
+                default_ttl_minutes=cache_config.default_ttl // 60
+            )
+            components['holding_service'] = HoldingRealtimeService(
+                components['db_manager'], 
+                components['cache_manager']
+            )
+            components['sync_service'] = FundDataSyncService(
+                components['cache_manager'], 
+                components['db_manager']
+            )
+            
+            # 启动定时同步服务
+            if os.environ.get('ENABLE_SYNC_SERVICE', 'true').lower() == 'true':
+                components['sync_service'].start()
+                logger.info("数据同步服务已启动")
+            
+            # 注册缓存相关API路由
+            init_cache_routes(
+                app, 
+                components['cache_manager'], 
+                components['holding_service'], 
+                components['sync_service']
+            )
+        
+        # 初始化预加载服务（如果可用）
+        if PRELOAD_SERVICES_AVAILABLE:
+            logger.info("初始化数据预加载服务...")
+            try:
+                # 初始化预加载器
+                preloader = get_preloader()
+                components['preloader'] = preloader
+                
+                # 同步启动预加载（阻塞直到完成）
+                # 确保系统启动时数据已准备就绪
+                logger.info("开始预加载基金数据...")
+                preloader.preload_all(async_mode=False)
+                logger.info("数据预加载完成，系统已准备就绪")
+                
+                # 启动后台更新服务
+                if os.environ.get('ENABLE_BACKGROUND_UPDATE', 'true').lower() == 'true':
+                    updater = get_background_updater()
+                    updater.start()
+                    components['background_updater'] = updater
+                    logger.info("后台数据更新服务已启动")
+                
+            except Exception as e:
+                logger.error(f"预加载服务初始化失败: {e}")
+        
+        logger.info("系统组件初始化完成")
+        
     except Exception as e:
         logger.error(f"系统组件初始化失败: {str(e)}", exc_info=True)
         raise
 
-# ==================== 页面路由 ====================
 
-@app.route('/')
-def index():
-    """首页 - 重定向到仪表盘"""
-    return render_template('dashboard.html')
-
-@app.route('/dashboard')
-def dashboard():
-    """仪表盘页面"""
-    return render_template('dashboard.html')
-
-@app.route('/test')
-def test_api():
-    """API测试页"""
-    return render_template('test_api.html')
-
-@app.route('/fund/<fund_code>')
-def fund_detail(fund_code):
-    """基金详情页"""
-    return render_template('fund_detail.html', fund_code=fund_code)
-
-@app.route('/strategy')
-def strategy_page():
-    """策略分析页"""
-    return render_template('strategy.html')
-
-@app.route('/strategy-editor')
-def strategy_editor_page():
-    """策略编辑器页"""
-    return render_template('strategy_editor.html')
-
-@app.route('/etf')
-def etf_page():
-    """ETF市场页"""
-    return render_template('etf_market.html')
-
-@app.route('/correlation-analysis')
-def correlation_analysis_page():
-    """基金相关性分析页面"""
-    return render_template('correlation_analysis.html')
-
-@app.route('/investment-advice')
-def investment_advice_page():
-    """投资建议分析页面"""
-    return render_template('investment_advice.html')
-
-@app.route('/etf/<etf_code>')
-def etf_detail_page(etf_code):
-    """ETF详情页"""
-    return render_template('etf_detail.html', etf_code=etf_code)
-
-@app.route('/my-holdings')
-@app.route('/my_holdings')
-def my_holdings():
-    """我的持仓页"""
-    # 通过 query 参数 ?v=2 使用重构版模板
-    use_refactored = request.args.get('v') == '2'
-    template = 'my_holdings_refactored.html' if use_refactored else 'my_holdings.html'
-    return render_template(template)
-
-@app.route('/my-holdings-new')
-def my_holdings_new():
-    """我的持仓页 - 重构版"""
-    return render_template('my_holdings_refactored.html')
-
-@app.route('/test-holding-recognition')
-def test_holding_recognition():
-    """基金持仓识别测试页"""
-    return render_template('test_holding_recognition.html')
-
-@app.route('/demo-holding-result')
-def demo_holding_result():
-    """基金持仓识别结果演示页"""
-    return render_template('demo_holding_result.html')
-
-@app.route('/holding-nav')
-def holding_nav():
-    """基金持仓识别功能导航页"""
-    return render_template('holding_nav.html')
-
-@app.route('/fund-analysis/<fund_code>')
-def fund_analysis(fund_code):
-    """基金深度分析页"""
-    return render_template('fund_analysis.html', fund_code=fund_code)
-
-@app.route('/portfolio-analysis')
-def portfolio_analysis():
-    """投资组合分析页面 - 展示净值曲线和绩效指标"""
-    return render_template('portfolio_analysis.html')
-
-@app.route('/strategy_test')
-def strategy_test():
-    return render_template('strategy_test.html')
-
-@app.route('/chart_debug')
-def chart_debug():
-    return render_template('chart_debug.html')
-
-
-
-# ==================== API 路由 ====================
-
-@app.route('/api/dashboard/stats', methods=['GET'])
-def get_dashboard_stats():
-    """获取仪表盘统计数据"""
+def register_routes_automatically():
+    """自动注册所有路由"""
     try:
-        user_id = request.args.get('user_id', 'default_user')
+        from web.utils.auto_router import register_routes_automatically as auto_register
         
-        # 获取用户持仓数据
-        sql = """
-        SELECT h.*, far.today_return, far.prev_day_return, far.sharpe_ratio,
-               far.current_estimate as current_nav, far.yesterday_nav as previous_nav
-        FROM user_holdings h
-        LEFT JOIN (
-            SELECT * FROM fund_analysis_results
-            WHERE (fund_code, analysis_date) IN (
-                SELECT fund_code, MAX(analysis_date) as max_date
-                FROM fund_analysis_results
-                GROUP BY fund_code
-            )
-        ) far ON h.fund_code = far.fund_code
-        WHERE h.user_id = :user_id
-        """
+        # 获取路由目录
+        routes_dir = os.path.join(os.path.dirname(__file__), 'routes')
         
-        df = db_manager.execute_query(sql, {'user_id': user_id})
+        # 注册路由
+        results = auto_register(app, routes_dir, components)
         
-        total_assets = 0  # 总资产 = 持有金额之和
-        today_profit = 0
-        total_cost = 0
-        total_sharpe = 0
-        sharpe_count = 0
+        # 检查注册结果
+        failed_modules = [name for name, success in results.items() if not success]
+        if failed_modules:
+            logger.warning(f"以下路由模块注册失败: {', '.join(failed_modules)}")
         
-        if not df.empty:
-            for _, row in df.iterrows():
-                holding_shares = float(row['holding_shares']) if pd.notna(row['holding_shares']) else 0
-                cost_price = float(row['cost_price']) if pd.notna(row['cost_price']) else 0
-                
-                # 分析数据可能缺失
-                current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
-                previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
-                today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
-                sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
-                
-                # 持有金额（成本）= 持有份额 × 成本价
-                holding_amount = holding_shares * cost_price
-                
-                # 总资产 = 所有持仓基金的持有金额之和
-                total_assets += holding_amount
-                
-                # 总成本（与总资产相同，用于计算收益率）
-                total_cost += holding_amount
-                
-                # 只有当有分析数据时才计算今日收益
-                if current_nav is not None and previous_nav is not None:
-                    # 当前市值 = 持有份额 × 当前净值（用于计算今日收益）
-                    current_value = holding_shares * current_nav
-                    previous_value = holding_shares * previous_nav
-                    
-                    # 今日收益 = (当前市值 - 昨日市值)
-                    today_profit += (current_value - previous_value)
-                
-                if sharpe is not None and sharpe != 0:
-                    total_sharpe += sharpe
-                    sharpe_count += 1
-        
-        # 计算收益率（总资产相对于总成本的变化）
-        # 注意：这里总资产和总成本相同，所以收益率为0
-        # 如果需要显示盈亏率，可以基于当前市值计算
-        assets_change = 0  # 持有金额没有涨跌
-        profit_change = (today_profit / total_assets * 100) if total_assets > 0 else 0
-        avg_sharpe = total_sharpe / sharpe_count if sharpe_count > 0 else 0
-        
-        # 获取系统状态 - 从数据库获取最新更新时间
-        try:
-            last_update_sql = "SELECT MAX(analysis_date) as last_date FROM fund_analysis_results"
-            last_update_df = db_manager.execute_query(last_update_sql)
-            last_update = last_update_df.iloc[0]['last_date'].strftime('%Y-%m-%d %H:%M') if not last_update_df.empty and last_update_df.iloc[0]['last_date'] else datetime.now().strftime('%Y-%m-%d %H:%M')
-        except:
-            last_update = datetime.now().strftime('%Y-%m-%d %H:%M')
-        
-        system_status = {
-            'lastUpdate': last_update,
-            'apiResponseTime': '45',
-            'load': 35
-        }
-        
-        # 获取最近活动 - 从数据库查询实际操作记录
-        activities = get_recent_activities(user_id)
-        
-        # 获取真实的持仓分布
-        distribution = get_real_holding_distribution(user_id)
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'totalAssets': total_assets,
-                'assetsChange': assets_change,
-                'todayProfit': today_profit,
-                'profitChange': profit_change,
-                'holdingCount': len(df) if not df.empty else 0,
-                'sharpeRatio': avg_sharpe,
-                'system': system_status,
-                'activities': activities,
-                'distribution': distribution
-            }
-        })
+        return results
         
     except Exception as e:
-        logger.error(f"获取仪表盘统计数据失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/dashboard/profit-trend', methods=['GET'])
-def get_profit_trend():
-    """获取收益趋势数据（使用真实历史数据）"""
-    try:
-        user_id = request.args.get('user_id', 'default_user')
-        days = request.args.get('days', 90, type=int)  # 修改默认为90天（三个月）
-        total_return = request.args.get('total_return', 20, type=float)  # 默认20%总收益
-        fund_codes = request.args.get('fund_codes', '000001')  # 基金代码，逗号分隔
-        weights = request.args.get('weights', '1.0')  # 权重，逗号分隔
-        
-        # 解析基金代码和权重
-        fund_code_list = [code.strip() for code in fund_codes.split(',')]
-        weight_list = [float(w.strip()) for w in weights.split(',')]
-        
-        # 如果没有提供基金代码，则获取用户的持仓基金
-        if fund_codes == '000001' and user_id != 'default_user':
-            try:
-                # 获取用户持仓数据
-                holdings_sql = """
-                SELECT fund_code, holding_shares, cost_price
-                FROM user_holdings 
-                WHERE user_id = :user_id AND holding_shares > 0
-                """
-                holdings_df = db_manager.execute_query(holdings_sql, {'user_id': user_id})
-                
-                if not holdings_df.empty:
-                    fund_code_list = holdings_df['fund_code'].tolist()
-                    # 计算权重基于持仓金额
-                    total_amount = 0
-                    amounts = []
-                    for _, row in holdings_df.iterrows():
-                        amount = float(row['holding_shares'] or 0) * float(row['cost_price'] or 0)
-                        amounts.append(amount)
-                        total_amount += amount
-                    
-                    if total_amount > 0:
-                        weight_list = [amount/total_amount for amount in amounts]
-                    else:
-                        weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
-            except Exception as e:
-                logger.warning(f"获取用户持仓失败: {str(e)}, 使用默认基金")
-        
-        # 确保权重和基金代码数量一致（仅当不是从持仓获取时）
-        if fund_codes != '000001' or user_id == 'default_user':
-            if len(weight_list) == 1 and len(fund_code_list) > 1:
-                # 如果只有一个权重，平均分配
-                weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
-            elif len(weight_list) != len(fund_code_list):
-                # 如果权重数量不匹配，平均分配
-                weight_list = [1.0/len(fund_code_list)] * len(fund_code_list)
-        
-        # 归一化权重
-        weight_sum = sum(weight_list)
-        if weight_sum > 0:
-            weight_list = [w/weight_sum for w in weight_list]
-        
-        # 导入真实数据获取器
-        from web.real_data_fetcher import data_fetcher
-        
-        # 获取沪深300真实历史数据
-        csi300_data = data_fetcher.get_csi300_history(days)
-        
-        # 获取基金组合真实历史净值
-        portfolio_data = data_fetcher.calculate_portfolio_nav(
-            fund_code_list, weight_list, initial_amount=10000, days=days
-        )
-        
-        if csi300_data.empty or portfolio_data.empty:
-            # 如果获取真实数据失败，返回错误
-            return jsonify({
-                'success': False,
-                'error': '无法获取真实历史数据，请检查网络连接或基金代码是否正确'
-            }), 500
-        
-        # 准备返回数据
-        labels = []
-        profit_data = []
-        benchmark_data = []
-        
-        # 找到共同的日期范围
-        portfolio_dates = set(portfolio_data['date'].dt.date)
-        csi300_dates = set(csi300_data['date'].dt.date)
-        common_dates = sorted(list(portfolio_dates.intersection(csi300_dates)))[:days]
-        
-        if not common_dates:
+        logger.error(f"路由注册失败: {str(e)}", exc_info=True)
+        raise
             # 如果没有共同日期，分别处理
             logger.warning("没有共同日期，分别处理数据")
             
@@ -4049,180 +3871,20 @@ def _get_holdings_from_akshare(fund_code):
         logger.error(f"akshare获取数据失败: {e}")
         raise
 
-
-def _get_holdings_from_eastmoney(fund_code):
-    """从天天基金网获取基金持仓数据"""
-    try:
-        import requests
-        import json
-        
-        # 天天基金网API
-        url = f"http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={fund_code}&topline=10"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        response.encoding = 'utf-8'
-        
-        # 解析返回的JSONP数据
-        text = response.text
-        if 'var' in text:
-            json_str = text[text.find('{'):text.rfind('}')+1]
-            data = json.loads(json_str)
-            
-            if 'data' in data and len(data['data']) > 0:
-                holdings = []
-                for item in data['data'][:10]:
-                    holdings.append({
-                        'stock_name': item.get('GPM', ''),
-                        'stock_code': item.get('GPJC', ''),
-                        'proportion': float(item.get('JZBL', 0)),
-                        'industry': _get_industry_by_stock_name(item.get('GPM', '')),
-                        'change_percent': item.get('ZDF', '--'),
-                        'fund_code': fund_code
-                    })
-                
-                return pd.DataFrame(holdings)
-        
-        logger.warning(f"天天基金网返回数据格式异常: {fund_code}")
-        return None
-        
-    except Exception as e:
-        logger.error(f"天天基金网获取数据失败: {e}")
-        raise
-
-
-def _get_holdings_from_sina(fund_code):
-    """从新浪财经获取基金持仓数据"""
-    try:
-        import requests
-        
-        # 新浪财经API
-        url = f"https://stock.finance.sina.com.cn/fundInfo/api/openapi.php/CaihuiFundInfoService.getFundPortDetail?symbol={fund_code}"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        data = response.json()
-        
-        if 'result' in data and 'data' in data['result']:
-            holdings_data = data['result']['data']
-            
-            if holdings_data and len(holdings_data) > 0:
-                holdings = []
-                for item in holdings_data[:10]:
-                    holdings.append({
-                        'stock_name': item.get('name', ''),
-                        'stock_code': item.get('code', ''),
-                        'proportion': float(item.get('ratio', 0)),
-                        'industry': _get_industry_by_stock_name(item.get('name', '')),
-                        'change_percent': item.get('change', '--'),
-                        'fund_code': fund_code
-                    })
-                
-                return pd.DataFrame(holdings)
-        
-        logger.warning(f"新浪财经返回数据格式异常: {fund_code}")
-        return None
-        
-    except Exception as e:
-        logger.error(f"新浪财经获取数据失败: {e}")
-        raise
-
-
-def _get_industry_by_stock_name(stock_name):
-    """根据股票名称推断所属行业（简化版）"""
-    industry_mapping = {
-        '茅台': '食品饮料', '五粮液': '食品饮料', '食品': '食品饮料', '饮料': '食品饮料',
-        '宁德': '新能源', '隆基': '新能源', '阳光电源': '新能源', '新能源': '新能源',
-        '银行': '银行', '招商': '银行', '平安银行': '银行', '工商银行': '银行',
-        '保险': '保险', '中国平安': '保险', '人寿': '保险', '太保': '保险',
-        '腾讯': '互联网', '阿里': '互联网', '美团': '互联网', '字节': '互联网',
-        '医药': '医药生物', '药明': '医药生物', '恒瑞': '医药生物', '康龙': '医药生物',
-        '白酒': '食品饮料', '啤酒': '食品饮料', '红酒': '食品饮料',
-        '证券': '非银金融', '中信': '非银金融', '建投': '非银金融', '中金': '非银金融',
-        '汽车': '汽车', '比亚迪': '汽车', '长城': '汽车', '上汽': '汽车',
-        '电子': '电子', '立讯': '电子', '歌尔': '电子', '半导体': '电子',
-        '化工': '化工', '万华': '化工', '石化': '化工',
-        '机械': '机械设备', '三一': '机械设备', '中联': '机械设备'
-    }
+# 应用初始化
+@with_error_handling
+def initialize_application():
+    """初始化应用"""
+    logger.info("开始初始化基金分析系统...")
     
-    for keyword, industry in industry_mapping.items():
-        if keyword in stock_name:
-            return industry
+    # 初始化组件
+    init_components()
     
-    return '其他'
+    # 自动注册路由
+    register_routes_automatically()
+    
+    logger.info("应用初始化完成")
 
-def calculate_asset_allocation(holdings_df, total_asset, fund_codes_count=1):
-    """
-    Calculate asset allocation based on holdings data
-    
-    Args:
-        holdings_df: 持仓数据DataFrame
-        total_asset: 总资产（用于市值计算）
-        fund_codes_count: 基金数量（用于加权平均）
-    """
-    try:
-        # Group by asset type
-        if 'asset_type' in holdings_df.columns:
-            asset_groups = holdings_df.groupby('asset_type')['proportion'].sum()
-        else:
-            # Default to stock allocation if no asset type column
-            # 当多个基金时，需要计算加权平均而不是简单相加
-            stock_proportion = holdings_df['proportion'].sum()
-            # 按基金数量加权平均，确保总比例不超过100%
-            weighted_stock_proportion = stock_proportion / max(fund_codes_count, 1)
-            asset_groups = pd.Series({'股票': weighted_stock_proportion, '债券': 0, '现金': 0, '其他': 0})
-        
-        # Convert to dictionary with percentage format
-        asset_allocation = {}
-        for asset_type, proportion in asset_groups.items():
-            # 对多基金情况进行加权平均
-            adjusted_proportion = proportion / max(fund_codes_count, 1)
-            asset_allocation[str(asset_type)] = round(float(adjusted_proportion), 2)
-        
-        return asset_allocation
-    except Exception as e:
-        logger.error(f"计算资产配置失败: {e}")
-        return {}
-
-def calculate_industry_distribution(holdings_df, total_asset, fund_codes_count=1):
-    """
-    Calculate industry distribution based on holdings data
-    
-    Args:
-        holdings_df: 持仓数据DataFrame
-        total_asset: 总资产（用于市值计算）
-        fund_codes_count: 基金数量（用于加权平均）
-    """
-    try:
-        # Group by industry
-        if 'industry' in holdings_df.columns:
-            industry_groups = holdings_df.groupby('industry')['proportion'].sum()
-        elif 'industry_name' in holdings_df.columns:
-            industry_groups = holdings_df.groupby('industry_name')['proportion'].sum()
-        else:
-            # Default to empty if no industry column
-            return {}
-        
-        # Sort by proportion
-        industry_groups = industry_groups.sort_values(ascending=False)
-        
-        # Convert to dictionary with percentage format
-        # 对多基金情况进行加权平均
-        industry_distribution = {}
-        for industry, proportion in industry_groups.items():
-            adjusted_proportion = proportion / max(fund_codes_count, 1)
-            industry_distribution[str(industry)] = round(float(adjusted_proportion), 2)
-        
-        return industry_distribution
-    except Exception as e:
-        logger.error(f"计算行业分布失败: {e}")
-        return {}
 
 def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
     """
@@ -5805,10 +5467,21 @@ def clear_heavyweight_stocks_cache(fund_code):
         }), 500
 
 
-if __name__ == '__main__':
-    init_components()
-    app.run(host='0.0.0.0', port=5000, debug=True)
-else:
-    # 褰撲綔涓烘ā鍧楀鍏ユ椂锛岃嚜鍔ㄥ垵濮嬪寲缁勪欢
-    init_components()
+# 初始化应用
+initialize_application()
 
+
+if __name__ == '__main__':
+    # 获取应用配置
+    app_config = config_manager.get_app_config()
+    
+    logger.info(f"启动基金分析系统 v2.0")
+    logger.info(f"监听地址: {app_config.host}:{app_config.port}")
+    logger.info(f"调试模式: {app_config.debug}")
+    
+    app.run(
+        debug=app_config.debug,
+        host=app_config.host,
+        port=app_config.port,
+        use_reloader=False  # 禁用重载器，避免日志重复打印
+    )

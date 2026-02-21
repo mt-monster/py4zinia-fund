@@ -940,3 +940,451 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--gray-500);
 }
+
+/* ==================== 加载动画样式 ==================== */
+.loading-dots {
+    display: inline-block;
+    animation: loadingDots 1.5s infinite;
+}
+
+@keyframes loadingDots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+.loading-dots::after {
+    content: '...';
+    animation: loadingDotsContent 1.5s infinite;
+}
+
+@keyframes loadingDotsContent {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+}
+
+/* 骨架屏加载效果 */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* 状态栏加载样式 */
+.status-bar.loading {
+    background: linear-gradient(90deg, var(--primary-light) 0%, rgba(59, 130, 246, 0.1) 50%, var(--primary-light) 100%);
+    background-size: 200% 100%;
+    animation: status-loading 2s infinite;
+}
+
+@keyframes status-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ==================== 懒加载优化样式 ==================== */
+
+/* 懒加载列表样式 */
+.lazy-load-list .pair-item {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.lazy-load-list .pair-item.clickable {
+    cursor: pointer;
+}
+
+.lazy-load-list .pair-item.clickable:hover {
+    background: var(--primary-light);
+    transform: translateX(4px);
+}
+
+.lazy-load-list .pair-item.active {
+    background: var(--primary-light);
+    border-left: 3px solid var(--primary-color);
+}
+
+.lazy-load-list .pair-hint {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.lazy-load-list .pair-item.clickable:hover .pair-hint {
+    opacity: 1;
+}
+
+/* 懒加载提示框 */
+.lazy-load-hint {
+    margin-bottom: 15px;
+}
+
+/* 加载动画 */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* 大数据集优化提示 */
+.dataset-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--info-light);
+    color: var(--info-color);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.dataset-info i {
+    font-size: 14px;
+}
+
+/* 性能优化: 减少重绘 */
+.chart-canvas {
+    will-change: transform;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .lazy-load-list .pair-hint {
+        display: none;
+    }
+}
+
+/* ==================== 7个优化项新增样式 ==================== */
+
+/* 图表工具箱样式 */
+.chart-toolbox {
+    display: flex;
+    gap: 0.25rem;
+    margin-right: auto;
+}
+
+.chart-toolbox .toolbox-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray-500);
+    transition: all 0.2s;
+}
+
+.chart-toolbox .toolbox-btn:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+}
+
+.chart-toolbox .toolbox-btn.rotating i {
+    animation: rotate 1s linear;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 联动提示样式 */
+.interaction-hint {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateX(-50%) translateY(100%); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.interaction-hint button {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.interaction-hint button:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* 增强矩阵样式 */
+.correlation-matrix.enhanced {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+}
+
+.correlation-matrix.enhanced th,
+.correlation-matrix.enhanced td {
+    padding: 0.5rem;
+    text-align: center;
+    border: 1px solid var(--gray-200);
+}
+
+.correlation-matrix.enhanced .sortable-header {
+    cursor: pointer;
+    background: var(--gray-100);
+    transition: background 0.2s;
+}
+
+.correlation-matrix.enhanced .sortable-header:hover {
+    background: var(--gray-200);
+}
+
+.correlation-matrix.enhanced .corr-cell {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 600;
+}
+
+.correlation-matrix.enhanced .corr-cell:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: var(--shadow-md);
+}
+
+.correlation-matrix.enhanced .high-positive {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.correlation-matrix.enhanced .high-negative {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.correlation-matrix.enhanced .medium-positive {
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.correlation-matrix.enhanced .medium-negative {
+    background: #fef2f2;
+    color: #7f1d1d;
+}
+
+.correlation-matrix.enhanced .low-correlation {
+    background: var(--gray-50);
+    color: var(--gray-700);
+}
+
+.correlation-matrix.enhanced .diagonal {
+    background: var(--gray-200);
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+}
+
+.pulse-animation {
+    animation: pulse 0.5s ease;
+}
+
+/* 全屏模式样式 */
+.chart-fullscreen-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+}
+
+.fullscreen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: rgba(0,0,0,0.5);
+    color: white;
+}
+
+.fullscreen-header h3 {
+    margin: 0;
+}
+
+.exit-fullscreen-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.exit-fullscreen-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.fullscreen-body {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fullscreen-body .chart-wrapper {
+    width: 100%;
+    height: 100%;
+    max-width: 1200px;
+}
+
+/* 数据视图模态框 */
+.data-view-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.data-view-modal .modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+}
+
+.data-view-modal .modal-content {
+    position: relative;
+    background: white;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+}
+
+.data-view-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.data-view-modal .modal-header h3 {
+    margin: 0;
+}
+
+.data-view-modal .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--gray-500);
+}
+
+.data-view-modal .modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 1rem;
+}
+
+.data-view-modal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.data-table-wrapper {
+    overflow: auto;
+    max-height: 400px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem;
+    border: 1px solid var(--gray-200);
+    text-align: left;
+}
+
+.data-table th {
+    background: var(--gray-50);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+.data-table tr:hover {
+    background: var(--gray-50);
+}
+
+.data-table .more-data {
+    text-align: center;
+    color: var(--gray-500);
+    font-style: italic;
+}
+
+/* Toast提示 */
+.chart-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    animation: slideUp 0.3s ease;
+    z-index: 10001;
+}

@@ -73,8 +73,8 @@ class StrategyConfig:
             'action': 'hold',
             'buy_multiplier': 0.0,
             'redeem_amount': 0,
-            'label': "🔴 **未知状态**",
-            'description': "不买入，不赎回"
+            'label': "⚪ **观望**",
+            'description': "走势不明，建议观望"
         }
     }
     

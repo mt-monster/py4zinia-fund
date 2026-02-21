@@ -101,7 +101,8 @@ class UnifiedStrategyEngine:
         performance_metrics: Optional[Dict] = None,
         strategy_id: Optional[str] = None,
         market_data: Optional[Dict] = None,
-        volume_data: Optional[Dict] = None
+        volume_data: Optional[Dict] = None,
+        base_invest: float = 100.0
     ) -> UnifiedStrategyResult:
         """
         综合策略分析
@@ -158,7 +159,8 @@ class UnifiedStrategyEngine:
                 stop_loss_result,
                 trend_result,
                 position_adjustment,
-                volume_confirmed_result.get('final_multiplier', enhanced_multiplier)
+                volume_confirmed_result.get('final_multiplier', enhanced_multiplier),
+                base_invest
             )
             
         except Exception as e:
@@ -239,9 +241,19 @@ class UnifiedStrategyEngine:
                 'comparison_value': today_return - prev_day_return
             }
         
-        # 否则，按原有逻辑遍历所有策略规则
-        # 遍历所有策略规则
-        for strategy_name, rule in self.strategy_rules.items():
+        # 否则，按优先级遍历所有策略规则
+        # 获取优先级配置
+        priority_weights = self.config.get('priority_weights', {})
+        
+        # 按优先级排序（数值越大优先级越高）
+        sorted_strategies = sorted(
+            self.strategy_rules.items(),
+            key=lambda x: priority_weights.get(x[0], 0),
+            reverse=True
+        )
+        
+        # 遍历排序后的策略规则
+        for strategy_name, rule in sorted_strategies:
             conditions = rule.get('conditions', [])
             
             for condition in conditions:
@@ -527,7 +539,8 @@ class UnifiedStrategyEngine:
         stop_loss_result: StopLossResult,
         trend_result: TrendResult,
         position_adjustment: PositionAdjustment,
-        final_multiplier: float
+        final_multiplier: float,
+        base_invest: float = 100.0
     ) -> UnifiedStrategyResult:
         """创建统一结果"""
         # 应用趋势调整
@@ -537,7 +550,8 @@ class UnifiedStrategyEngine:
         execution_amount = self._get_execution_amount(
             base_result['action'],
             trend_adjusted_multiplier,
-            base_result['redeem_amount']
+            base_result['redeem_amount'],
+            base_invest
         )
         
         # 生成综合建议
@@ -616,19 +630,44 @@ class UnifiedStrategyEngine:
         self,
         action: str,
         multiplier: float,
-        redeem_amount: float
+        redeem_amount: float,
+        base_invest: float = 100.0
     ) -> str:
-        """获取执行金额描述"""
+        """获取执行金额描述
+        
+        Args:
+            action: 操作类型 ('buy', 'sell', 'hold', 'stop_loss')
+            multiplier: 买入倍数
+            redeem_amount: 赎回金额
+            base_invest: 基准定投金额（默认100元）
+            
+        Returns:
+            str: 明确具体的执行金额描述
+        """
         if action == 'stop_loss':
-            return "全部赎回"
+            return "⚠️ 立即止损 - 全部赎回"
         elif action in ['sell', 'weak_sell']:
-            return f"赎回¥{redeem_amount}"
+            # 明确显示赎回金额
+            if redeem_amount > 0:
+                if 0 < redeem_amount <= 1:  # 如果是比例
+                    return f"建议赎回：赎回 {redeem_amount*100:.0f}% 持仓"
+                else:  # 如果是具体金额
+                    return f"建议赎回：赎回金额 ¥{redeem_amount:.2f}"
+            else:
+                return "无需赎回"
         elif action == 'hold':
-            return "持有不动"
-        elif multiplier > 0:
-            return f"买入{multiplier:.1f}×定额"
+            return "持有观望：无需买入"
+        elif action in ['buy', 'strong_buy', 'weak_buy'] and multiplier > 0:
+            # 明确显示买入金额
+            buy_amount = base_invest * multiplier
+            if action == 'strong_buy':
+                return f"今日买入：买入金额 ¥{buy_amount:.2f}（强力买入 {multiplier:.1f}×基准定投）"
+            elif action == 'weak_buy':
+                return f"今日买入：买入金额 ¥{buy_amount:.2f}（轻度买入 {multiplier:.1f}×基准定投）"
+            else:
+                return f"今日买入：买入金额 ¥{buy_amount:.2f}（标准买入 {multiplier:.1f}×基准定投）"
         else:
-            return "持有不动"
+            return "持有观望：无需买入"
     
     def _generate_final_suggestion(
         self,

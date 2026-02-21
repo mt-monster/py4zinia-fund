@@ -20,20 +20,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
 from shared.enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_fund_data import EnhancedFundData
+from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.enhanced_analytics import EnhancedFundAnalytics
 from data_retrieval.enhanced_database import EnhancedDatabaseManager
 from data_retrieval.enhanced_notification import EnhancedNotificationManager
-
-# 导入策略对比分析系统
-STRATEGY_ANALYZER_AVAILABLE = False
-try:
-    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
-    from complete_strategy_analyzer import CompleteStrategyAnalyzer
-    STRATEGY_ANALYZER_AVAILABLE = True
-except ImportError as e:
-    pass  # 静默处理，避免logger未定义错误
 
 # 设置日志
 logging.basicConfig(
@@ -52,7 +43,7 @@ class EnhancedFundAnalysisSystem:
     
     def __init__(self):
         """初始化系统组件"""
-        self.fund_data_manager = EnhancedFundData()
+        self.fund_data_manager = MultiSourceDataAdapter()
         self.strategy_engine = EnhancedInvestmentStrategy()
         self.analytics_engine = EnhancedFundAnalytics()
         self.db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
@@ -61,12 +52,6 @@ class EnhancedFundAnalysisSystem:
         # 配置中文字体显示
         self.setup_chinese_font()
         
-        # 检查策略对比分析系统是否可用
-        if STRATEGY_ANALYZER_AVAILABLE:
-            logger.info("策略对比分析系统已加载")
-        else:
-            logger.warning("策略对比分析系统不可用，将跳过相关功能")
-
         logger.info("增强版基金分析系统初始化完成")
     
     def setup_chinese_font(self):
@@ -117,30 +102,22 @@ class EnhancedFundAnalysisSystem:
         try:
             logger.info("开始检查策略最优性...")
             
-            # 尝试导入策略对比引擎
-            try:
-                sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'fund_backtest'))
-                from strategy_comparison_engine import StrategyComparisonEngine
-            except ImportError:
-                logger.warning("无法导入 StrategyComparisonEngine，跳过策略最优性检查")
-                return
-
-            # 运行策略对比
-            engine = StrategyComparisonEngine(
-                backtest_start_date='2024-01-01',
-                backtest_end_date=datetime.now().strftime('%Y-%m-%d'),
-                base_amount=1000,
-                portfolio_size=6
+            # 使用回测引擎进行策略对比
+            from backtesting.unified_strategy_engine import UnifiedStrategyEngine
+            
+            engine = UnifiedStrategyEngine()
+            results = engine.compare_strategies(
+                fund_codes=['000001', '000002', '000003'],  # 示例基金
+                start_date='2024-01-01',
+                end_date=datetime.now().strftime('%Y-%m-%d'),
+                base_investment=1000
             )
             
-            # 使用所有基金进行对比
-            results = engine.run_strategy_comparison(top_n=0, rank_type='daily')
-            
-            if not results or 'comparison_report' not in results:
+            if not results:
                 logger.warning("策略对比未返回有效结果")
                 return
                 
-            best_backtest_strategy = results['comparison_report'].get('best_strategy', {})
+            best_backtest_strategy = results.get('best_strategy', {})
             best_strategy_name = best_backtest_strategy.get('name', 'Unknown')
             
             # 当前策略信息
@@ -312,7 +289,7 @@ class EnhancedFundAnalysisSystem:
             logger.info(f"基金 {fund_code} 实时数据: current_nav={realtime_data.get('current_nav')}, "
                        f"previous_nav={realtime_data.get('previous_nav')}, "
                        f"daily_return={realtime_data.get('daily_return')}, "
-                       f"yesterday_return={realtime_data.get('yesterday_return')}, "
+                       f"prev_day_return={realtime_data.get('prev_day_return')}, "
                        f"data_source={realtime_data.get('data_source')}")
             
             # 获取绩效指标
@@ -339,8 +316,8 @@ class EnhancedFundAnalysisSystem:
             yesterday_return = 0.0
             
             # 首先尝试从实时数据获取昨日收益率（更可靠）
-            if 'yesterday_return' in realtime_data:
-                yesterday_return = realtime_data['yesterday_return']
+            if 'prev_day_return' in realtime_data:
+                yesterday_return = realtime_data['prev_day_return']
                 try:
                     yesterday_return = float(yesterday_return)
                     # 检查昨日收益率是否异常（超过±100%）
@@ -356,24 +333,50 @@ class EnhancedFundAnalysisSystem:
             
             # 如果实时数据中的昨日收益率不可用或异常，从历史数据获取
             if yesterday_return == 0.0 and not historical_data.empty:
-                if 'daily_growth_rate' in historical_data.columns:
-                    recent_growth = historical_data['daily_growth_rate'].dropna().tail(1)
-                    if len(recent_growth) >= 1:
+                # 支持两种列名：daily_return (来自adapter) 或 daily_growth_rate (旧格式)
+                growth_rate_col = 'daily_return' if 'daily_return' in historical_data.columns else 'daily_growth_rate'
+                if growth_rate_col in historical_data.columns:
+                    recent_growth_series = historical_data[growth_rate_col].dropna()
+                    
+                    if len(recent_growth_series) >= 1:
                         try:
-                            # 昨日盈亏率直接从最新一条数据的日增长率获取
-                            raw_value = float(recent_growth.iloc[-1]) if pd.notna(recent_growth.iloc[-1]) else 0.0
+                            # 检查是否为QDII基金
+                            is_qdii = MultiSourceDataAdapter.is_qdii_fund(fund_code, fund_name)
+                            logger.debug(f"基金 {fund_code} 名称={fund_name}, QDII判断结果={is_qdii}")
                             
-                            # AKShare返回的日增长率已经是百分比格式（如-0.20表示-0.20%），不需要额外处理
-                            yesterday_return = raw_value
+                            # 向前追溯寻找非零值（特别针对QDII基金）
+                            if is_qdii and yesterday_return == 0.0:
+                                logger.info(f"检测到QDII基金 {fund_code} ({fund_name}) 且昨日收益率为0，开始向前追溯获取非零值")
+                                logger.debug(f"QDII基金 {fund_code} 历史数据共 {len(recent_growth_series)} 条: {recent_growth_series.tolist()}")
+                                
+                                # 从最新的数据开始向前查找非零值（QDII基金可能延迟更多天）
+                                max_trace_days = 15  # QDII基金最多追溯15天
+                                for i in range(len(recent_growth_series) - 1, -1, -1):
+                                    raw_value = float(recent_growth_series.iloc[i]) if pd.notna(recent_growth_series.iloc[i]) else 0.0
+                                    # AKShare返回的日增长率已经是百分比格式
+                                    candidate_return = raw_value
+                                    
+                                    # 检查是否为有效非零值
+                                    if abs(candidate_return) <= 100 and abs(candidate_return) > 0.001:  # 允许微小非零值
+                                        yesterday_return = candidate_return
+                                        days_back = len(recent_growth_series) - 1 - i
+                                        logger.info(f"QDII基金 {fund_code} 向前追溯成功，往前第{days_back}天收益率: {yesterday_return}%")
+                                        break
+                                    
+                                    # 限制追溯范围
+                                    if len(recent_growth_series) - 1 - i >= max_trace_days:
+                                        logger.warning(f"QDII基金 {fund_code} 追溯{max_trace_days}天仍未找到非零值，停止追溯")
+                                        break
                             
-                            # 检查昨日收益率是否异常（超过±100%）
-                            if abs(yesterday_return) > 100:
-                                logger.warning(f"基金 {fund_code} 历史数据中的昨日收益率异常: {yesterday_return}%，使用默认值")
-                                yesterday_return = 0.0
-                            else:
-                                logger.debug(f"基金 {fund_code} 从历史数据daily_growth_rate获取昨日收益率: {yesterday_return}%")
-                        except (ValueError, TypeError):
-                            logger.warning(f"基金 {fund_code} 历史数据daily_growth_rate解析失败，使用默认值")
+                            # 如果仍然为0且不是QDII，使用最新的数据
+                            if yesterday_return == 0.0 and not is_qdii:
+                                raw_value = float(recent_growth_series.iloc[-1]) if pd.notna(recent_growth_series.iloc[-1]) else 0.0
+                                # AKShare返回的日增长率已经是百分比格式
+                                yesterday_return = raw_value
+                                logger.debug(f"基金 {fund_code} 从历史数据{growth_rate_col}获取昨日收益率: {yesterday_return}%")
+                                
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"基金 {fund_code} 历史数据{growth_rate_col}解析失败: {str(e)}，使用默认值")
                             yesterday_return = 0.0
             
             # 确保收益率格式正确，保留两位小数
@@ -1282,53 +1285,58 @@ class EnhancedFundAnalysisSystem:
         bool: 分析是否成功
         """
         try:
-            if not STRATEGY_ANALYZER_AVAILABLE:
-                logger.error("策略对比分析系统不可用，请检查模块导入")
-                return False
-
             logger.info("开始运行策略对比分析")
             logger.info(f"分析参数: 日期 {start_date} 至 {end_date or '当前'}, 基准金额 {base_amount}, 组合大小 {portfolio_size}")
 
-            # 创建策略分析器
-            analyzer = CompleteStrategyAnalyzer(
-                start_date=start_date,
-                end_date=end_date,
-                base_amount=base_amount,
-                portfolio_size=portfolio_size,
-                risk_profile=risk_profile
-            )
-
-            # 运行完整分析
-            results = analyzer.run_complete_analysis(
-                top_n=top_n,
-                rank_type=rank_type,
-                output_dir=output_dir,
-                generate_report=generate_report,
-                generate_charts=generate_charts
-            )
-
-            if 'error' in results:
-                logger.error(f"策略对比分析失败: {results['error']}")
+            # 使用现有的回测引擎进行策略对比
+            from backtesting.unified_strategy_engine import UnifiedStrategyEngine
+            from backtesting.advanced_strategies import get_all_advanced_strategies
+            
+            engine = UnifiedStrategyEngine()
+            strategies = get_all_advanced_strategies()
+            
+            # 获取示例基金进行回测
+            fund_codes = ['000001', '000002', '000003'][:portfolio_size]
+            
+            logger.info(f"使用 {len(strategies)} 种策略进行对比")
+            
+            # 运行策略对比
+            comparison_results = []
+            for strategy_name, strategy in strategies.items():
+                try:
+                    result = engine.run_backtest(
+                        strategy=strategy,
+                        fund_codes=fund_codes,
+                        start_date=start_date,
+                        end_date=end_date or datetime.now().strftime('%Y-%m-%d'),
+                        base_investment=base_amount
+                    )
+                    comparison_results.append({
+                        'strategy_name': strategy_name,
+                        'result': result
+                    })
+                except Exception as e:
+                    logger.warning(f"策略 {strategy_name} 回测失败: {str(e)}")
+            
+            if not comparison_results:
+                logger.error("所有策略回测均失败")
                 return False
-            else:
-                logger.info("策略对比分析完成")
-                print("\n" + "="*80)
-                print("🎯 策略对比分析结果")
-                print("="*80)
+            
+            # 找出最佳策略
+            best_strategy = max(comparison_results, 
+                              key=lambda x: x['result'].get('total_return', 0))
+            
+            logger.info("策略对比分析完成")
+            print("\n" + "="*80)
+            print("🎯 策略对比分析结果")
+            print("="*80)
+            print(f"🏆 推荐策略: {best_strategy['strategy_name']}")
+            print(f"📊 总收益率: {best_strategy['result'].get('total_return', 0):.2%}")
+            print(f"📈 对比策略数量: {len(comparison_results)}")
+            print(f"📁 结果保存路径: {output_dir}")
+            print("="*80)
 
-                if 'ranking' in results and 'recommendation' in results['ranking']:
-                    rec = results['ranking']['recommendation']
-                    print(f"🏆 推荐策略: {rec.get('recommended_strategy', {}).get('strategy_name', '未知')}")
-                    print(f"🔍 置信度: {rec.get('confidence_level', '中等')}")
-                    print(f"📊 总收益率: {rec.get('recommended_strategy', {}).get('raw_metrics', {}).get('total_return', 0):.2%}")
-
-                if 'comparison' in results and 'strategy_results' in results['comparison']:
-                    print(f"📈 对比策略数量: {len(results['comparison']['strategy_results'])}")
-
-                print(f"📁 结果保存路径: {output_dir}")
-                print("="*80)
-
-                return True
+            return True
 
         except Exception as e:
             logger.error(f"运行策略对比分析失败: {str(e)}")

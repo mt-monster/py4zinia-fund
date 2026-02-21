@@ -3,33 +3,45 @@
 
 """
 持仓信息提取和导入系统
-从OCR识别的截图中提取持仓信息并导入到数据库
+从OCR识别的截图中提取持仓信息并导入到MySQL数据库
 """
 
 import re
 import logging
-import sqlite3
 from typing import Dict, List, Optional
 from datetime import datetime
 from .akshare_fund_lookup import lookup_fund_info
 
 logger = logging.getLogger(__name__)
 
+
 class PortfolioImporter:
-    """持仓导入器"""
+    """持仓导入器 - MySQL版本"""
     
-    def __init__(self, db_path: str = "fund_analysis.db"):
-        self.db_path = db_path
+    def __init__(self, db_manager=None):
+        """
+        初始化持仓导入器
+        
+        Args:
+            db_manager: 数据库管理器实例，如果为None则自动创建
+        """
+        if db_manager is None:
+            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            from shared.enhanced_config import DATABASE_CONFIG
+            db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+        
+        self.db = db_manager
+        self._ensure_portfolio_table()
     
     def extract_portfolio_from_ocr(self, ocr_texts: List[str]) -> List[Dict]:
         """
         从OCR文本中提取持仓信息
         
         参数：
-        ocr_texts: OCR识别的文本列表
-        
+            ocr_texts: OCR识别的文本列表
+            
         返回：
-        list: 提取的持仓信息列表
+            list: 提取的持仓信息列表
         """
         holdings = []
         
@@ -120,7 +132,6 @@ class PortfolioImporter:
                 # 计算持仓金额（如果有净值和涨跌金额）
                 if holding['nav_value'] and holding['change_amount']:
                     # 根据涨跌金额反推持仓金额
-                    # 这是一个估算，实际可能需要更复杂的计算
                     if holding['change_percent']:
                         # 持仓金额 = 涨跌金额 / (涨跌百分比 / 100)
                         holding['position_value'] = abs(holding['change_amount']) / (abs(holding['change_percent']) / 100)
@@ -134,52 +145,50 @@ class PortfolioImporter:
     
     def import_to_database(self, holdings: List[Dict], user_id: str = "default") -> bool:
         """
-        将持仓信息导入到数据库
+        将持仓信息导入到MySQL数据库
         
         参数：
-        holdings: 持仓信息列表
-        user_id: 用户ID
-        
+            holdings: 持仓信息列表
+            user_id: 用户ID
+            
         返回：
-        bool: 是否成功
+            bool: 是否成功
         """
+        if not holdings:
+            logger.warning("没有持仓数据需要导入")
+            return False
+        
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            # 检查是否存在持仓表，如果不存在则创建
-            self._ensure_portfolio_table(cursor)
-            
-            import_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            import_time = datetime.now()
             success_count = 0
             
             for holding in holdings:
                 if not holding.get('fund_code'):
-                    logger.warning(f"跳过没有基金代码的持仓: {holding['fund_name']}")
+                    logger.warning(f"跳过没有基金代码的持仓: {holding.get('fund_name', '未知')}")
                     continue
                 
                 try:
                     # 检查是否已存在该基金的持仓
-                    cursor.execute("""
+                    check_sql = """
                         SELECT id FROM user_portfolio 
-                        WHERE user_id = ? AND fund_code = ?
-                    """, (user_id, holding['fund_code']))
+                        WHERE user_id = %s AND fund_code = %s
+                    """
+                    result = self.db.execute_query(check_sql, (user_id, holding['fund_code']))
                     
-                    existing = cursor.fetchone()
-                    
-                    if existing:
+                    if not result.empty:
                         # 更新现有持仓
-                        cursor.execute("""
+                        update_sql = """
                             UPDATE user_portfolio SET
-                                fund_name = ?,
-                                nav_value = ?,
-                                change_amount = ?,
-                                change_percent = ?,
-                                position_value = ?,
-                                shares = ?,
-                                last_updated = ?
-                            WHERE user_id = ? AND fund_code = ?
-                        """, (
+                                fund_name = %s,
+                                nav_value = %s,
+                                change_amount = %s,
+                                change_percent = %s,
+                                position_value = %s,
+                                shares = %s,
+                                last_updated = %s
+                            WHERE user_id = %s AND fund_code = %s
+                        """
+                        params = (
                             holding.get('fund_name_full', holding['fund_name']),
                             holding.get('nav_value'),
                             holding.get('change_amount'),
@@ -189,17 +198,19 @@ class PortfolioImporter:
                             import_time,
                             user_id,
                             holding['fund_code']
-                        ))
+                        )
+                        self.db.execute_sql(update_sql, params)
                         logger.info(f"更新持仓: {holding['fund_code']}")
                     else:
                         # 插入新持仓
-                        cursor.execute("""
+                        insert_sql = """
                             INSERT INTO user_portfolio (
                                 user_id, fund_code, fund_name, nav_value,
                                 change_amount, change_percent, position_value,
                                 shares, created_at, last_updated
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """
+                        params = (
                             user_id,
                             holding['fund_code'],
                             holding.get('fund_name_full', holding['fund_name']),
@@ -210,17 +221,15 @@ class PortfolioImporter:
                             holding.get('shares'),
                             import_time,
                             import_time
-                        ))
+                        )
+                        self.db.execute_sql(insert_sql, params)
                         logger.info(f"新增持仓: {holding['fund_code']}")
                     
                     success_count += 1
                     
                 except Exception as e:
-                    logger.error(f"导入持仓失败 {holding['fund_code']}: {e}")
+                    logger.error(f"导入持仓失败 {holding.get('fund_code')}: {e}")
                     continue
-            
-            conn.commit()
-            conn.close()
             
             logger.info(f"成功导入 {success_count}/{len(holdings)} 个持仓")
             return success_count > 0
@@ -229,69 +238,116 @@ class PortfolioImporter:
             logger.error(f"导入持仓到数据库失败: {e}")
             return False
     
-    def _ensure_portfolio_table(self, cursor):
-        """确保持仓表存在"""
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_portfolio (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id TEXT NOT NULL,
-                fund_code TEXT NOT NULL,
-                fund_name TEXT,
-                nav_value REAL,
-                change_amount REAL,
-                change_percent REAL,
-                position_value REAL,
-                shares REAL,
-                created_at TEXT,
-                last_updated TEXT,
-                UNIQUE(user_id, fund_code)
-            )
-        """)
+    def _ensure_portfolio_table(self):
+        """确保持仓表存在（MySQL版本）"""
+        try:
+            sql = """
+                CREATE TABLE IF NOT EXISTS user_portfolio (
+                    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+                    user_id VARCHAR(50) NOT NULL DEFAULT 'default' COMMENT '用户ID',
+                    fund_code VARCHAR(10) NOT NULL COMMENT '基金代码',
+                    fund_name VARCHAR(200) COMMENT '基金名称',
+                    nav_value DECIMAL(10,4) COMMENT '单位净值',
+                    change_amount DECIMAL(10,2) COMMENT '涨跌金额',
+                    change_percent DECIMAL(6,2) COMMENT '涨跌百分比',
+                    position_value DECIMAL(15,2) COMMENT '持仓金额',
+                    shares DECIMAL(15,4) COMMENT '持有份额',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
+                    UNIQUE KEY uk_user_fund (user_id, fund_code),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_fund_code (fund_code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                COMMENT='用户持仓表 - 存储从截图导入的持仓信息'
+            """
+            self.db.execute_sql(sql)
+            logger.info("user_portfolio 表检查/创建成功")
+        except Exception as e:
+            logger.error(f"创建 user_portfolio 表失败: {e}")
     
     def get_user_portfolio(self, user_id: str = "default") -> List[Dict]:
         """
         获取用户持仓列表
         
         参数：
-        user_id: 用户ID
-        
+            user_id: 用户ID
+            
         返回：
-        list: 持仓列表
+            list: 持仓列表
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
-            cursor.execute("""
+            sql = """
                 SELECT * FROM user_portfolio 
-                WHERE user_id = ?
+                WHERE user_id = %s
                 ORDER BY last_updated DESC
-            """, (user_id,))
+            """
+            result = self.db.execute_query(sql, (user_id,))
             
-            columns = [description[0] for description in cursor.description]
-            rows = cursor.fetchall()
+            if result.empty:
+                return []
             
-            portfolio = []
-            for row in rows:
-                portfolio.append(dict(zip(columns, row)))
-            
-            conn.close()
-            return portfolio
+            # 转换为字典列表
+            holdings = result.to_dict('records')
+            return holdings
             
         except Exception as e:
             logger.error(f"获取用户持仓失败: {e}")
             return []
+    
+    def delete_portfolio(self, fund_code: str, user_id: str = "default") -> bool:
+        """
+        删除指定持仓
+        
+        Args:
+            fund_code: 基金代码
+            user_id: 用户ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            sql = "DELETE FROM user_portfolio WHERE user_id = %s AND fund_code = %s"
+            affected = self.db.execute_sql(sql, (user_id, fund_code))
+            if affected > 0:
+                logger.info(f"删除持仓成功: {fund_code}")
+                return True
+            else:
+                logger.warning(f"未找到要删除的持仓: {fund_code}")
+                return False
+        except Exception as e:
+            logger.error(f"删除持仓失败 {fund_code}: {e}")
+            return False
+    
+    def clear_user_portfolio(self, user_id: str = "default") -> bool:
+        """
+        清空用户所有持仓
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            sql = "DELETE FROM user_portfolio WHERE user_id = %s"
+            affected = self.db.execute_sql(sql, (user_id,))
+            logger.info(f"清空用户 {user_id} 的持仓，删除 {affected} 条记录")
+            return True
+        except Exception as e:
+            logger.error(f"清空持仓失败: {e}")
+            return False
+
 
 def import_portfolio_from_screenshot(ocr_texts: List[str], user_id: str = "default") -> Dict:
     """
     从截图OCR文本导入持仓（简化接口）
     
     参数：
-    ocr_texts: OCR识别的文本列表
-    user_id: 用户ID
-    
+        ocr_texts: OCR识别的文本列表
+        user_id: 用户ID
+        
     返回：
-    dict: 导入结果
+        dict: 导入结果
     """
     importer = PortfolioImporter()
     
@@ -316,7 +372,6 @@ def import_portfolio_from_screenshot(ocr_texts: List[str], user_id: str = "defau
     }
 
 
-# 模块级函数，供测试使用
 def parse_excel_file(file_path: str) -> List[Dict]:
     """
     解析Excel文件中的持仓数据

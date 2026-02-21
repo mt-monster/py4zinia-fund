@@ -559,6 +559,15 @@
     color: #333;
 }
 
+.fund-name-cell {
+    color: #666;
+    font-size: 13px;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* 模态框底部摘要 */
 .fund-modal-summary {
     margin-top: 16px;
@@ -1015,17 +1024,81 @@
     text-align: center;
 }
 
-.strategy-table .col-status {
-    width: 120px;
-}
-
-.strategy-table .col-action {
-    width: 140px;
-}
-
-.strategy-table .col-amount {
+.strategy-table .col-change {
     width: 100px;
     text-align: center;
+}
+
+.strategy-table .col-strategy {
+    width: 180px;
+    min-width: 160px;
+}
+
+.strategy-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.strategy-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot.buy {
+    background-color: #52c41a;
+}
+
+.status-dot.sell {
+    background-color: #f5222d;
+}
+
+.status-dot.hold {
+    background-color: #faad14;
+}
+
+.status-text {
+    font-size: 12px;
+    color: #666;
+}
+
+.strategy-action {
+    margin: 2px 0;
+}
+
+.strategy-amount {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.amount-label {
+    color: #999;
+}
+
+.amount-value {
+    font-weight: 500;
+}
+
+.amount-value.buy {
+    color: #52c41a;
+}
+
+.amount-value.sell {
+    color: #f5222d;
+}
+
+.amount-value.hold {
+    color: #faad14;
 }
 
 .strategy-row {

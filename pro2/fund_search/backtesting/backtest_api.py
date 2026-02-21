@@ -645,7 +645,7 @@ class BacktestAPIHandler:
         
         sql = """
         SELECT fund_code, fund_name, analysis_date as date,
-               current_estimate as nav, today_return, yesterday_return,
+               current_estimate as nav, today_return, prev_day_return as yesterday_return,
                annualized_return, sharpe_ratio, max_drawdown, volatility,
                composite_score, status_label
         FROM fund_analysis_results

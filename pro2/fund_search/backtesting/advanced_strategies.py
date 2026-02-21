@@ -57,8 +57,16 @@ class BaseStrategy(ABC):
             return df['nav']
         elif 'close' in df.columns:
             return df['close']
+        elif 'current_estimate' in df.columns:
+            return df['current_estimate']
+        elif 'yesterday_nav' in df.columns:
+            return df['yesterday_nav']
         else:
-            raise ValueError("DataFrame必须包含 '单位净值', 'nav' 或 'close' 列")
+            # 尝试使用第一个数值列
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                return df[numeric_cols[0]]
+            raise ValueError("DataFrame必须包含 '单位净值', 'nav', 'close', 'current_estimate' 或 'yesterday_nav' 列")
 
 # 1. 双均线动量策略 (Trend Following)
 class DualMAStrategy(BaseStrategy):

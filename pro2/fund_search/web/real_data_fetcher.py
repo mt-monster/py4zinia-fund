@@ -47,20 +47,36 @@ class RealDataFetcher:
             # 确保日期列格式正确
             df['date'] = pd.to_datetime(df['date'])
             
-            # 过滤日期范围
+            # 过滤日期范围 - 修复：不应该使用 .tail(days) 限制，因为我们已经按日期过滤了
             df = df[df['date'] >= start_date]
-            df = df.sort_values('date', ascending=True).tail(days).reset_index(drop=True)
+            df = df.sort_values('date', ascending=True).reset_index(drop=True)
             
-            # 重命名列
-            df = df.rename(columns={
-                'date': 'date',
-                'close': 'price'
-            })
+            # 检查并处理列名（akshare不同版本可能返回中英文列名）
+            logger.info(f"沪深300原始数据列名: {list(df.columns)}")
+            
+            # 重命名列 - 处理中英文列名
+            column_mapping = {}
+            if 'close' in df.columns:
+                column_mapping['close'] = 'price'
+            elif '收盘' in df.columns:
+                column_mapping['收盘'] = 'price'
+            
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
             
             # 只保留需要的列
-            df = df[['date', 'price']]
+            if 'price' in df.columns:
+                df = df[['date', 'price']]
+            else:
+                logger.error(f"无法找到价格列，可用列名: {list(df.columns)}")
+                return pd.DataFrame()
             
-            logger.info(f"成功获取沪深300指数 {len(df)} 条历史数据")
+            # 检查数据有效性
+            if df['price'].isna().all():
+                logger.error("沪深300价格数据全为NaN")
+                return pd.DataFrame()
+            
+            logger.info(f"成功获取沪深300指数 {len(df)} 条历史数据，日期范围: {df['date'].min()} 至 {df['date'].max()}")
             return df
             
         except Exception as e:
@@ -102,6 +118,206 @@ class RealDataFetcher:
             return pd.DataFrame()
     
 
+    @staticmethod
+    def get_index_latest(symbol: str = "sh000300") -> Dict[str, Optional[float]]:
+        """
+        获取指数最新行情（实时）- 优先使用Tushare
+        
+        参数:
+            symbol: 指数代码，例如 sh000300
+            
+        返回:
+            dict: {name, price, change, change_percent, date}
+        """
+        try:
+            logger.info(f"正在获取指数最新行情: {symbol}")
+            
+            # 优先尝试Tushare获取指数数据
+            tushare_result = RealDataFetcher._get_index_from_tushare(symbol)
+            if tushare_result:
+                logger.info(f"使用Tushare获取指数 {symbol} 成功")
+                return tushare_result
+            
+            # 如果Tushare失败，回退到AkShare
+            spot_fetchers = [
+                ("stock_zh_index_spot_em", {}),
+                ("stock_zh_index_spot", {}),
+                ("stock_zh_index_spot_sina", {})
+            ]
+
+            df = None
+            used_source = None
+            max_retries = 3
+            retry_delay = 1  # 秒
+            
+            for fetcher_name, kwargs in spot_fetchers:
+                if hasattr(ak, fetcher_name):
+                    # 为每个数据源添加重试机制
+                    for attempt in range(max_retries):
+                        try:
+                            df = getattr(ak, fetcher_name)(**kwargs)
+                            if df is not None and len(df) > 0:
+                                used_source = fetcher_name
+                                logger.info(f"{fetcher_name} 获取成功 (尝试 {attempt + 1}/{max_retries})")
+                                break
+                            else:
+                                logger.warning(f"{fetcher_name} 返回空数据 (尝试 {attempt + 1}/{max_retries})")
+                        except Exception as e:
+                            error_type = type(e).__name__
+                            error_msg = str(e)
+                            logger.warning(f"{fetcher_name} 获取失败 (尝试 {attempt + 1}/{max_retries}): {error_type} - {error_msg}")
+                            if attempt < max_retries - 1:
+                                import time
+                                time.sleep(retry_delay)
+                            continue
+                    
+                    if df is not None and len(df) > 0:
+                        break
+
+            if df is None or df.empty:
+                logger.error("指数最新行情获取失败，返回空结果")
+                return {}
+
+            def pick_col(candidates):
+                for c in candidates:
+                    if c in df.columns:
+                        return c
+                return None
+
+            code_col = pick_col(['代码', '指数代码', 'symbol', 'code'])
+            name_col = pick_col(['名称', '指数名称', 'name'])
+            price_col = pick_col(['最新价', '最新', 'price', '最新值', 'close'])
+            change_col = pick_col(['涨跌额', '涨跌', 'change', '涨跌值'])
+            change_pct_col = pick_col(['涨跌幅', 'change_percent', '涨跌幅%'])
+            date_col = pick_col(['日期', '时间', 'date', 'datetime'])
+
+            symbol_norm = symbol.lower().replace('.', '').replace('sh', '').replace('sz', '')
+            row = None
+
+            if code_col:
+                df[code_col] = df[code_col].astype(str)
+                row = df[df[code_col].str.contains(symbol_norm, na=False)]
+            if (row is None or row.empty) and name_col:
+                row = df[df[name_col].astype(str).str.contains('沪深300', na=False)]
+            if row is None or row.empty:
+                row = df.head(1)
+
+            row = row.iloc[0]
+            name = row[name_col] if name_col and name_col in row else '沪深300'
+            price = float(row[price_col]) if price_col and pd.notna(row[price_col]) else None
+            change = float(row[change_col]) if change_col and pd.notna(row[change_col]) else None
+            change_percent = None
+            if change_pct_col and pd.notna(row[change_pct_col]):
+                change_percent = float(str(row[change_pct_col]).replace('%', '').strip())
+
+            date_value = None
+            if date_col and pd.notna(row[date_col]):
+                date_value = str(row[date_col])
+
+            return {
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'date': date_value,
+                'source': used_source
+            }
+        except Exception as e:
+            logger.error(f"获取指数最新行情失败: {str(e)}")
+            return {}
+
+    @staticmethod
+    def _get_index_from_tushare(symbol: str) -> Optional[Dict]:
+        """
+        从Tushare获取指数数据
+        
+        参数:
+            symbol: 指数代码，例如 sh000300
+            
+        返回:
+            dict: 指数数据字典，失败返回None
+        """
+        try:
+            import tushare as ts
+            from shared.enhanced_config import DATA_SOURCE_CONFIG
+            
+            # 获取Tushare token
+            tushare_token = DATA_SOURCE_CONFIG.get('tushare', {}).get('token')
+            if not tushare_token:
+                logger.warning("Tushare token未配置，跳过Tushare数据源")
+                return None
+                
+            # 初始化Tushare
+            ts.set_token(tushare_token)
+            pro = ts.pro_api()
+            
+            # 转换指数代码格式
+            ts_symbol = RealDataFetcher._convert_symbol_for_tushare(symbol)
+            if not ts_symbol:
+                logger.warning(f"无法转换指数代码: {symbol}")
+                return None
+            
+            logger.info(f"正在使用Tushare获取指数数据: {ts_symbol}")
+            
+            # 获取指数行情数据
+            df = pro.index_daily(ts_code=ts_symbol, limit=1)
+            
+            if df is None or df.empty:
+                logger.warning(f"Tushare未返回 {ts_symbol} 数据")
+                return None
+            
+            # 提取数据
+            row = df.iloc[0]
+            name = row.get('name', '沪深300')
+            price = float(row.get('close', 0))
+            pre_close = float(row.get('pre_close', price))
+            change = price - pre_close
+            change_percent = (change / pre_close * 100) if pre_close != 0 else 0
+            
+            return {
+                'name': name,
+                'price': price,
+                'change': change,
+                'change_percent': change_percent,
+                'date': str(row.get('trade_date', '')),
+                'source': 'tushare'
+            }
+            
+        except Exception as e:
+            logger.warning(f"Tushare获取指数 {symbol} 失败: {str(e)}")
+            return None
+    
+    @staticmethod
+    def _convert_symbol_for_tushare(symbol: str) -> Optional[str]:
+        """
+        转换指数代码为Tushare格式
+        
+        参数:
+            symbol: 原始指数代码
+            
+        返回:
+            str: Tushare格式的指数代码，无法转换返回None
+        """
+        symbol_lower = symbol.lower()
+        
+        # 沪深300
+        if '000300' in symbol_lower or 'sh000300' in symbol_lower:
+            return '000300.SH'
+        
+        # 上证指数
+        if '000001' in symbol_lower or 'sh000001' in symbol_lower:
+            return '000001.SH'
+        
+        # 深证成指
+        if '399001' in symbol_lower or 'sz399001' in symbol_lower:
+            return '399001.SZ'
+        
+        # 创业板指
+        if '399006' in symbol_lower or 'sz399006' in symbol_lower:
+            return '399006.SZ'
+        
+        logger.warning(f"不支持的指数代码格式: {symbol}")
+        return None
     @staticmethod
     def get_fund_nav_history(fund_code: str, days: int = 365) -> pd.DataFrame:
         """

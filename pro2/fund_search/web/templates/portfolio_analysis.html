@@ -226,6 +226,13 @@
             </div>
         </section>
 
+        <!-- 数据来源说明 -->
+        <section class="mb-5">
+            <div class="alert alert-light border" id="data-source-container">
+                <i class="bi bi-database me-2"></i>数据来源加载中...
+            </div>
+        </section>
+
         <!-- 风险提示 -->
         <section class="mb-5">
             <div class="alert alert-warning">
@@ -247,66 +254,131 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/portfolio-analysis-integrated.js') }}"></script>
     <script>
-        // 分析数据
-        const portfolioData = {
-            initialAmount: 10000,
-            finalValue: 9672.7,
-            totalReturn: -3.27,
-            totalDays: 90,
-            funds: [
-                { code: '007605', name: '华夏科技创新混合A', initial: 666.667, final: 661.65, return: -0.75, annualized: -3.02, maxDrawdown: 0.75, sharpe: -3.76, trades: 10 },
-                { code: '001614', name: '东方新能源汽车混合', initial: 666.667, final: 636.07, return: -4.59, annualized: -17.35, maxDrawdown: 4.59, sharpe: -5.30, trades: 24 },
-                { code: '006718', name: '工银新能源汽车混合A', initial: 666.667, final: 622.8, return: -6.58, annualized: -24.12, maxDrawdown: 6.58, sharpe: -5.12, trades: 28 },
-                { code: '013048', name: '华夏半导体芯片混合A', initial: 666.667, final: 634.51, return: -4.82, annualized: -18.17, maxDrawdown: 4.82, sharpe: -4.04, trades: 18 },
-                { code: '013277', name: '南方新能源产业混合A', initial: 666.667, final: 645.66, return: -3.15, annualized: -12.18, maxDrawdown: 3.15, sharpe: -4.42, trades: 18 },
-                { code: '001270', name: '招商中证白酒指数A', initial: 666.667, final: 623.98, return: -6.40, annualized: -23.54, maxDrawdown: 6.40, sharpe: -5.24, trades: 22 },
-                { code: '007153', name: '华夏中证5G通信主题ETF联接A', initial: 666.667, final: 661.13, return: -0.83, annualized: -3.32, maxDrawdown: 0.83, sharpe: -4.12, trades: 12 },
-                { code: '010033', name: '华夏中证人工智能主题ETF联接A', initial: 666.667, final: 635.19, return: -4.72, annualized: -17.81, maxDrawdown: 4.72, sharpe: -3.78, trades: 16 },
-                { code: '014978', name: '华夏中证新能源汽车ETF联接A', initial: 666.667, final: 655.69, return: -1.65, annualized: -6.51, maxDrawdown: 1.65, sharpe: -2.99, trades: 12 },
-                { code: '006105', name: '汇添富中证主要消费ETF联接A', initial: 666.667, final: 658.47, return: -1.23, annualized: -4.89, maxDrawdown: 1.23, sharpe: -4.07, trades: 24 },
-                { code: '017962', name: '华夏中证细分食品饮料产业主题ETF联接A', initial: 666.667, final: 608.28, return: -8.76, annualized: -31.04, maxDrawdown: 8.76, sharpe: -6.57, trades: 36 },
-                { code: '008401', name: '华夏中证银行ETF联接A', initial: 666.667, final: 663.96, return: -0.41, annualized: -1.64, maxDrawdown: 0.41, sharpe: -2.63, trades: 6 },
-                { code: '400032', name: '东方新能源汽车混合', initial: 666.667, final: 637.57, return: -4.37, annualized: -16.56, maxDrawdown: 4.36, sharpe: -5.27, trades: 24 },
-                { code: '021539', name: '华安法国CAC40ETF发起式联接(QDII)A', initial: 666.667, final: 661.07, return: -0.84, annualized: -3.36, maxDrawdown: 0.84, sharpe: -3.24, trades: 10 },
-                { code: '012509', name: '华夏中证全指证券公司ETF联接A', initial: 666.667, final: 666.67, return: 0.00, annualized: 0.00, maxDrawdown: 0.00, sharpe: 0.00, trades: 0 }
-            ]
-        };
+        let navChartInstance = null;
 
-        // 计算绩效指标
-        function calculateMetrics(data) {
-            const years = data.totalDays / 365.25;
-            const annualizedReturn = Math.pow(data.finalValue / data.initialAmount, 1 / years) - 1;
-            const volatility = 0.15; // 假设年化波动率15%
-            const maxDrawdown = Math.max(...data.funds.map(f => f.maxDrawdown));
+        function formatNumber(value) {
+            const num = Number(value);
+            if (Number.isNaN(num)) return '--';
+            return num.toFixed(2);
+        }
+
+        function renderDataUnavailable(message) {
+            const metricsContainer = document.getElementById('metrics-container');
+            if (metricsContainer) {
+                metricsContainer.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-exclamation-triangle me-2"></i>${message}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const fundTableBody = document.getElementById('fund-table-body');
+            if (fundTableBody) {
+                fundTableBody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">暂无基金明细</td></tr>';
+            }
+
+            const navChart = document.getElementById('navChart');
+            if (navChart && navChart.parentElement) {
+                navChart.parentElement.innerHTML = `
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>暂无真实净值曲线数据
+                    </div>
+                `;
+            }
+
+            const dataSourceContainer = document.getElementById('data-source-container');
+            if (dataSourceContainer) {
+                dataSourceContainer.innerHTML = `<i class="bi bi-database me-2"></i>${message}`;
+            }
+
+            const maxDrawdownWarning = document.getElementById('max-drawdown-warning');
+            const volatilityWarning = document.getElementById('volatility-warning');
+            if (maxDrawdownWarning) maxDrawdownWarning.textContent = '--';
+            if (volatilityWarning) volatilityWarning.textContent = '--';
+        }
+
+        function setReportDate() {
+            document.getElementById('report-date').textContent = new Date().toLocaleString('zh-CN');
+        }
+
+        function calculateMetrics(portfolioValues, benchmarkValues) {
+            const totalDays = Math.max(portfolioValues.length - 1, 1);
+            const initialValue = portfolioValues[0] || 0;
+            const finalValue = portfolioValues[portfolioValues.length - 1] || 0;
+            const totalReturn = initialValue > 0 ? (finalValue / initialValue - 1) * 100 : 0;
+
+            const years = totalDays / 252;
+            const annualizedReturn = initialValue > 0 && years > 0
+                ? (Math.pow(finalValue / initialValue, 1 / years) - 1) * 100
+                : 0;
+
+            const dailyReturns = [];
+            for (let i = 1; i < portfolioValues.length; i++) {
+                const prev = portfolioValues[i - 1] || 0;
+                const curr = portfolioValues[i] || 0;
+                dailyReturns.push(prev > 0 ? (curr - prev) / prev : 0);
+            }
+
+            const dailyAvg = dailyReturns.reduce((sum, v) => sum + v, 0) / Math.max(dailyReturns.length, 1);
+            const variance = dailyReturns.reduce((sum, v) => sum + Math.pow(v - dailyAvg, 2), 0) / Math.max(dailyReturns.length, 1);
+            const volatility = Math.sqrt(variance) * Math.sqrt(252) * 100;
+
+            let peak = initialValue;
+            let maxDrawdown = 0;
+            portfolioValues.forEach(value => {
+                if (value > peak) peak = value;
+                const drawdown = peak > 0 ? (peak - value) / peak : 0;
+                if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+            });
+            maxDrawdown = maxDrawdown * 100;
+
+            const benchmarkInitial = benchmarkValues[0] || 0;
+            const benchmarkFinal = benchmarkValues[benchmarkValues.length - 1] || 0;
+            const benchmarkAnnualized = benchmarkInitial > 0 && years > 0
+                ? (Math.pow(benchmarkFinal / benchmarkInitial, 1 / years) - 1) * 100
+                : 0;
+
+            const benchmarkDailyReturns = [];
+            for (let i = 1; i < benchmarkValues.length; i++) {
+                const prev = benchmarkValues[i - 1] || 0;
+                const curr = benchmarkValues[i] || 0;
+                benchmarkDailyReturns.push(prev > 0 ? (curr - prev) / prev : 0);
+            }
+
+            const activeReturns = dailyReturns.map((v, idx) => v - (benchmarkDailyReturns[idx] || 0));
+            const activeAvg = activeReturns.reduce((sum, v) => sum + v, 0) / Math.max(activeReturns.length, 1);
+            const activeVar = activeReturns.reduce((sum, v) => sum + Math.pow(v - activeAvg, 2), 0) / Math.max(activeReturns.length, 1);
+            const trackingError = Math.sqrt(activeVar) * Math.sqrt(252) * 100;
+            const informationRatio = trackingError !== 0 ? (annualizedReturn - benchmarkAnnualized) / trackingError : 0;
+
             const riskFreeRate = 0.02;
-            const sharpeRatio = (annualizedReturn - riskFreeRate) / volatility;
-            const benchmarkReturn = -0.05; // 假设基准收益-5%
-            const trackingError = 0.08;
-            const informationRatio = (annualizedReturn - benchmarkReturn) / trackingError;
-            const calmarRatio = annualizedReturn / (maxDrawdown / 100);
+            const sharpeRatio = volatility !== 0 ? ((annualizedReturn / 100) - riskFreeRate) / (volatility / 100) : 0;
+            const calmarRatio = maxDrawdown !== 0 ? annualizedReturn / maxDrawdown : 0;
 
             return {
-                totalReturn: data.totalReturn,
-                annualizedReturn: annualizedReturn * 100,
-                volatility: volatility * 100,
-                maxDrawdown: maxDrawdown,
-                sharpeRatio: sharpeRatio,
-                informationRatio: informationRatio,
-                calmarRatio: calmarRatio
+                totalReturn,
+                annualizedReturn,
+                volatility,
+                maxDrawdown,
+                sharpeRatio,
+                informationRatio,
+                calmarRatio
             };
         }
 
-        // 渲染绩效指标
         function renderMetrics(metrics) {
             const container = document.getElementById('metrics-container');
             const metricsConfig = [
-                { icon: 'bi-cash-stack', title: '总收益率', value: `${metrics.totalReturn.toFixed(2)}%`, class: metrics.totalReturn >= 0 ? 'positive' : 'negative' },
-                { icon: 'bi-graph-up', title: '年化收益率', value: `${metrics.annualizedReturn.toFixed(2)}%`, class: metrics.annualizedReturn >= 0 ? 'positive' : 'negative' },
-                { icon: 'bi-activity', title: '年化波动率', value: `${metrics.volatility.toFixed(2)}%`, class: 'neutral' },
-                { icon: 'bi-arrow-down-up', title: '最大回撤', value: `${metrics.maxDrawdown.toFixed(2)}%`, class: 'negative' },
-                { icon: 'bi-speedometer2', title: '夏普比率', value: metrics.sharpeRatio.toFixed(2), class: metrics.sharpeRatio >= 0 ? 'positive' : 'negative' },
-                { icon: 'bi-info-circle', title: '信息比率', value: metrics.informationRatio.toFixed(2), class: metrics.informationRatio >= 0 ? 'positive' : 'negative' }
+                { icon: 'bi-cash-stack', title: '总收益率', value: `${formatNumber(metrics.totalReturn)}%`, class: metrics.totalReturn >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-graph-up', title: '年化收益率', value: `${formatNumber(metrics.annualizedReturn)}%`, class: metrics.annualizedReturn >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-activity', title: '年化波动率', value: `${formatNumber(metrics.volatility)}%`, class: 'neutral' },
+                { icon: 'bi-arrow-down-up', title: '最大回撤', value: `${formatNumber(metrics.maxDrawdown)}%`, class: 'negative' },
+                { icon: 'bi-speedometer2', title: '夏普比率', value: formatNumber(metrics.sharpeRatio), class: metrics.sharpeRatio >= 0 ? 'positive' : 'negative' },
+                { icon: 'bi-info-circle', title: '信息比率', value: formatNumber(metrics.informationRatio), class: metrics.informationRatio >= 0 ? 'positive' : 'negative' }
             ];
 
             container.innerHTML = metricsConfig.map(metric => `
@@ -322,62 +394,29 @@
             `).join('');
         }
 
-        // 渲染基金表格
-        function renderFundTable(funds) {
+        function renderFundTablePlaceholder() {
             const tbody = document.getElementById('fund-table-body');
-            const bestFund = funds.find(f => f.return === Math.max(...funds.map(fund => fund.return)));
-            const worstFund = funds.find(f => f.return === Math.min(...funds.map(fund => fund.return)));
-
-            tbody.innerHTML = funds.map(fund => {
-                const isBest = fund.code === bestFund.code;
-                const isWorst = fund.code === worstFund.code;
-                const rowClass = isBest ? 'best-performer' : (isWorst ? 'worst-performer' : '');
-                const badge = isBest ? '<span class="badge bg-success ms-2">最佳</span>' : (isWorst ? '<span class="badge bg-danger ms-2">最差</span>' : '');
-
-                return `
-                    <tr class="${rowClass}">
-                        <td><strong>${fund.code}</strong>${badge}</td>
-                        <td>${fund.name}</td>
-                        <td>¥${fund.initial.toLocaleString()}</td>
-                        <td>¥${fund.final.toLocaleString()}</td>
-                        <td class="${fund.return >= 0 ? 'positive' : 'negative'}">${fund.return >= 0 ? '+' : ''}${fund.return.toFixed(2)}%</td>
-                        <td class="${fund.annualized >= 0 ? 'positive' : 'negative'}">${fund.annualized >= 0 ? '+' : ''}${fund.annualized.toFixed(2)}%</td>
-                        <td class="negative">${fund.maxDrawdown.toFixed(2)}%</td>
-                        <td class="${fund.sharpe >= 0 ? 'positive' : 'negative'}">${fund.sharpe.toFixed(2)}</td>
-                        <td>${fund.trades}</td>
-                    </tr>
-                `;
-            }).join('');
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">暂无基金明细</td></tr>';
         }
 
-        // 绘制净值曲线
-        function drawNavChart() {
-            const ctx = document.getElementById('navChart').getContext('2d');
-            const days = portfolioData.totalDays;
-            const dates = [];
-            const portfolioNavs = [];
-            const benchmarkNavs = [];
+        function updateRiskWarning(metrics) {
+            document.getElementById('max-drawdown-warning').textContent = formatNumber(metrics.maxDrawdown);
+            document.getElementById('volatility-warning').textContent = formatNumber(metrics.volatility);
+        }
 
-            // 生成模拟数据
-            for (let i = 0; i <= days; i++) {
-                const date = new Date();
-                date.setDate(date.getDate() - (days - i));
-                dates.push(date.toISOString().split('T')[0]);
-                
-                // 组合净值（基于总收益率线性插值）
-                const progress = i / days;
-                const portfolioReturn = (portfolioData.totalReturn / 100) * progress;
-                portfolioNavs.push(portfolioData.initialAmount * (1 + portfolioReturn));
-                
-                // 基准净值（假设基准收益-5%）
-                const benchmarkReturn = -0.05 * progress;
-                benchmarkNavs.push(portfolioData.initialAmount * (1 + benchmarkReturn));
+        function drawNavChart(labels, portfolioNavs, benchmarkNavs) {
+            const canvas = document.getElementById('navChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            if (navChartInstance) {
+                navChartInstance.destroy();
             }
 
-            new Chart(ctx, {
+            navChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dates,
+                    labels,
                     datasets: [{
                         label: '组合净值',
                         data: portfolioNavs,
@@ -424,7 +463,7 @@
                             },
                             ticks: {
                                 callback: function(value) {
-                                    return '¥' + value.toLocaleString();
+                                    return '¥' + Number(value).toFixed(2);
                                 }
                             }
                         }
@@ -433,41 +472,107 @@
             });
         }
 
-        // 更新风险提示
-        function updateRiskWarning(metrics) {
-            document.getElementById('max-drawdown-warning').textContent = metrics.maxDrawdown.toFixed(2);
-            document.getElementById('volatility-warning').textContent = metrics.volatility.toFixed(2);
+        function renderDataSource(sourceDetail, benchmarkName) {
+            const container = document.getElementById('data-source-container');
+            if (!container) return;
+
+            if (!sourceDetail) {
+                container.innerHTML = '<i class="bi bi-database me-2"></i>数据来源：暂无说明';
+                return;
+            }
+
+            const portfolioSource = sourceDetail.portfolio_nav || 'akshare:fund_open_fund_info_em';
+            const benchmarkSource = sourceDetail.benchmark || 'akshare:stock_zh_index_daily';
+            const asOf = sourceDetail.as_of ? `更新至：${sourceDetail.as_of}` : '';
+
+            container.innerHTML = `
+                <div><i class="bi bi-database me-2"></i>数据来源</div>
+                <div class="text-muted">组合净值：${portfolioSource}</div>
+                <div class="text-muted">基准指数（${benchmarkName || '沪深300'}）：${benchmarkSource}</div>
+                ${asOf ? `<div class="text-muted">${asOf}</div>` : ''}
+            `;
         }
 
-        // 设置报告日期
-        function setReportDate() {
-            document.getElementById('report-date').textContent = new Date().toLocaleString('zh-CN');
+        async function loadReportData() {
+            const params = new URLSearchParams(window.location.search);
+            const fundCodes = params.get('fund_codes');
+            const weights = params.get('weights');
+            const days = parseInt(params.get('days') || '90', 10);
+
+            if (!fundCodes) {
+                renderDataUnavailable('缺少基金代码参数，请从策略回测或持仓回测进入本页。');
+                return;
+            }
+
+            const query = new URLSearchParams({
+                days: String(days),
+                fund_codes: fundCodes
+            });
+            if (weights) {
+                query.set('weights', weights);
+            }
+
+            try {
+                const response = await fetch(`/api/dashboard/profit-trend?${query.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    throw new Error(result.error || '数据加载失败');
+                }
+
+                const labels = result.data.labels || [];
+                const portfolioNavs = result.data.profit || [];
+                const benchmarkNavs = result.data.benchmark || [];
+
+                if (labels.length === 0 || portfolioNavs.length === 0 || benchmarkNavs.length === 0) {
+                    renderDataUnavailable('真实历史数据不足，无法生成报告。');
+                    return;
+                }
+
+                const metrics = calculateMetrics(portfolioNavs, benchmarkNavs);
+                renderMetrics(metrics);
+                renderFundTablePlaceholder();
+                drawNavChart(labels, portfolioNavs, benchmarkNavs);
+                updateRiskWarning(metrics);
+                renderDataSource(result.data.data_source_detail, result.data.benchmark_name);
+            } catch (error) {
+                console.error('加载报告失败:', error);
+                renderDataUnavailable('加载真实数据失败，请稍后重试。');
+            }
         }
 
-        // 图表类型切换
-        function toggleChartType(type) {
-            // 实现图表类型切换逻辑
-            console.log('切换到' + type + '图表');
-        }
-
-        // 导出图表
-        function exportChart() {
-            const canvas = document.getElementById('navChart');
-            const url = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = '投资组合净值曲线.png';
-            link.href = url;
-            link.click();
-        }
-
-        // 初始化页面
         document.addEventListener('DOMContentLoaded', function() {
-            const metrics = calculateMetrics(portfolioData);
-            renderMetrics(metrics);
-            renderFundTable(portfolioData.funds);
-            drawNavChart();
-            updateRiskWarning(metrics);
             setReportDate();
+            
+            // 调试信息
+            console.log('🚀 页面DOM加载完成');
+            console.log('Chart.js存在:', typeof Chart !== 'undefined');
+            console.log('PortfolioAnalysis存在:', typeof PortfolioAnalysis !== 'undefined');
+            
+            // 初始化完整的投资组合分析功能
+            if (typeof PortfolioAnalysis !== 'undefined') {
+                console.log('🚀 初始化PortfolioAnalysis模块');
+                PortfolioAnalysis.init();
+                
+                // 延迟执行自动分析，确保DOM完全加载
+                setTimeout(() => {
+                    PortfolioAnalysis.autoAnalyze()
+                        .then(() => {
+                            console.log('✅ PortfolioAnalysis自动分析完成');
+                        })
+                        .catch(error => {
+                            console.error('❌ PortfolioAnalysis自动分析失败:', error);
+                        });
+                }, 1000);
+            } else {
+                console.log('⚠️ PortfolioAnalysis模块未加载');
+            }
+            
+            // 同时执行原有的数据加载逻辑
+            loadReportData();
         });
     </script>
 </body>
