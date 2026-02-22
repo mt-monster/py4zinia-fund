@@ -20,11 +20,11 @@ from flask import Flask, jsonify, request
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS

@@ -11,7 +11,7 @@ import pandas as pd
 import logging
 
 from .base import BaseDataSourceAdapter
-from ..constants import DEFAULT_RETRY_TIMES, DEFAULT_RETRY_DELAY
+from data_retrieval.utils.constants import DEFAULT_RETRY_TIMES, DEFAULT_RETRY_DELAY
 
 logger = logging.getLogger(__name__)
 

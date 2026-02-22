@@ -642,7 +642,7 @@ class HoldingRealtimeService:
                 
                 # 对于 QDII 基金，需要从 Adapter 获取以获取正确的延迟标记
                 # 所以这里只处理非 QDII 基金
-                from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+                from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
                 qdii_codes = [code for code in still_missing if MultiSourceDataAdapter.is_qdii_fund(code)]
                 non_qdii_codes = [code for code in still_missing if not MultiSourceDataAdapter.is_qdii_fund(code)]
                 
@@ -692,7 +692,7 @@ class HoldingRealtimeService:
                 if still_missing_after_db:
                     logger.info(f"尝试从 MultiSourceDataAdapter 批量获取 {len(still_missing_after_db)} 只基金的昨日收益率")
                     try:
-                        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+                        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
                         adapter = MultiSourceDataAdapter()
                         
                         # 【优化】使用批量获取替代逐个获取

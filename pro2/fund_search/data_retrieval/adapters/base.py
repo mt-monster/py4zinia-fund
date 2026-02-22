@@ -155,7 +155,7 @@ class BaseDataSourceAdapter(ABC):
         Returns:
             标准化后的DataFrame
         """
-        from ..constants import FUND_NAV_COLUMN_MAPPING
+        from data_retrieval.utils.constants import FUND_NAV_COLUMN_MAPPING
         
         if df.empty:
             return df
