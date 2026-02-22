@@ -8,13 +8,15 @@ ETF 相关 API 路由
 import os
 import sys
 import json
+import logging
+import traceback
+from datetime import datetime, timedelta
+
+import pandas as pd
+import akshare as ak
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
-import pandas as pd
-from datetime import datetime, timedelta
-import logging
 
-# 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
@@ -146,7 +148,6 @@ def get_etf_list():
         
     except Exception as e:
         logger.error(f"获取ETF列表失败: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -280,13 +281,10 @@ def get_etf_history(etf_code):
 def get_etf_holdings(etf_code):
     """获取ETF持仓数据"""
     try:
-        import akshare as ak
-        
         holdings = []
         update_date = None
         
         try:
-            # 尝试获取ETF持仓
             holdings_df = ak.fund_etf_fund_info_em(fund=etf_code)
             
             if holdings_df is not None and not holdings_df.empty:
@@ -338,8 +336,6 @@ def get_etf_holdings(etf_code):
 def get_etf_info(etf_code):
     """获取ETF基金公司和基金经理信息"""
     try:
-        import akshare as ak
-        
         info = {
             'fund_company': None,
             'fund_manager': None,
