@@ -9,13 +9,18 @@
 import os
 import sys
 import json
+import time
 import logging
-import pandas as pd
+import threading
+import traceback
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
 
-# 添加父目录到 Python 路径
+import pandas as pd
+import numpy as np
+import akshare as ak
+import requests
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
@@ -96,9 +101,6 @@ def get_fund_holdings_data(fund_code):
 def _get_holdings_from_akshare(fund_code):
     """从akshare获取基金持仓数据"""
     try:
-        import akshare as ak
-        
-        # 获取基金持仓数据
         df = ak.fund_portfolio_hold_em(symbol=fund_code, date=None)
         
         if df is None or df.empty:
@@ -140,10 +142,6 @@ def _get_holdings_from_akshare(fund_code):
 def _get_holdings_from_eastmoney(fund_code):
     """从天天基金网获取基金持仓数据"""
     try:
-        import requests
-        import json
-        
-        # 天天基金网API
         url = f"http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jjcc&code={fund_code}&topline=10"
         
         headers = {
@@ -184,9 +182,6 @@ def _get_holdings_from_eastmoney(fund_code):
 def _get_holdings_from_sina(fund_code):
     """从新浪财经获取基金持仓数据"""
     try:
-        import requests
-        
-        # 新浪财经API
         url = f"https://stock.finance.sina.com.cn/fundInfo/api/openapi.php/CaihuiFundInfoService.getFundPortDetail?symbol={fund_code}"
         
         headers = {
@@ -385,7 +380,6 @@ def calculate_top_stocks(holdings_df, total_asset, fund_codes_count=1):
         return top_stocks
     except Exception as e:
         logger.error(f"计算重仓股失败: {e}")
-        import traceback
         traceback.print_exc()
         return []
 
@@ -853,7 +847,6 @@ def get_personalized_investment_advice(fund_codes):
         
     except Exception as e:
         logger.error(f"获取个性化投资建议失败: {e}")
-        import traceback
         traceback.print_exc()
         return {
             'success': False,
@@ -1082,7 +1075,6 @@ def get_personalized_investment_advice_parallel(fund_codes: list, max_workers: i
     Returns:
         dict: 包含每只基金的个性化投资建议
     """
-    import time
     start_time = time.time()
     logger.info(f"[并行分析] 开始分析 {len(fund_codes)} 只基金，最大并行数: {max_workers}")
     
@@ -1148,7 +1140,6 @@ def get_personalized_investment_advice_parallel(fund_codes: list, max_workers: i
         
     except Exception as e:
         logger.error(f"[并行分析] 获取个性化投资建议失败: {e}")
-        import traceback
         traceback.print_exc()
         return {
             'success': False,

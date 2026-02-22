@@ -10,11 +10,12 @@ import sys
 import json
 import math
 import logging
-from flask import jsonify, request
-import pandas as pd
+import traceback
 from datetime import datetime, timedelta
 
-# 添加父目录到 Python 路径
+import pandas as pd
+from flask import jsonify, request
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
@@ -374,7 +375,6 @@ def backtest_strategy():
         })
     except Exception as e:
         logger.error(f"策略回测失败: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -589,7 +589,6 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
 
     except Exception as e:
         logger.error(f"Single fund backtest failed for {fund_code}: {str(e)}")
-        import traceback
         traceback.print_exc()
         return None
 
@@ -893,7 +892,6 @@ def _execute_multi_fund_backtest(fund_codes, strategy_id, initial_amount, base_i
         
     except Exception as e:
         logger.error(f"Multi-fund backtest failed: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1002,7 +1000,6 @@ def backtest_holdings():
         
     except Exception as e:
         logger.error(f"Enhanced backtest failed: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1197,7 +1194,6 @@ def compare_strategies():
                 logger.warning("沪深300数据为空")
         except Exception as e:
             logger.warning(f"获取沪深300基准数据失败: {str(e)}")
-            import traceback
             traceback.print_exc()
         
         logger.info(f"Strategy comparison completed: {len(comparison_results)} strategies, best={best_strategy_id}")
@@ -1220,7 +1216,6 @@ def compare_strategies():
         
     except Exception as e:
         logger.error(f"Strategy comparison failed: {str(e)}")
-        import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1283,18 +1278,21 @@ def get_funds_by_date(date):
         sort_by = request.args.get('sort_by', 'composite_score')
         sort_order = request.args.get('sort_order', 'desc')
         
-        sql = f"SELECT * FROM fund_analysis_results WHERE analysis_date = '{date}'"
+        sql = "SELECT * FROM fund_analysis_results WHERE analysis_date = :date"
+        params = {'date': date}
         
         if search:
-            sql += f" AND (fund_code LIKE '%%{search}%%' OR fund_name LIKE '%%{search}%%')"
+            sql += " AND (fund_code LIKE :search OR fund_name LIKE :search)"
+            params['search'] = f'%{search}%'
         
         valid_sort_fields = ['composite_score', 'today_return', 'prev_day_return', 'annualized_return', 'sharpe_ratio', 'max_drawdown', 'fund_code']
         if sort_by not in valid_sort_fields:
             sort_by = 'composite_score'
         
-        sql += f" ORDER BY {sort_by} {'DESC' if sort_order == 'desc' else 'ASC'}"
+        sort_direction = 'DESC' if sort_order == 'desc' else 'ASC'
+        sql += f" ORDER BY {sort_by} {sort_direction}"
         
-        df = db_manager.execute_query(sql)
+        df = db_manager.execute_query(sql, params)
         
         if df.empty:
             return jsonify({'success': True, 'data': [], 'total': 0})

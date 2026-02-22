@@ -9,12 +9,14 @@
 import os
 import sys
 import json
-from flask import Flask, jsonify, request
-import pandas as pd
-from datetime import datetime, timedelta
 import logging
+import numpy as np
+from datetime import datetime, timedelta
 
-# 添加父目录到 Python 路径
+import pandas as pd
+import akshare as ak
+from flask import Flask, jsonify, request
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
@@ -92,8 +94,7 @@ def _register_fund_routes(app):
             
             max_date = date_df.iloc[0]['max_date']
             
-            # 联合查询基金数据和持仓数据
-            sql = f"""
+            sql = """
             SELECT DISTINCT 
                 far.fund_code, far.fund_name, far.today_return, far.prev_day_return,
                 far.annualized_return, far.sharpe_ratio, far.sharpe_ratio_ytd, far.sharpe_ratio_1y, far.sharpe_ratio_all,
@@ -104,20 +105,23 @@ def _register_fund_routes(app):
                 h.holding_shares, h.cost_price, h.holding_amount, h.buy_date
             FROM fund_analysis_results far
             LEFT JOIN user_holdings h ON far.fund_code = h.fund_code AND h.user_id = 'default_user'
-            WHERE far.analysis_date = '{max_date}'
+            WHERE far.analysis_date = :max_date
             """
             
-            if search:
-                sql += f" AND (far.fund_code LIKE '%{search}%' OR far.fund_name LIKE '%{search}%')"
+            params = {'max_date': max_date}
             
-            # 如果不是持仓相关字段，使用数据库排序
+            if search:
+                sql += " AND (far.fund_code LIKE :search OR far.fund_name LIKE :search)"
+                params['search'] = f'%{search}%'
+            
             if sort_by not in ['today_profit_rate', 'holding_profit_rate', 'holding_amount']:
                 valid_sort_fields = ['composite_score', 'today_return', 'prev_day_return', 'annualized_return', 
                                     'sharpe_ratio', 'max_drawdown', 'fund_code']
                 if sort_by in valid_sort_fields:
-                    sql += f" ORDER BY far.{sort_by} {'DESC' if sort_order == 'desc' else 'ASC'}"
+                    sort_direction = 'DESC' if sort_order == 'desc' else 'ASC'
+                    sql += f" ORDER BY far.{sort_by} {sort_direction}"
             
-            df = db_manager.execute_query(sql)
+            df = db_manager.execute_query(sql, params)
             
             if df.empty:
                 return safe_jsonify({'success': True, 'data': [], 'total': 0, 'page': page, 'per_page': per_page})
@@ -297,8 +301,8 @@ def _register_fund_routes(app):
                 logger.warning(f"获取实时数据失败: {str(e)}, 使用缓存数据")
             
             # 如果实时数据获取失败，回退到数据库缓存数据
-            sql = f"SELECT * FROM fund_analysis_results WHERE fund_code = '{fund_code}' ORDER BY analysis_date DESC LIMIT 1"
-            df = db_manager.execute_query(sql)
+            sql = "SELECT * FROM fund_analysis_results WHERE fund_code = :fund_code ORDER BY analysis_date DESC LIMIT 1"
+            df = db_manager.execute_query(sql, {'fund_code': fund_code})
             
             if df.empty:
                 return jsonify({'success': False, 'error': '基金不存在'}), 404
@@ -997,8 +1001,8 @@ def _register_fund_routes(app):
                 logger.warning(f"获取实时数据失败: {str(e)}, 使用缓存数据")
             
             # 如果实时数据获取失败，回退到数据库缓存数据
-            sql = f"SELECT * FROM fund_analysis_results WHERE fund_code = '{fund_code}' ORDER BY analysis_date DESC LIMIT 1"
-            df = db_manager.execute_query(sql)
+            sql = "SELECT * FROM fund_analysis_results WHERE fund_code = :fund_code ORDER BY analysis_date DESC LIMIT 1"
+            df = db_manager.execute_query(sql, {'fund_code': fund_code})
             
             if df.empty:
                 return jsonify({'success': False, 'error': '基金不存在'}), 404
@@ -1031,10 +1035,6 @@ def _register_fund_routes(app):
 def get_fund_holdings_original(fund_code):
     """获取基金持仓数据（股票持仓）"""
     try:
-        import akshare as ak
-        
-        # 使用akshare获取基金持仓数据
-        # fund_portfolio_hold_em: 天天基金网-基金档案-投资组合-基金持仓
         try:
             holdings_df = ak.fund_portfolio_hold_em(symbol=fund_code, date="2024")
             
