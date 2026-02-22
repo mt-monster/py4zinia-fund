@@ -21,10 +21,10 @@ from shared.config_manager import config_manager
 from shared.exceptions import with_error_handling
 from shared.json_utils import SafeJSONEncoder
 
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 
 try:
     from services import FundNavCacheManager, HoldingRealtimeService, FundDataSyncService

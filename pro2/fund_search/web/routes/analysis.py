@@ -24,7 +24,7 @@ import requests
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_access.enhanced_database import EnhancedDatabaseManager
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -37,8 +37,8 @@ _thread_local = threading.local()
 def _get_thread_local_objects():
     """获取线程本地的数据适配器和策略选择器（避免线程间共享状态）"""
     if not hasattr(_thread_local, 'fund_data_manager'):
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
-        from backtesting.strategy_selector import get_strategy_selector
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+        from backtesting import get_strategy_selector
         _thread_local.fund_data_manager = MultiSourceDataAdapter()
         _thread_local.strategy_selector = get_strategy_selector()
     return _thread_local.fund_data_manager, _thread_local.strategy_selector
@@ -434,7 +434,7 @@ def get_fund_strategy_analysis(fund_codes):
         dict: 包含策略分析结果的字典
     """
     try:
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
         
         fund_data_manager = MultiSourceDataAdapter()
@@ -687,7 +687,7 @@ def get_personalized_investment_advice(fund_codes):
     try:
         from backtesting.akshare_data_fetcher import fetch_fund_history_from_akshare
         from backtesting.strategy_selector import get_strategy_selector
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         
         fund_data_manager = MultiSourceDataAdapter()
         strategy_selector = get_strategy_selector()

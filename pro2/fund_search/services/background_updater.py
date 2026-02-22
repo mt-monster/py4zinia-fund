@@ -258,7 +258,7 @@ class BackgroundUpdater:
                 return
             
             # 批量获取最新净值
-            from data_retrieval.optimized_fund_data import OptimizedFundData
+            from data_retrieval.fetchers.optimized_fund_data import OptimizedFundData
             fetcher = OptimizedFundData()
             
             results = fetcher.batch_get_latest_nav(codes[:100])  # 限制数量
@@ -288,7 +288,7 @@ class BackgroundUpdater:
                 return
             
             # 分批更新
-            from data_retrieval.optimized_fund_data import OptimizedFundData
+            from data_retrieval.fetchers.optimized_fund_data import OptimizedFundData
             fetcher = OptimizedFundData()
             
             # 只更新部分基金（避免一次性更新太多）

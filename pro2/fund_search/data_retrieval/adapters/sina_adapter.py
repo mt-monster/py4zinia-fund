@@ -12,7 +12,7 @@ import pandas as pd
 import logging
 
 from .base import BaseDataSourceAdapter
-from ..constants import SINA_REALTIME_FIELD_MAPPING
+from data_retrieval.utils.constants import SINA_REALTIME_FIELD_MAPPING
 
 logger = logging.getLogger(__name__)
 

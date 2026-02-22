@@ -26,11 +26,11 @@ from flask_cors import CORS
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
@@ -102,7 +102,7 @@ def update_fund_analysis_results(fund_code, fund_name):
         bool: 是否成功
     """
     try:
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
         from datetime import datetime
         
@@ -127,7 +127,7 @@ def update_fund_analysis_results(fund_code, fund_name):
         # 获取数据库管理器
         global db_manager
         if db_manager is None:
-            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            from data_access.enhanced_database import EnhancedDatabaseManager
             from shared.enhanced_config import DATABASE_CONFIG
             db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
         
@@ -1066,7 +1066,7 @@ def update_holding(fund_code):
         
         # 更新成功后，获取最新实时数据并更新fund_analysis_results表
         try:
-            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+            from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
             from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
             
             fund_data_manager = MultiSourceDataAdapter()
@@ -1776,7 +1776,7 @@ def analyze_fund_correlation():
         logger.info(f"[Correlation] 开始分析 {len(fund_codes)} 只基金的相关性")
         
         # 导入相关性分析模块
-        from data_retrieval.fund_analyzer import FundAnalyzer
+        from services.fund_analyzer import FundAnalyzer
         from backtesting.enhanced_correlation import EnhancedCorrelationAnalyzer
         
         # 基础相关性分析 - 优先使用数据库
@@ -2040,7 +2040,7 @@ def analyze_personalized_advice():
         from web.routes.analysis import get_personalized_investment_advice_parallel
         
         # 导入MultiSourceDataAdapter用于缓存预热
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         
         data = request.get_json()
         fund_codes = data.get('fund_codes', [])
@@ -2054,7 +2054,7 @@ def analyze_personalized_advice():
         logger.info(f"[缓存预热] 开始预热 {len(fund_codes)} 只基金的实时数据缓存...")
         try:
             # 使用线程本地存储获取或创建adapter
-            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+            from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
             adapter = MultiSourceDataAdapter()
             warmup_result = adapter.warmup_realtime_cache(fund_codes)
             logger.info(f"[缓存预热] 完成: 成功 {warmup_result['success_count']} 只，失败 {warmup_result['fail_count']} 只")
@@ -2465,7 +2465,7 @@ def get_fund_strategy_analysis(fund_codes):
         dict: 包含策略分析结果的字典
     """
     try:
-        from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         from backtesting.unified_strategy_engine import UnifiedStrategyEngine
         
         fund_data_manager = MultiSourceDataAdapter()

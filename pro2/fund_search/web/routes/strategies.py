@@ -19,11 +19,11 @@ from flask import jsonify, request
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
-from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
-from backtesting.unified_strategy_engine import UnifiedStrategyEngine
-from backtesting.strategy_evaluator import StrategyEvaluator
-from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+from data_access.enhanced_database import EnhancedDatabaseManager
+from backtesting import EnhancedInvestmentStrategy
+from backtesting import UnifiedStrategyEngine
+from backtesting import StrategyEvaluator
+from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 
 # 设置日志
 logger = logging.getLogger(__name__)

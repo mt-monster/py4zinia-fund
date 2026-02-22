@@ -183,7 +183,7 @@ class FundDataPreloader:
     def fetcher(self):
         """延迟初始化数据获取器"""
         if self._fetcher is None:
-            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+            from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
             # MultiSourceDataAdapter 会自动从配置读取 Tushare token
             self._fetcher = MultiSourceDataAdapter()
         return self._fetcher
@@ -298,7 +298,7 @@ class FundDataPreloader:
         """
         # 尝试从数据库获取用户持仓
         try:
-            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            from data_access.enhanced_database import EnhancedDatabaseManager
             
             # 尝试连接数据库
             db_config = self._get_db_config()
@@ -399,7 +399,7 @@ class FundDataPreloader:
                 logger.warning("无法获取数据库配置，跳过数据同步检查")
                 return False
             
-            from data_retrieval.enhanced_database import EnhancedDatabaseManager
+            from data_access.enhanced_database import EnhancedDatabaseManager
             db = EnhancedDatabaseManager(db_config)
             
             try:
@@ -587,7 +587,7 @@ class FundDataPreloader:
         logger.info(f"预加载 {len(fund_codes)} 只基金的QDII标识...")
         
         try:
-            from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+            from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
             
             for code in fund_codes:
                 is_qdii = MultiSourceDataAdapter.is_qdii_fund(code)
@@ -737,7 +737,7 @@ class FundDataPreloader:
             
             # 获取用户持仓
             try:
-                from data_retrieval.enhanced_database import get_database_manager
+                from data_access.enhanced_database import get_database_manager
                 db_manager = get_database_manager()
                 
                 holdings_sql = """

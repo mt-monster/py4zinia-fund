@@ -54,7 +54,7 @@ import numpy as np
 
 # 尝试导入数据库管理器
 try:
-    from data_retrieval.enhanced_database import EnhancedDatabaseManager
+    from data_access.enhanced_database import EnhancedDatabaseManager
 except ImportError:
     EnhancedDatabaseManager = None
 

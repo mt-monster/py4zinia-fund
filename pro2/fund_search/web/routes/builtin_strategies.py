@@ -16,7 +16,7 @@ import logging
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backtesting.builtin_strategies import get_builtin_strategies_manager
+from backtesting import get_builtin_strategies_manager
 
 # 设置日志
 logger = logging.getLogger(__name__)

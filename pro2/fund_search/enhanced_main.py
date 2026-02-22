@@ -20,11 +20,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
 from shared.enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
-from data_retrieval.multi_source_adapter import MultiSourceDataAdapter
-from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
-from backtesting.enhanced_analytics import EnhancedFundAnalytics
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
-from data_retrieval.enhanced_notification import EnhancedNotificationManager
+from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+from backtesting import EnhancedInvestmentStrategy
+from backtesting import get_all_advanced_strategies  # 导入高级策略
+from backtesting.analysis.enhanced_analytics import EnhancedFundAnalytics
+from data_access.enhanced_database import EnhancedDatabaseManager
+from services.notification import EnhancedNotificationManager
 
 # 设置日志
 logging.basicConfig(
@@ -265,6 +266,119 @@ class EnhancedFundAnalysisSystem:
             logger.error(f"加载Excel文件失败: {str(e)}")
             return pd.DataFrame()
     
+    def _evaluate_best_strategy(self, history_df: pd.DataFrame) -> Optional[Dict]:
+        """
+        评估并选择表现最好的高级策略
+        
+        Args:
+            history_df: 历史数据DataFrame
+            
+        Returns:
+            Dict: 最佳策略生成的今日建议，如果无法评估则返回None
+        """
+        try:
+            if history_df.empty or len(history_df) < 60:
+                return None
+                
+            strategies = get_all_advanced_strategies()
+            best_return = -float('inf')
+            best_strategy_key = None
+            
+            # 简易回测窗口：最近60个交易日
+            backtest_window = min(60, len(history_df) - 1)
+            start_idx = len(history_df) - backtest_window
+            
+            # 获取净值序列
+            if '单位净值' in history_df.columns:
+                nav_series = history_df['单位净值']
+            elif 'nav' in history_df.columns:
+                nav_series = history_df['nav']
+            else:
+                return None
+                
+            # 对每个策略进行回测
+            for key, strategy in strategies.items():
+                # 初始资金10000，持有0
+                cash = 10000.0
+                holdings = 0.0
+                
+                # 模拟交易
+                for i in range(start_idx, len(history_df)):
+                    # 获取当日信号
+                    try:
+                        signal = strategy.generate_signal(
+                            history_df=history_df,
+                            current_index=i,
+                            current_holdings=holdings * nav_series.iloc[i],
+                            cash=cash
+                        )
+                        
+                        current_nav = nav_series.iloc[i]
+                        
+                        if signal.action == 'buy':
+                            amount = 1000 * signal.amount_multiplier  # 假设基准定投1000
+                            if cash >= amount:
+                                shares = amount / current_nav
+                                holdings += shares
+                                cash -= amount
+                        elif signal.action == 'sell':
+                            amount = 1000 * signal.amount_multiplier
+                            if holdings * current_nav >= amount:
+                                shares = amount / current_nav
+                                holdings -= shares
+                                cash += amount
+                    except Exception:
+                        continue
+                        
+                # 计算最终价值
+                final_value = cash + holdings * nav_series.iloc[-1]
+                returns = (final_value - 10000.0) / 10000.0
+                
+                if returns > best_return:
+                    best_return = returns
+                    best_strategy_key = key
+                    
+            # 使用最佳策略生成今日信号
+            if best_strategy_key:
+                best_strategy = strategies[best_strategy_key]
+                today_idx = len(history_df) - 1
+                # 假设持有10000市值用于生成建议
+                current_signal = best_strategy.generate_signal(
+                    history_df=history_df,
+                    current_index=today_idx,
+                    current_holdings=10000,
+                    cash=5000
+                )
+                
+                # 转换为标准格式
+                action_map = {
+                    'buy': '买入',
+                    'sell': '卖出',
+                    'hold': '持有'
+                }
+                
+                # 构造操作建议文本
+                suggestion = f"{best_strategy.name}: {action_map.get(current_signal.action, '观望')}"
+                if current_signal.reason:
+                    suggestion += f" ({current_signal.reason})"
+                
+                return {
+                    'strategy_name': best_strategy.name,
+                    'action': current_signal.action,
+                    'buy_multiplier': current_signal.amount_multiplier,
+                    'redeem_amount': 0 if current_signal.action == 'buy' else (1000 * current_signal.amount_multiplier),
+                    'status_label': f"🏆 {best_strategy.name[:4]}",
+                    'operation_suggestion': suggestion,
+                    'execution_amount': f"{current_signal.amount_multiplier:.1f}倍",
+                    'comparison_value': best_return * 100
+                }
+                
+            return None
+            
+        except Exception as e:
+            logger.warning(f"高级策略评估失败: {e}")
+            return None
+
     def analyze_single_fund(self, fund_code: str, fund_name: str, analysis_date: str) -> Dict:
         """
         分析单个基金
@@ -297,8 +411,8 @@ class EnhancedFundAnalysisSystem:
             logger.debug(f"基金 {fund_code} 绩效指标: sharpe_ratio={performance_metrics.get('sharpe_ratio')}, "
                         f"composite_score={performance_metrics.get('composite_score')}")
             
-            # 获取历史数据用于策略分析
-            historical_data = self.fund_data_manager.get_historical_data(fund_code, days=30)
+            # 获取历史数据用于策略分析 (增加天数以支持高级策略)
+            historical_data = self.fund_data_manager.get_historical_data(fund_code, days=365)
             
             # 计算今日和昨日收益率
             # 从实时数据获取今日收益率，并添加验证
@@ -386,8 +500,16 @@ class EnhancedFundAnalysisSystem:
             # 记录最终计算的收益率
             logger.info(f"基金 {fund_code} 收益率计算完成: today_return={today_return}%, prev_day_return={prev_day_return}%")
             
-            # 投资策略分析 - 使用策略引擎
-            strategy_result = self.strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
+            # 1. 尝试使用高级策略评估
+            advanced_strategy_result = self._evaluate_best_strategy(historical_data)
+            
+            if advanced_strategy_result:
+                logger.info(f"基金 {fund_code} 选出最佳高级策略: {advanced_strategy_result['strategy_name']}")
+                strategy_result = advanced_strategy_result
+            else:
+                # 2. 降级使用原有策略引擎
+                logger.info(f"基金 {fund_code} 使用基础策略引擎")
+                strategy_result = self.strategy_engine.analyze_strategy(today_return, prev_day_return, performance_metrics)
             
             # 从策略结果中提取字段
             strategy_name = strategy_result.get('strategy_name', 'momentum_strategy')
@@ -1490,6 +1612,12 @@ def main():
         action='store_true',
         help='策略分析不生成详细报告'
     )
+
+    parser.add_argument(
+        '--backtest', '-b',
+        type=str,
+        help='运行单基金回测，指定基金代码'
+    )
     
     args = parser.parse_args()
     
@@ -1501,6 +1629,43 @@ def main():
         # 创建基金分析系统
         system = EnhancedFundAnalysisSystem()
         
+        # 运行单基金回测
+        if args.backtest:
+            logger.info(f"开始回测基金: {args.backtest}")
+            try:
+                from backtesting.backtest_engine import FundBacktest
+                
+                backtest = FundBacktest(
+                    base_amount=args.strategy_base_amount,
+                    start_date=args.strategy_start_date,
+                    end_date=args.strategy_end_date,
+                    use_unified_strategy=True
+                )
+                
+                result, metrics = backtest.backtest_single_fund(args.backtest)
+                
+                if result is not None:
+                    if not os.path.exists(args.output):
+                        os.makedirs(args.output)
+                    
+                    output_file = os.path.join(args.output, f'backtest_{args.backtest}.csv')
+                    result.to_csv(output_file, index=False)
+                    print(f"\n✓ 回测结果已保存到: {output_file}")
+                    
+                    print("\n=== 回测绩效指标 ===")
+                    for key, value in metrics.items():
+                        if isinstance(value, float):
+                            print(f"  {key}: {value:.4f}")
+                        else:
+                            print(f"  {key}: {value}")
+                    sys.exit(0)
+                else:
+                    logger.error("回测失败")
+                    sys.exit(1)
+            except Exception as e:
+                logger.error(f"回测过程出错: {e}")
+                sys.exit(1)
+
         # 检查策略最优性
         if args.all or args.strategy_analysis:
             logger.info("检查当前策略最优性...")

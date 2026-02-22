@@ -21,11 +21,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logger = logging.getLogger(__name__)
 
 # 导入策略模型
-from backtesting.strategy_models import (
-    StrategyConfig, FilterCondition, StrategyValidator, 
-    calculate_equal_weights, validate_weights_sum
+from backtesting.core.strategy_models import (
+    CustomStrategyConfig as StrategyConfig, StrategyValidator
 )
-from backtesting.builtin_strategies import get_builtin_strategies_manager
 
 # 数据库管理器将在 register_routes 中设置
 db_manager = None

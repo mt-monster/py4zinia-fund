@@ -362,7 +362,7 @@ def create_database_accessor(db_manager=None) -> DatabaseAccessor:
     """
     if db_manager is None:
         # 自动创建 EnhancedDatabaseManager
-        from data_retrieval.enhanced_database import EnhancedDatabaseManager
+        from data_access.enhanced_database import EnhancedDatabaseManager
         from shared.enhanced_config import DATABASE_CONFIG
         db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
     
@@ -381,7 +381,7 @@ def create_fund_data_accessor(db_manager=None) -> FundDataAccessor:
     """
     if db_manager is None:
         # 自动创建 EnhancedDatabaseManager
-        from data_retrieval.enhanced_database import EnhancedDatabaseManager
+        from data_access.enhanced_database import EnhancedDatabaseManager
         from shared.enhanced_config import DATABASE_CONFIG
         db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
     

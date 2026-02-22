@@ -16,88 +16,70 @@
 - BacktestAPIHandler: 回测API处理器
 """
 
-from .strategy_config import StrategyConfig, get_strategy_config
-from .stop_loss_manager import StopLossManager, StopLossLevel, StopLossResult
-from .trend_analyzer import TrendAnalyzer, TrendType, TrendResult
-from .position_manager import PositionManager, VolatilityLevel, PositionAdjustment
-from .strategy_evaluator import StrategyEvaluator, EvaluationResult
-from .unified_strategy_engine import UnifiedStrategyEngine, UnifiedStrategyResult
-from .strategy_adapter import StrategyAdapter, get_strategy_adapter
-from .custom_strategy_backtest import (
+# Core components
+from .core.strategy_models import CustomStrategyConfig, StrategyValidator, FilterCondition
+from .core.strategy_config import StrategyConfig, get_strategy_config
+from .core.stop_loss_manager import StopLossManager, StopLossLevel, StopLossResult
+from .core.position_manager import PositionManager, VolatilityLevel, PositionAdjustment
+from .core.unified_strategy_engine import UnifiedStrategyEngine, UnifiedStrategyResult
+from .core.backtest_api import (
+    BacktestAPIHandler, BacktestTaskManager, BacktestTask, BacktestStatus,
+    get_task_manager
+)
+from .core.backtest_engine import FundBacktest
+from .core.akshare_data_fetcher import fetch_fund_history_from_akshare
+
+# Strategies
+from .strategies.trend_analyzer import TrendAnalyzer, TrendType, TrendResult
+from .strategies.strategy_adapter import StrategyAdapter, get_strategy_adapter
+from .strategies.custom_strategy_backtest import (
     CustomStrategyBacktest, BacktestResult, TradeRecord,
-    FilterEngine, SortingEngine, WeightCalculator, RiskController,
     run_custom_backtest
 )
-from .performance_metrics import (
-    PerformanceMetrics, PerformanceCalculator, calculate_performance_metrics,
-    MetricsInput, MetricRuleSet, MetricValue, MetricBundle, MetricReport, MetricEngine,
-    calculate_metrics_report
+from .strategies.builtin_strategies import BuiltinStrategies, get_builtin_strategies_manager
+from .strategies.advanced_strategies import BaseStrategy, get_all_advanced_strategies
+from .strategies.enhanced_strategy import EnhancedInvestmentStrategy
+from .strategies.strategy_selector import StrategySelector, get_strategy_selector
+
+# Analysis
+from .analysis.enhanced_analytics import EnhancedFundAnalytics
+from .analysis.strategy_evaluator import StrategyEvaluator, EvaluationResult
+from .analysis.performance_metrics import (
+    PerformanceMetrics, PerformanceCalculator, calculate_performance_metrics
 )
-from .backtest_api import (
-    BacktestAPIHandler, BacktestTaskManager, BacktestTask, BacktestStatus,
-    TradeRecordFilter, CSVExporter, get_task_manager
-)
+from .analysis.risk_metrics import calculate_var, calculate_cvar
+from .analysis.advanced_risk_metrics import EnhancedRiskMetrics, RiskMetrics
+from .analysis.visualization import StrategyVisualizer
+from .analysis.monte_carlo import MonteCarloSimulator
+
+# Utils
+from .utils.strategy_parameter_tuner import StrategyParameterTuner
 
 __all__ = [
-    # 配置
-    'StrategyConfig',
-    'get_strategy_config',
+    # Core
+    'CustomStrategyConfig', 'StrategyValidator', 'FilterCondition',
+    'StrategyConfig', 'get_strategy_config',
+    'StopLossManager', 'StopLossLevel', 'StopLossResult',
+    'PositionManager', 'VolatilityLevel', 'PositionAdjustment',
+    'UnifiedStrategyEngine', 'UnifiedStrategyResult',
+    'BacktestAPIHandler', 'BacktestTaskManager', 'BacktestTask', 'BacktestStatus',
+    'FundBacktest', 'fetch_fund_history_from_akshare',
     
-    # 止损管理
-    'StopLossManager',
-    'StopLossLevel',
-    'StopLossResult',
+    # Strategies
+    'TrendAnalyzer', 'TrendType', 'TrendResult',
+    'StrategyAdapter', 'get_strategy_adapter',
+    'CustomStrategyBacktest', 'BacktestResult', 'TradeRecord', 'run_custom_backtest',
+    'BuiltinStrategies', 'get_builtin_strategies_manager', 'BaseStrategy', 'get_all_advanced_strategies',
+    'EnhancedInvestmentStrategy', 'StrategySelector', 'get_strategy_selector',
     
-    # 趋势分析
-    'TrendAnalyzer',
-    'TrendType',
-    'TrendResult',
+    # Analysis
+    'EnhancedFundAnalytics',
+    'StrategyEvaluator', 'EvaluationResult',
+    'PerformanceMetrics', 'PerformanceCalculator', 'calculate_performance_metrics',
+    'calculate_var', 'calculate_cvar',
+    'EnhancedRiskMetrics', 'RiskMetrics',
+    'StrategyVisualizer', 'MonteCarloSimulator',
     
-    # 仓位管理
-    'PositionManager',
-    'VolatilityLevel',
-    'PositionAdjustment',
-    
-    # 策略评估
-    'StrategyEvaluator',
-    'EvaluationResult',
-    
-    # 统一策略引擎
-    'UnifiedStrategyEngine',
-    'UnifiedStrategyResult',
-    
-    # 策略适配器
-    'StrategyAdapter',
-    'create_strategy_adapter',
-    
-    # 自定义策略回测
-    'CustomStrategyBacktest',
-    'BacktestResult',
-    'TradeRecord',
-    'FilterEngine',
-    'SortingEngine',
-    'WeightCalculator',
-    'RiskController',
-    'run_custom_backtest',
-    
-    # 绩效指标计算
-    'PerformanceMetrics',
-    'PerformanceCalculator',
-    'calculate_performance_metrics',
-    'MetricsInput',
-    'MetricRuleSet',
-    'MetricValue',
-    'MetricBundle',
-    'MetricReport',
-    'MetricEngine',
-    'calculate_metrics_report',
-    
-    # 回测API
-    'BacktestAPIHandler',
-    'BacktestTaskManager',
-    'BacktestTask',
-    'BacktestStatus',
-    'TradeRecordFilter',
-    'CSVExporter',
-    'get_task_manager',
+    # Utils
+    'StrategyParameterTuner'
 ]

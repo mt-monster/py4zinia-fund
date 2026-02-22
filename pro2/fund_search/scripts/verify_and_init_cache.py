@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from shared.enhanced_config import DATABASE_CONFIG
-from data_retrieval.enhanced_database import EnhancedDatabaseManager
+from data_access.enhanced_database import EnhancedDatabaseManager
 from services.fund_nav_cache_manager import FundNavCacheManager
 from services.holding_realtime_service import HoldingRealtimeService
 

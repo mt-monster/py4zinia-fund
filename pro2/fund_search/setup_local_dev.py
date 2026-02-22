@@ -42,7 +42,7 @@ def check_mysql_connection():
     print("\n检查MySQL连接...")
     
     try:
-        from data_retrieval.enhanced_database import EnhancedDatabaseManager
+        from data_access.enhanced_database import EnhancedDatabaseManager
         from shared.enhanced_config import DATABASE_CONFIG
         
         db = EnhancedDatabaseManager(DATABASE_CONFIG)
