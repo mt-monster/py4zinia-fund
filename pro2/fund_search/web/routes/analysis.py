@@ -435,7 +435,7 @@ def get_fund_strategy_analysis(fund_codes):
     """
     try:
         from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-        from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+        from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
         
         fund_data_manager = MultiSourceDataAdapter()
         strategy_engine = EnhancedInvestmentStrategy()
