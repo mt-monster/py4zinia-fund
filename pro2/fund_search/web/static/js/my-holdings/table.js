@@ -431,8 +431,9 @@ const FundTable = {
                 FundState.funds = FundState.funds.filter(f => f.fund_code !== fundCode);
                 FundState.filteredFunds = FundState.filteredFunds.filter(f => f.fund_code !== fundCode);
                 FundState.selectedFunds.delete(fundCode);
-                
+
                 this.renderData();
+                FundApp.updateTotalCount();
                 FundUtils.showNotification('删除成功', 'success');
             } else {
                 FundUtils.showNotification('删除失败: ' + (data.error || '未知错误'), 'error');

@@ -998,7 +998,7 @@
         function displayStrategyComparison(data) {
             const content = document.getElementById('backtest-result-content');
             
-            if (!data || !data.all_performances) {
+            if (!data || !data.strategies) {
                 content.innerHTML = '<p style="color: #999;">暂无对比数据</p>';
                 return;
             }
@@ -1008,20 +1008,20 @@
             html += '<th>排名</th>';
             html += '<th>策略名称</th>';
             html += '<th>总收益率</th>';
-            html += '<th>夏普比率</th>';
+            html += '<th>年化收益率</th>';
             html += '<th>最大回撤</th>';
-            html += '<th>胜率</th>';
+            html += '<th>交易次数</th>';
             html += '</tr></thead><tbody>';
 
-            data.all_performances.forEach((perf, index) => {
-                const isBest = index === 0;
+            data.strategies.forEach((perf, index) => {
+                const isBest = perf.is_best;
                 html += `<tr style="${isBest ? 'background: #d4edda;' : ''}">
                     <td><strong>#${index + 1}</strong></td>
-                    <td>${perf.strategy_name} ${isBest ? '<span style="color: #28a745;">(最优)</span>' : ''}</td>
+                    <td>${perf.strategy_id} ${isBest ? '<span style="color: #28a745;">(最优)</span>' : ''}</td>
                     <td>${perf.total_return ? perf.total_return.toFixed(2) : '--'}%</td>
-                    <td>${perf.sharpe_ratio ? perf.sharpe_ratio.toFixed(2) : '--'}</td>
+                    <td>${perf.annual_return ? perf.annual_return.toFixed(2) : '--'}%</td>
                     <td style="color: #dc3545;">${perf.max_drawdown ? perf.max_drawdown.toFixed(2) : '--'}%</td>
-                    <td>${perf.win_rate ? perf.win_rate.toFixed(1) : '--'}%</td>
+                    <td>${perf.trades_count || 0}</td>
                 </tr>`;
             });
 

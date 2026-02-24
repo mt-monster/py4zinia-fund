@@ -194,6 +194,13 @@ def evaluate_strategy():
 
 def backtest_strategy():
     """策略回测（使用统一策略引擎）"""
+    global unified_strategy_engine, db_manager
+    
+    # 检查 unified_strategy_engine 是否已初始化
+    if unified_strategy_engine is None:
+        from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
+        unified_strategy_engine = UnifiedStrategyEngine()
+    
     try:
         data = request.get_json()
         fund_code = data.get('fund_code')
@@ -261,15 +268,15 @@ def backtest_strategy():
         cumulative_pnl = 0.0
         
         for idx, row in df.iterrows():
-            today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
-            sharpe_ratio = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else 0
-            max_drawdown = float(row['max_drawdown']) if pd.notna(row['max_drawdown']) else 0
-            volatility = float(row['volatility']) if pd.notna(row['volatility']) else 0
-            annualized_return = float(row['annualized_return']) if pd.notna(row['annualized_return']) else 0
-            calmar_ratio = float(row['calmar_ratio']) if pd.notna(row['calmar_ratio']) else 0
-            sortino_ratio = float(row['sortino_ratio']) if pd.notna(row['sortino_ratio']) else 0
-            composite_score = float(row['composite_score']) if pd.notna(row['composite_score']) else 0
-            prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else 0
+            today_return = float(row.get('today_return', 0)) if pd.notna(row.get('today_return', 0)) else 0
+            sharpe_ratio = float(row.get('sharpe_ratio', 0)) if pd.notna(row.get('sharpe_ratio', 0)) else 0
+            max_drawdown = float(row.get('max_drawdown', 0)) if pd.notna(row.get('max_drawdown', 0)) else 0
+            volatility = float(row.get('volatility', 0)) if pd.notna(row.get('volatility', 0)) else 0
+            annualized_return = float(row.get('annualized_return', 0)) if pd.notna(row.get('annualized_return', 0)) else 0
+            calmar_ratio = float(row.get('calmar_ratio', 0)) if pd.notna(row.get('calmar_ratio', 0)) else 0
+            sortino_ratio = float(row.get('sortino_ratio', 0)) if pd.notna(row.get('sortino_ratio', 0)) else 0
+            composite_score = float(row.get('composite_score', 0)) if pd.notna(row.get('composite_score', 0)) else 0
+            prev_day_return = float(row.get('prev_day_return', 0)) if pd.notna(row.get('prev_day_return', 0)) else 0
             
             # 更新历史收益率
             returns_history.append(today_return / 100)  # 转换为小数
@@ -388,8 +395,8 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
     """
     try:
         # 导入 AkShare 数据获取模块
-        from backtesting.akshare_data_fetcher import fetch_fund_history_with_fallback
-        from backtesting.strategy_adapter import get_strategy_adapter
+        from backtesting.core.akshare_data_fetcher import fetch_fund_history_with_fallback
+        from backtesting.strategies.strategy_adapter import get_strategy_adapter
         
         # 获取历史数据（优先数据库，不足时从 AkShare 获取）
         df = fetch_fund_history_with_fallback(fund_code, days, db_manager)
