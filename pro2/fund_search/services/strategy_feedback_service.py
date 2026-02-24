@@ -209,9 +209,12 @@ class StrategyFeedbackService:
             Optional[Any]: 数据库管理器实例或None
         """
         try:
-            from web.app import components
-            return components.get('db_manager')
-        except ImportError:
+            import flask
+            if flask.has_app_context():
+                from flask import current_app
+                return getattr(current_app, 'db_manager', None)
+            return None
+        except Exception:
             self.logger.warning("无法从全局获取数据库管理器")
             return None
     

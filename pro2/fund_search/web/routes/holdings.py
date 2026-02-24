@@ -1239,7 +1239,7 @@ def analyze_fund_correlation_interactive():
 
         # 步骤4: 执行相关性分析
         step_start = time.perf_counter()
-        from backtesting.enhanced_correlation import EnhancedCorrelationAnalyzer
+        from backtesting.analysis.enhanced_correlation import EnhancedCorrelationAnalyzer
         analyzer = EnhancedCorrelationAnalyzer()
         
         # 如果请求了特定基金对的详情，则只返回该基金对的数据
@@ -1777,7 +1777,7 @@ def analyze_fund_correlation():
         
         # 导入相关性分析模块
         from services.fund_analyzer import FundAnalyzer
-        from backtesting.enhanced_correlation import EnhancedCorrelationAnalyzer
+        from backtesting.analysis.enhanced_correlation import EnhancedCorrelationAnalyzer
         
         # 基础相关性分析 - 优先使用数据库
         analyzer = FundAnalyzer()

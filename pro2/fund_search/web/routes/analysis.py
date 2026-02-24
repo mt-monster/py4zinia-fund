@@ -685,8 +685,8 @@ def get_personalized_investment_advice(fund_codes):
         dict: 包含每只基金的个性化投资建议
     """
     try:
-        from backtesting.akshare_data_fetcher import fetch_fund_history_from_akshare
-        from backtesting.strategy_selector import get_strategy_selector
+        from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
+        from backtesting.strategies.strategy_selector import get_strategy_selector
         from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
         
         fund_data_manager = MultiSourceDataAdapter()
@@ -951,7 +951,7 @@ def _analyze_single_fund(fund_code: str) -> dict:
         fund_data_manager, strategy_selector = _get_thread_local_objects()
         
         # 导入akshare数据获取（支持缓存）
-        from backtesting.akshare_data_fetcher import fetch_fund_history_from_akshare
+        from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
         
         # 获取基金名称
         fund_name = get_fund_name_from_db(fund_code) or fund_code
