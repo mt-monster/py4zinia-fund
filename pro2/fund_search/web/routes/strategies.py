@@ -20,9 +20,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
-from backtesting import EnhancedInvestmentStrategy
-from backtesting import UnifiedStrategyEngine
-from backtesting import StrategyEvaluator
+from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
+from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
+from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 
 # 设置日志

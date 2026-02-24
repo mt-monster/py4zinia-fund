@@ -184,3 +184,8 @@ class MonteCarloEngine:
         """
         # Placeholder implementation - will be implemented in subsequent tasks
         pass
+
+
+# 别名，用于兼容旧代码
+MonteCarloSimulator = MonteCarloEngine
+

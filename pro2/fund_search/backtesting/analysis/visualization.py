@@ -5,7 +5,7 @@ This module provides advanced visualization capabilities for portfolio
 analysis including interactive dashboards, risk heatmaps, and reports.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -191,3 +191,8 @@ class AdvancedVisualization:
         """
         # Placeholder implementation - will be implemented in subsequent tasks
         pass
+
+
+# ���������ڼ��ݾɴ���
+StrategyVisualizer = AdvancedVisualization
+

@@ -19,12 +19,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
-from backtesting import EnhancedInvestmentStrategy
-from backtesting import UnifiedStrategyEngine
-from backtesting import StrategyEvaluator
+from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
+from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
+from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
-from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
+from data_retrieval.parsers.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
+from data_retrieval.fetchers.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
@@ -730,7 +730,7 @@ def get_holding_stocks():
         fund_name_map = dict(zip(df_holdings['fund_code'], df_holdings['fund_name']))
         
         # 使用批量获取接口，优先从数据库缓存读取
-        from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks_batch
+        from data_retrieval.fetchers.heavyweight_stocks_fetcher import fetch_heavyweight_stocks_batch
         
         logger.info(f"开始批量获取 {len(fund_codes)} 只基金的重仓股数据")
         batch_results = fetch_heavyweight_stocks_batch(fund_codes)

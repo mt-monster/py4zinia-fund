@@ -9,7 +9,7 @@
 import re
 import logging
 from typing import Dict, List, Optional, Tuple
-from .akshare_fund_lookup import lookup_fund_info
+from ..fetchers.akshare_fund_lookup import lookup_fund_info
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +255,7 @@ class SmartFundParser:
     def _lookup_fund_by_code(self, fund_code: str) -> Optional[Dict]:
         """通过基金代码查找基金信息"""
         try:
-            from .akshare_fund_lookup import AkshareFundLookup
+            from ..fetchers.akshare_fund_lookup import AkshareFundLookup
             
             lookup = AkshareFundLookup()
             fund_list = lookup.get_fund_list()

@@ -50,7 +50,7 @@ from .analysis.performance_metrics import (
 from .analysis.risk_metrics import calculate_var, calculate_cvar
 from .analysis.advanced_risk_metrics import EnhancedRiskMetrics, RiskMetrics
 from .analysis.visualization import StrategyVisualizer
-from .analysis.monte_carlo import MonteCarloSimulator
+from .analysis.monte_carlo import MonteCarloEngine
 
 # Utils
 from .utils.strategy_parameter_tuner import StrategyParameterTuner
@@ -78,7 +78,7 @@ __all__ = [
     'PerformanceMetrics', 'PerformanceCalculator', 'calculate_performance_metrics',
     'calculate_var', 'calculate_cvar',
     'EnhancedRiskMetrics', 'RiskMetrics',
-    'StrategyVisualizer', 'MonteCarloSimulator',
+    'StrategyVisualizer', 'MonteCarloEngine',
     
     # Utils
     'StrategyParameterTuner'

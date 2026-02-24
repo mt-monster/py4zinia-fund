@@ -638,3 +638,7 @@ class PerformanceVisualizer:
         
         print(f"馃搳 Generated {len(figures)} charts in '{save_dir}' directory")
         return figures
+
+# 别名，用于兼容旧代码
+ChartGenerator = PerformanceVisualizer
+

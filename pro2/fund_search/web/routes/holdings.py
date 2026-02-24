@@ -27,12 +27,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
-from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
-from backtesting.unified_strategy_engine import UnifiedStrategyEngine
-from backtesting.strategy_evaluator import StrategyEvaluator
+from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
+from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
+from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
-from data_retrieval.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
+from data_retrieval.parsers.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
+from data_retrieval.fetchers.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
@@ -103,7 +103,7 @@ def update_fund_analysis_results(fund_code, fund_name):
     """
     try:
         from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-        from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+        from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
         from datetime import datetime
         
         # 初始化数据适配器和策略引擎
@@ -737,7 +737,7 @@ def import_holding_screenshot():
             return jsonify({'success': False, 'error': '未提供图片数据'}), 400
             
         # 调用OCR识别函数
-        from data_retrieval.fund_screenshot_ocr import recognize_fund_screenshot
+        from data_retrieval.parsers.fund_screenshot_ocr import recognize_fund_screenshot
         
         recognized_funds = recognize_fund_screenshot(
             image_data=image_data,
@@ -1067,7 +1067,7 @@ def update_holding(fund_code):
         # 更新成功后，获取最新实时数据并更新fund_analysis_results表
         try:
             from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-            from backtesting.enhanced_strategy import EnhancedInvestmentStrategy
+            from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
             
             fund_data_manager = MultiSourceDataAdapter()
             strategy_engine = EnhancedInvestmentStrategy()

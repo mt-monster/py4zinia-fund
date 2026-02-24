@@ -22,8 +22,8 @@ from shared.exceptions import with_error_handling
 from shared.json_utils import SafeJSONEncoder
 
 from data_access.enhanced_database import EnhancedDatabaseManager
-from backtesting.unified_strategy_engine import UnifiedStrategyEngine
-from backtesting.strategy_evaluator import StrategyEvaluator
+from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
+from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 
 try:
