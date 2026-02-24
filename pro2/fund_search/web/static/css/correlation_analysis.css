@@ -67,8 +67,8 @@ body {
 }
 
 .header-content {
-    max-width: 1400px;
-    margin: 0 auto;
+    width: 100%;
+    margin: 0;
 }
 
 .header-title {
@@ -98,9 +98,8 @@ body {
 
 .main-container {
     flex: 1;
-    max-width: 1400px;
     width: 100%;
-    margin: 0 auto;
+    margin: 0;
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
@@ -690,14 +689,22 @@ body {
 /* ==================== 图表容器 ==================== */
 .charts-container {
     display: grid;
-    gap: 1.5rem;
+    gap: 2rem;
+    margin: 2rem 0;
 }
 
 .charts-container .chart-wrapper {
-    background: var(--gray-50);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 2rem;
     border: 1px solid var(--gray-100);
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+}
+
+.charts-container .chart-wrapper:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
 }
 
 /* ==================== 状态组件 ==================== */

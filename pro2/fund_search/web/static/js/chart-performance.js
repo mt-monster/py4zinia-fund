@@ -49,8 +49,8 @@ const ChartControlButtons = {
         const wrapper = canvas.closest('.chart-wrapper');
         if (!wrapper) return;
         
-        // 检查是否已有控制按钮
-        if (wrapper.querySelector('.chart-zoom-controls')) {
+        // 检查是否已有控制按钮（包括chart-toolbar）
+        if (wrapper.querySelector('.chart-zoom-controls') || wrapper.querySelector('.chart-toolbar')) {
             console.log('控制按钮已存在，跳过');
             return;
         }
@@ -133,7 +133,6 @@ const ChartControlButtons = {
             const chartMap = {
                 'scatter-correlation-chart': 'scatter',
                 'nav-comparison-chart': 'line',
-                'rolling-correlation-chart': 'rolling',
                 'distribution-chart': 'distribution'
             };
             const key = chartMap[canvasId];

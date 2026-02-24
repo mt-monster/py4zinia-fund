@@ -164,7 +164,6 @@ const CHART_CONFIG = {
     // 数据采样阈值
     sampling: {
         lineChart: 200,        // 净值走势图最大点数
-        rollingChart: 150,     // 滚动相关性图最大点数
         scatterChart: 500,     // 散点图最大点数（一般不采样）
         distributionChart: 50  // 分布图最大区间数
     },
@@ -187,7 +186,6 @@ const CHART_CONFIG = {
 const correlationCharts = {
     scatter: null,
     line: null,
-    rolling: null,
     distribution: null
 };
 
@@ -355,11 +353,7 @@ function initCorrelationCharts(container, chartData) {
         initLineChart(lineData);
     }
     
-    if (rollingData) {
-        const rollingWrapper = createChartWrapper('rolling-correlation-chart', '滚动相关性变化图');
-        container.appendChild(rollingWrapper);
-        initRollingChart(rollingData);
-    }
+
     
     if (distributionData) {
         console.log('🚀 初始化收益率分布图，数据:', distributionData);
@@ -409,31 +403,34 @@ function injectChartStyles() {
         .interactive-charts-container {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 35px;
-            margin: 30px 0;
-            padding: 30px;
+            gap: 40px;
+            margin: 0;
+            padding: 20px;
             background: linear-gradient(145deg, #ffffff, #f8fafc);
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            width: 100%;
+            border-radius: 0;
+            box-shadow: none;
+            width: 100vw;
+            max-width: 100%;
+            min-height: calc(100vh - 200px);
         }
         
         .chart-wrapper {
             background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
             border: 1px solid #e2e8f0;
             position: relative;
             overflow: hidden;
-            min-height: 500px;
+            min-height: 700px;
             width: 100%;
+            max-width: 100%;
         }
         
         .chart-wrapper:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
         }
         
         .chart-wrapper > * {
@@ -442,7 +439,7 @@ function injectChartStyles() {
         
         .chart-wrapper canvas {
             width: 100% !important;
-            height: 460px !important;
+            height: 600px !important;
         }
         
         .chart-toolbar {
@@ -501,19 +498,61 @@ function injectChartStyles() {
         }
         
         /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .interactive-charts-container {
+                gap: 35px;
+                padding: 35px;
+            }
+            
+            .chart-wrapper {
+                padding: 25px;
+                min-height: 600px;
+            }
+            
+            .chart-wrapper canvas {
+                height: 550px !important;
+            }
+        }
+        
         @media (max-width: 992px) {
             .interactive-charts-container {
                 gap: 30px;
+                padding: 30px;
+            }
+            
+            .chart-wrapper {
+                padding: 20px;
+                min-height: 500px;
+            }
+            
+            .chart-wrapper canvas {
+                height: 450px !important;
+            }
+            
+            .chart-title-text {
+                font-size: 15px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .interactive-charts-container {
+                gap: 25px;
                 padding: 25px;
             }
             
             .chart-wrapper {
                 padding: 15px;
-                min-height: 450px;
+                min-height: 400px;
             }
             
             .chart-wrapper canvas {
-                height: 380px !important;
+                height: 350px !important;
+            }
+            
+            .chart-toolbar {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
             }
             
             .chart-title-text {
@@ -521,25 +560,20 @@ function injectChartStyles() {
             }
         }
         
-        @media (max-width: 768px) {
+        @media (max-width: 480px) {
             .interactive-charts-container {
-                gap: 25px;
+                gap: 20px;
                 padding: 20px;
+                margin: 20px 0;
             }
             
             .chart-wrapper {
                 padding: 12px;
-                min-height: 400px;
+                min-height: 350px;
             }
             
             .chart-wrapper canvas {
-                height: 330px !important;
-            }
-            
-            .chart-toolbar {
-                flex-direction: column;
-                gap: 10px;
-                align-items: flex-start;
+                height: 300px !important;
             }
             
             .chart-title-text {
@@ -862,23 +896,7 @@ function initLineChart(lineData) {
     console.log('📊 创建净值走势图，数据集数量:', datasets.length, 
                 isLargeDataset ? '(大数据集模式)' : '(标准模式)');
 
-    // 获取图表容器并添加全屏按钮
-    const chartContainer = canvas.parentElement;
-    if (chartContainer && !chartContainer.querySelector('.chart-zoom-controls')) {
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'chart-zoom-controls';
-        controlsDiv.style.cssText = 'position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10;';
-        controlsDiv.innerHTML = `
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleLineChartFullscreen()" title="全屏">
-                <i class="bi bi-fullscreen"></i>
-            </button>
-            <button class="btn btn-sm btn-outline-primary" onclick="zoomLineChartIn()" title="放大">+</button>
-            <button class="btn btn-sm btn-outline-primary" onclick="zoomLineChartOut()" title="缩小">-</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="resetLineChartZoom()" title="重置">⟲</button>
-        `;
-        chartContainer.style.position = 'relative';
-        chartContainer.appendChild(controlsDiv);
-    }
+
 
     correlationCharts.line = new Chart(ctx, {
         type: 'line',
@@ -997,138 +1015,7 @@ function initLineChart(lineData) {
     });
 }
 
-/**
- * 初始化滚动相关性图
- */
-function initRollingChart(rollingData) {
-    const canvas = document.getElementById('rolling-correlation-chart');
-    if (!canvas) {
-        console.error('滚动相关性图Canvas元素未找到');
-        return;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
-    // 销毁旧图表
-    if (correlationCharts.rolling) {
-        correlationCharts.rolling.destroy();
-    }
-    
-    correlationCharts.rolling = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: rollingData.dates,
-            datasets: [{
-                label: '滚动相关系数',
-                data: rollingData.correlations,
-                borderColor: 'rgba(147, 51, 234, 0.8)',
-                backgroundColor: 'rgba(147, 51, 234, 0.1)',
-                borderWidth: 2,
-                pointRadius: 0,
-                plugins: [{
-                    id: 'registerChart',
-                    afterInit: (chart) => {
-                        collapsibleChartManager.registerChart('rolling-correlation-chart', chart);
-                        const totalPoints = rollingData.dates ? rollingData.dates.length : 0;
-                        collapsibleChartManager.updateCounter('rolling-correlation-chart', `${totalPoints} 个数据点`);
-                    }
-                }],
-                pointHoverRadius: 4,
-                tension: 0.1,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-                padding: {
-                    left: 80,
-                    right: 40,
-                    top: 20,
-                    bottom: 80
-                }
-            },
-            plugins: {
-                title: {
-                    display: false
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    bodyFont: {
-                        size: 14
-                    },
-                    titleFont: {
-                        size: 14
-                    },
-                    callbacks: {
-                        label: function(context) {
-                            return `相关系数: ${context.parsed.y.toFixed(4)}`;
-                        }
-                    }
-                },
-                zoom: {
-                    zoom: {
-                        wheel: {
-                            enabled: true
-                        },
-                        pinch: {
-                            enabled: true
-                        },
-                        mode: 'x'
-                    },
-                    pan: {
-                        enabled: true,
-                        mode: 'x'
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: '日期',
-                        font: {
-                            size: 15,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            top: 20
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            size: 13
-                        },
-                        maxTicksLimit: 10
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: '相关系数',
-                        font: {
-                            size: 15,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            bottom: 20
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            size: 13
-                        }
-                    },
-                    min: -1,
-                    max: 1
-                }
-            }
-        }
-    });
-}
+
 
 /**
  * 初始化收益率分布对比图
