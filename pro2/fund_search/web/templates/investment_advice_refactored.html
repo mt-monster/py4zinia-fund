@@ -857,14 +857,38 @@
                         <div id="fund-empty" class="empty-state hidden">
                             <i class="bi bi-inbox"></i>
                             <h3>暂无持仓基金</h3>
-                            <p>请先添加基金到您的持仓</p>
-                            <a href="/my-holdings-new" class="btn btn-primary" style="margin-top: 15px;">
-                                <i class="bi bi-plus-lg"></i>
-                                添加持仓
-                            </a>
+                            <p id="fund-empty-message">请先添加基金到您的持仓</p>
+                            <div id="fund-empty-actions" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                                <a href="/my-holdings-new" class="btn btn-primary">
+                                    <i class="bi bi-plus-lg"></i>
+                                    添加持仓
+                                </a>
+                            </div>
                         </div>
                         <div id="fund-selection-grid" class="fund-selection-grid hidden">
                             <!-- 基金卡片将动态生成 -->
+                        </div>
+                        
+                        <!-- 从"我的持仓"传递过来的基金列表 -->
+                        <div id="transferred-funds-list" class="transferred-funds-list hidden" style="margin-top: 20px;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; border-radius: 12px 12px 0 0;">
+                                <h4 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                    已选基金组合（从我的持仓传递）
+                                </h4>
+                                <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">
+                                    已为您选中 <strong id="transferred-count">0</strong> 只基金，可直接进入下一步选择策略
+                                </p>
+                            </div>
+                            <div id="transferred-funds-table" style="background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); overflow: hidden;">
+                                <!-- 基金列表将动态生成 -->
+                            </div>
+                            <div style="margin-top: 15px; text-align: center;">
+                                <button class="btn btn-primary" onclick="proceedToStrategyStep()" style="padding: 12px 30px; font-size: 16px;">
+                                    <i class="bi bi-arrow-right-circle"></i>
+                                    下一步：选择策略
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1044,7 +1068,9 @@
             strategies: [],
             backtestResult: null,
             adviceResult: null,
-            backtestChart: null
+            backtestChart: null,
+            transferredFunds: null,  // 从上一页面传递过来的基金代码
+            transferredFundsDetails: null  // 传递过来基金的详细信息
         };
 
         // ==================== 初始化 ====================
@@ -1052,11 +1078,206 @@
             initializePage();
         });
 
+        // 从sessionStorage获取传递过来的基金代码
+        function getTransferredFunds() {
+            try {
+                const stored = sessionStorage.getItem('investmentAdviceData');
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    // 检查数据是否过期（超过30分钟）
+                    const timestamp = new Date(data.timestamp);
+                    const now = new Date();
+                    const diffMinutes = (now - timestamp) / (1000 * 60);
+                    
+                    if (diffMinutes <= 30 && data.fund_codes && data.fund_codes.length > 0) {
+                        return data.fund_codes;
+                    }
+                }
+            } catch (error) {
+                console.error('读取sessionStorage失败:', error);
+            }
+            return null;
+        }
+
+        // 使用传递过来的基金代码
+        async function useTransferredFunds(fundCodes) {
+            console.log('💰 使用传递过来的基金:', fundCodes);
+            
+            // 清除sessionStorage中的数据（防止刷新后重复使用）
+            sessionStorage.removeItem('investmentAdviceData');
+            
+            // 设置选中的基金
+            AppState.selectedFunds = [...fundCodes];
+            
+            // 获取基金的详细信息（优先从持仓中查找，否则使用代码）
+            const fundsWithInfo = [];
+            for (const code of fundCodes) {
+                const holding = AppState.holdings.find(h => h.fund_code === code);
+                if (holding) {
+                    fundsWithInfo.push(holding);
+                } else {
+                    // 如果不在持仓中，创建一个基本信息对象
+                    fundsWithInfo.push({
+                        fund_code: code,
+                        fund_name: code,  // 使用代码作为名称，后续可以通过API获取完整信息
+                        shares: 0,
+                        market_value: 0,
+                        cost_price: 0,
+                        today_return: 0
+                    });
+                }
+            }
+            
+            // 保存传递的基金信息
+            AppState.transferredFundsDetails = fundsWithInfo;
+            
+            // 隐藏加载和空状态
+            document.getElementById('fund-loading').classList.add('hidden');
+            document.getElementById('fund-empty').classList.add('hidden');
+            
+            // 如果有持仓基金，显示基金选择网格（作为参考）
+            if (AppState.holdings.length > 0) {
+                document.getElementById('fund-selection-grid').classList.remove('hidden');
+                renderHoldings();
+            }
+            
+            // 显示传递过来的基金列表
+            renderTransferredFundsList(fundsWithInfo);
+            
+            // 更新选中汇总
+            updateSelectedSummary();
+            
+            showNotification(`已自动带入 ${fundCodes.length} 只基金，可直接进入选择策略`, 'success');
+        }
+
+        // 渲染传递过来的基金列表
+        function renderTransferredFundsList(funds) {
+            const container = document.getElementById('transferred-funds-list');
+            const table = document.getElementById('transferred-funds-table');
+            const countEl = document.getElementById('transferred-count');
+            
+            countEl.textContent = funds.length;
+            
+            table.innerHTML = `
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #f8f9fa;">
+                        <tr>
+                            <th style="padding: 12px 15px; text-align: left; font-weight: 600; color: #495057; font-size: 13px; border-bottom: 1px solid #e9ecef;">序号</th>
+                            <th style="padding: 12px 15px; text-align: left; font-weight: 600; color: #495057; font-size: 13px; border-bottom: 1px solid #e9ecef;">基金代码</th>
+                            <th style="padding: 12px 15px; text-align: left; font-weight: 600; color: #495057; font-size: 13px; border-bottom: 1px solid #e9ecef;">基金名称</th>
+                            <th style="padding: 12px 15px; text-align: right; font-weight: 600; color: #495057; font-size: 13px; border-bottom: 1px solid #e9ecef;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${funds.map((fund, index) => `
+                            <tr style="border-bottom: 1px solid #f1f3f4;">
+                                <td style="padding: 12px 15px; color: #6c757d; font-size: 13px;">${index + 1}</td>
+                                <td style="padding: 12px 15px; font-weight: 600; color: #667eea; font-size: 14px;">${fund.fund_code}</td>
+                                <td style="padding: 12px 15px; color: #212529; font-size: 14px;">${fund.fund_name || '-'}</td>
+                                <td style="padding: 12px 15px; text-align: right;">
+                                    <button onclick="removeTransferredFund('${fund.fund_code}')" 
+                                            style="background: none; border: none; color: #dc3545; cursor: pointer; padding: 5px; border-radius: 4px; transition: background 0.2s;"
+                                            onmouseover="this.style.background='#fff5f5'" 
+                                            onmouseout="this.style.background='none'"
+                                            title="移除">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.classList.remove('hidden');
+        }
+
+        // 移除传递过来的基金
+        function removeTransferredFund(fundCode) {
+            const index = AppState.selectedFunds.indexOf(fundCode);
+            if (index > -1) {
+                AppState.selectedFunds.splice(index, 1);
+                AppState.transferredFundsDetails = AppState.transferredFundsDetails.filter(f => f.fund_code !== fundCode);
+                
+                if (AppState.selectedFunds.length === 0) {
+                    // 如果没有选中的基金了，隐藏列表
+                    document.getElementById('transferred-funds-list').classList.add('hidden');
+                    // 如果持仓也为空，显示空状态
+                    if (AppState.holdings.length === 0) {
+                        document.getElementById('fund-empty').classList.remove('hidden');
+                    }
+                } else {
+                    renderTransferredFundsList(AppState.transferredFundsDetails);
+                }
+                
+                updateSelectedSummary();
+                showNotification(`已移除基金 ${fundCode}`, 'info');
+            }
+        }
+
+        // 直接进入策略选择步骤
+        function proceedToStrategyStep() {
+            if (AppState.selectedFunds.length === 0) {
+                showNotification('请至少选择一只基金', 'warning');
+                return;
+            }
+            goToStep(2);
+        }
+
+        // 重置空状态到默认
+        function resetFundEmptyState() {
+            const messageEl = document.getElementById('fund-empty-message');
+            const actionsEl = document.getElementById('fund-empty-actions');
+            
+            messageEl.textContent = '请先添加基金到您的持仓';
+            actionsEl.innerHTML = `
+                <a href="/my-holdings-new" class="btn btn-primary">
+                    <i class="bi bi-plus-lg"></i>
+                    添加持仓
+                </a>
+            `;
+        }
+
+        // 显示空状态（带有使用传递基金的选项）
+        function showFundEmptyStateWithTransferred(transferredFunds) {
+            const emptyEl = document.getElementById('fund-empty');
+            const messageEl = document.getElementById('fund-empty-message');
+            const actionsEl = document.getElementById('fund-empty-actions');
+            
+            document.getElementById('fund-loading').classList.add('hidden');
+            emptyEl.classList.remove('hidden');
+            document.getElementById('fund-selection-grid').classList.add('hidden');
+            
+            if (transferredFunds && transferredFunds.length > 0) {
+                // 不再显示这个空状态，而是直接使用传递的基金列表
+                emptyEl.classList.add('hidden');
+                // 调用useTransferredFunds来显示传递的基金列表
+                if (!AppState.transferredFundsDetails || AppState.transferredFundsDetails.length === 0) {
+                    useTransferredFunds(transferredFunds);
+                }
+            }
+        }
+
+        // 添加传递的基金到持仓（跳转到我的持仓页面）
+        function addTransferredFundsToHoldings() {
+            // 保留sessionStorage中的数据，跳转到我的持仓页面
+            window.location.href = '/my-holdings-new';
+        }
+
         async function initializePage() {
             console.log('=== 初始化投资建议页面 ===');
             
+            // 检查是否有从上一页面传递过来的基金代码
+            AppState.transferredFunds = getTransferredFunds();
+            
             // 加载持仓基金
             await loadHoldings();
+            
+            // 如果有传递过来的基金代码，自动使用它们
+            if (AppState.transferredFunds && AppState.transferredFunds.length > 0) {
+                console.log('📥 检测到传递的基金代码:', AppState.transferredFunds);
+                await useTransferredFunds(AppState.transferredFunds);
+            }
             
             // 加载策略列表
             await loadStrategies();
@@ -1076,13 +1297,22 @@
                 
                 if (result.success) {
                     AppState.holdings = result.data || [];
-                    renderHoldings();
+                    // 如果没有传递的基金，才渲染基金列表
+                    if (!AppState.transferredFunds || AppState.transferredFunds.length === 0) {
+                        renderHoldings();
+                    }
                 } else {
-                    showFundEmptyState();
+                    // 如果没有传递的基金，显示空状态
+                    if (!AppState.transferredFunds || AppState.transferredFunds.length === 0) {
+                        showFundEmptyState();
+                    }
                 }
             } catch (error) {
                 console.error('加载持仓失败:', error);
-                showFundEmptyState();
+                // 如果没有传递的基金，显示空状态
+                if (!AppState.transferredFunds || AppState.transferredFunds.length === 0) {
+                    showFundEmptyState();
+                }
             }
         }
 
@@ -1106,11 +1336,21 @@
             const loadingEl = document.getElementById('fund-loading');
             const emptyEl = document.getElementById('fund-empty');
             const gridEl = document.getElementById('fund-selection-grid');
+            const transferredList = document.getElementById('transferred-funds-list');
             
             loadingEl.classList.add('hidden');
             
             if (AppState.holdings.length === 0) {
-                emptyEl.classList.remove('hidden');
+                // 如果有传递过来的基金并且正在显示列表，则不显示空状态
+                if (transferredList && !transferredList.classList.contains('hidden')) {
+                    emptyEl.classList.add('hidden');
+                } else if (AppState.transferredFunds && AppState.transferredFunds.length > 0) {
+                    showFundEmptyStateWithTransferred(AppState.transferredFunds);
+                } else {
+                    // 重置为默认状态
+                    resetFundEmptyState();
+                    emptyEl.classList.remove('hidden');
+                }
                 gridEl.classList.add('hidden');
                 return;
             }
@@ -1716,6 +1956,52 @@
             document.getElementById('fund-loading').classList.add('hidden');
             document.getElementById('fund-empty').classList.remove('hidden');
             document.getElementById('fund-selection-grid').classList.add('hidden');
+        }
+
+        // 显示通知消息
+        function showNotification(message, type = 'info') {
+            // 创建通知元素
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 8px;
+                color: white;
+                font-size: 14px;
+                z-index: 9999;
+                max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideIn 0.3s ease;
+                background: ${type === 'success' ? '#48bb78' : type === 'error' ? '#f56565' : type === 'warning' ? '#ed8936' : '#4299e1'};
+            `;
+            notification.textContent = message;
+            
+            // 添加动画样式
+            if (!document.getElementById('notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // 3秒后移除
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
         }
 
         function showLoading(text) {
