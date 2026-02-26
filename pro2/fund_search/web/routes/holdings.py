@@ -3216,10 +3216,22 @@ def _generate_simple_return_curve(portfolio_data, weights, initial_capital):
             }
         
         df = portfolio_data[0]['data'].copy()
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.sort_values('date')
         
-        dates = df['date'].dt.strftime('%Y-%m-%d').tolist()
+        # 检查日期列的名称
+        date_col = None
+        for col in df.columns:
+            if col.lower() in ['date', 'datetime', 'time', '日期']:
+                date_col = col
+                break
+        
+        if date_col is None:
+            # 如果没有日期列，使用索引作为x轴
+            dates = [f"第{i+1}天" for i in range(len(df))]
+        else:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df = df.sort_values(date_col)
+            dates = df[date_col].dt.strftime('%Y-%m-%d').tolist()
+        
         nav_values = df['nav'].astype(float).values
         
         # 计算累计收益率
@@ -3248,28 +3260,36 @@ def _generate_simple_return_curve(portfolio_data, weights, initial_capital):
 
 def generate_investment_advice_api():
     """
-    生成投资建议
+    生成专业投资建议（基金经理视角）
     
     Request Body:
         - fund_codes: 基金代码列表
         - strategy_id: 策略ID（可选）
+        - initial_capital: 初始资金（可选，默认100000）
     """
     try:
         data = request.get_json()
         fund_codes = data.get('fund_codes', [])
+        initial_capital = data.get('initial_capital', 100000)
         
         if not fund_codes:
             return safe_jsonify({'success': False, 'error': '请选择至少一只基金'}), 400
         
         # 调用现有的个性化建议生成逻辑
         from web.routes.analysis import get_personalized_investment_advice_parallel
+        from web.routes.holdings_advice_enhanced import enhance_investment_advice_professional
         
         advice_result = get_personalized_investment_advice_parallel(fund_codes)
         
         if not advice_result.get('success'):
             return safe_jsonify(advice_result), 500
         
-        return safe_jsonify(advice_result)
+        # 增强建议的专业性（基金经理视角）
+        enhanced_result = enhance_investment_advice_professional(
+            fund_codes, advice_result, initial_capital, db_manager
+        )
+        
+        return safe_jsonify(enhanced_result)
         
     except Exception as e:
         logger.error(f"生成投资建议失败: {str(e)}")
@@ -3329,10 +3349,11 @@ def get_investment_advice_valuation():
 def get_fund_name_from_db(fund_code: str):
     """从数据库获取基金名称"""
     try:
-        sql = "SELECT name FROM fund_basic WHERE code = :code"
-        df = db_manager.execute_query(sql, {'code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['name']):
-            return df.iloc[0]['name']
+        # 优先从 user_holdings 表查找
+        sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
+        df = db_manager.execute_query(sql, {'fund_code': fund_code})
+        if not df.empty and pd.notna(df.iloc[0]['fund_name']):
+            return df.iloc[0]['fund_name']
         return fund_code
     except:
         return fund_code
