@@ -36,6 +36,7 @@ class Templates:
     ETF_DETAIL = "etf_detail.html"
     CORRELATION_ANALYSIS = "correlation_analysis.html"
     INVESTMENT_ADVICE = "investment_advice.html"
+    INVESTMENT_ADVICE_REFACTORED = "investment_advice_refactored.html"
     STRATEGY_MANAGEMENT = "strategy_management.html"
     MY_HOLDINGS = "my_holdings.html"
     MY_HOLDINGS_REFACTORED = "my_holdings_refactored.html"
@@ -226,8 +227,8 @@ class PageRoutes:
         
         @self._route("/investment-advice")
         def investment_advice_page() -> str:
-            """投资建议分析页面"""
-            return render_template(Templates.INVESTMENT_ADVICE)
+            """投资建议分析页面 - 重构版"""
+            return render_template(Templates.INVESTMENT_ADVICE_REFACTORED)
         
         @self._route("/strategy-management")
         def strategy_management_page() -> str:

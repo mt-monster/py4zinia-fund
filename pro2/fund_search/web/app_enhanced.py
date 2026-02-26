@@ -274,6 +274,16 @@ def register_routes():
             logger.warning(f"以下路由注册失败: {', '.join(failed)}")
     except Exception as e:
         logger.error(f"路由注册失败: {e}")
+    
+    # 注册重构版投资建议页面 API 路由
+    try:
+        from web.routes.investment_advice_refactored import register_routes as register_advice_routes
+        db_manager = components.get('db_manager')
+        if db_manager:
+            register_advice_routes(app, db_manager)
+            logger.info("✅ 重构版投资建议 API 路由已注册")
+    except Exception as e:
+        logger.warning(f"投资建议 API 路由注册失败: {e}")
 
 
 # ============ 初始化应用 ============
