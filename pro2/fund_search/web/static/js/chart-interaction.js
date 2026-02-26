@@ -241,8 +241,8 @@ class ChartInteractionManager {
 const chartInteractionManager = new ChartInteractionManager();
 
 // 添加CSS动画
-const style = document.createElement('style');
-style.textContent = `
+const chartInteractionStyle = document.createElement('style');
+chartInteractionStyle.textContent = `
     @keyframes pulse {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.02); }
@@ -293,7 +293,7 @@ style.textContent = `
         cursor: pointer;
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(chartInteractionStyle);
 
 // 导出模块
 if (typeof module !== 'undefined' && module.exports) {

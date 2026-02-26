@@ -296,10 +296,18 @@ class RealtimeDataFetcher:
             if key in data:
                 parts = data.split('"')[1].split(',')
                 if len(parts) >= 6:
+                    current_nav = float(parts[1]) if parts[1] else None
+                    prev_nav = float(parts[3]) if len(parts) > 3 and parts[3] else None
+                    
+                    # 新浪接口的涨跌幅字段不可靠，直接使用计算值
+                    today_return = 0.0
+                    if current_nav and prev_nav and prev_nav > 0:
+                        today_return = round((current_nav - prev_nav) / prev_nav * 100, 2)
+                    
                     return {
-                        'current_nav': float(parts[1]) if parts[1] else None,
-                        'estimate_nav': float(parts[1]) if parts[1] else None,
-                        'today_return': float(parts[5]) if parts[5] else 0.0,
+                        'current_nav': current_nav,
+                        'estimate_nav': current_nav,
+                        'today_return': today_return,
                         'source': 'sina'
                     }
         return None
@@ -564,78 +572,14 @@ class HoldingRealtimeService:
         if not missing_codes:
             return results
         
-        # 从预加载的基金数据缓存获取（FundDataPreloader）
-        try:
-            from services.fund_data_preloader import get_preloader
-            preloader = get_preloader()
-            
-            still_missing = []
-            for code in missing_codes:
-                # 尝试从预加载缓存获取最新净值（包含 daily_return）
-                latest_nav = preloader.get_fund_latest_nav(code)
-                if latest_nav and latest_nav.get('daily_return', 0) != 0:
-                    results[code] = {
-                        'yesterday_nav': latest_nav.get('nav'),
-                        'yesterday_return': latest_nav.get('daily_return', 0),
-                        'yesterday_return_date': latest_nav.get('date'),
-                        'yesterday_return_days_diff': 1,
-                        'yesterday_return_is_stale': False
-                    }
-                    # 回填到 holding_service 的缓存
-                    self.cache.set_to_memory(f'yesterday:{code}', results[code], ttl_minutes=15)
-                    logger.debug(f"从预加载缓存获取 {code} 昨日收益率: {latest_nav.get('daily_return')}%")
-                else:
-                    still_missing.append(code)
-            
-            missing_codes = still_missing
-            
-        except Exception as e:
-            logger.debug(f"从预加载缓存获取昨日数据失败: {e}")
-        
-        if not missing_codes:
-            return results
+        # 注意：不再从预加载缓存或 fund_nav_cache 获取昨日收益率
+        # 因为 fund_nav_cache.daily_return 是当日涨跌幅，不是昨日盈亏
+        # 昨日盈亏需要从 fund_analysis_results.prev_day_return 或 Adapter._get_yesterday_return 获取
         
         # 查询数据库
-        if self.db:
+        if self.db and missing_codes:
             try:
                 yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-                
-                # 尝试从 fund_nav_cache 获取（如果表存在）
-                try:
-                    placeholders = ','.join([f':code{i}' for i in range(len(missing_codes))])
-                    sql = f"""
-                        SELECT 
-                            fund_code,
-                            nav_value as yesterday_nav,
-                            daily_return as yesterday_return
-                        FROM fund_nav_cache
-                        WHERE fund_code IN ({placeholders})
-                          AND nav_date = :yesterday
-                    """
-                    
-                    params = {f'code{i}': code for i, code in enumerate(missing_codes)}
-                    params['yesterday'] = yesterday
-                    df = self.db.execute_query(sql, params)
-                    
-                    if not df.empty:
-                        for _, row in df.iterrows():
-                            code = row['fund_code']
-                            data = {
-                                'yesterday_nav': float(row['yesterday_nav']) if pd.notna(row['yesterday_nav']) else None,
-                                'yesterday_return': float(row['yesterday_return']) if pd.notna(row['yesterday_return']) else 0.0,
-                                'yesterday_return_date': yesterday,
-                                'yesterday_return_days_diff': 1,
-                                'yesterday_return_is_stale': False
-                            }
-                            results[code] = data
-                            # 回填内存缓存
-                            self.cache.set_to_memory(f'yesterday:{code}', data, ttl_minutes=15)
-                        
-                        # 更新缺失列表
-                        missing_codes = [code for code in missing_codes if code not in results]
-                except Exception as e:
-                    # fund_nav_cache 表可能不存在，记录日志继续
-                    logger.debug(f"从 fund_nav_cache 获取数据失败（表可能不存在）: {e}")
                 
                 # 从 fund_analysis_results 获取（作为 fallback 或补充）
                 still_missing = [code for code in missing_codes if code not in results]
@@ -702,20 +646,25 @@ class HoldingRealtimeService:
                             # 使用批量接口获取多只基金的历史数据
                             batch_nav_data = adapter.batch_get_fund_nav(still_missing_after_db)
                             for code, df in batch_nav_data.items():
-                                if not df.empty and len(df) >= 2:
-                                    # 计算昨日收益率
-                                    latest_nav = float(df.iloc[-1]['nav'])
-                                    yesterday_nav = float(df.iloc[-2]['nav'])
-                                    yesterday_date = str(df.iloc[-2].get('date', ''))
+                                if not df.empty and len(df) >= 3:
+                                    # 确保数据按日期倒序排列（最新在前）
+                                    if 'date' in df.columns:
+                                        df = df.sort_values('date', ascending=False)
                                     
-                                    if yesterday_nav > 0:
-                                        yesterday_return = (latest_nav - yesterday_nav) / yesterday_nav * 100
+                                    # 计算昨日收益率：使用第1条（前一天）和第2条（再前一天）的数据
+                                    # 第0条是最新净值，第1条是前一天净值，第2条是再前一天净值
+                                    prev_nav = float(df.iloc[1]['nav'])  # 前一天净值
+                                    prev_prev_nav = float(df.iloc[2]['nav'])  # 再前一天净值
+                                    prev_date = str(df.iloc[1].get('date', ''))  # 前一天日期
+                                    
+                                    if prev_prev_nav > 0:
+                                        yesterday_return = (prev_nav - prev_prev_nav) / prev_prev_nav * 100
                                         yesterday_return = round(yesterday_return, 2)
                                         
                                         batch_results[code] = {
-                                            'yesterday_nav': yesterday_nav,
+                                            'yesterday_nav': prev_nav,
                                             'yesterday_return': yesterday_return,
-                                            'yesterday_return_date': yesterday_date,
+                                            'yesterday_return_date': prev_date,
                                             'yesterday_return_days_diff': 1,
                                             'yesterday_return_is_stale': False
                                         }
