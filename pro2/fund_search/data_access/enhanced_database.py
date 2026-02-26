@@ -105,6 +105,12 @@ class EnhancedDatabaseManager:
             # 创建用户操作记录表
             self._create_user_operations_table()
             
+            # 创建定投交易记录表
+            self._create_dip_transactions_table()
+            
+            # 创建每日净值快照表
+            self._create_dip_daily_snapshot_table()
+            
             logger.info("数据库表结构初始化完成")
             
         except Exception as e:
@@ -465,6 +471,63 @@ class EnhancedDatabaseManager:
         """
         self.execute_sql(sql)
         logger.info("用户操作记录表 user_operations 创建/检查完成")
+
+    def _create_dip_transactions_table(self):
+        """
+        创建定投交易记录表
+        存储用户的定投交易记录
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS dip_transactions (
+            id INT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键ID',
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user' COMMENT '用户ID',
+            fund_code VARCHAR(20) NOT NULL COMMENT '基金代码',
+            fund_name VARCHAR(100) COMMENT '基金名称',
+            trade_date DATE NOT NULL COMMENT '交易日期',
+            trade_type VARCHAR(20) NOT NULL COMMENT '交易类型：buy/sell/dividend',
+            amount DECIMAL(12, 2) NOT NULL COMMENT '投入金额',
+            nav DECIMAL(10, 4) NOT NULL COMMENT '买入净值',
+            shares DECIMAL(12, 4) COMMENT '买入份额',
+            commission DECIMAL(8, 2) DEFAULT 0 COMMENT '手续费',
+            total_shares DECIMAL(12, 4) COMMENT '累计份额',
+            total_cost DECIMAL(12, 2) COMMENT '累计投入',
+            avg_cost DECIMAL(10, 4) COMMENT '平均成本',
+            notes TEXT COMMENT '备注',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            INDEX idx_user_fund (user_id, fund_code),
+            INDEX idx_trade_date (trade_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='定投交易记录表 - 存储定投买入记录';
+        """
+        self.execute_sql(sql)
+        logger.info("定投交易记录表 dip_transactions 创建/检查完成")
+
+    def _create_dip_daily_snapshot_table(self):
+        """
+        创建每日净值快照表
+        存储每日持仓快照数据
+        """
+        sql = """
+        CREATE TABLE IF NOT EXISTS dip_daily_snapshot (
+            id INT PRIMARY KEY AUTO_INCREMENT COMMENT '自增主键ID',
+            user_id VARCHAR(50) NOT NULL DEFAULT 'default_user' COMMENT '用户ID',
+            fund_code VARCHAR(20) NOT NULL COMMENT '基金代码',
+            trade_date DATE NOT NULL COMMENT '交易日期',
+            nav DECIMAL(10, 4) COMMENT '当日净值',
+            shares DECIMAL(12, 4) COMMENT '持有份额',
+            market_value DECIMAL(12, 2) COMMENT '市值 = 份额 × 净值',
+            total_cost DECIMAL(12, 2) COMMENT '累计投入',
+            total_return DECIMAL(12, 2) COMMENT '累计收益 = 市值 - 累计投入',
+            return_rate DECIMAL(10, 4) COMMENT '收益率 = 累计收益 / 累计投入',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+            UNIQUE KEY uk_user_fund_date (user_id, fund_code, trade_date),
+            INDEX idx_user_fund (user_id, fund_code),
+            INDEX idx_date (trade_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        COMMENT='每日净值快照表 - 存储每日持仓快照';
+        """
+        self.execute_sql(sql)
+        logger.info("每日净值快照表 dip_daily_snapshot 创建/检查完成")
 
 
     def fetch_one(self, sql: str, params: Optional[Dict] = None) -> Optional[Tuple]:

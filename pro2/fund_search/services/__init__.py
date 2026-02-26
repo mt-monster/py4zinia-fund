@@ -10,6 +10,7 @@ from .fund_data_sync_service import FundDataSyncService
 from .fund_data_service import FundDataService, fund_data_service
 from .fund_business_service import FundBusinessService, fund_business_service, FundDetailDTO, HoldingDetailDTO
 from .cache import FundDataCache, fund_cache
+from .dip_return_calculator import DipReturnCalculator, get_dip_calculator
 
 __all__ = [
     'FundNavCacheManager',
@@ -23,5 +24,7 @@ __all__ = [
     'FundDetailDTO',
     'HoldingDetailDTO',
     'FundDataCache',
-    'fund_cache'
+    'fund_cache',
+    'DipReturnCalculator',
+    'get_dip_calculator'
 ]
