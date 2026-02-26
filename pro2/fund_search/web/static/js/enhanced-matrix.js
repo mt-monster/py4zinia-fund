@@ -240,8 +240,8 @@ ${fund2.name} (${fund2.code})
 const enhancedMatrixManager = new EnhancedMatrixManager();
 
 // 添加样式
-const style = document.createElement('style');
-style.textContent = `
+const enhancedMatrixStyle = document.createElement('style');
+enhancedMatrixStyle.textContent = `
     .correlation-matrix.enhanced {
         width: 100%;
         border-collapse: collapse;
@@ -342,7 +342,7 @@ style.textContent = `
         background: #e5e7eb;
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(enhancedMatrixStyle);
 
 // 导出
 if (typeof module !== 'undefined' && module.exports) {

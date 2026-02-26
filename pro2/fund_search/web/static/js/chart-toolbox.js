@@ -370,8 +370,8 @@ class ChartToolboxManager {
 const chartToolboxManager = new ChartToolboxManager();
 
 // 添加样式
-const style = document.createElement('style');
-style.textContent = `
+const chartToolboxStyle = document.createElement('style');
+chartToolboxStyle.textContent = `
     .chart-toolbox {
         display: flex;
         gap: 0.25rem;
@@ -580,7 +580,7 @@ style.textContent = `
         to { transform: translateX(-50%) translateY(0); opacity: 1; }
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(chartToolboxStyle);
 
 // 导出
 if (typeof module !== 'undefined' && module.exports) {
