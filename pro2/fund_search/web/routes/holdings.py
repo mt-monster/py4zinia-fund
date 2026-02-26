@@ -263,6 +263,12 @@ def register_routes(app, **kwargs):
     app.route('/api/holdings/analyze/personalized-advice', methods=['POST'])(analyze_personalized_advice)
     app.route('/api/analysis', methods=['POST'])(start_analysis)
     app.route('/api/holdings/<fund_code>', methods=['DELETE'])(delete_holding)
+    
+    app.route('/api/dip/returns', methods=['GET', 'POST'])(get_dip_returns)
+    app.route('/api/dip/returns/<fund_code>', methods=['GET'])(get_fund_dip_returns)
+    app.route('/api/dip/portfolio/returns', methods=['POST'])(get_portfolio_dip_returns)
+    app.route('/api/dip/transactions', methods=['POST'])(add_dip_transaction)
+    app.route('/api/dip/transactions/<fund_code>', methods=['GET'])(get_dip_transactions)
 
 
 # ==================== API 路由函数 ====================
@@ -2659,3 +2665,259 @@ def _get_holdings_from_db():
     except Exception as e:
         logger.warning(f"获取持仓失败: {e}")
         return []
+
+
+def get_dip_returns():
+    """获取所有基金的定投收益率曲线"""
+    try:
+        from services.dip_return_calculator import get_dip_calculator
+        
+        calculator = get_dip_calculator(db_manager)
+        
+        data = request.get_json() or {}
+        fund_codes = data.get('fund_codes', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not fund_codes:
+            holdings = _get_holdings_from_db()
+            fund_codes = [h['fund_code'] for h in holdings]
+        
+        if not fund_codes:
+            return safe_jsonify({'success': False, 'error': '没有持仓基金'}), 400
+        
+        portfolio_returns = calculator.get_portfolio_returns(
+            fund_codes, 
+            start_date=start_date, 
+            end_date=end_date
+        )
+        
+        if portfolio_returns.empty:
+            return safe_jsonify({'success': False, 'error': '无法获取数据'}), 400
+        
+        chart_data = {
+            'dates': [str(d) for d in portfolio_returns['date'].tolist()],
+            'market_value': portfolio_returns['market_value'].tolist(),
+            'total_cost': portfolio_returns['total_cost'].tolist(),
+            'total_return': portfolio_returns['total_return'].tolist(),
+            'return_rate': (portfolio_returns['return_rate'] * 100).tolist()
+        }
+        
+        latest = portfolio_returns.iloc[-1]
+        
+        return safe_jsonify({
+            'success': True,
+            'chart_data': chart_data,
+            'summary': {
+                'market_value': float(latest['market_value']),
+                'total_cost': float(latest['total_cost']),
+                'total_return': float(latest['total_return']),
+                'return_rate': float(latest['return_rate']) * 100
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取定投收益失败: {e}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_fund_dip_returns(fund_code):
+    """获取单只基金的定投收益率"""
+    try:
+        from services.dip_return_calculator import get_dip_calculator
+        
+        calculator = get_dip_calculator(db_manager)
+        
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        df = calculator.calculate_daily_returns(fund_code, start_date, end_date)
+        
+        if df.empty:
+            return safe_jsonify({'success': False, 'error': '无法获取数据'}), 400
+        
+        chart_data = {
+            'dates': [str(d) for d in df['date'].tolist()],
+            'nav': df['nav'].tolist(),
+            'shares': df['shares'].tolist(),
+            'market_value': df['market_value'].tolist(),
+            'total_cost': df['total_cost'].tolist(),
+            'total_return': df['total_return'].tolist(),
+            'return_rate': (df['return_rate'] * 100).tolist()
+        }
+        
+        summary = calculator.get_return_summary(fund_code, start_date)
+        
+        return safe_jsonify({
+            'success': True,
+            'fund_code': fund_code,
+            'chart_data': chart_data,
+            'summary': summary
+        })
+        
+    except Exception as e:
+        logger.error(f"获取基金 {fund_code} 定投收益失败: {e}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_portfolio_dip_returns():
+    """获取组合的定投收益率"""
+    try:
+        from services.dip_return_calculator import get_dip_calculator
+        
+        calculator = get_dip_calculator(db_manager)
+        
+        data = request.get_json() or {}
+        fund_codes = data.get('fund_codes', [])
+        weights = data.get('weights')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not fund_codes:
+            return safe_jsonify({'success': False, 'error': '请提供基金代码列表'}), 400
+        
+        df = calculator.get_portfolio_returns(fund_codes, weights, start_date, end_date)
+        
+        if df.empty:
+            return safe_jsonify({'success': False, 'error': '无法获取数据'}), 400
+        
+        chart_data = {
+            'dates': [str(d) for d in df['date'].tolist()],
+            'market_value': df['market_value'].tolist(),
+            'total_cost': df['total_cost'].tolist(),
+            'total_return': df['total_return'].tolist(),
+            'return_rate': (df['return_rate'] * 100).tolist()
+        }
+        
+        latest = df.iloc[-1]
+        
+        return safe_jsonify({
+            'success': True,
+            'chart_data': chart_data,
+            'summary': {
+                'market_value': float(latest['market_value']),
+                'total_cost': float(latest['total_cost']),
+                'total_return': float(latest['total_return']),
+                'return_rate': float(latest['return_rate']) * 100
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取组合定投收益失败: {e}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def add_dip_transaction():
+    """添加定投交易记录"""
+    try:
+        data = request.get_json() or {}
+        
+        fund_code = data.get('fund_code')
+        fund_name = data.get('fund_name', fund_code)
+        trade_date = data.get('trade_date')
+        trade_type = data.get('trade_type', 'buy')
+        amount = float(data.get('amount', 0))
+        nav = float(data.get('nav', 0))
+        
+        if not fund_code or not trade_date or amount <= 0 or nav <= 0:
+            return safe_jsonify({'success': False, 'error': '参数不完整'}), 400
+        
+        shares = amount / nav
+        
+        total_shares, total_cost, avg_cost = _calculate_cumulative(fund_code, trade_date, amount, shares)
+        
+        sql = """
+            INSERT INTO dip_transactions 
+            (user_id, fund_code, fund_name, trade_date, trade_type, amount, nav, shares, 
+             total_shares, total_cost, avg_cost)
+            VALUES ('default_user', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        db_manager.execute_sql(sql, (
+            fund_code, fund_name, trade_date, trade_type, 
+            amount, nav, shares, total_shares, total_cost, avg_cost
+        ))
+        
+        return safe_jsonify({
+            'success': True,
+            'message': '交易记录添加成功',
+            'data': {
+                'fund_code': fund_code,
+                'trade_date': trade_date,
+                'amount': amount,
+                'nav': nav,
+                'shares': shares,
+                'total_shares': total_shares,
+                'total_cost': total_cost,
+                'avg_cost': avg_cost
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"添加定投交易记录失败: {e}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _calculate_cumulative(fund_code: str, trade_date: str, amount: float, shares: float):
+    """计算累计份额、成本和平均成本"""
+    try:
+        sql = """
+            SELECT total_shares, total_cost 
+            FROM dip_transactions 
+            WHERE user_id = 'default_user' AND fund_code = %s
+            ORDER BY trade_date DESC LIMIT 1
+        """
+        result = db_manager.execute_query(sql, (fund_code,))
+        
+        if result is not None and not result.empty:
+            prev_total_shares = float(result.iloc[0]['total_shares'])
+            prev_total_cost = float(result.iloc[0]['total_cost'])
+        else:
+            prev_total_shares = 0
+            prev_total_cost = 0
+        
+        total_shares = prev_total_shares + shares
+        total_cost = prev_total_cost + amount
+        avg_cost = total_cost / total_shares if total_shares > 0 else 0
+        
+        return total_shares, total_cost, avg_cost
+        
+    except Exception as e:
+        logger.warning(f"计算累计数据失败: {e}")
+        return shares, amount, amount / shares if shares > 0 else 0
+
+
+def get_dip_transactions(fund_code):
+    """获取基金的定投交易记录"""
+    try:
+        sql = """
+            SELECT id, trade_date, trade_type, amount, nav, shares, 
+                   total_shares, total_cost, avg_cost, notes, created_at
+            FROM dip_transactions
+            WHERE user_id = 'default_user' AND fund_code = %s
+            ORDER BY trade_date DESC
+        """
+        
+        result = db_manager.execute_query(sql, (fund_code,))
+        
+        if result is None or result.empty:
+            return safe_jsonify({'success': True, 'transactions': []})
+        
+        transactions = result.to_dict('records')
+        
+        for t in transactions:
+            t['amount'] = float(t['amount'])
+            t['nav'] = float(t['nav'])
+            t['shares'] = float(t['shares'])
+            t['total_shares'] = float(t['total_shares'])
+            t['total_cost'] = float(t['total_cost'])
+            t['avg_cost'] = float(t['avg_cost'])
+        
+        return safe_jsonify({
+            'success': True,
+            'transactions': transactions
+        })
+        
+    except Exception as e:
+        logger.error(f"获取定投交易记录失败: {e}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500

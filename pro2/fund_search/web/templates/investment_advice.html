@@ -479,6 +479,19 @@
                 <!-- 动态生成 -->
             </div>
 
+            <!-- 收益率曲线图表 -->
+            <div class="return-curve-section" id="return-curve-section" style="margin-top: 30px;">
+                <h3 class="section-title"><i class="bi bi-graph-up"></i> 定投收益曲线</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadDipReturns('all')">全部基金</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadDipReturns('portfolio')">组合收益</button>
+                </div>
+                <canvas id="dip-return-chart" style="max-height: 350px;"></canvas>
+                <div id="dip-return-summary" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <!-- 动态生成收益摘要 -->
+                </div>
+            </div>
+
             <!-- 仪表盘容器 -->
             <div id="fund-analysis-dashboard" style="min-height: 600px;"></div>
         </div>
@@ -588,6 +601,11 @@
                 document.getElementById('fund-analysis-dashboard').innerHTML = 
                     '<div class="error-state"><p>仪表盘组件加载失败</p></div>';
             }
+            
+            // 加载定投收益曲线
+            setTimeout(() => {
+                loadDipReturns('all');
+            }, 500);
         }
 
         // 渲染个性化投资建议
@@ -841,6 +859,170 @@
             document.getElementById('error-section').classList.add('hidden');
             document.getElementById('empty-section').classList.remove('hidden');
             document.getElementById('analysis-result-section').style.display = 'none';
+        }
+
+        // ==================== 定投收益曲线 ====================
+        let dipReturnChart = null;
+        
+        async function loadDipReturns(type) {
+            const chartContainer = document.getElementById('return-curve-section');
+            if (!chartContainer) return;
+            
+            try {
+                let url = '/api/dip/returns';
+                let method = 'POST';
+                let body = null;
+                
+                const data = getAnalysisData();
+                const fundCodes = data && data.fund_codes ? data.fund_codes : [];
+                
+                if (type === 'portfolio') {
+                    url = '/api/dip/portfolio/returns';
+                    method = 'POST';
+                    body = JSON.stringify({ fund_codes: fundCodes });
+                } else {
+                    method = 'POST';
+                    body = JSON.stringify({ fund_codes: fundCodes });
+                }
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.warn('获取定投收益数据失败:', result.error);
+                    return;
+                }
+                
+                renderDipReturnChart(result.chart_data, result.summary);
+                
+            } catch (error) {
+                console.error('加载定投收益曲线失败:', error);
+            }
+        }
+        
+        function renderDipReturnChart(chartData, summary) {
+            const ctx = document.getElementById('dip-return-chart');
+            if (!ctx) return;
+            
+            if (dipReturnChart) {
+                dipReturnChart.destroy();
+            }
+            
+            dipReturnChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.dates,
+                    datasets: [
+                        {
+                            label: '收益率(%)',
+                            data: chartData.return_rate,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.3
+                        },
+                        {
+                            label: '市值(元)',
+                            data: chartData.market_value,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.3
+                        },
+                        {
+                            label: '累计投入(元)',
+                            data: chartData.total_cost,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            yAxisID: 'y1',
+                            borderDash: [5, 5],
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.dataset.yAxisID === 'y') {
+                                        label += context.parsed.y.toFixed(2) + '%';
+                                    } else {
+                                        label += '¥' + context.parsed.y.toFixed(2);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: { display: true, text: '日期' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: '收益率(%)' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(1) + '%';
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: '金额(元)' },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 更新摘要
+            const summaryEl = document.getElementById('dip-return-summary');
+            if (summaryEl && summary) {
+                summaryEl.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                        <div>
+                            <div style="font-size: 12px; color: #666;">当前市值</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">¥${summary.market_value.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: #666;">累计投入</div>
+                            <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">¥${summary.total_cost.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: #666;">累计收益</div>
+                            <div style="font-size: 18px; font-weight: bold; color: ${summary.total_return >= 0 ? '#28a745' : '#dc3545'};">¥${summary.total_return.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 12px; color: #666;">收益率</div>
+                            <div style="font-size: 18px; font-weight: bold; color: ${summary.return_rate >= 0 ? '#28a745' : '#dc3545'};">${summary.return_rate.toFixed(2)}%</div>
+                        </div>
+                    </div>
+                `;
+            }
         }
     </script>
 </body>

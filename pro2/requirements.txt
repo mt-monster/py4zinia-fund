@@ -21,3 +21,18 @@ plotly>=5.18.0
 cvxpy>=1.4.0
 mysql-connector-python>=8.0.0
 pymysql>=1.1.0
+
+# === 架构改进新增依赖 ===
+
+# 1. Celery异步处理
+celery>=5.3.0
+
+# 2. Redis消息队列
+redis>=5.0.0
+
+# 3. gRPC微服务（可选）
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+
+# 4. GraphQL API
+graphene>=3.3.0
