@@ -269,6 +269,13 @@ def register_routes(app, **kwargs):
     app.route('/api/dip/portfolio/returns', methods=['POST'])(get_portfolio_dip_returns)
     app.route('/api/dip/transactions', methods=['POST'])(add_dip_transaction)
     app.route('/api/dip/transactions/<fund_code>', methods=['GET'])(get_dip_transactions)
+    
+    # 重构版投资建议页面 API
+    app.route('/api/investment-advice/holdings', methods=['GET'])(get_investment_advice_holdings)
+    app.route('/api/investment-advice/strategies', methods=['GET'])(get_investment_advice_strategies)
+    app.route('/api/investment-advice/backtest', methods=['POST'])(run_investment_advice_backtest)
+    app.route('/api/investment-advice/generate', methods=['POST'])(generate_investment_advice_api)
+    app.route('/api/investment-advice/valuation', methods=['GET', 'POST'])(get_investment_advice_valuation)
 
 
 # ==================== API 路由函数 ====================
@@ -2921,3 +2928,411 @@ def get_dip_transactions(fund_code):
     except Exception as e:
         logger.error(f"获取定投交易记录失败: {e}")
         return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+# ==================== 重构版投资建议页面 API ====================
+
+def get_investment_advice_holdings():
+    """
+    获取投资建议页面的持仓列表
+    
+    Returns:
+        持仓基金列表，包含基金代码、名称、份额、成本等信息
+    """
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        sql = """
+        SELECT 
+            h.fund_code,
+            h.fund_name,
+            h.holding_shares as shares,
+            h.cost_price,
+            h.holding_amount as total_cost,
+            h.notes,
+            h.updated_at as last_updated,
+            COALESCE(f.latest_nav, 0) as latest_nav,
+            COALESCE(f.nav_date, '') as nav_date,
+            COALESCE(f.today_return, 0) as today_return
+        FROM user_holdings h
+        LEFT JOIN fund_nav f ON h.fund_code = f.fund_code
+        WHERE h.user_id = :user_id
+        ORDER BY h.holding_amount DESC
+        """
+        
+        df = db_manager.execute_query(sql, {'user_id': user_id})
+        
+        if df.empty:
+            return safe_jsonify({'success': True, 'data': [], 'total': 0})
+        
+        holdings = []
+        for _, row in df.iterrows():
+            shares = _safe_round_float(row.get('shares'), 0)
+            cost_price = _safe_round_float(row.get('cost_price'), 0)
+            latest_nav = _safe_round_float(row.get('latest_nav'), 0)
+            today_return = _safe_round_float(row.get('today_return'), 0)
+            
+            market_value = shares * latest_nav if shares and latest_nav else 0
+            total_cost = _safe_round_float(row.get('total_cost'), 0)
+            profit_loss = market_value - total_cost if market_value and total_cost else 0
+            profit_loss_pct = (profit_loss / total_cost * 100) if total_cost else 0
+            
+            holding = {
+                'fund_code': row['fund_code'],
+                'fund_name': row['fund_name'] if pd.notna(row['fund_name']) else row['fund_code'],
+                'shares': round(shares, 4) if shares else 0,
+                'cost_price': round(cost_price, 4) if cost_price else 0,
+                'latest_nav': round(latest_nav, 4) if latest_nav else 0,
+                'total_cost': round(total_cost, 2) if total_cost else 0,
+                'market_value': round(market_value, 2) if market_value else 0,
+                'profit_loss': round(profit_loss, 2) if profit_loss else 0,
+                'profit_loss_pct': round(profit_loss_pct, 2) if profit_loss_pct else 0,
+                'today_return': round(today_return, 2) if today_return else 0,
+                'nav_date': str(row['nav_date']) if pd.notna(row['nav_date']) else '',
+                'notes': row['notes'] if pd.notna(row['notes']) else '',
+                'last_updated': str(row['last_updated']) if pd.notna(row['last_updated']) else ''
+            }
+            holdings.append(holding)
+        
+        return safe_jsonify({
+            'success': True, 
+            'data': holdings, 
+            'total': len(holdings)
+        })
+        
+    except Exception as e:
+        logger.error(f"获取投资建议持仓列表失败: {str(e)}")
+        traceback.print_exc()
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_investment_advice_strategies():
+    """
+    获取投资建议页面的策略列表
+    
+    Returns:
+        用户策略列表
+    """
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        
+        sql = """
+        SELECT 
+            id,
+            name,
+            description,
+            config,
+            created_at,
+            updated_at
+        FROM user_strategies
+        WHERE user_id = :user_id
+        ORDER BY updated_at DESC
+        """
+        
+        df = db_manager.execute_query(sql, {'user_id': user_id})
+        
+        if df.empty:
+            return safe_jsonify({'success': True, 'data': [], 'total': 0})
+        
+        strategies = []
+        strategy_type_map = {
+            'fixed_amount': '固定金额定投',
+            'fixed_ratio': '固定比例定投',
+            'value_averaging': '价值平均定投',
+            'momentum': '动量策略',
+            'mean_reversion': '均值回归',
+            'dual_ma': '双均线策略',
+            'grid_trading': '网格交易',
+            'enhanced': '增强策略',
+            'custom': '自定义策略'
+        }
+        
+        for _, row in df.iterrows():
+            config = {}
+            if pd.notna(row['config']):
+                try:
+                    config = json.loads(row['config']) if isinstance(row['config'], str) else row['config']
+                except:
+                    config = {}
+            
+            strategy_type = config.get('strategy_type', 'custom')
+            
+            strategy = {
+                'id': int(row['id']),
+                'name': row['name'],
+                'description': row['description'] if pd.notna(row['description']) else '',
+                'type': strategy_type,
+                'type_name': strategy_type_map.get(strategy_type, '自定义'),
+                'config': config,
+                'created_at': str(row['created_at']) if pd.notna(row['created_at']) else '',
+                'updated_at': str(row['updated_at']) if pd.notna(row['updated_at']) else ''
+            }
+            strategies.append(strategy)
+        
+        return safe_jsonify({
+            'success': True, 
+            'data': strategies, 
+            'total': len(strategies)
+        })
+        
+    except Exception as e:
+        logger.error(f"获取策略列表失败: {str(e)}")
+        traceback.print_exc()
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def run_investment_advice_backtest():
+    """
+    执行组合回测
+    
+    Request Body:
+        - fund_codes: 基金代码列表
+        - strategy_id: 策略ID（可选）
+        - start_date: 开始日期
+        - end_date: 结束日期
+        - initial_capital: 初始资金
+    """
+    try:
+        data = request.get_json()
+        fund_codes = data.get('fund_codes', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        initial_capital = data.get('initial_capital', 100000.0)
+        weights = data.get('weights', {})
+        
+        if not fund_codes:
+            return safe_jsonify({'success': False, 'error': '请选择至少一只基金'}), 400
+        
+        # 如果没有指定日期，使用最近一年
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start = datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365)
+            start_date = start.strftime('%Y-%m-%d')
+        
+        # 导入回测相关模块
+        from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
+        from backtesting.analysis.calculators import calculate_sharpe_ratio, calculate_max_drawdown
+        
+        portfolio_data = []
+        fund_results = []
+        
+        # 获取每只基金的历史数据
+        for fund_code in fund_codes:
+            try:
+                hist_data = fetch_fund_history_from_akshare(fund_code, days=365)
+                if hist_data is not None and not hist_data.empty:
+                    portfolio_data.append({
+                        'fund_code': fund_code,
+                        'data': hist_data
+                    })
+            except Exception as e:
+                logger.warning(f"获取基金 {fund_code} 历史数据失败: {e}")
+        
+        if not portfolio_data:
+            return safe_jsonify({'success': False, 'error': '无法获取基金历史数据'}), 400
+        
+        # 简化回测：计算等权重组合的表现
+        total_return = 0
+        weighted_returns = []
+        
+        for fund_info in portfolio_data:
+            fund_code = fund_info['fund_code']
+            df = fund_info['data']
+            
+            # 计算基金收益率
+            if len(df) >= 2:
+                start_nav = float(df.iloc[0]['nav'])
+                end_nav = float(df.iloc[-1]['nav'])
+                fund_return = (end_nav - start_nav) / start_nav * 100
+                
+                # 计算最大回撤
+                nav_series = df['nav'].astype(float)
+                max_dd = calculate_max_drawdown(nav_series)
+                
+                # 计算夏普比率
+                returns = nav_series.pct_change().dropna()
+                sharpe = calculate_sharpe_ratio(returns) if len(returns) > 1 else 0
+                
+                fund_weight = weights.get(fund_code, 1.0 / len(portfolio_data))
+                weighted_return = fund_return * fund_weight
+                weighted_returns.append(weighted_return)
+                
+                fund_results.append({
+                    'fund_code': fund_code,
+                    'fund_name': get_fund_name_from_db(fund_code) or fund_code,
+                    'start_nav': round(start_nav, 4),
+                    'end_nav': round(end_nav, 4),
+                    'total_return': round(fund_return, 2),
+                    'max_drawdown': round(max_dd * 100, 2) if max_dd else 0,
+                    'sharpe_ratio': round(sharpe, 2) if sharpe else 0,
+                    'weight': round(fund_weight * 100, 2),
+                    'data_points': len(df)
+                })
+        
+        # 计算组合整体指标
+        total_return = sum(weighted_returns)
+        annualized_return = total_return / 365 * 252 if total_return else 0
+        
+        # 生成简化收益曲线
+        chart_data = _generate_simple_return_curve(portfolio_data, weights, initial_capital)
+        
+        result = {
+            'fund_codes': fund_codes,
+            'start_date': start_date,
+            'end_date': end_date,
+            'initial_capital': initial_capital,
+            'fund_results': fund_results,
+            'portfolio_summary': {
+                'total_return': round(total_return, 2),
+                'annualized_return': round(annualized_return, 2),
+                'backtest_days': 365
+            },
+            'chart_data': chart_data
+        }
+        
+        return safe_jsonify({
+            'success': True,
+            'data': result
+        })
+        
+    except Exception as e:
+        logger.error(f"执行组合回测失败: {str(e)}")
+        traceback.print_exc()
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def _generate_simple_return_curve(portfolio_data, weights, initial_capital):
+    """生成简化收益曲线数据"""
+    try:
+        # 使用第一个基金的数据生成简化曲线
+        if not portfolio_data:
+            return {
+                'dates': [],
+                'portfolio_values': [],
+                'initial_capital': initial_capital,
+                'final_value': initial_capital
+            }
+        
+        df = portfolio_data[0]['data'].copy()
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.sort_values('date')
+        
+        dates = df['date'].dt.strftime('%Y-%m-%d').tolist()
+        nav_values = df['nav'].astype(float).values
+        
+        # 计算累计收益率
+        start_nav = nav_values[0]
+        cumulative_returns = [(nav / start_nav - 1) for nav in nav_values]
+        
+        # 计算组合市值
+        portfolio_values = [initial_capital * (1 + r) for r in cumulative_returns]
+        
+        return {
+            'dates': dates,
+            'portfolio_values': [round(v, 2) for v in portfolio_values],
+            'initial_capital': initial_capital,
+            'final_value': round(portfolio_values[-1], 2) if portfolio_values else initial_capital
+        }
+        
+    except Exception as e:
+        logger.error(f"生成收益曲线失败: {e}")
+        return {
+            'dates': [],
+            'portfolio_values': [],
+            'initial_capital': initial_capital,
+            'final_value': initial_capital
+        }
+
+
+def generate_investment_advice_api():
+    """
+    生成投资建议
+    
+    Request Body:
+        - fund_codes: 基金代码列表
+        - strategy_id: 策略ID（可选）
+    """
+    try:
+        data = request.get_json()
+        fund_codes = data.get('fund_codes', [])
+        
+        if not fund_codes:
+            return safe_jsonify({'success': False, 'error': '请选择至少一只基金'}), 400
+        
+        # 调用现有的个性化建议生成逻辑
+        from web.routes.analysis import get_personalized_investment_advice_parallel
+        
+        advice_result = get_personalized_investment_advice_parallel(fund_codes)
+        
+        if not advice_result.get('success'):
+            return safe_jsonify(advice_result), 500
+        
+        return safe_jsonify(advice_result)
+        
+    except Exception as e:
+        logger.error(f"生成投资建议失败: {str(e)}")
+        traceback.print_exc()
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_investment_advice_valuation():
+    """获取基金估值数据"""
+    try:
+        if request.method == 'POST':
+            data = request.get_json()
+            fund_codes = data.get('fund_codes', [])
+        else:
+            fund_codes = request.args.getlist('fund_codes')
+        
+        if not fund_codes:
+            return safe_jsonify({'success': False, 'error': '请提供基金代码'}), 400
+        
+        from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+        
+        adapter = MultiSourceDataAdapter()
+        valuations = []
+        
+        for fund_code in fund_codes:
+            try:
+                data = adapter.get_realtime_data(fund_code, '')
+                valuations.append({
+                    'fund_code': fund_code,
+                    'fund_name': data.get('name', fund_code),
+                    'today_return': _safe_round_float(data.get('today_return'), 0),
+                    'estimated_nav': _safe_round_float(data.get('estimated_nav'), 0),
+                    'last_nav': _safe_round_float(data.get('last_nav'), 0),
+                    'update_time': data.get('update_time', '')
+                })
+            except Exception as e:
+                logger.warning(f"获取基金 {fund_code} 估值失败: {e}")
+                valuations.append({
+                    'fund_code': fund_code,
+                    'fund_name': fund_code,
+                    'today_return': 0,
+                    'estimated_nav': 0,
+                    'last_nav': 0,
+                    'update_time': ''
+                })
+        
+        return safe_jsonify({
+            'success': True,
+            'data': valuations
+        })
+        
+    except Exception as e:
+        logger.error(f"获取基金估值失败: {str(e)}")
+        return safe_jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_fund_name_from_db(fund_code: str):
+    """从数据库获取基金名称"""
+    try:
+        sql = "SELECT name FROM fund_basic WHERE code = :code"
+        df = db_manager.execute_query(sql, {'code': fund_code})
+        if not df.empty and pd.notna(df.iloc[0]['name']):
+            return df.iloc[0]['name']
+        return fund_code
+    except:
+        return fund_code
