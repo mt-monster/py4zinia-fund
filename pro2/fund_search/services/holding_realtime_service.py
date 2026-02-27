@@ -276,10 +276,16 @@ class RealtimeDataFetcher:
             
             # 验证是今天数据
             if today in gztime:
+                gszzl = float(data.get('gszzl', 0)) if data.get('gszzl') else 0.0
+                jzrq = data.get('jzrq', '')  # 最新确认净值日期
+                # gszzl=0 且净值日期不是今天：QDII/港股等开盘前估值未更新，
+                # 让后续数据源（Tushare/AKShare）尝试获取最新已确认涨跌幅
+                if gszzl == 0 and jzrq != today:
+                    return None
                 return {
                     'current_nav': float(data.get('dwjz', 0)) if data.get('dwjz') else None,
                     'estimate_nav': float(data.get('gsz', 0)) if data.get('gsz') else None,
-                    'today_return': float(data.get('gszzl', 0)) if data.get('gszzl') else 0.0,
+                    'today_return': gszzl,
                     'source': 'tiantian'
                 }
         return None

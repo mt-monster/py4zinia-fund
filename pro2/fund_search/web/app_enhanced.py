@@ -220,27 +220,44 @@ def init_components():
             preloader = get_preloader()
             components['preloader'] = preloader
             logger.info("预加载服务已初始化")
-            
-            # 检查是否使用Celery
-            if CELERY_AVAILABLE and os.environ.get('USE_CELERY_BG', 'true').lower() == 'true':
-                logger.info("使用Celery处理后台任务")
-            else:
-                if os.environ.get('ENABLE_BACKGROUND_UPDATE', 'true').lower() == 'true':
-                    updater = get_background_updater()
-                    updater.start()
-                    components['background_updater'] = updater
-                    logger.info("后台数据更新服务已启动")
         except Exception as e:
             logger.error(f"预加载服务初始化失败: {e}")
-    
-    # 6. 初始化Celery
+
+    # 6. 初始化Celery（内存模式，无需 Redis，始终可用）
     if CELERY_AVAILABLE:
         try:
             celery = init_celery(app)
             components['celery'] = celery
-            logger.info("Celery已初始化")
+            logger.info("Celery 已初始化（内存模式）")
+
+            # 启动时触发一次净值更新（task_always_eager=True，同步执行）
+            if os.environ.get('CELERY_TRIGGER_ON_START', 'false').lower() == 'true':
+                try:
+                    from celery_tasks import update_fund_nav_task
+                    update_fund_nav_task.delay()
+                    logger.info("已触发启动时净值更新任务")
+                except Exception as e:
+                    logger.warning(f"触发启动任务失败: {e}")
         except Exception as e:
-            logger.error(f"Celery初始化失败: {e}")
+            logger.error(f"Celery 初始化失败，降级为线程后台更新: {e}")
+            if PRELOAD_SERVICES_AVAILABLE and os.environ.get('ENABLE_BACKGROUND_UPDATE', 'true').lower() == 'true':
+                try:
+                    updater = get_background_updater()
+                    updater.start()
+                    components['background_updater'] = updater
+                    logger.info("降级：线程后台更新服务已启动")
+                except Exception as e2:
+                    logger.error(f"线程后台更新服务启动失败: {e2}")
+    else:
+        # Celery 不可用时使用线程后台更新
+        if PRELOAD_SERVICES_AVAILABLE and os.environ.get('ENABLE_BACKGROUND_UPDATE', 'true').lower() == 'true':
+            try:
+                updater = get_background_updater()
+                updater.start()
+                components['background_updater'] = updater
+                logger.info("线程后台数据更新服务已启动")
+            except Exception as e:
+                logger.error(f"线程后台更新服务启动失败: {e}")
     
     # 7. 初始化消息队列
     if MESSAGING_AVAILABLE:

@@ -475,6 +475,110 @@ def clear_heavyweight_stocks_cache(fund_code):
         }), 500
 
 
+def run_strategy_backtest_async():
+    """
+    异步执行策略回测（Celery 版本）
+
+    将耗时回测任务提交到 Celery 队列，立即返回 task_id。
+    客户端通过 GET /api/strategy-backtest/async/<task_id> 轮询结果。
+
+    Request JSON:
+        strategy_id: 策略ID
+        user_id: 用户ID（可选，默认 default_user）
+        start_date: 开始日期 YYYY-MM-DD
+        end_date: 结束日期 YYYY-MM-DD
+        initial_capital: 初始资金（可选，默认 100000）
+        rebalance_freq: 再平衡频率（可选，默认 monthly）
+    """
+    try:
+        data = request.get_json()
+        strategy_id = data.get('strategy_id')
+        if not strategy_id:
+            return jsonify({'success': False, 'error': '策略ID不能为空'}), 400
+
+        user_id = data.get('user_id', 'default_user')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        initial_capital = float(data.get('initial_capital', 100000.0))
+        rebalance_freq = data.get('rebalance_freq', 'monthly')
+
+        # 尝试使用 Celery 异步提交
+        try:
+            from celery_tasks import run_backtest_task
+            task = run_backtest_task.apply_async(
+                kwargs={
+                    'strategy_id': strategy_id,
+                    'user_id': user_id,
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'initial_capital': initial_capital,
+                    'rebalance_freq': rebalance_freq,
+                },
+                queue='backtest'
+            )
+            return jsonify({
+                'success': True,
+                'async': True,
+                'task_id': task.id,
+                'status': 'PENDING',
+                'message': '回测任务已提交，请通过 task_id 轮询结果',
+                'poll_url': f'/api/strategy-backtest/async/{task.id}'
+            })
+        except Exception as celery_err:
+            logger.warning(f"Celery 不可用，降级为同步回测: {celery_err}")
+            # 降级：同步执行
+            handler = get_backtest_handler()
+            success, result = handler.run_backtest(
+                strategy_id=strategy_id, user_id=user_id,
+                start_date=start_date, end_date=end_date,
+                initial_capital=initial_capital, rebalance_freq=rebalance_freq
+            )
+            if success:
+                return jsonify({'success': True, 'async': False, 'data': result})
+            return jsonify({'success': False, 'error': result.get('error', '回测失败')}), 500
+
+    except Exception as e:
+        logger.error(f"提交异步回测失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_async_backtest_status(task_id):
+    """
+    查询 Celery 异步回测任务状态
+
+    Response:
+        status: PENDING / STARTED / SUCCESS / FAILURE / RETRY
+        result: 任务结果（SUCCESS 时有效）
+        error:  错误信息（FAILURE 时有效）
+    """
+    try:
+        from celery_tasks import run_backtest_task
+        task = run_backtest_task.AsyncResult(task_id)
+
+        response = {
+            'success': True,
+            'task_id': task_id,
+            'status': task.state,
+        }
+
+        if task.state == 'SUCCESS':
+            response['result'] = task.result
+        elif task.state == 'FAILURE':
+            response['error'] = str(task.result)
+        elif task.state == 'PENDING':
+            response['message'] = '任务排队中，等待 Worker 执行'
+        elif task.state == 'STARTED':
+            response['message'] = '任务执行中'
+
+        return jsonify(response)
+
+    except ImportError:
+        return jsonify({'success': False, 'error': 'Celery 不可用'}), 503
+    except Exception as e:
+        logger.error(f"查询异步回测状态失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 def register_routes(app, **kwargs):
     """注册所有回测相关路由"""
     global db_manager, strategy_engine, unified_strategy_engine, strategy_evaluator
@@ -491,6 +595,8 @@ def register_routes(app, **kwargs):
     
     # 注册路由
     app.route('/api/strategy-backtest', methods=['POST'])(run_strategy_backtest)
+    app.route('/api/strategy-backtest/async', methods=['POST'])(run_strategy_backtest_async)
+    app.route('/api/strategy-backtest/async/<task_id>', methods=['GET'])(get_async_backtest_status)
     app.route('/api/strategy-backtest/status/<task_id>', methods=['GET'])(get_backtest_status)
     app.route('/api/strategy-backtest/result/<task_id>', methods=['GET'])(get_backtest_result)
     app.route('/api/strategy-backtest/export/<task_id>', methods=['GET'])(export_backtest_trades)

@@ -28,24 +28,30 @@ Celery异步任务模块
 
 from .celery_app import init_celery, get_celery_app, celery_app
 
-# 延迟导入任务，避免在Celery未初始化时出错
-def __getattr__(name):
-    if name in ('update_fund_data_task', 'run_backtest_task', 'sync_fund_data_task',
-                'clear_expired_cache_task', 'update_fund_nav_task', 
-                'recalc_performance_task', 'batch_update_task'):
-        from . import tasks
-        return getattr(tasks, name)
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
-__all__ = [
-    'init_celery',
-    'get_celery_app',
-    'celery_app',
+# 延迟导入任务，避免在 Celery 未初始化时出错
+_TASK_NAMES = (
     'update_fund_data_task',
     'run_backtest_task',
     'sync_fund_data_task',
     'clear_expired_cache_task',
     'update_fund_nav_task',
+    'update_nav_history_task',
     'recalc_performance_task',
-    'batch_update_task'
+    'batch_update_task',
+    'send_notification_task',
+)
+
+
+def __getattr__(name):
+    if name in _TASK_NAMES:
+        from . import tasks
+        return getattr(tasks, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+__all__ = [
+    'init_celery',
+    'get_celery_app',
+    'celery_app',
+    *_TASK_NAMES,
 ]
