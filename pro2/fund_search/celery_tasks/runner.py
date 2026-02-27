@@ -26,11 +26,11 @@ import subprocess
 
 
 def run_worker():
-    """启动Celery Worker"""
+    """启动Celery Worker（消费全部队列）"""
     cmd = [
         'celery', '-A', 'celery_tasks.celery_app', 'worker',
         '--loglevel=info',
-        '-Q', 'default,high_priority,low_priority',
+        '-Q', 'default,high_priority,low_priority,backtest,data_sync,calculation',
         '-n', 'fund_platform_worker@%h',
         '--concurrency=4'
     ]
@@ -51,12 +51,12 @@ def run_beat():
 
 
 def run_flower():
-    """启动Flower监控"""
+    """启动Flower监控（内存模式下功能受限，仅显示任务历史）"""
     cmd = [
         'celery', '-A', 'celery_tasks.celery_app', 'flower',
         '--port=5555',
-        '--broker=redis://localhost:6379/0'
     ]
+    print("注意：内存模式下 Flower 实时监控功能受限（无持久化 broker）")
     print(f"启动Flower监控: {' '.join(cmd)}")
     subprocess.run(cmd)
 

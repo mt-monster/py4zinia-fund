@@ -1,28 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Celery 应用初始化
-异步任务处理入口
+services/celery_app.py — 兼容转发层
+
+Celery 应用实例已统一到顶层 celery_tasks/celery_app.py。
+此文件保留 celery_app 变量引用，防止旧代码 from services.celery_app import celery_app 报错。
 """
 
-import os
-import sys
-import logging
-from celery import Celery
+from celery_tasks.celery_app import celery_app, init_celery, get_celery_app, create_celery_app
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from services.celery_config import CeleryConfig
-
-logger = logging.getLogger(__name__)
-
-celery_app = Celery('fund_analysis')
-celery_app.config_from_object(CeleryConfig)
-
-celery_app.autodiscover_tasks(['services.celery_tasks'])
-
-logger.info("Celery 应用初始化完成")
-
-if __name__ == '__main__':
-    celery_app.start()
-
+__all__ = ['celery_app', 'init_celery', 'get_celery_app', 'create_celery_app']

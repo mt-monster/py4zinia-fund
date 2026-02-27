@@ -63,13 +63,16 @@ class BacktestCompletedHandler:
         try:
             if success:
                 # 发送成功通知
-                from celery_tasks.tasks import send_notification_task
-                send_notification_task.delay(
-                    user_id=user_id,
-                    notification_type='push',
-                    title='回测完成',
-                    message=f'策略 {strategy_id} 的回测任务已完成，任务ID: {task_id}'
-                )
+                try:
+                    from celery_tasks.tasks import send_notification_task
+                    send_notification_task.delay(
+                        user_id=user_id,
+                        notification_type='push',
+                        title='回测完成',
+                        message=f'策略 {strategy_id} 的回测任务已完成，任务ID: {task_id}'
+                    )
+                except Exception as notify_err:
+                    logger.warning(f"发送回测完成通知失败（Celery 可能未启动）: {notify_err}")
                 
                 # 触发报告生成
                 event_bus = EventBus()
@@ -80,13 +83,16 @@ class BacktestCompletedHandler:
             else:
                 # 发送失败通知
                 error = event.data.get('error', '未知错误')
-                from celery_tasks.tasks import send_notification_task
-                send_notification_task.delay(
-                    user_id=user_id,
-                    notification_type='push',
-                    title='回测失败',
-                    message=f'策略 {strategy_id} 的回测任务失败: {error}'
-                )
+                try:
+                    from celery_tasks.tasks import send_notification_task
+                    send_notification_task.delay(
+                        user_id=user_id,
+                        notification_type='push',
+                        title='回测失败',
+                        message=f'策略 {strategy_id} 的回测任务失败: {error}'
+                    )
+                except Exception as notify_err:
+                    logger.warning(f"发送回测失败通知失败（Celery 可能未启动）: {notify_err}")
                 
         except Exception as e:
             logger.error(f"处理回测完成事件失败: {e}")

@@ -345,6 +345,10 @@ class MultiSourceDataAdapter(OptimizedFundData):
             qdii_data['current_nav'],
             qdii_data.get('previous_nav', qdii_data['current_nav'])
         )
+        # 估值涨跌幅为0（开盘前），fallback 到历史净值最新一条的 daily_return
+        if today_return == 0 and qdii_data.get('daily_return', 0) != 0:
+            today_return = round(float(qdii_data['daily_return']), 2)
+            logger.info(f"QDII基金 {fund_code} 估值涨跌幅为0，使用历史净值涨跌幅: {today_return}%")
         
         result = {
             'fund_code': fund_code,
@@ -785,18 +789,33 @@ class MultiSourceDataAdapter(OptimizedFundData):
                 data = json.loads(json_str)
                 
                 gztime = data.get('gztime', '')
+                dwjz = float(data.get('dwjz', 0))   # 最新确认单位净值
+                gsz = float(data.get('gsz', 0))     # 实时估算净值
+                gszzl = float(data.get('gszzl', 0)) # 估算涨跌幅（%）
                 # 检查是否是今天的数据
                 if today_str in gztime:
-                    logger.info(f"天天基金网获取 {fund_code} 实时估值成功: {data.get('gsz')} ({gztime})")
+                    logger.info(f"天天基金网获取 {fund_code} 实时估值成功: {gsz} ({gztime})")
                     return {
-                        'estimate_nav': float(data.get('gsz', 0)),  # 估算净值
-                        'yesterday_nav': float(data.get('dwjz', 0)),  # 单位净值（昨日）
+                        'estimate_nav': gsz,
+                        'yesterday_nav': dwjz,
                         'estimate_time': gztime,
-                        'daily_return': float(data.get('gszzl', 0)),  # 估算涨跌幅
+                        'daily_return': gszzl,
                         'source': 'tiantian'
                     }
                 else:
-                    logger.debug(f"天天基金网 {fund_code} 估值不是今天: {gztime}")
+                    # 非交易时段：用最新确认净值和其日涨跌幅（dwjz/gszzl 对应最后一个交易日）
+                    # gszzl 此时是上一个确认净值对应的日涨跌幅，作为"最近已知涨跌幅"使用
+                    if dwjz > 0 and gszzl != 0:
+                        logger.info(f"天天基金网 {fund_code} 使用最近已知涨跌幅(非今日估值): {gszzl}% ({gztime})")
+                        return {
+                            'estimate_nav': dwjz,   # 用确认净值代替估值
+                            'yesterday_nav': round(dwjz / (1 + gszzl / 100), 4),  # 反推前日净值
+                            'estimate_time': gztime,
+                            'daily_return': gszzl,
+                            'source': 'tiantian_confirmed'
+                        }
+                    else:
+                        logger.debug(f"天天基金网 {fund_code} 估值不是今天且涨跌幅为0: {gztime}")
         except Exception as e:
             logger.debug(f"天天基金网实时估值获取失败 {fund_code}: {e}")
         

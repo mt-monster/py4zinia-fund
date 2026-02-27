@@ -224,6 +224,73 @@ def clear_expired_cache_task(self) -> Dict[str, Any]:
         raise self.retry(exc=exc)
 
 
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=300, time_limit=3600)
+def update_nav_history_task(self, fund_codes: Optional[List[str]] = None,
+                            days: int = 30) -> Dict[str, Any]:
+    """
+    批量更新基金历史净值任务（定时任务，每日收盘后执行）
+
+    Args:
+        fund_codes: 基金代码列表，None 表示全量
+        days: 获取最近多少天的历史数据
+
+    Returns:
+        Dict: 更新结果
+    """
+    try:
+        logger.info(f"开始更新历史净值，days={days}")
+
+        from data_retrieval.fetchers.optimized_fund_data import OptimizedFundData
+        from services.fund_data_preloader import get_preloader
+
+        preloader = get_preloader()
+        fetcher = OptimizedFundData()
+
+        if fund_codes is None:
+            fund_codes = _get_all_fund_codes()
+
+        import time
+        updated_count = 0
+        failed_count = 0
+        batch_size = 50
+
+        for i in range(0, len(fund_codes), batch_size):
+            batch = fund_codes[i:i + batch_size]
+            try:
+                results = fetcher.batch_get_fund_nav(batch, days=days)
+                for code, df in results.items():
+                    if df is not None and not df.empty:
+                        key = f"fund:nav:{code}"
+                        data = {
+                            'records': df.to_dict('records'),
+                            'columns': df.columns.tolist(),
+                            'last_date': str(df.iloc[-1].get('date', '')) if len(df) > 0 else None
+                        }
+                        preloader.cache.set(key, data, 24 * 3600)
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+            except Exception as e:
+                logger.debug(f"批次更新历史净值失败 {batch[:3]}...: {e}")
+                failed_count += len(batch)
+
+            time.sleep(1)  # 避免 API 限频
+
+        logger.info(f"历史净值更新完成: 成功 {updated_count}, 失败 {failed_count}")
+        return {
+            'success': True,
+            'updated_count': updated_count,
+            'failed_count': failed_count,
+            'total': len(fund_codes),
+            'days': days,
+            'timestamp': datetime.now().isoformat()
+        }
+
+    except Exception as exc:
+        logger.error(f"历史净值更新任务失败: {exc}")
+        raise self.retry(exc=exc)
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60, time_limit=900)
 def update_fund_nav_task(self) -> Dict[str, Any]:
     """
@@ -414,3 +481,31 @@ def send_notification_task(self, user_id: str, notification_type: str,
     except Exception as exc:
         logger.error(f"发送通知失败: {exc}")
         raise self.retry(exc=exc)
+
+
+# ============ 辅助函数 ============
+
+def _get_all_fund_codes() -> List[str]:
+    """获取所有场外开放式基金代码（优先从 akshare 获取，失败返回空列表）"""
+    try:
+        import akshare as ak
+
+        # 方法1：从每日行情获取
+        try:
+            fund_df = ak.fund_open_fund_daily_em()
+            if not fund_df.empty and '基金代码' in fund_df.columns:
+                codes = fund_df['基金代码'].unique().tolist()
+                return [c for c in codes if isinstance(c, str) and len(c) == 6 and c.isdigit()]
+        except Exception:
+            pass
+
+        # 方法2：从基金名称列表获取，过滤场内 ETF
+        fund_list = ak.fund_name_em()
+        codes = fund_list['基金代码'].unique().tolist()
+        valid = [c for c in codes if isinstance(c, str) and len(c) == 6 and c.isdigit()]
+        # 排除场内基金前缀
+        return [c for c in valid if not c.startswith(('51', '15', '16', '50', '18'))]
+
+    except Exception as e:
+        logger.warning(f"获取基金代码列表失败: {e}")
+        return []
