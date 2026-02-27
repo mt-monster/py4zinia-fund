@@ -162,6 +162,18 @@ def _register_fund_routes(app):
                         except (ValueError, TypeError):
                             fund[key] = None
                 
+                # 当 today_return 为空或为0时，用实时估值和昨日净值计算
+                if not fund.get('today_return'):
+                    cur = fund.get('current_nav')
+                    prev = fund.get('previous_nav')
+                    try:
+                        cur_f = float(cur)
+                        prev_f = float(prev)
+                        if prev_f > 0 and cur_f > 0 and cur_f != prev_f:
+                            fund['today_return'] = round((cur_f - prev_f) / prev_f * 100, 2)
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        pass
+                
                 for key in ['sharpe_ratio', 'sharpe_ratio_ytd', 'sharpe_ratio_1y', 'sharpe_ratio_all', 'composite_score']:
                     if fund.get(key) is not None:
                         try:
@@ -1029,6 +1041,73 @@ def _register_fund_routes(app):
             
         except Exception as e:
             logger.error(f"获取基金最新数据失败: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    @app.route('/api/funds/realtime-estimates', methods=['POST'])
+    def get_funds_realtime_estimates():
+        """批量获取基金实时估值
+        
+        请求体: {"fund_codes": ["000001", "110022", ...]}
+        返回: {"success": true, "data": {"000001": {"estimate_nav": 1.2345, ...}, ...}}
+        """
+        try:
+            data = request.get_json()
+            if not data or 'fund_codes' not in data:
+                return jsonify({'success': False, 'error': '请提供基金代码列表'}), 400
+            
+            fund_codes = data['fund_codes']
+            if not isinstance(fund_codes, list) or len(fund_codes) == 0:
+                return jsonify({'success': False, 'error': '基金代码列表无效'}), 400
+            
+            # 限制一次请求的基金数量
+            if len(fund_codes) > 100:
+                fund_codes = fund_codes[:100]
+            
+            logger.info(f"批量获取 {len(fund_codes)} 只基金的实时估值")
+            
+            results = {}
+            for fund_code in fund_codes:
+                try:
+                    # 获取实时数据
+                    realtime_data = fund_data_manager.get_realtime_data(fund_code, '')
+                    
+                    # 提取估值相关字段
+                    estimate_nav = realtime_data.get('estimate_nav') or realtime_data.get('current_nav')
+                    previous_nav = realtime_data.get('previous_nav')
+                    today_return = realtime_data.get('today_return')
+                    
+                    # 如果 today_return 为空或0，用净值差计算
+                    if (not today_return or today_return == 0) and estimate_nav and previous_nav:
+                        try:
+                            e = float(estimate_nav)
+                            p = float(previous_nav)
+                            if p > 0 and e > 0:
+                                today_return = round((e - p) / p * 100, 2)
+                        except (TypeError, ValueError, ZeroDivisionError):
+                            pass
+                    
+                    results[fund_code] = {
+                        'fund_code': fund_code,
+                        'estimate_nav': estimate_nav,
+                        'current_nav': realtime_data.get('current_nav'),
+                        'previous_nav': previous_nav,
+                        'today_return': today_return,
+                        'estimate_return': realtime_data.get('estimate_return'),
+                        'data_source': realtime_data.get('data_source'),
+                        'update_time': realtime_data.get('nav_date') or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                except Exception as e:
+                    logger.warning(f"获取基金 {fund_code} 实时估值失败: {str(e)}")
+                    results[fund_code] = {
+                        'fund_code': fund_code,
+                        'estimate_nav': None,
+                        'error': str(e)
+                    }
+            
+            return safe_jsonify({'success': True, 'data': results})
+            
+        except Exception as e:
+            logger.error(f"批量获取实时估值失败: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
 

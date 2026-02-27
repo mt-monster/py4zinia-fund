@@ -38,6 +38,10 @@ from services.fund_type_service import (
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
 )
 from shared.json_utils import safe_jsonify, create_safe_response
+from shared.fund_helpers import (
+    get_fund_name_from_db as _get_fund_name_from_db_helper,
+    get_fund_type_for_allocation as _get_fund_type_for_allocation_helper,
+)
 
 
 # 添加安全的浮点数处理函数
@@ -1672,36 +1676,8 @@ def get_real_holding_distribution(user_id: str = 'default_user') -> list:
 
 
 def get_fund_type_for_allocation(fund_code: str) -> str:
-    """为资产配置获取基金类型 - 使用证监会标准分类"""
-    # 首先从fund_basic_info获取官方类型
-    try:
-        sql = """
-        SELECT fund_name, fund_type FROM fund_basic_info 
-        WHERE fund_code = :fund_code 
-        LIMIT 1
-        """
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty:
-            fund_name = df.iloc[0]['fund_name'] if pd.notna(df.iloc[0]['fund_name']) else ''
-            official_type = df.iloc[0]['fund_type'] if pd.notna(df.iloc[0]['fund_type']) else ''
-            return classify_fund(fund_name, fund_code, official_type)
-    except:
-        pass
-    
-    # 备选：从fund_analysis_results获取基金名称
-    try:
-        sql = """
-        SELECT fund_name FROM fund_analysis_results 
-        WHERE fund_code = :fund_code 
-        ORDER BY analysis_date DESC LIMIT 1
-        """
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['fund_name']):
-            return classify_fund(df.iloc[0]['fund_name'], fund_code)
-    except:
-        pass
-    
-    return 'unknown'
+    """为资产配置获取基金类型（委托 shared.fund_helpers 统一实现）"""
+    return _get_fund_type_for_allocation_helper(fund_code, db_manager)
 
 
 def infer_fund_type_from_name(fund_name: str) -> str:
@@ -2649,16 +2625,8 @@ def get_strategy_explanation(today_return, prev_day_return, strategy_result):
 
 
 def get_fund_name_from_db(fund_code):
-    """从数据库获取基金名称"""
-    try:
-        sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
-        result = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if result is not None and not result.empty:
-            return result.iloc[0]['fund_name']
-        return None
-    except Exception as e:
-        logger.warning(f"获取基金名称失败: {e}")
-        return None
+    """从数据库获取基金名称（委托 shared.fund_helpers 统一实现）"""
+    return _get_fund_name_from_db_helper(fund_code, db_manager)
 
 
 def _get_holdings_from_db():
@@ -3344,16 +3312,3 @@ def get_investment_advice_valuation():
     except Exception as e:
         logger.error(f"获取基金估值失败: {str(e)}")
         return safe_jsonify({'success': False, 'error': str(e)}), 500
-
-
-def get_fund_name_from_db(fund_code: str):
-    """从数据库获取基金名称"""
-    try:
-        # 优先从 user_holdings 表查找
-        sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['fund_name']):
-            return df.iloc[0]['fund_name']
-        return fund_code
-    except:
-        return fund_code

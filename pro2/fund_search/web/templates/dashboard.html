@@ -696,6 +696,7 @@
         // 全局图表实例
         let profitChart = null;
         let allocationChart = null;
+        let isInitialLoad = true; // 标记是否为首次加载
 
         // 颜色处理辅助函数
         function adjustColorBrightness(hexColor, percent) {
@@ -765,34 +766,160 @@
             return result;
         }
 
-        // 初始化仪表盘
-        document.addEventListener('DOMContentLoaded', function() {
-            loadDashboardData();
+        // 显示/隐藏全局加载状态
+        function showGlobalLoading() {
+            const container = document.querySelector('.dashboard-container');
+            if (!document.getElementById('globalLoadingOverlay')) {
+                const overlay = document.createElement('div');
+                overlay.id = 'globalLoadingOverlay';
+                overlay.innerHTML = `
+                    <div style="
+                        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(255,255,255,0.95); z-index: 9999;
+                        display: flex; flex-direction: column; align-items: center; justify-content: center;
+                    ">
+                        <div class="spinner" style="
+                            width: 50px; height: 50px; border: 4px solid #f3f3f3;
+                            border-top: 4px solid #e74c3c; border-radius: 50%;
+                            animation: spin 1s linear infinite;
+                        "></div>
+                        <p style="margin-top: 16px; color: #666; font-size: 14px;">正在加载数据...</p>
+                    </div>
+                    <style>
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+                    </style>
+                `;
+                document.body.appendChild(overlay);
+            }
+        }
+
+        function hideGlobalLoading() {
+            const overlay = document.getElementById('globalLoadingOverlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => overlay.remove(), 300);
+            }
+            isInitialLoad = false;
+        }
+
+        // 初始化仪表盘 - 统一加载所有数据
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 首次加载显示全局loading
+            showGlobalLoading();
+            
+            // 初始化图表容器（不加载数据）
             initCharts();
-            loadHoldingStocks();  // 加载重仓股统计
+            
+            // 并行加载所有数据，等待全部完成
+            await loadAllDashboardData();
+            
+            // 隐藏loading
+            hideGlobalLoading();
+            
+            // 启动自动刷新
             startAutoRefresh();
         });
 
-        // 加载仪表盘数据
-        async function loadDashboardData(forceRefresh = false) {
+        // 统一加载所有仪表盘数据
+        async function loadAllDashboardData(forceRefresh = false) {
             try {
                 if (forceRefresh) {
-                    DashboardCache.clear(); // 强制刷新时清除缓存
+                    DashboardCache.clear();
                 }
-                
-                const data = await cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60);
 
-                if (data.success) {
-                    updateStatsCards(data.data);
-                    updateSystemStatus(data.data.system);
-                    updateActivityList(data.data.activities);
+                console.log('[统一加载] 开始并行加载所有数据...');
+
+                // 并行发起所有请求
+                const [statsResult, profitResult, allocationResult, holdingStocksResult] = await Promise.all([
+                    cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60).catch(e => ({ success: false, error: e })),
+                    cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 300).catch(e => ({ success: false, error: e })),
+                    cachedFetch('/api/dashboard/allocation', 'allocation', 120).catch(e => ({ success: false, error: e })),
+                    cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300).catch(e => ({ success: false, error: e }))
+                ]);
+
+                console.log('[统一加载] 所有数据加载完成，开始渲染...');
+
+                // 统一渲染所有组件
+                if (statsResult.success) {
+                    updateStatsCards(statsResult.data);
+                    updateSystemStatus(statsResult.data.system);
+                    updateActivityList(statsResult.data.activities);
                 }
-                
-                // 同时加载基金列表实时涨跌数据
+
+                if (profitResult.success && profitChart) {
+                    updateProfitChart(profitResult.data);
+                }
+
+                if (allocationResult.success && allocationChart) {
+                    updateAllocationChart(allocationResult.data);
+                }
+
+                if (holdingStocksResult.success) {
+                    updateHoldingStocks(holdingStocksResult.data);
+                }
+
+                // 加载基金列表实时涨跌数据
                 loadFundListChanges();
+
+                console.log('[统一加载] 渲染完成');
+                
             } catch (error) {
                 console.error('加载仪表盘数据失败:', error);
-                showNotification('数据加载失败，请稍后重试', 'error');
+                if (isInitialLoad) {
+                    showNotification('数据加载失败，请刷新页面重试', 'error');
+                }
+            }
+        }
+
+        // 更新收益趋势图表
+        function updateProfitChart(data) {
+            if (!profitChart || !data) return;
+
+            // 检查是否为无持仓数据情况
+            if (data.data_source === 'no_holdings') {
+                showNoHoldingsMessage();
+                return;
+            }
+
+            profitChart.data.labels = data.labels || [];
+            profitChart.data.datasets[0].data = data.profit || [];
+            profitChart.data.datasets[1].data = data.benchmark || [];
+
+            if (data.benchmark_name) {
+                profitChart.data.datasets[1].label = data.benchmark_name;
+            }
+
+            profitChart.update();
+
+            const chartTitle = document.querySelector('.chart-card .header h3');
+            if (chartTitle && data.labels) {
+                const benchmarkInfo = data.benchmark_name ? `(${data.benchmark_name}基准)` : '';
+                chartTitle.innerHTML = `<i class="bi bi-graph-up-arrow"></i> 近三个月收益趋势 ${benchmarkInfo} (${data.labels.length}个交易日)`;
+            }
+        }
+
+        // 更新资产配置图表
+        function updateAllocationChart(data) {
+            if (!allocationChart || !data) return;
+
+            if (data.distribution && data.distribution.length > 0) {
+                const labels = data.distribution.map(item => item.name);
+                const values = data.distribution.map(item => item.percentage);
+                const colors = data.distribution.map(item => item.color);
+
+                allocationChart.data.labels = labels;
+                allocationChart.data.datasets[0].data = values;
+                allocationChart.data.datasets[0].backgroundColor = colors;
+                allocationChart.update('active');
+            }
+
+            // 更新基金类型分布列表
+            if (data.distribution) {
+                updateFundTypeDistribution(data);
             }
         }
 
@@ -837,7 +964,7 @@
             initAllocationChart();
         }
 
-        // 收益趋势图
+        // 收益趋势图 - 仅初始化图表实例，不加载数据
         function initProfitChart() {
             const ctx = document.getElementById('profitChart').getContext('2d');
             profitChart = new Chart(ctx, {
@@ -890,12 +1017,9 @@
                     }
                 }
             });
-
-            // 加载收益数据
-            loadProfitData();
         }
 
-        // 资产配置图
+        // 资产配置图 - 仅初始化图表实例，不加载数据
         function initAllocationChart() {
             const canvas = document.getElementById('allocationChart');
             const ctx = canvas.getContext('2d');
@@ -958,11 +1082,6 @@
                     radius: '90%'
                 }
             });
-
-            // 加载配置数据
-            setTimeout(() => {
-                loadAllocationData();
-            }, 100);
         }
 
         // 显示无持仓数据提示
@@ -1015,90 +1134,6 @@
             `;
         }
         
-        // 加载收益数据
-        async function loadProfitData() {
-            try {
-                // 构建查询参数
-                const params = new URLSearchParams({
-                    days: 90,  // 请求最近90天的数据
-                    user_id: 'default_user'  // 可以根据实际情况修改
-                });
-                
-                const cacheKey = `profit_trend_${params.toString()}`;
-                const data = await cachedFetch(`/api/dashboard/profit-trend?${params}`, cacheKey, 300); // 缓存5分钟
-
-                if (data.success && profitChart) {
-                    // 检查是否为无持仓数据情况
-                    if (data.data.data_source === 'no_holdings') {
-                        // 显示无数据提示
-                        showNoHoldingsMessage();
-                        return;
-                    }
-                    
-                    profitChart.data.labels = data.data.labels;
-                    profitChart.data.datasets[0].data = data.data.profit;
-                    profitChart.data.datasets[1].data = data.data.benchmark;
-                    
-                    // 动态更新基准标签（如果API提供了基准名称）
-                    if (data.data.benchmark_name) {
-                        profitChart.data.datasets[1].label = data.data.benchmark_name;
-                    }
-                    
-                    profitChart.update();
-                    
-                    // 更新图表标题显示时间范围和基准信息
-                    const chartTitle = document.querySelector('.chart-card .header h3');
-                    if (chartTitle) {
-                        const benchmarkInfo = data.data.benchmark_name ? `(${data.data.benchmark_name}基准)` : '';
-                        chartTitle.innerHTML = `<i class="bi bi-graph-up-arrow"></i> 近三个月收益趋势 ${benchmarkInfo} (${data.data.labels.length}个交易日)`;
-                    }
-                }
-            } catch (error) {
-                console.error('加载收益数据失败:', error);
-            }
-        }
-
-        // 加载配置数据
-        async function loadAllocationData() {
-            try {
-                console.log('开始加载资产配置数据...');
-                const data = await cachedFetch('/api/dashboard/allocation', 'allocation', 120); // 缓存2分钟
-                console.log('资产配置API响应:', data);
-
-                if (data.success && allocationChart) {
-                    console.log('更新图表数据:', data.data);
-                    
-                    // 确保数据不为空
-                    if (data.data.distribution && data.data.distribution.length > 0) {
-                        // 使用 distribution 中的中文名称作为标签
-                        const labels = data.data.distribution.map(item => item.name);
-                        const values = data.data.distribution.map(item => item.percentage);
-                        const colors = data.data.distribution.map(item => item.color);
-                        
-                        allocationChart.data.labels = labels;
-                        allocationChart.data.datasets[0].data = values;
-                        allocationChart.data.datasets[0].backgroundColor = colors;
-                        
-                        // 强制更新图表
-                        allocationChart.update('active');
-                        
-                        console.log('图表更新完成');
-                    } else {
-                        console.warn('数据为空或格式不正确');
-                    }
-                } else {
-                    console.error('API返回失败或图表未初始化');
-                }
-                
-                // 更新基金类型分布列表
-                if (data.success && data.data.distribution) {
-                    updateFundTypeDistribution(data.data);
-                }
-            } catch (error) {
-                console.error('加载配置数据失败:', error);
-            }
-        }
-
         // 更新基金类型分布组件
         function updateFundTypeDistribution(data) {
             const container = document.getElementById('fundTypeDistribution');
@@ -1207,25 +1242,6 @@
             `).join('');
         }
 
-        // 加载重仓股统计
-        async function loadHoldingStocks() {
-            try {
-                const data = await cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300); // 缓存5分钟
-
-                if (data.success) {
-                    updateHoldingStocks(data.data);
-                }
-            } catch (error) {
-                console.error('加载重仓股统计失败:', error);
-                const container = document.getElementById('holdingStocks');
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 20px; color: #7f8c8d;">
-                        <p>加载重仓股数据失败</p>
-                    </div>
-                `;
-            }
-        }
-
         // 更新重仓股显示 - 列表组件形式
         function updateHoldingStocks(data) {
             const container = document.getElementById('holdingStocks');
@@ -1290,14 +1306,28 @@
             container.innerHTML = html;
         }
 
-        // 刷新图表
-        function refreshChart(type) {
-            if (type === 'profit') {
-                loadProfitData();
-            } else if (type === 'allocation') {
-                loadAllocationData();
+        // 刷新图表 - 使用统一加载
+        async function refreshChart(type) {
+            DashboardCache.clear(); // 清除缓存获取最新数据
+            showNotification('正在刷新...', 'info');
+            
+            try {
+                if (type === 'profit') {
+                    const data = await cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 0);
+                    if (data.success) {
+                        updateProfitChart(data.data);
+                    }
+                } else if (type === 'allocation') {
+                    const data = await cachedFetch('/api/dashboard/allocation', 'allocation', 0);
+                    if (data.success) {
+                        updateAllocationChart(data.data);
+                    }
+                }
+                showNotification('图表已刷新', 'success');
+            } catch (error) {
+                console.error('刷新图表失败:', error);
+                showNotification('刷新失败', 'error');
             }
-            showNotification('图表已刷新', 'success');
         }
 
         // 格式化货币
@@ -1452,15 +1482,15 @@
 
         // 自动刷新
         function startAutoRefresh() {
-            // 每30秒刷新一次数据
+            // 每60秒刷新一次全部数据
             setInterval(() => {
-                loadDashboardData();
-            }, 30000);
+                loadAllDashboardData();
+            }, 60000);
             
-            // 每15秒单独刷新基金涨跌数据（更频繁）
+            // 每30秒单独刷新基金涨跌数据（更频繁）
             setInterval(() => {
                 loadFundListChanges();
-            }, 15000);
+            }, 30000);
         }
 
     </script>

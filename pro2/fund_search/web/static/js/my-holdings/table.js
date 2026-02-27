@@ -201,6 +201,9 @@ const FundTable = {
                         displayValue = FundUtils.formatCurrency(value);
                         cellClass = FundUtils.getCellClass(value, 'currency');
                         break;
+                    case 'nav':
+                        displayValue = (value != null && !isNaN(value)) ? parseFloat(value).toFixed(4) : '--';
+                        break;
                     case 'number':
                         displayValue = FundUtils.formatNumber(value);
                         break;

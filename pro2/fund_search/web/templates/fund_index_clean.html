@@ -1072,6 +1072,7 @@
                             <th class="sortable" data-column="fund_code">代码 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="fund_name">名称 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_return">日涨跌幅 <span class="sort-indicator"></span></th>
+                            <th class="sortable" data-column="current_estimate">实时估值 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="prev_day_return">昨日盈亏<span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="holding_amount">持有金额 <span class="sort-indicator"></span></th>
                             <th class="sortable" data-column="today_profit">当日盈亏 <span class="sort-indicator"></span></th>
@@ -1086,7 +1087,7 @@
                         </tr>
                     </thead>
                     <tbody id="fund-table-body">
-                        <tr><td colspan="15" class="loading">加载?..</td></tr>
+                        <tr><td colspan="16" class="loading">加载?..</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1194,6 +1195,7 @@
             'fund_code': { type: 'text', sortable: true, label: '代码' },
             'fund_name': { type: 'text', sortable: true, label: '名称' },
             'today_return': { type: 'number', sortable: true, label: '日涨跌幅' },
+            'current_estimate': { type: 'number', sortable: true, label: '实时估值' },
             'prev_day_return': { type: 'number', sortable: true, label: '昨日盈亏 },
             'holding_amount': { type: 'number', sortable: true, label: '持有金额' },
             'today_profit': { type: 'number', sortable: true, label: '当日盈亏' },
@@ -1340,7 +1342,7 @@
                 const tbody = document.getElementById('fund-table-body');
                 
                 if (!funds || funds.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="15" class="empty-state">暂无数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="16" class="empty-state">暂无数据</td></tr>';
                     return;
                 }
 
@@ -1366,6 +1368,7 @@
                     tr.className = selectedFund && selectedFund.fund_code === fund.fund_code ? 'selected' : '';
                     
                     const todayReturn = fund.today_return || 0;
+                    const currentEstimate = fund.current_nav || 0;
                     const yesterdayReturn = fund.prev_day_return || 0;
                     const annualReturn = fund.annualized_return || 0;
                     const maxDrawdown = fund.max_drawdown || 0;
@@ -1381,11 +1384,15 @@
                     const totalProfit = fund.total_profit;
                     const totalProfitRate = fund.total_profit_rate;
                     
+                    // 实时估值涨跌样式（基于日涨跌幅）
+                    const estimateClass = todayReturn >= 0 ? 'positive' : 'negative';
+                    
                     tr.innerHTML = `
                         <td><input type="checkbox"></td>
                         <td class="fund-code">${fund.fund_code}</td>
                         <td>${this.truncate(fund.fund_name || '--', 12)}</td>
                         <td class="${todayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(todayReturn)}</td>
+                        <td class="${estimateClass}">${currentEstimate ? currentEstimate.toFixed(4) : '--'}</td>
                         <td class="${yesterdayReturn >= 0 ? 'positive' : 'negative'}">${this.formatPercent(yesterdayReturn)}</td>
                         <td>${holdingAmount !== null && holdingAmount !== undefined ? '' + holdingAmount.toFixed(2) : '--'}</td>
                         <td class="${todayProfit !== null && todayProfit >= 0 ? 'positive' : 'negative'}">${todayProfit !== null && todayProfit !== undefined ? (todayProfit >= 0 ? '+' : '') + todayProfit.toFixed(2) : '--'}</td>
@@ -2547,7 +2554,7 @@
 
         async function loadFunds() {
             const tbody = document.getElementById('fund-table-body');
-            tbody.innerHTML = '<tr><td colspan="15" class="loading">加载?..</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="16" class="loading">加载中...</td></tr>';
             
             try {
                 const search = document.getElementById('search-input').value.trim();
@@ -2566,12 +2573,12 @@
                     allFunds = result.data;
                     document.getElementById('total-count').textContent = allFunds.length;
                     
-                    // 应用当前排序状态（性能优化版本?
+                    // 应用当前排序状态（性能优化版本）
                     const sortState = sortController.getSortState();
                     const isLargeDataset = allFunds.length > 500;
                     
                     if (isLargeDataset) {
-                        uiRenderer.toggleLoading(true, '加载?..');
+                        uiRenderer.toggleLoading(true, '加载中...');
                     }
                     
                     // 异步应用排序
@@ -2585,8 +2592,8 @@
                                 uiRenderer.renderTableRows(allFunds);
                             }
                             
-                            // 注释：自动选择第一个基金的逻辑保留供展开功能使用
-                            // if (allFunds.length > 0) selectFund(allFunds[0]);
+                            // 异步加载实时估值
+                            loadRealtimeEstimates(allFunds);
                         } catch (error) {
                             console.error('应用排序失败:', error);
                             uiRenderer.renderTableRows(allFunds);
@@ -2603,6 +2610,48 @@
                 console.error('加载失败:', error);
                 console.error('Error details:', error.message, error.stack);
                 tbody.innerHTML = '<tr><td colspan="15" class="empty-state">加载失败: ' + error.message + '</td></tr>';
+            }
+        }
+        
+        // 异步加载实时估值
+        async function loadRealtimeEstimates(funds) {
+            if (!funds || funds.length === 0) return;
+            
+            const fundCodes = funds.map(f => f.fund_code).filter(c => c);
+            if (fundCodes.length === 0) return;
+            
+            try {
+                const response = await fetch('/api/funds/realtime-estimates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fund_codes: fundCodes })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    // 更新allFunds中的实时估值
+                    funds.forEach(fund => {
+                        const estimate = result.data[fund.fund_code];
+                        if (estimate && estimate.estimate_nav) {
+                            fund.current_nav = estimate.estimate_nav;
+                            fund.realtime_estimate = estimate.estimate_nav;
+                            fund.estimate_source = estimate.data_source;
+                        }
+                    });
+                    
+                    // 重新渲染表格
+                    const sortState = sortController.getSortState();
+                    if (sortState.order !== 'none') {
+                        const columnType = sortController.getColumnType(sortState.column);
+                        const sortedFunds = dataSorter.sortByColumn(allFunds, sortState.column, sortState.order, columnType);
+                        uiRenderer.renderTableRows(sortedFunds);
+                    } else {
+                        uiRenderer.renderTableRows(allFunds);
+                    }
+                }
+            } catch (error) {
+                console.warn('加载实时估值失败:', error);
             }
         }
         

@@ -2,8 +2,11 @@
 # coding: utf-8
 
 """
-内置策略 API 路由
-提供内置策略的查询、详情获取和应用功能
+内置策略 API 路由（Web 层）
+提供内置策略的查询、详情获取和应用功能。
+
+注意：此文件是 Web 路由层，处理 HTTP 请求/响应。
+      策略的具体实现逻辑位于 backtesting/strategies/builtin_strategies.py。
 """
 
 import os
