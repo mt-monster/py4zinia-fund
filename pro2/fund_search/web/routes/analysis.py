@@ -25,6 +25,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
+from shared.fund_helpers import get_fund_name_from_db as _get_fund_name_from_db_helper  # noqa
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -597,78 +598,8 @@ def get_strategy_explanation(today_return, prev_day_return, strategy_result):
 
 
 def get_fund_name_from_db(fund_code):
-    """从数据库获取基金名称（支持多个数据源）"""
-    try:
-        # 1. 首先尝试从 fund_basic_info 表获取（标准基金信息表）
-        try:
-            sql = "SELECT fund_name FROM fund_basic_info WHERE fund_code = :fund_code"
-            result = db_manager.execute_query(sql, {'fund_code': fund_code})
-            if result is not None and not result.empty:
-                name = result.iloc[0]['fund_name']
-                if name and name != fund_code:
-                    return name
-        except Exception as e:
-            logger.debug(f"从fund_basic_info获取基金名称失败: {e}")
-        
-        # 2. 尝试从用户持仓表获取
-        try:
-            sql = "SELECT fund_name FROM user_holdings WHERE fund_code = :fund_code LIMIT 1"
-            result = db_manager.execute_query(sql, {'fund_code': fund_code})
-            if result is not None and not result.empty:
-                name = result.iloc[0]['fund_name']
-                if name and name != fund_code:
-                    return name
-        except Exception as e:
-            logger.debug(f"从user_holdings获取基金名称失败: {e}")
-        
-        # 3. 尝试从基金分析结果表获取
-        try:
-            sql = "SELECT fund_name FROM fund_analysis_results WHERE fund_code = :fund_code ORDER BY analysis_date DESC LIMIT 1"
-            result = db_manager.execute_query(sql, {'fund_code': fund_code})
-            if result is not None and not result.empty:
-                name = result.iloc[0]['fund_name']
-                if name and name != fund_code:
-                    return name
-        except Exception as e:
-            logger.debug(f"从fund_analysis_results获取基金名称失败: {e}")
-        
-        # 4. 尝试使用akshare实时获取
-        try:
-            import akshare as ak
-            # 方法1: 从基金列表获取
-            try:
-                fund_list = ak.fund_name_em()
-                if '基金代码' in fund_list.columns and '基金简称' in fund_list.columns:
-                    fund_row = fund_list[fund_list['基金代码'] == fund_code]
-                    if not fund_row.empty:
-                        return fund_row.iloc[0]['基金简称']
-            except:
-                pass
-            
-            # 方法2: 从基金基本信息获取
-            try:
-                fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
-                if '基金名称' in fund_info.columns:
-                    return fund_info['基金名称'].values[0]
-            except:
-                pass
-                
-            # 方法3: 从每日基金数据获取
-            try:
-                fund_daily = ak.fund_open_fund_daily_em()
-                if '基金代码' in fund_daily.columns and '基金简称' in fund_daily.columns:
-                    fund_row = fund_daily[fund_daily['基金代码'] == fund_code]
-                    if not fund_row.empty:
-                        return fund_row.iloc[0]['基金简称']
-            except:
-                pass
-        except Exception as e:
-            logger.debug(f"从akshare获取基金名称失败: {e}")
-        
-        return None
-    except Exception as e:
-        logger.warning(f"获取基金名称失败: {e}")
-        return None
+    """从数据库获取基金名称（委托 shared.fund_helpers 统一实现）"""
+    return _get_fund_name_from_db_helper(fund_code, db_manager)
 
 
 def get_personalized_investment_advice(fund_codes):

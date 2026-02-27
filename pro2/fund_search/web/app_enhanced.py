@@ -19,15 +19,17 @@ from flask_cors import CORS
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 配置日志
+# 配置日志 - 只打印错误日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler('fund_analysis.log', encoding='utf-8')
     ]
 )
+# 设置 werkzeug 日志级别为 ERROR，只显示错误请求
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 # ============ 尝试导入各个模块 ============
@@ -274,16 +276,6 @@ def register_routes():
             logger.warning(f"以下路由注册失败: {', '.join(failed)}")
     except Exception as e:
         logger.error(f"路由注册失败: {e}")
-    
-    # 注册重构版投资建议页面 API 路由
-    try:
-        from web.routes.investment_advice_refactored import register_routes as register_advice_routes
-        db_manager = components.get('db_manager')
-        if db_manager:
-            register_advice_routes(app, db_manager)
-            logger.info("✅ 重构版投资建议 API 路由已注册")
-    except Exception as e:
-        logger.warning(f"投资建议 API 路由注册失败: {e}")
 
 
 # ============ 初始化应用 ============

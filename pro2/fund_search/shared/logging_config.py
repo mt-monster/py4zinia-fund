@@ -15,7 +15,7 @@ _default_logger = None
 
 
 def configure_logging(
-    level: int = logging.INFO,
+    level: int = logging.ERROR,
     log_file: Optional[str] = 'fund_analysis.log',
     format_string: str = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     enable_console: bool = True,

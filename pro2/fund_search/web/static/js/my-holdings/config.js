@@ -12,6 +12,7 @@ const FundConfig = {
         { key: 'fund_code', label: '基金代码', visible: true, sortable: true },
         { key: 'fund_name', label: '基金名称', visible: true, sortable: true, required: true },
         { key: 'today_return', label: '日涨跌幅', visible: true, sortable: true, type: 'percent' },
+        { key: 'current_nav', label: '实时估值', visible: true, sortable: true, type: 'nav' },
         { key: 'prev_day_return', label: '昨日盈亏率', visible: true, sortable: true, type: 'percent' },
         { key: 'holding_amount', label: '持有金额', visible: true, sortable: true, type: 'currency' },
         { key: 'holding_profit', label: '持有收益', visible: true, sortable: true, type: 'currency' },

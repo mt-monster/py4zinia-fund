@@ -94,6 +94,8 @@ const FundApp = {
                 FundFilters.updateResultCount();
                 // 更新顶部基金总数显示
                 this.updateTotalCount();
+                // 异步加载实时估值（不阻塞主流程）
+                this.loadRealtimeEstimates(response.data);
             } else {
                 // 数据加载失败（静默处理）
                 console.warn('数据加载失败:', response.error);
@@ -105,6 +107,47 @@ const FundApp = {
             FundTable.renderData([]);
         } finally {
             FundState.isLoading = false;
+        }
+    },
+
+    /**
+     * 异步加载实时估值并更新表格
+     */
+    async loadRealtimeEstimates(funds) {
+        if (!funds || funds.length === 0) return;
+        const fundCodes = funds.map(f => f.fund_code).filter(Boolean);
+        if (fundCodes.length === 0) return;
+
+        try {
+            const result = await FundAPI.getRealtimeEstimates(fundCodes);
+            if (result.success && result.data) {
+                const updateFund = (fund) => {
+                    const estimate = result.data[fund.fund_code];
+                    if (!estimate || !estimate.estimate_nav) return;
+                    const newNav = parseFloat(estimate.estimate_nav);
+                    fund.current_nav = newNav;
+                    // 优先使用接口返回的 today_return
+                    if (estimate.today_return != null && !isNaN(parseFloat(estimate.today_return))) {
+                        const rt = parseFloat(estimate.today_return);
+                        if (rt !== 0) {
+                            fund.today_return = parseFloat(rt.toFixed(2));
+                        }
+                    }
+                    // 接口没有涨跌幅或为0，用净值差计算
+                    if (!fund.today_return || fund.today_return === 0) {
+                        const prevNav = parseFloat(estimate.previous_nav || fund.previous_nav);
+                        if (!isNaN(newNav) && !isNaN(prevNav) && prevNav > 0 && newNav > 0) {
+                            fund.today_return = parseFloat(((newNav - prevNav) / prevNav * 100).toFixed(2));
+                        }
+                    }
+                };
+                FundState.funds.forEach(updateFund);
+                FundState.filteredFunds.forEach(updateFund);
+                // 重新渲染表格
+                FundTable.renderData();
+            }
+        } catch (error) {
+            console.warn('实时估值加载失败:', error);
         }
     },
 

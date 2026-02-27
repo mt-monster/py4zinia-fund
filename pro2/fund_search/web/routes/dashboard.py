@@ -30,6 +30,7 @@ from services.fund_type_service import (
     get_fund_type_css_class, FUND_TYPE_CN, FUND_TYPE_CSS_CLASS
 )
 from shared.cache_utils import cached, _global_cache
+from shared.fund_helpers import get_fund_type_for_allocation as _get_fund_type_for_allocation_helper
 
 # 设置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -648,50 +649,8 @@ def get_allocation():
 
 
 def get_fund_type_for_allocation(fund_code: str) -> str:
-    """为资产配置获取基金类型 - 使用证监会标准分类"""
-    
-    # 首先尝试从预加载器缓存获取（优先，因为预加载器已加载所有持仓基金信息）
-    try:
-        from services.fund_data_preloader import get_preloader
-        preloader = get_preloader()
-        basic_info = preloader.get_fund_basic_info(fund_code)
-        if basic_info:
-            fund_name = basic_info.get('fund_name', '')
-            official_type = basic_info.get('fund_type', '')
-            if fund_name or official_type:
-                return classify_fund(fund_name, fund_code, official_type)
-    except:
-        pass
-    
-    # 备选：从fund_basic_info表获取
-    try:
-        sql = """
-        SELECT fund_name, fund_type FROM fund_basic_info 
-        WHERE fund_code = :fund_code 
-        LIMIT 1
-        """
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty:
-            fund_name = df.iloc[0]['fund_name'] if pd.notna(df.iloc[0]['fund_name']) else ''
-            official_type = df.iloc[0]['fund_type'] if pd.notna(df.iloc[0]['fund_type']) else ''
-            return classify_fund(fund_name, fund_code, official_type)
-    except:
-        pass
-    
-    # 备选：从fund_analysis_results获取基金名称
-    try:
-        sql = """
-        SELECT fund_name FROM fund_analysis_results 
-        WHERE fund_code = :fund_code 
-        ORDER BY analysis_date DESC LIMIT 1
-        """
-        df = db_manager.execute_query(sql, {'fund_code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['fund_name']):
-            return classify_fund(df.iloc[0]['fund_name'], fund_code)
-    except:
-        pass
-    
-    return 'unknown'
+    """为资产配置获取基金类型（委托 shared.fund_helpers 统一实现）"""
+    return _get_fund_type_for_allocation_helper(fund_code, db_manager)
 
 
 @cached(ttl=600, key_prefix='holding_stocks')  # 缓存10分钟，重仓股变化不频繁

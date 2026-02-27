@@ -124,6 +124,32 @@ const FundAPI = {
     },
 
     /**
+     * 批量获取基金实时估值
+     */
+    async getRealtimeEstimates(fundCodes) {
+        try {
+            const response = await fetch('/api/funds/realtime-estimates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fund_codes: fundCodes })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return {
+                success: data.success,
+                data: data.data || {}
+            };
+        } catch (error) {
+            console.warn('API Warning - getRealtimeEstimates:', error);
+            return { success: false, data: {} };
+        }
+    },
+
+    /**
      * 获取市场指数
      */
     async getMarketIndex() {

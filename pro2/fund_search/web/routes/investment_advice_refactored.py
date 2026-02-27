@@ -22,6 +22,8 @@ from flask import jsonify, request
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from shared.fund_helpers import get_fund_name_from_db as _get_fund_name_from_db_helper  # noqa
+
 # 初始化日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -622,15 +624,8 @@ def get_action_name(action: str) -> str:
 
 
 def get_fund_name_from_db(fund_code: str) -> Optional[str]:
-    """从数据库获取基金名称"""
-    try:
-        sql = "SELECT name FROM fund_basic WHERE code = :code"
-        df = db_manager.execute_query(sql, {'code': fund_code})
-        if not df.empty and pd.notna(df.iloc[0]['name']):
-            return df.iloc[0]['name']
-        return fund_code
-    except:
-        return fund_code
+    """从数据库获取基金名称（委托 shared.fund_helpers 统一实现）"""
+    return _get_fund_name_from_db_helper(fund_code, db_manager)
 
 
 def get_fund_valuation():
@@ -680,13 +675,18 @@ def get_fund_valuation():
 
 # ==================== 路由注册 ====================
 
-def register_routes(app, database_manager, holding_svc=None, cache_svc=None, fund_data_svc=None):
+def register_routes(app, database_manager=None, holding_svc=None, cache_svc=None, fund_data_svc=None, **kwargs):
     """注册投资建议页面路由"""
     global db_manager, holding_service, fund_data_manager
     
-    db_manager = database_manager
-    holding_service = holding_svc
-    fund_data_manager = fund_data_svc
+    # 从参数或kwargs中获取依赖项
+    db_manager = database_manager or kwargs.get('db_manager')
+    holding_service = holding_svc or kwargs.get('holding_service')
+    fund_data_manager = fund_data_svc or kwargs.get('fund_data_manager')
+    
+    if not db_manager:
+        logger.warning("数据库管理器未提供，投资建议路由功能可能受限")
+        return
     
     # 基金组合选择
     app.route('/api/investment-advice/holdings')(get_my_holdings)
