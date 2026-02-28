@@ -7,6 +7,15 @@ Dashboard 相关 API 路由
 
 import os
 import sys
+
+# 设置 Tushare 缓存目录到项目目录（避免权限问题）
+# 必须在导入 tushare 之前设置
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+tushare_cache_dir = os.path.join(project_root, '.cache', 'tushare')
+os.makedirs(tushare_cache_dir, exist_ok=True)
+os.environ['TUSHARE_CACHE_DIR'] = tushare_cache_dir
+os.environ['HOME'] = project_root  # 一些库使用 HOME 环境变量
+
 from flask import Flask, render_template, jsonify, request
 import pandas as pd
 from datetime import datetime, timedelta

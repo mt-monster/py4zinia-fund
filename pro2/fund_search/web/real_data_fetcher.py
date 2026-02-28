@@ -6,6 +6,17 @@
 用于获取沪深300指数和基金的真实历史净值数据
 """
 
+import os
+from pathlib import Path
+
+# 设置 Tushare 缓存目录到项目目录（避免权限问题）
+# 必须在导入 tushare 之前设置，因为 tushare 使用 os.path.expanduser('~')
+_cache_dir = Path(__file__).parent.parent / '.cache' / 'tushare'
+_cache_dir.mkdir(parents=True, exist_ok=True)
+os.environ['HOME'] = str(_cache_dir)
+os.environ['USERPROFILE'] = str(_cache_dir)
+os.environ['TUSHARE_CACHE_DIR'] = str(_cache_dir)
+
 import akshare as ak
 import pandas as pd
 import numpy as np

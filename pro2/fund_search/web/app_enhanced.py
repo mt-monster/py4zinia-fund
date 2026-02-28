@@ -17,7 +17,14 @@ import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 设置 Tushare 缓存目录到项目目录（避免权限问题）
+# 必须在导入 tushare 之前设置
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+tushare_cache_dir = os.path.join(project_root, '.cache', 'tushare')
+os.makedirs(tushare_cache_dir, exist_ok=True)
+os.environ['TUSHARE_CACHE_DIR'] = tushare_cache_dir
+
+sys.path.append(project_root)
 
 # 配置日志 - 只打印错误日志
 logging.basicConfig(

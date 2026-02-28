@@ -126,7 +126,8 @@ class EnhancedInvestmentStrategy:
 
         try:
             # 构建策略配置文件路径
-            config_dir = os.path.join(os.path.dirname(__file__), '..', 'shared')
+            # __file__ 在 backtesting/strategies/ 目录下，需要 ../.. 回到项目根目录
+            config_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'shared')
             config_path = os.path.join(config_dir, 'strategy_config.yaml')
 
             # 读取YAML配置文件
