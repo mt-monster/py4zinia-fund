@@ -17,6 +17,7 @@ os.environ['HOME'] = str(_cache_dir)
 os.environ['USERPROFILE'] = str(_cache_dir)
 os.environ['TUSHARE_CACHE_DIR'] = str(_cache_dir)
 
+
 import akshare as ak
 import pandas as pd
 import numpy as np

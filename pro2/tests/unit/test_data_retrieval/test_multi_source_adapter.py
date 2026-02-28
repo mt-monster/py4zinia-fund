@@ -4,10 +4,13 @@
 多数据源适配器单元测试
 """
 
+<<<<<<< HEAD
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'fund_search'))
 
+=======
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
 import pytest
 import pandas as pd
 import numpy as np
@@ -21,7 +24,11 @@ class TestMultiSourceDataAdapter:
     @pytest.fixture
     def adapter(self):
         """创建适配器实例"""
+<<<<<<< HEAD
         from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+=======
+        from fund_search.data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
         return MultiSourceDataAdapter()
     
     @pytest.fixture
@@ -36,7 +43,11 @@ class TestMultiSourceDataAdapter:
     
     def test_init_with_config(self):
         """测试使用配置初始化"""
+<<<<<<< HEAD
         from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+=======
+        from fund_search.data_retrieval.multi_source_adapter import MultiSourceDataAdapter
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
         adapter = MultiSourceDataAdapter()
         assert adapter is not None
         assert adapter.cache is not None
@@ -105,7 +116,11 @@ class TestPerformanceMetrics:
     
     def test_sharpe_ratio_calculation(self):
         """测试夏普比率计算"""
+<<<<<<< HEAD
         from backtesting.analysis.performance_metrics import PerformanceCalculator
+=======
+        from fund_search.backtesting.performance_metrics import PerformanceCalculator
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
         
         calculator = PerformanceCalculator(risk_free_rate=0.03)
         
@@ -121,7 +136,11 @@ class TestPerformanceMetrics:
     
     def test_sharpe_ratio_insufficient_data(self):
         """测试数据不足时的夏普比率"""
+<<<<<<< HEAD
         from backtesting.analysis.performance_metrics import PerformanceCalculator
+=======
+        from fund_search.backtesting.performance_metrics import PerformanceCalculator
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
         
         calculator = PerformanceCalculator()
         
@@ -133,7 +152,11 @@ class TestPerformanceMetrics:
     
     def test_volatility_calculation(self):
         """测试波动率计算"""
+<<<<<<< HEAD
         from backtesting.analysis.performance_metrics import PerformanceCalculator
+=======
+        from fund_search.backtesting.performance_metrics import PerformanceCalculator
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
         
         calculator = PerformanceCalculator()
         
@@ -143,3 +166,9 @@ class TestPerformanceMetrics:
         assert isinstance(volatility, (int, float))
         assert volatility >= 0
         assert not np.isnan(volatility)
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714

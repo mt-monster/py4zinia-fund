@@ -24,6 +24,7 @@ tushare_cache_dir = os.path.join(project_root, '.cache', 'tushare')
 os.makedirs(tushare_cache_dir, exist_ok=True)
 os.environ['TUSHARE_CACHE_DIR'] = tushare_cache_dir
 
+# 添加父目录到 Python 路径
 sys.path.append(project_root)
 
 # 配置日志 - 只打印错误日志
