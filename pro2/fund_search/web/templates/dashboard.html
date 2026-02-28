@@ -738,205 +738,185 @@
     </div>
 
     <script>
+        // ==================== 性能计时工具 ====================
+        const Perf = {
+            marks: {},
+            start(name) { this.marks[name] = performance.now(); },
+            end(name) {
+                const dur = performance.now() - (this.marks[name] || 0);
+                console.log(`[Perf] ${name}: ${dur.toFixed(1)}ms`);
+                return dur;
+            }
+        };
+
         // 全局图表实例
         let profitChart = null;
-        let isInitialLoad = true; // 标记是否为首次加载
+        let isInitialLoad = true;
+
+        // ==================== 骨架屏工具 ====================
+        function removeSkeleton(el) { if (el) el.classList.remove('skeleton'); }
+        function removeAllSkeletons() { document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton')); }
+
+        // Chart.js 就绪回调
+        function _whenChartJsReady(cb) {
+            if (window._chartJsReady) { cb(); }
+            else { window._chartJsReadyCb = cb; }
+        }
 
         // 颜色处理辅助函数
         function adjustColorBrightness(hexColor, percent) {
-            // 移除 # 符号
             hexColor = hexColor.replace('#', '');
-            
-            // 解析RGB值
             let r = parseInt(hexColor.substr(0, 2), 16);
             let g = parseInt(hexColor.substr(2, 2), 16);
             let b = parseInt(hexColor.substr(4, 2), 16);
-            
-            // 调整亮度
             r = Math.min(255, Math.max(0, r + (percent * 2.55)));
             g = Math.min(255, Math.max(0, g + (percent * 2.55)));
             b = Math.min(255, Math.max(0, b + (percent * 2.55)));
-            
-            // 返回新的十六进制颜色
             return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
         }
 
         // ==================== 前端缓存工具 ====================
         const DashboardCache = {
             cache: new Map(),
-            
             get(key) {
                 const item = this.cache.get(key);
                 if (!item) return null;
-                
-                // 检查是否过期
-                if (Date.now() > item.expireTime) {
-                    this.cache.delete(key);
-                    return null;
-                }
+                if (Date.now() > item.expireTime) { this.cache.delete(key); return null; }
                 return item.data;
             },
-            
             set(key, data, ttlSeconds = 60) {
-                this.cache.set(key, {
-                    data: data,
-                    expireTime: Date.now() + (ttlSeconds * 1000)
-                });
+                this.cache.set(key, { data, expireTime: Date.now() + ttlSeconds * 1000 });
             },
-            
-            clear() {
-                this.cache.clear();
-            }
+            clear() { this.cache.clear(); }
         };
 
-        // 带缓存的 fetch 请求
-        async function cachedFetch(url, cacheKey, ttlSeconds = 60) {
-            // 先检查缓存
+        // 带缓存的 fetch 请求（含超时控制）
+        async function cachedFetch(url, cacheKey, ttlSeconds = 60, timeoutMs = 15000) {
             const cached = DashboardCache.get(cacheKey);
-            if (cached) {
-                console.log(`[缓存命中] ${cacheKey}`);
-                return { success: true, data: cached, fromCache: true };
-            }
-            
-            // 发起请求
-            const response = await fetch(url);
-            const result = await response.json();
-            
-            // 缓存成功响应
-            if (result.success && result.data) {
-                DashboardCache.set(cacheKey, result.data, ttlSeconds);
-            }
-            
-            return result;
+            if (cached) { console.log(`[缓存命中] ${cacheKey}`); return { success: true, data: cached, fromCache: true }; }
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, { signal: controller.signal });
+                const result = await response.json();
+                if (result.success && result.data) DashboardCache.set(cacheKey, result.data, ttlSeconds);
+                return result;
+            } finally { clearTimeout(timer); }
         }
 
-        // 显示/隐藏全局加载状态
-        function showGlobalLoading() {
-            const container = document.querySelector('.dashboard-container');
-            if (!document.getElementById('globalLoadingOverlay')) {
-                const overlay = document.createElement('div');
-                overlay.id = 'globalLoadingOverlay';
-                overlay.innerHTML = `
-                    <div style="
-                        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                        background: rgba(255,255,255,0.95); z-index: 9999;
-                        display: flex; flex-direction: column; align-items: center; justify-content: center;
-                    ">
-                        <div class="spinner" style="
-                            width: 50px; height: 50px; border: 4px solid #f3f3f3;
-                            border-top: 4px solid #e74c3c; border-radius: 50%;
-                            animation: spin 1s linear infinite;
-                        "></div>
-                        <p style="margin-top: 16px; color: #666; font-size: 14px;">正在加载数据...</p>
-                    </div>
-                    <style>
-                        @keyframes spin {
-                            0% { transform: rotate(0deg); }
-                            100% { transform: rotate(360deg); }
-                        }
-                    </style>
-                `;
-                document.body.appendChild(overlay);
-            }
-        }
+        // ==================== 初始化入口 ====================
+        document.addEventListener('DOMContentLoaded', async function () {
+            Perf.start('total_load');
+            Perf.start('dom_to_data');
 
-        function hideGlobalLoading() {
-            const overlay = document.getElementById('globalLoadingOverlay');
-            if (overlay) {
-                overlay.style.opacity = '0';
-                overlay.style.transition = 'opacity 0.3s ease';
-                setTimeout(() => overlay.remove(), 300);
-            }
-            isInitialLoad = false;
-        }
+            // 非阻塞：Chart.js 就绪后初始化图表
+            _whenChartJsReady(initProfitChart);
 
-        // 初始化仪表盘 - 统一加载所有数据
-        document.addEventListener('DOMContentLoaded', async function() {
-            // 首次加载显示全局loading
-            showGlobalLoading();
-            
-            // 初始化图表容器（不加载数据）
-            initCharts();
-            
-            // 并行加载所有数据，等待全部完成
+            // 并行加载首屏关键数据
             await loadAllDashboardData();
-            
-            // 隐藏loading
-            hideGlobalLoading();
-            
-            // 启动自动刷新
+
+            // 移除骨架屏
+            removeAllSkeletons();
+            isInitialLoad = false;
+            console.log(`[Perf] 首屏加载完成: ${Perf.end('dom_to_data').toFixed(0)}ms`);
+
+            // 懒加载非关键：恐贪指数（可见时再加载）
+            _lazyLoadFearGreed();
+
             startAutoRefresh();
+            Perf.end('total_load');
         });
 
-        // 统一加载所有仪表盘数据
+        // ==================== 懒加载：恐贪指数 ====================
+        function _lazyLoadFearGreed() {
+            const card = document.getElementById('fear-greed-card');
+            if (!card) { loadFearGreedIndex(); return; }
+            if ('IntersectionObserver' in window) {
+                const obs = new IntersectionObserver((entries, observer) => {
+                    if (entries[0].isIntersecting) { loadFearGreedIndex(); observer.disconnect(); }
+                }, { threshold: 0.1 });
+                obs.observe(card);
+            } else { loadFearGreedIndex(); }
+        }
+
+        // ==================== 统一数据加载（优化版） ====================
         async function loadAllDashboardData(forceRefresh = false) {
             try {
-                if (forceRefresh) {
-                    DashboardCache.clear();
-                }
+                if (forceRefresh) DashboardCache.clear();
+                console.log('[统一加载] 开始并行加载...');
+                Perf.start('parallel_fetch');
 
-                console.log('[统一加载] 开始并行加载所有数据...');
-
-                // 并行发起所有请求
-                const [statsResult, profitResult, holdingStocksResult] = await Promise.all([
-                    cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60).catch(e => ({ success: false, error: e })),
-                    cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 300).catch(e => ({ success: false, error: e })),
-                    cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300).catch(e => ({ success: false, error: e }))
+                // 聚合接口（stats+allocation=1请求）+ profit-trend + holding-stocks 三路并行
+                const [summaryResult, profitResult, holdingStocksResult] = await Promise.all([
+                    cachedFetch('/api/dashboard/summary', 'dashboard_summary', 60, 20000)
+                        .catch(e => ({ success: false, error: String(e) })),
+                    cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 300, 30000)
+                        .catch(e => ({ success: false, error: String(e) })),
+                    cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300, 20000)
+                        .catch(e => ({ success: false, error: String(e) }))
                 ]);
 
-                console.log('[统一加载] 所有数据加载完成，开始渲染...');
+                Perf.end('parallel_fetch');
+                console.log('[统一加载] 数据获取完成，渲染中...');
 
-                // 统一渲染所有组件
-                if (statsResult.success) {
-                    updateStatsCards(statsResult.data);
-                    updateSystemStatus(statsResult.data.system);
-                    updateActivityList(statsResult.data.activities);
+                // 渲染 summary（stats + allocation）
+                if (summaryResult.success && summaryResult.data) {
+                    const d = summaryResult.data;
+                    if (d.stats) {
+                        updateStatsCards(d.stats);
+                        updateSystemStatus(d.stats.system);
+                        updateActivityList(d.stats.activities);
+                    }
+                    if (d.allocation) updateFundTypeDistribution(d.allocation);
+                } else {
+                    // 降级：分别请求
+                    const statsResult = await cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60).catch(() => ({ success: false }));
+                    if (statsResult.success) {
+                        updateStatsCards(statsResult.data);
+                        updateSystemStatus(statsResult.data.system);
+                        updateActivityList(statsResult.data.activities);
+                    }
+                    loadAllocationData();
                 }
 
-                if (profitResult.success && profitChart) {
-                    updateProfitChart(profitResult.data);
+                // 渲染收益趋势
+                if (profitResult.success) {
+                    _whenChartJsReady(() => updateProfitChart(profitResult.data));
                 }
 
-                if (holdingStocksResult.success) {
-                    updateHoldingStocks(holdingStocksResult.data);
-                }
+                // 渲染重仓股
+                if (holdingStocksResult.success) updateHoldingStocks(holdingStocksResult.data);
 
-                // 加载基金列表实时涨跌数据
+                // 基金涨跌（批量，非阻塞）
                 loadFundListChanges();
 
-                // 加载基金类型分布数据
-                loadAllocationData();
-
                 console.log('[统一加载] 渲染完成');
-                
             } catch (error) {
                 console.error('加载仪表盘数据失败:', error);
-                if (isInitialLoad) {
-                    showNotification('数据加载失败，请刷新页面重试', 'error');
-                }
+                if (isInitialLoad) showNotification('数据加载失败，请刷新页面重试', 'error');
             }
+        }
+
+        // 资产配置独立加载（供刷新按钮）
+        async function loadAllocationData(forceRefresh = false) {
+            try {
+                const cacheKey = 'allocation_data';
+                if (forceRefresh) DashboardCache.cache.delete(cacheKey);
+                const result = await cachedFetch('/api/dashboard/allocation', cacheKey, 120);
+                if (result.success && result.data) updateFundTypeDistribution(result.data);
+            } catch (e) { console.warn('[allocation] 加载失败:', e); }
         }
 
         // 更新收益趋势图表
         function updateProfitChart(data) {
-            if (!profitChart || !data) return;
-
-            // 检查是否为无持仓数据情况
-            if (data.data_source === 'no_holdings') {
-                showNoHoldingsMessage();
-                return;
-            }
-
+            if (!data) return;
+            if (data.data_source === 'no_holdings') { showNoHoldingsMessage(); return; }
+            if (!profitChart) { _whenChartJsReady(() => { initProfitChart(); updateProfitChart(data); }); return; }
             profitChart.data.labels = data.labels || [];
             profitChart.data.datasets[0].data = data.profit || [];
             profitChart.data.datasets[1].data = data.benchmark || [];
-
-            if (data.benchmark_name) {
-                profitChart.data.datasets[1].label = data.benchmark_name;
-            }
-
-            profitChart.update();
-
+            if (data.benchmark_name) profitChart.data.datasets[1].label = data.benchmark_name;
+            profitChart.update('none');
             const chartTitle = document.querySelector('.chart-card .header h3');
             if (chartTitle && data.labels) {
                 const benchmarkInfo = data.benchmark_name ? `(${data.benchmark_name}基准)` : '';
@@ -944,58 +924,42 @@
             }
         }
 
-        // 更新资产配置图表（含基金类型分布）
-        function updateAllocationChart(data) {
-            // 仅更新基金类型分布列表，不再渲染饼图
-            if (data && data.distribution) {
-                updateFundTypeDistribution(data);
-            }
-        }
-
         // 更新统计卡片
         function updateStatsCards(data) {
-            // 持仓金额
-            document.getElementById('totalAssets').textContent = formatCurrency(data.totalAssets);
+            const totalAssetsEl = document.getElementById('totalAssets');
             const assetsChangeEl = document.getElementById('assetsChange');
-            const assetsChangeValue = data.assetsChange !== undefined && data.assetsChange !== null ? data.assetsChange : 0;
-            assetsChangeEl.innerHTML = `
-                <i class="bi bi-arrow-${assetsChangeValue >= 0 ? 'up' : 'down'}"></i>
-                ${Math.abs(assetsChangeValue).toFixed(2)}%
-            `;
-            assetsChangeEl.className = `change ${assetsChangeValue >= 0 ? 'positive' : 'negative'}`;
-
-            // 今日收益
-            document.getElementById('todayProfit').textContent = formatCurrency(data.todayProfit);
+            const todayProfitEl = document.getElementById('todayProfit');
             const profitChangeEl = document.getElementById('profitChange');
-            const profitChangeValue = data.profitChange !== undefined && data.profitChange !== null ? data.profitChange : 0;
-            profitChangeEl.innerHTML = `
-                <i class="bi bi-arrow-${profitChangeValue >= 0 ? 'up' : 'down'}"></i>
-                ${Math.abs(profitChangeValue).toFixed(2)}%
-            `;
-            profitChangeEl.className = `change ${profitChangeValue >= 0 ? 'positive' : 'negative'}`;
-
-            // 持仓基金数
-            document.getElementById('holdingCount').textContent = data.holdingCount;
-            
-            // 本月新增基金数
+            const holdingCountEl = document.getElementById('holdingCount');
             const newFundChangeEl = document.getElementById('newFundChange');
-            if (data.newFundCount !== undefined) {
-                newFundChangeEl.innerHTML = `<i class="bi bi-plus-circle"></i> 新增 ${data.newFundCount} 只`;
+            const sharpeRatioEl = document.getElementById('sharpeRatio');
+
+            if (totalAssetsEl) { totalAssetsEl.textContent = formatCurrency(data.totalAssets); removeSkeleton(totalAssetsEl); }
+            if (assetsChangeEl) {
+                const v = data.assetsChange !== undefined ? data.assetsChange : 0;
+                assetsChangeEl.innerHTML = `<i class="bi bi-arrow-${v >= 0 ? 'up' : 'down'}"></i> ${Math.abs(v).toFixed(2)}%`;
+                assetsChangeEl.className = `change ${v >= 0 ? 'positive' : 'negative'}`;
+                removeSkeleton(assetsChangeEl);
             }
-
-            // 夏普比率
-            document.getElementById('sharpeRatio').textContent = data.sharpeRatio.toFixed(2);
+            if (todayProfitEl) { todayProfitEl.textContent = formatCurrency(data.todayProfit); removeSkeleton(todayProfitEl); }
+            if (profitChangeEl) {
+                const v = data.profitChange !== undefined ? data.profitChange : 0;
+                profitChangeEl.innerHTML = `<i class="bi bi-arrow-${v >= 0 ? 'up' : 'down'}"></i> ${Math.abs(v).toFixed(2)}%`;
+                profitChangeEl.className = `change ${v >= 0 ? 'positive' : 'negative'}`;
+                removeSkeleton(profitChangeEl);
+            }
+            if (holdingCountEl) { holdingCountEl.textContent = data.holdingCount; removeSkeleton(holdingCountEl); }
+            if (newFundChangeEl && data.newFundCount !== undefined) {
+                newFundChangeEl.innerHTML = `<i class="bi bi-plus-circle"></i> 新增 ${data.newFundCount} 只`;
+                removeSkeleton(newFundChangeEl);
+            }
+            if (sharpeRatioEl) { sharpeRatioEl.textContent = data.sharpeRatio.toFixed(2); removeSkeleton(sharpeRatioEl); }
         }
-
         // 初始化图表
-        function initCharts() {
-            initProfitChart();
-            loadFearGreedIndex();
-        }
-
-        // 收益趋势图 - 仅初始化图表实例，不加载数据
         function initProfitChart() {
-            const ctx = document.getElementById('profitChart').getContext('2d');
+            const canvasEl = document.getElementById('profitChart');
+            if (!canvasEl || typeof Chart === 'undefined' || profitChart) return;
+            const ctx = canvasEl.getContext('2d');
             profitChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -1005,96 +969,47 @@
                         data: [],
                         borderColor: '#e74c3c',
                         backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
+                        borderWidth: 2, fill: true, tension: 0.4
                     }, {
                         label: '沪深300',
                         data: [],
                         borderColor: '#3498db',
                         backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
+                        borderWidth: 2, fill: true, tension: 0.4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            align: 'end',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 20
-                            }
-                        }
-                    },
+                    animation: { duration: 400 },
+                    plugins: { legend: { position: 'top', align: 'end', labels: { usePointStyle: true, padding: 20 } } },
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
+                        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                        x: { grid: { display: false } }
                     }
                 }
             });
         }
 
-        // ==================== 市场恐贪指数 ====================
-
-        /**
-         * 加载并渲染 A 股市场情绪指数（来自后端 Tushare 真实计算）
-         */
+        // ==================== 市场恐贪指数（懒加载） ====================
         async function loadFearGreedIndex() {
-            const colorMap = {
-                'Extreme Fear': '#e74c3c',
-                'Fear':         '#e67e22',
-                'Neutral':      '#f1c40f',
-                'Greed':        '#2ecc71',
-                'Extreme Greed':'#27ae60'
-            };
-            const labelMap = {
-                'Extreme Fear': '极度恐慌',
-                'Fear':         '恐慌',
-                'Neutral':      '中性',
-                'Greed':        '贪婪',
-                'Extreme Greed':'极度贪婪'
-            };
+            const colorMap = { 'Extreme Fear': '#e74c3c', 'Fear': '#e67e22', 'Neutral': '#f1c40f', 'Greed': '#2ecc71', 'Extreme Greed': '#27ae60' };
+            const labelMap = { 'Extreme Fear': '极度恐慌', 'Fear': '恐慌', 'Neutral': '中性', 'Greed': '贪婪', 'Extreme Greed': '极度贪婪' };
             try {
-                const res  = await fetch('/api/market/fear-greed');
-                const json = await res.json();
-                if (!json.success || !json.data) throw new Error(json.error || '接口返回异常');
-
-                const data  = json.data;
-                const value = data.value;
-                const classification = data.classification;
-                const dateStr = data.date || new Date().toLocaleDateString('zh-CN');
-                const color = colorMap[classification] || '#aaa';
-                const label = labelMap[classification] || classification;
-
-                // 渲染仪表盘（SVG半圆）
-                renderFearGreedGauge(value, color);
-
-                // 更新数字和文字
+                const result = await cachedFetch('/api/market/fear-greed', 'fear_greed', 3600, 15000);
+                if (!result.success || !result.data) throw new Error(result.error || '接口返回异常');
+                const data = result.data;
+                const color = colorMap[data.classification] || '#aaa';
+                const label = labelMap[data.classification] || data.classification;
+                renderFearGreedGauge(data.value, color);
                 const valueEl = document.getElementById('fearGreedValue');
                 const labelEl = document.getElementById('fearGreedLabel');
-                const dateEl  = document.getElementById('fearGreedDate');
-                if (valueEl) { valueEl.textContent = value; valueEl.style.color = color; }
+                const dateEl = document.getElementById('fearGreedDate');
+                if (valueEl) { valueEl.textContent = data.value; valueEl.style.color = color; }
                 if (labelEl) { labelEl.textContent = label; labelEl.style.color = color; }
-                if (dateEl)  { dateEl.textContent = `更新于 ${dateStr}`; }
-
-                // 渲染7日历史小条（history 已是倒序，最新在前）
+                if (dateEl) dateEl.textContent = `更新于 ${data.date || new Date().toLocaleDateString('zh-CN')}`;
                 const histList = (data.history || []).slice(0, 7);
                 renderFearGreedHistory([...histList].reverse(), colorMap, labelMap);
-
             } catch (e) {
                 const labelEl = document.getElementById('fearGreedLabel');
                 if (labelEl) labelEl.textContent = '数据加载失败';
@@ -1102,21 +1017,14 @@
             }
         }
 
-        /**
-         * 绘制半圆仪表盘
-         */
         function renderFearGreedGauge(value, color) {
             const container = document.getElementById('fearGreedGauge');
             if (!container) return;
-
-            // 角度：从左 (-180°) 到右 (0°)，value 0-100
             const angle = -180 + (value / 100) * 180;
             const rad = (angle * Math.PI) / 180;
             const cx = 160, cy = 130, r = 110;
             const nx = cx + r * Math.cos(rad);
             const ny = cy + r * Math.sin(rad);
-
-            // 渐变段色（极恐->恐->中->贪->极贪）
             const stops = [
                 { offset: '0%',   color: '#e74c3c' },
                 { offset: '25%',  color: '#e67e22' },
@@ -1124,473 +1032,254 @@
                 { offset: '75%',  color: '#2ecc71' },
                 { offset: '100%', color: '#27ae60' }
             ];
-
-            container.innerHTML = `
-                <svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" style="width:100%; overflow:visible;">
-                    <defs>
-                        <linearGradient id="fgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                            ${stops.map(s => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('')}
-                        </linearGradient>
-                    </defs>
-                    <!-- 背景弧 -->
-                    <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="#f0f0f0" stroke-width="18" stroke-linecap="round"/>
-                    <!-- 彩色弧 -->
-                    <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
-                    <!-- 指针 -->
-                    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"
-                          stroke="${color}" stroke-width="3" stroke-linecap="round"/>
-                    <circle cx="${cx}" cy="${cy}" r="6" fill="${color}"/>
-                    <!-- 刻度标签 -->
-                    <text x="44"  y="148" font-size="11" fill="#e74c3c" text-anchor="middle">0</text>
-                    <text x="160" y="20"  font-size="11" fill="#f1c40f" text-anchor="middle">50</text>
-                    <text x="276" y="148" font-size="11" fill="#27ae60" text-anchor="middle">100</text>
-                </svg>`;
+            container.innerHTML = `<svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" style="width:100%;overflow:visible;">
+                <defs><linearGradient id="fgGrad" x1="0%" y1="0%" x2="100%" y2="0%">${stops.map(s => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>
+                <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="#f0f0f0" stroke-width="18" stroke-linecap="round"/>
+                <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
+                <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="${cx}" cy="${cy}" r="6" fill="${color}"/>
+                <text x="44" y="148" font-size="11" fill="#e74c3c" text-anchor="middle">0</text>
+                <text x="160" y="20" font-size="11" fill="#f1c40f" text-anchor="middle">50</text>
+                <text x="276" y="148" font-size="11" fill="#27ae60" text-anchor="middle">100</text>
+            </svg>`;
         }
 
-        /**
-         * 渲染7日历史迷你条形图
-         * list 中每项结构: { value, classification, date }
-         */
         function renderFearGreedHistory(list, colorMap, labelMap) {
             const container = document.getElementById('fearGreedHistory');
             if (!container || !list.length) return;
 
+
             const max = 100;
-            const html = `
-                <div style="font-size:11px; color:#999; margin-bottom:6px; text-align:center;">近7日走势</div>
-                <div style="display:flex; gap:4px; align-items:flex-end; justify-content:center; height:50px;">
+            container.innerHTML = `<div style="font-size:11px;color:#999;margin-bottom:6px;text-align:center;">近7日走势</div>
+                <div style="display:flex;gap:4px;align-items:flex-end;justify-content:center;height:50px;">
                     ${list.map(item => {
                         const v = parseInt(item.value);
                         const c = colorMap[item.classification] || '#aaa';
                         const l = labelMap[item.classification] || item.classification;
-                        // date 格式为 "YYYY-MM-DD"
                         const parts = (item.date || '').split('-');
                         const d = parts.length >= 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : item.date;
                         const h = Math.max(8, (v / max) * 44);
-                        return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;" title="${d}: ${v} ${l}">
-                            <div style="font-size:9px; color:${c}; font-weight:600;">${v}</div>
-                            <div style="width:100%; height:${h}px; background:${c}; border-radius:3px 3px 0 0; opacity:0.85;"></div>
-                            <div style="font-size:9px; color:#bbb;">${d}</div>
+                        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;" title="${d}: ${v} ${l}">
+                            <div style="font-size:9px;color:${c};font-weight:600;">${v}</div>
+                            <div style="width:100%;height:${h}px;background:${c};border-radius:3px 3px 0 0;opacity:0.85;"></div>
+                            <div style="font-size:9px;color:#bbb;">${d}</div>
                         </div>`;
                     }).join('')}
                 </div>`;
-            container.innerHTML = html;
         }
 
         // 显示无持仓数据提示
         function showNoHoldingsMessage() {
             const chartContainer = document.getElementById('profitChart').parentElement;
-            
-            // 清空现有内容
-            chartContainer.innerHTML = `
-                <div style="
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    height: 300px;
-                    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                    border-radius: 12px;
-                    border: 2px dashed #ced4da;
-                    text-align: center;
-                    padding: 20px;
-                ">
-                    <div style="
-                        width: 80px;
-                        height: 80px;
-                        background: #e9ecef;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin-bottom: 20px;
-                    ">
-                        <i class="bi bi-bar-chart" style="font-size: 32px; color: #6c757d;"></i>
-                    </div>
-                    <h4 style="color: #495057; margin-bottom: 10px;">暂无收益数据</h4>
-                    <p style="color: #6c757d; margin-bottom: 20px; max-width: 300px;">
-                        您还没有添加任何基金持仓，无法生成收益趋势图表
-                    </p>
-                    <a href="/my-holdings-new" class="btn btn-primary" style="
-                        background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-                        border: none;
-                        padding: 10px 20px;
-                        border-radius: 8px;
-                        text-decoration: none;
-                        color: white;
-                        font-weight: 500;
-                        transition: all 0.3s ease;
-                    ">
-                        <i class="bi bi-plus-circle me-2"></i>添加基金持仓
-                    </a>
-                </div>
-            `;
+            chartContainer.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;background:linear-gradient(135deg,#f8f9fa 0%,#e9ecef 100%);border-radius:12px;border:2px dashed #ced4da;text-align:center;padding:20px;">
+                <div style="width:80px;height:80px;background:#e9ecef;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:20px;"><i class="bi bi-bar-chart" style="font-size:32px;color:#6c757d;"></i></div>
+                <h4 style="color:#495057;margin-bottom:10px;">暂无收益数据</h4>
+                <p style="color:#6c757d;margin-bottom:20px;max-width:300px;">您还没有添加任何基金持仓，无法生成收益趋势图表</p>
+                <a href="/my-holdings-new" class="btn btn-primary" style="background:linear-gradient(135deg,#e74c3c 0%,#c0392b 100%);border:none;padding:10px 20px;border-radius:8px;text-decoration:none;color:white;font-weight:500;">
+                    <i class="bi bi-plus-circle me-2"></i>添加基金持仓
+                </a></div>`;
         }
-        
+
         // 更新基金类型分布组件
         function updateFundTypeDistribution(data) {
             const container = document.getElementById('fundTypeDistribution');
+            if (!container) return;
             if (!data.distribution || data.distribution.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 30px 20px; color: #7f8c8d;">
-                        <i class="bi bi-grid-3x3" style="font-size: 32px; display: block; margin-bottom: 10px; opacity: 0.5;"></i>
-                        <p>暂无基金类型数据</p>
-                        <p style="font-size: 12px; margin-top: 8px;">请先导入基金持仓</p>
-                    </div>
-                `;
+                container.innerHTML = `<div style="text-align:center;padding:30px 20px;color:#7f8c8d;">
+                    <i class="bi bi-grid-3x3" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.5;"></i>
+                        <p>暂无基金类型数据</p><p style="font-size:12px;margin-top:8px;">请先导入基金持仓</p>
+                </div>`;
                 return;
             }
-            
-            // 使用 Grid 布局展示
-            let html = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">`;
-            
-            html += data.distribution.map((item, index) => `
-                <div style="padding: 16px; background: linear-gradient(135deg, ${item.color}25 0%, ${item.color}20 100%); border-radius: 12px; border: 1px solid ${item.color}40; position: relative; overflow: hidden; box-shadow: 0 4px 15px ${item.color}25; transition: all 0.3s ease;">
-                    <!-- 图标 -->
-                    <div style="position: absolute; top: -10px; right: -10px; width: 60px; height: 60px; border-radius: 50%; background: ${item.color}25; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px ${item.color}30;">
-                        <i class="bi bi-wallet2" style="font-size: 24px; color: ${item.color}; filter: brightness(1.1);"></i>
+            let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">`;
+            html += data.distribution.map(item => `
+                <div style="padding:16px;background:linear-gradient(135deg,${item.color}25 0%,${item.color}20 100%);border-radius:12px;border:1px solid ${item.color}40;position:relative;overflow:hidden;box-shadow:0 4px 15px ${item.color}25;transition:all 0.3s ease;">
+                    <div style="position:absolute;top:-10px;right:-10px;width:60px;height:60px;border-radius:50%;background:${item.color}25;display:flex;align-items:center;justify-content:center;">
+                        <i class="bi bi-wallet2" style="font-size:24px;color:${item.color};filter:brightness(1.1);"></i>
                     </div>
-                    
-                    <!-- 类型名称 -->
-                    <div style="font-size: 13px; color: #555; margin-bottom: 4px; font-weight: 500;">${item.name}</div>
-                    
-                    <!-- 百分比 -->
-                    <div style="font-size: 24px; font-weight: 700; color: ${item.color}; margin-bottom: 8px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">${item.percentage}%</div>
-                    
-                    <!-- 数量和金额 -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #666;">
+                    <div style="font-size:13px;color:#555;margin-bottom:4px;font-weight:500;">${item.name}</div>
+                    <div style="font-size:24px;font-weight:700;color:${item.color};margin-bottom:8px;">${item.percentage}%</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#666;">
                         <span><i class="bi bi-collection"></i> ${item.count} 只</span>
-                        <span style="font-weight: 600; color: #333;">${formatCurrency(item.amount)}</span>
+                        <span style="font-weight:600;color:#333;">${formatCurrency(item.amount)}</span>
                     </div>
-                    
-                    <!-- 进度条 -->
-                    <div style="margin-top: 10px; height: 6px; background: rgba(255,255,255,0.7); border-radius: 3px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
-                        <div style="width: ${item.percentage}%; height: 100%; background: linear-gradient(90deg, ${item.color}, ${adjustColorBrightness(item.color, 20)}); border-radius: 3px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 3px ${item.color}40;"></div>
+                    <div style="margin-top:10px;height:6px;background:rgba(255,255,255,0.7);border-radius:3px;overflow:hidden;">
+                        <div style="width:${item.percentage}%;height:100%;background:linear-gradient(90deg,${item.color},${adjustColorBrightness(item.color, 20)});border-radius:3px;transition:width 0.6s cubic-bezier(0.4,0,0.2,1);"></div>
                     </div>
-                </div>
-            `).join('');
-            
-            html += `</div>`;
-            
+                </div>`).join('');
+            html += `</div>
+                <div style="margin-top:16px;padding:12px;background:#f8f9fa;border-radius:8px;display:flex;justify-content:space-around;text-align:center;">
+                    <div><div style="font-size:18px;font-weight:700;color:#2c3e50;">${data.totalCount}</div><div style="font-size:11px;color:#7f8c8d;">持仓基金</div></div>
+                    <div style="border-left:1px solid #e0e0e0;padding-left:20px;"><div style="font-size:18px;font-weight:700;color:#2c3e50;">${formatCurrency(data.totalAmount)}</div><div style="font-size:11px;color:#7f8c8d;">持仓金额</div></div>
+                    <div style="border-left:1px solid #e0e0e0;padding-left:20px;"><div style="font-size:18px;font-weight:700;color:#2c3e50;">${data.distribution.length}</div><div style="font-size:11px;color:#7f8c8d;">基金类型</div></div>
+                </div>`;
             container.innerHTML = html;
         }
 
         // 更新系统状态
         function updateSystemStatus(system) {
-            document.getElementById('lastUpdate').textContent = system.lastUpdate;
-            document.getElementById('apiResponseTime').textContent = system.apiResponseTime;
-            document.getElementById('systemLoad').textContent = system.load + '%';
-            document.getElementById('loadBar').style.width = system.load + '%';
-
-            // 根据负载调整颜色
-            const loadBar = document.getElementById('loadBar');
-            loadBar.className = 'fill ' + (system.load < 50 ? 'success' : system.load < 80 ? 'warning' : 'danger');
+            const lu = document.getElementById('lastUpdate');
+            const art = document.getElementById('apiResponseTime');
+            const sl = document.getElementById('systemLoad');
+            const lb = document.getElementById('loadBar');
+            if (lu) lu.textContent = system.lastUpdate;
+            if (art) art.textContent = system.apiResponseTime;
+            if (sl) sl.textContent = system.load + '%';
+            if (lb) { lb.style.width = system.load + '%'; lb.className = 'fill ' + (system.load < 50 ? 'success' : system.load < 80 ? 'warning' : 'danger'); }
         }
 
         // 更新活动列表
         function updateActivityList(activities) {
             const container = document.getElementById('activityList');
+            if (!container) return;
             if (!activities || activities.length === 0) {
-                container.innerHTML = `
-                    <div class="activity-item">
-                        <div class="avatar">
-                            <i class="bi bi-info-circle"></i>
-                        </div>
-                        <div class="content">
-                            <p>暂无活动记录</p>
-                            <span class="time">开始导入持仓数据以查看活动</span>
-                        </div>
-                    </div>
-                `;
+                container.innerHTML = `<div class="activity-item"><div class="avatar"><i class="bi bi-info-circle"></i></div><div class="content"><p>暂无活动记录</p><span class="time">开始导入持仓数据以查看活动</span></div></div>`;
                 return;
             }
-            container.innerHTML = activities.map(activity => `
+            container.innerHTML = activities.map(a => `
                 <div class="activity-item">
-                    <div class="avatar">
-                        <i class="bi ${activity.icon}"></i>
-                    </div>
-                    <div class="content">
-                        <p>${activity.description}</p>
-                        <span class="time">${activity.time}</span>
-                    </div>
-                </div>
-            `).join('');
+                    <div class="avatar"><i class="bi ${a.icon || 'bi-clock'}"></i></div>
+                    <div class="content"><p>${a.description || a.detail || ''}</p><span class="time">${a.time || a.date || ''}</span></div>
+                </div>`).join('');
         }
 
-        // 更新重仓股显示 - 列表组件形式
+        // 更新重仓股显示
         function updateHoldingStocks(data) {
             const container = document.getElementById('holdingStocks');
             const summaryEl = document.getElementById('holdingStocksSummary');
-            
-            // 更新摘要
-            if (summaryEl) {
-                summaryEl.textContent = data.stocks && data.stocks.length > 0 
-                    ? `共 ${data.totalFunds} 只基金持仓` 
-                    : '';
-            }
-            
+            if (!container) return;
+            if (summaryEl) summaryEl.textContent = data.stocks && data.stocks.length > 0 ? `共 ${data.totalFunds} 只基金持仓` : '';
             if (!data.stocks || data.stocks.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 30px 20px; color: #7f8c8d;">
-                        <i class="bi bi-building" style="font-size: 32px; display: block; margin-bottom: 10px; opacity: 0.5;"></i>
-                        <p>暂无重仓股数据</p>
-                        <p style="font-size: 12px; margin-top: 8px;">持仓基金未获取到重仓股信息</p>
-                    </div>
-                `;
+                container.innerHTML = `<div style="text-align:center;padding:30px 20px;color:#7f8c8d;"><i class="bi bi-building" style="font-size:32px;display:block;margin-bottom:10px;opacity:0.5;"></i><p>暂无重仓股数据</p></div>`;
                 return;
             }
-            
-            // 列表头部
-            let html = `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; margin-bottom: 8px; font-size: 12px; color: #7f8c8d; font-weight: 500;">
-                    <span style="flex: 1;">股票名称</span>
-                    <span style="width: 80px; text-align: center;">持有基金</span>
-                    <span style="width: 70px; text-align: right;">平均占比</span>
-                </div>
-            `;
-            
-            // 列表项
-            html += data.stocks.map((stock, index) => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; cursor: pointer;" 
-                     onmouseover="this.style.background='#f8f9fa'" 
-                     onmouseout="this.style.background='transparent'"
+            let html = `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8f9fa;border-radius:6px;margin-bottom:8px;font-size:12px;color:#7f8c8d;font-weight:500;"><span style="flex:1;">股票名称</span><span style="width:80px;text-align:center;">持有基金</span><span style="width:70px;text-align:right;">平均占比</span></div>`;
+            html += data.stocks.map((stock, i) => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f0f0f0;transition:background 0.2s;cursor:pointer;"
+                     onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='transparent'"
                      title="所属基金: ${stock.funds.join(', ')}">
-                    <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
-                        <span style="width: 18px; height: 18px; border-radius: 4px; background: ${index < 3 ? '#e74c3c' : '#3498db'}; color: white; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600;">${index + 1}</span>
-                        <div>
-                            <div style="font-weight: 500; color: #2c3e50; font-size: 13px;">${stock.stock_name}</div>
-                            <div style="font-size: 11px; color: #95a5a6;">${stock.stock_code}</div>
-                        </div>
+                    <div style="flex:1;display:flex;align-items:center;gap:8px;">
+                        <span style="width:18px;height:18px;border-radius:4px;background:${i < 3 ? '#e74c3c' : '#3498db'};color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;">${i + 1}</span>
+                        <div><div style="font-weight:500;color:#2c3e50;font-size:13px;">${stock.stock_name}</div><div style="font-size:11px;color:#95a5a6;">${stock.stock_code}</div></div>
                     </div>
-                    <div style="width: 80px; text-align: center;">
-                        <span style="background: #e8f4f8; color: #17a2b8; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">${stock.fund_count}只</span>
-                    </div>
-                    <div style="width: 70px; text-align: right;">
-                        <span style="font-weight: 600; color: #2c3e50; font-size: 13px;">${stock.avg_ratio}%</span>
-                    </div>
-                </div>
-            `).join('');
-            
-            // 列表底部统计
-            html += `
-                <div style="padding: 12px; text-align: center; color: #7f8c8d; font-size: 12px; border-top: 1px solid #f0f0f0; margin-top: 8px;">
-                    共 ${data.totalStocks} 只重仓股，显示前 ${data.stocks.length} 只
-                </div>
-            `;
-            
+                    <div style="width:80px;text-align:center;"><span style="background:#e8f4f8;color:#17a2b8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;">${stock.fund_count}只</span></div>
+                    <div style="width:70px;text-align:right;"><span style="font-weight:600;color:#2c3e50;font-size:13px;">${stock.avg_ratio}%</span></div>
+                </div>`).join('');
+            html += `<div style="padding:12px;text-align:center;color:#7f8c8d;font-size:12px;border-top:1px solid #f0f0f0;margin-top:8px;">共 ${data.totalStocks} 只重仓股，显示前 ${data.stocks.length} 只</div>`;
             container.innerHTML = html;
         }
 
-        // 刷新图表 - 使用统一加载
+        // 刷新图表
         async function refreshChart(type) {
-            DashboardCache.clear(); // 清除缓存获取最新数据
+            DashboardCache.clear();
             showNotification('正在刷新...', 'info');
-            
             try {
                 if (type === 'profit') {
                     const data = await cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 0);
-                    if (data.success) {
-                        updateProfitChart(data.data);
-                    }
+                    if (data.success) updateProfitChart(data.data);
                 } else if (type === 'fear-greed') {
                     await loadFearGreedIndex();
                 }
                 showNotification('图表已刷新', 'success');
-            } catch (error) {
-                console.error('刷新图表失败:', error);
-                showNotification('刷新失败', 'error');
-            }
+            } catch (error) { showNotification('刷新失败', 'error'); }
         }
 
         // 格式化货币
         function formatCurrency(value) {
             if (value === null || value === undefined) return '--';
-            if (Math.abs(value) >= 100000000) {
-                return '¥' + (value / 100000000).toFixed(2) + '亿';
-            } else if (Math.abs(value) >= 10000) {
-                return '¥' + (value / 10000).toFixed(2) + '万';
-            }
+            if (Math.abs(value) >= 100000000) return '¥' + (value / 100000000).toFixed(2) + '亿';
+            if (Math.abs(value) >= 10000) return '¥' + (value / 10000).toFixed(2) + '万';
             return '¥' + value.toFixed(2);
         }
 
         // 显示通知
         function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                <span>${message}</span>
-            `;
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 9999;
-                animation: slideIn 0.3s ease;
-            `;
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease forwards';
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
+            const n = document.createElement('div');
+            n.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i><span>${message}</span>`;
+            n.style.cssText = `position:fixed;top:20px;right:20px;background:${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};color:white;padding:12px 20px;border-radius:8px;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:9999;`;
+            document.body.appendChild(n);
+            setTimeout(() => { n.style.transition = 'opacity 0.3s'; n.style.opacity = '0'; setTimeout(() => n.remove(), 300); }, 3000);
         }
 
-        // 加载基金列表实时涨跌数据
+        // ==================== 基金涨跌（批量优化：N+1→1次请求） ====================
         async function loadFundListChanges() {
             try {
-                console.log('[实时更新] 开始获取基金列表涨跌数据');
-                
-                // 获取当前用户的持仓基金列表
-                const holdingsResponse = await fetch('/api/holdings/list?user_id=default_user');
-                const holdingsResult = await holdingsResponse.json();
-                
-                if (!holdingsResult.success || !holdingsResult.data || holdingsResult.data.length === 0) {
-                    console.log('[实时更新] 无持仓基金数据');
-                    updateFundListChangeDisplay(0, 0, '无持仓');
-                    return;
+                let fundCodes = null;
+                const summaryCache = DashboardCache.get('dashboard_summary');
+                if (summaryCache && summaryCache.stats && summaryCache.stats.distribution) {
+                    fundCodes = summaryCache.stats.distribution.map(d => d.name).filter(Boolean);
                 }
-                
-                const fundCodes = holdingsResult.data.map(fund => fund.fund_code);
-                console.log(`[实时更新] 获取到 ${fundCodes.length} 只基金:`, fundCodes);
-                
-                // 获取这些基金的实时涨跌数据
-                const fundDataPromises = fundCodes.map(code => 
-                    fetch(`/api/fund/${code}/latest`).then(res => res.json()).catch(err => ({ success: false, error: err }))
-                );
-                
-                const fundDataResults = await Promise.all(fundDataPromises);
-                console.log('[实时更新] 基金数据获取结果:', fundDataResults);
-                
-                // 计算整体涨跌情况
-                let totalChange = 0;
-                let validFunds = 0;
-                let positiveFunds = 0;
-                let negativeFunds = 0;
-                
-                fundDataResults.forEach((result, index) => {
-                    if (result.success && result.data && result.data.today_return !== undefined) {
-                        const change = parseFloat(result.data.today_return) || 0;
-                        totalChange += change;
-                        validFunds++;
-                        if (change > 0) positiveFunds++;
-                        else if (change < 0) negativeFunds++;
+                if (!fundCodes) {
+                    const res = await fetch('/api/holdings/list?user_id=default_user');
+                    const r = await res.json();
+                    if (!r.success || !r.data || r.data.length === 0) { updateFundListChangeDisplay(0, 0, '无持仓'); return; }
+                    fundCodes = r.data.map(f => f.fund_code);
+                }
+                if (!fundCodes || fundCodes.length === 0) { updateFundListChangeDisplay(0, 0, '无持仓'); return; }
+
+                let fundDataResults = [];
+                try {
+                    const batchResponse = await fetch('/api/funds/realtime-estimates', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fund_codes: fundCodes.slice(0, 100) })
+                    });
+                    const batchResult = await batchResponse.json();
+                    if (batchResult.success && batchResult.data) fundDataResults = Object.values(batchResult.data);
+                } catch (batchErr) {
+                    // 降级：分块并行（限制5并发）
+                    const CONCURRENCY = 5;
+                    for (let i = 0; i < fundCodes.length; i += CONCURRENCY) {
+                        const chunk = fundCodes.slice(i, i + CONCURRENCY);
+                        const results = await Promise.all(chunk.map(code =>
+                            fetch(`/api/fund/${code}/latest`).then(r => r.json()).catch(() => ({ success: false }))
+                        ));
+                        fundDataResults.push(...results);
+                    }
+                }
+
+                let totalChange = 0, validFunds = 0, positiveFunds = 0, negativeFunds = 0;
+                fundDataResults.forEach(result => {
+                    const d = result.data || result;
+                    if (d && d.today_return !== undefined) {
+                        const change = parseFloat(d.today_return) || 0;
+                        totalChange += change; validFunds++;
+                        if (change > 0) positiveFunds++; else if (change < 0) negativeFunds++;
                     }
                 });
-                
-                // 计算平均涨跌幅
                 const avgChange = validFunds > 0 ? totalChange / validFunds : 0;
-                
-                console.log(`[实时更新] 统计结果 - 平均涨跌: ${avgChange.toFixed(2)}%, 上涨: ${positiveFunds}只, 下跌: ${negativeFunds}只`);
-                
-                // 更新显示
                 updateFundListChangeDisplay(avgChange, validFunds, `${positiveFunds}涨${negativeFunds}跌`);
-                
             } catch (error) {
-                console.error('[实时更新] 获取基金涨跌数据失败:', error);
+                console.error('[实时更新] 失败:', error);
                 updateFundListChangeDisplay(0, 0, '数据获取失败');
             }
         }
-        
-        // 更新基金列表涨跌显示
+
         function updateFundListChangeDisplay(changePercent, fundCount, statusText) {
-            const changeElement = document.querySelector('.stat-card.info .change'); // 今日收益卡片的变化显示
-            const valueElement = document.getElementById('todayProfit'); // 今日收益数值
-            
-            if (changeElement && valueElement) {
-                // 添加更新动画效果
-                changeElement.classList.add('updated');
-                setTimeout(() => {
-                    changeElement.classList.remove('updated');
-                }, 500);
-                
-                // 更新变化百分比显示
-                const icon = changePercent >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
-                const sign = changePercent >= 0 ? '+' : '';
-                
-                changeElement.innerHTML = `
-                    <i class="bi ${icon}"></i> ${sign}${Math.abs(changePercent).toFixed(2)}%
-                `;
-                changeElement.className = `change ${changePercent >= 0 ? 'positive' : 'negative'}`;
-                
-                // 如果有基金数量，也更新状态文本
-                if (fundCount > 0) {
-                    const statusElement = changeElement.parentElement.querySelector('.change-description');
-                    if (statusElement) {
-                        statusElement.textContent = statusText;
-                        // 添加淡入效果
-                        statusElement.style.opacity = '0';
-                        setTimeout(() => {
-                            statusElement.style.transition = 'opacity 0.3s ease';
-                            statusElement.style.opacity = '1';
-                        }, 100);
-                    } else {
-                        // 创建状态描述元素
-                        const descElement = document.createElement('div');
-                        descElement.className = 'change-description';
-                        descElement.style.cssText = 'font-size: 11px; color: #7f8c8d; margin-top: 2px; opacity: 0;';
-                        descElement.textContent = statusText;
-                        changeElement.parentElement.appendChild(descElement);
-                        
-                        // 淡入效果
-                        setTimeout(() => {
-                            descElement.style.transition = 'opacity 0.3s ease';
-                            descElement.style.opacity = '1';
-                        }, 100);
-                    }
+            const changeElement = document.querySelector('.stat-card.info .change');
+            if (!changeElement) return;
+            changeElement.classList.add('updated');
+            setTimeout(() => changeElement.classList.remove('updated'), 500);
+            const icon = changePercent >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+            changeElement.innerHTML = `<i class="bi ${icon}"></i> ${changePercent >= 0 ? '+' : ''}${Math.abs(changePercent).toFixed(2)}%`;
+            changeElement.className = `change ${changePercent >= 0 ? 'positive' : 'negative'}`;
+            if (fundCount > 0) {
+                let statusEl = changeElement.parentElement.querySelector('.change-description');
+                if (!statusEl) {
+                    statusEl = document.createElement('div');
+                    statusEl.className = 'change-description';
+                    statusEl.style.cssText = 'font-size:11px;color:#7f8c8d;margin-top:2px;opacity:0;';
+                    changeElement.parentElement.appendChild(statusEl);
                 }
-            }
-            
-            console.log(`[实时更新] 已更新基金涨跌显示: ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}% (${fundCount}只基金)`);
-        }
-
-        // 加载基金类型分布数据
-        async function loadAllocationData() {
-            try {
-                console.log('[基金类型分布] 开始获取数据');
-                
-                const response = await fetch('/api/dashboard/allocation');
-                const result = await response.json();
-                
-                if (result.success && result.data) {
-                    updateFundTypeDistribution(result.data);
-                    console.log('[基金类型分布] 数据加载成功');
-                } else {
-                    console.warn('[基金类型分布] 数据加载失败:', result.message);
-                    const container = document.getElementById('fundTypeDistribution');
-                    if (container) {
-                        container.innerHTML = `
-                            <div style="text-align: center; padding: 30px 20px; color: #7f8c8d;">
-                                <i class="bi bi-exclamation-triangle" style="font-size: 32px; display: block; margin-bottom: 10px; opacity: 0.5;"></i>
-                                <p>加载失败: ${result.message || '未知错误'}</p>
-                            </div>
-                        `;
-                    }
-                }
-            } catch (error) {
-                console.error('[基金类型分布] 请求失败:', error);
+                statusEl.textContent = statusText;
+                statusEl.style.opacity = '0';
+                setTimeout(() => { statusEl.style.transition = 'opacity 0.3s ease'; statusEl.style.opacity = '1'; }, 100);
             }
         }
 
-        // 自动刷新
+        // ==================== 自动刷新 ====================
         function startAutoRefresh() {
-            // 每60秒刷新一次全部数据
-            setInterval(() => {
-                loadAllDashboardData();
-            }, 60000);
-            
-            // 每30秒单独刷新基金涨跌数据（更频繁）
-            setInterval(() => {
-                loadFundListChanges();
-            }, 30000);
+            setInterval(() => loadAllDashboardData(), 60000);
+            setInterval(() => loadFundListChanges(), 30000);
         }
 
     </script>

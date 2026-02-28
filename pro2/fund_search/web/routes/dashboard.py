@@ -119,7 +119,7 @@ def get_real_holding_distribution(user_id='default_user'):
 
 # ==================== API 路由 ====================
 
-@cached(ttl=60, key_prefix='dashboard_stats')  # 缓存1分钟
+@cached(ttl=300, key_prefix='dashboard_stats')  # 缓存5分钟（优化后）
 def get_dashboard_stats():
     """获取仪表盘统计数据"""
     try:
@@ -281,12 +281,22 @@ def get_dashboard_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@cached(ttl=300, key_prefix='profit_trend')  # 缓存5分钟，历史数据变化不频繁
-def get_profit_trend():
-    """获取收益趋势数据（使用真实历史数据）"""
+@cached(ttl=1800, key_prefix='profit_trend')  # 缓存30分钟（优化后）
+def get_profit_trend(user_id=None, days=None):
+    """
+    获取收益趋势数据（使用真实历史数据）
+
+    参数（可选）:
+        user_id: 用户ID，默认从request获取
+        days: 天数，默认从request获取
+    """
     try:
-        user_id = request.args.get('user_id', 'default_user')
-        days = request.args.get('days', 90, type=int)  # 修改默认为90天（三个月）
+        # 支持直接传入参数，也支持从request获取
+        if user_id is None:
+            user_id = request.args.get('user_id', 'default_user')
+        if days is None:
+            days = request.args.get('days', 90, type=int)
+
         total_return = request.args.get('total_return', 20, type=float)  # 默认20%总收益
         fund_codes = request.args.get('fund_codes', '000001')  # 基金代码，逗号分隔
         weights = request.args.get('weights', '1.0')  # 权重，逗号分隔
@@ -509,7 +519,7 @@ def get_profit_trend():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@cached(ttl=3600, key_prefix='fear_greed')  # 缓存1小时，每日计算一次即可
+@cached(ttl=21600, key_prefix='fear_greed')  # 缓存6小时（优化后）
 def get_fear_greed():
     """获取 A 股市场情绪指数（基于 Tushare 真实数据计算）"""
     try:
@@ -523,7 +533,7 @@ def get_fear_greed():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@cached(ttl=30, key_prefix='market_index')  # 缓存30秒，市场数据较实时
+@cached(ttl=60, key_prefix='market_index')  # 缓存1分钟（优化后）
 def get_market_index():
     """获取市场指数实时数据（沪深300）"""
     try:
@@ -552,7 +562,7 @@ def get_market_index():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@cached(ttl=120, key_prefix='allocation')  # 缓存2分钟
+@cached(ttl=600, key_prefix='allocation')  # 缓存10分钟（优化后）
 def get_allocation():
     """获取资产配置数据 - 按基金类型分布"""
     try:
@@ -663,7 +673,7 @@ def get_fund_type_for_allocation(fund_code: str) -> str:
     return _get_fund_type_for_allocation_helper(fund_code, db_manager)
 
 
-@cached(ttl=600, key_prefix='holding_stocks')  # 缓存10分钟，重仓股变化不频繁
+@cached(ttl=1800, key_prefix='holding_stocks')  # 缓存30分钟（优化后）
 def get_holding_stocks():
     """
     获取用户持仓基金的重仓股票统计
@@ -941,7 +951,7 @@ def get_dashboard_summary():
 
 
 # ---- 带缓存的聚合接口包装 ----
-@cached(ttl=60, key_prefix='dashboard_summary')
+@cached(ttl=300, key_prefix='dashboard_summary')  # 缓存5分钟（优化后）
 def get_dashboard_summary_cached():
     """带服务端缓存的聚合接口（TTL=60s）"""
     return get_dashboard_summary()
@@ -1004,64 +1014,66 @@ def register_routes(app, **kwargs):
     # ---- 新增：聚合接口（stats + allocation，减少前端请求往返） ----
     app.route('/api/dashboard/summary', methods=['GET'])(get_dashboard_summary_cached)
 
-    # ---- 新增：性能审计接口 ----
-    @app.route('/api/dashboard/perf-audit', methods=['GET'])
-    def perf_audit():
+    # ---- 新增：并行获取所有仪表盘数据（优化版） ----
+    @app.route('/api/dashboard/all-data', methods=['GET'])
+    def get_dashboard_all_data():
         """
-        性能基准测试端点
-        逐一计时各 dashboard 子接口，返回耗时报告（仅供开发/调试使用）
+        并行获取所有仪表盘核心数据
+        使用 ThreadPoolExecutor 并行获取 stats, allocation, profit_trend, holding_stocks
+        显著减少总体加载时间
         """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from flask import jsonify
         import time
-        import threading
-        from flask import jsonify as _jsonify
 
-        results = {}
+        user_id = request.args.get('user_id', 'default_user')
+        days = request.args.get('days', 90, type=int)
 
-        def _time_call(name, fn, *args, **kwargs):
-            t = time.time()
-            try:
-                fn(*args, **kwargs)
-                results[name] = {'status': 'ok', 'ms': round((time.time() - t) * 1000, 1)}
-            except Exception as e:
-                results[name] = {'status': 'error', 'ms': round((time.time() - t) * 1000, 1), 'error': str(e)}
+        logger.info(f"[并行API] 开始获取 dashboard 数据, user_id={user_id}")
 
-        # 顺序执行（避免并发干扰计时）
-        _time_call('stats', get_dashboard_stats)
-        _time_call('profit_trend', get_profit_trend)
-        _time_call('allocation', get_allocation)
-        _time_call('holding_stocks', get_holding_stocks)
-        _time_call('fear_greed', get_fear_greed)
-        _time_call('market_index', get_market_index)
-        _time_call('summary_aggregated', get_dashboard_summary)
+        result = {
+            'stats': None,
+            'allocation': None,
+            'profit_trend': None,
+            'holding_stocks': None,
+            'errors': []
+        }
 
-        total_sequential = sum(v['ms'] for v in results.values() if 'ms' in v)
-        # 并行预估 = 最慢的单个接口（近似）
-        critical_path = max((v['ms'] for v in results.values() if 'ms' in v), default=0)
+        # 并行执行任务（直接调用原函数，需要Flask上下文）
+        def run_with_context(fn, *args, **kwargs):
+            """在线程中运行Flask函数"""
+            with app.test_request_context():
+                return fn(*args, **kwargs)
 
-        return _jsonify({
-            'success': True,
-            'data': {
-                'endpoints': results,
-                'analysis': {
-                    'total_sequential_ms': round(total_sequential, 1),
-                    'estimated_parallel_ms': round(critical_path, 1),
-                    'parallelism_speedup': round(total_sequential / critical_path, 1) if critical_path > 0 else 1,
-                    'recommendation': (
-                        '建议优先优化耗时最长的接口，并使用 /api/dashboard/summary 合并请求'
-                    )
-                },
-                'optimization_hints': {
-                    'summary_api': '/api/dashboard/summary 一次性返回 stats+allocation，减少 RTT',
-                    'cache_ttls': {
-                        'stats': '60s', 'profit_trend': '300s', 'allocation': '120s',
-                        'holding_stocks': '600s', 'fear_greed': '3600s', 'market_index': '30s'
-                    },
-                    'realtime_data': ['market_index(30s)'],
-                    'near_realtime': ['stats(60s)', 'allocation(120s)'],
-                    'slow_data': ['profit_trend(300s)', 'holding_stocks(600s)', 'fear_greed(3600s)']
-                }
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_key = {
+                executor.submit(run_with_context, get_dashboard_stats): 'stats',
+                executor.submit(run_with_context, get_allocation): 'allocation',
+                executor.submit(run_with_context, get_profit_trend, user_id, days): 'profit_trend',
+                executor.submit(run_with_context, get_holding_stocks): 'holding_stocks',
             }
+
+            for future in as_completed(future_to_key):
+                key = future_to_key[future]
+                try:
+                    resp = future.result()
+                    if hasattr(resp, 'get_json'):
+                        result[key] = resp.get_json(True).get('data')
+                    elif isinstance(resp, dict):
+                        result[key] = resp.get('data')
+                except Exception as e:
+                    logger.warning(f"[并行API] {key} 获取失败: {e}")
+                    result['errors'].append(f"{key}: {str(e)}")
+
+        logger.info(f"[并行API] 获取完成")
+
+        return jsonify({
+            'success': True,
+            'data': result,
+            'parallel': True
         })
+
+
 
     # 验证路由是否注册成功
     logger.info(f"应用路由数量: {len(app.url_map._rules)}")
