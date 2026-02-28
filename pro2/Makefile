@@ -1,7 +1,7 @@
 # 基金分析系统 - Makefile
 # 提供便捷的命令来运行测试、构建和部署
 
-.PHONY: help install test test-unit test-integration test-api test-db coverage build deploy clean lint format
+.PHONY: help install test test-unit test-integration test-api test-db coverage build deploy clean lint format type-check pre-commit
 
 # 默认目标
 help:
@@ -19,6 +19,8 @@ help:
 	@echo "  make deploy-local     - 本地部署"
 	@echo "  make lint             - 代码检查"
 	@echo "  make format           - 代码格式化"
+	@echo "  make type-check       - 类型检查"
+	@echo "  make pre-commit       - 提交前检查"
 	@echo "  make clean            - 清理临时文件"
 	@echo "  make ci               - 运行完整CI流程"
 
@@ -60,6 +62,17 @@ lint:
 format:
 	black fund_search --line-length=120 --exclude='/(\.venv|venv|__pycache__|build|dist)/'
 	isort fund_search --profile black --skip .venv --skip venv
+
+# 类型检查
+type-check:
+	mypy fund_search --python-version=3.10 --ignore-missing-imports --exclude=.venv --exclude=venv --exclude=build --exclude=dist
+
+# 提交前检查 (需要先安装 pre-commit)
+pre-commit:
+	@echo "安装 pre-commit 钩子..."
+	pre-commit install
+	@echo "运行 pre-commit 检查..."
+	pre-commit run --all-files
 
 # 构建项目
 build:
