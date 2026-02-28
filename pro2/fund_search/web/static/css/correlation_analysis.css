@@ -60,6 +60,41 @@ body {
     flex-direction: column;
 }
 
+/* 顶部导航（与主页一致） */
+.top-nav {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.top-nav .brand {
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.top-nav .nav-links {
+    display: flex;
+    gap: 20px;
+}
+
+.top-nav .nav-links a {
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+.top-nav .nav-links a:hover {
+    background: rgba(255,255,255,0.1);
+}
+
 .page-header {
     background: linear-gradient(135deg, var(--primary-color) 0%, #1d4ed8 100%);
     padding: 2rem 1.5rem;

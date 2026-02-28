@@ -18,16 +18,17 @@
     <!-- 加载指示器（由JS动态创建） -->
     
     <div class="page-wrapper">
-        <!-- 页面头部 -->
-        <header class="page-header">
-            <div class="header-content">
-                <div class="header-title">
-                    <i class="bi bi-diagram-3-fill"></i>
-                    <h1>基金相关性分析</h1>
-                </div>
-                <p class="header-desc">分析基金之间的相关性，帮助您分散投资风险，优化投资组合配置</p>
+        <!-- 顶部导航（与主页一致） -->
+        <div class="top-nav">
+            <div class="brand">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span>基金分析系统</span>
             </div>
-        </header>
+            <div class="nav-links">
+                <a href="/"><i class="bi bi-house"></i> 首页</a>
+                <a href="/strategy"><i class="bi bi-lightbulb"></i> 策略分析</a>
+            </div>
+        </div>
 
         <main class="main-container">
             <!-- 基金选择状态栏 -->
@@ -310,11 +311,6 @@
                         statusText.textContent = `已完成 ${fundCodes.length} 只基金的相关性分析`;
                     }
                     
-                    // 显示懒加载提示
-                    if (responseData.lazy_load_enabled && responseData.all_combinations_summary && responseData.all_combinations_summary.length > 1) {
-                        showLazyLoadHint(responseData.all_combinations_summary.length);
-                    }
-                    
                     chartLoadingManager.updateProgress(100, '分析完成！');
                     console.log('✅ 页面渲染完成');
                 } else {
@@ -512,23 +508,6 @@
             
             html += '</tbody></table>';
             container.innerHTML = html;
-        }
-        
-        // 显示懒加载提示
-        function showLazyLoadHint(combinationCount) {
-            const container = document.getElementById('interactive-charts-section');
-            const hint = document.createElement('div');
-            hint.className = 'lazy-load-hint';
-            hint.innerHTML = `
-                <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 12px 16px; margin: 10px 0; border-radius: 4px;">
-                    <i class="bi bi-info-circle" style="color: #2196f3; margin-right: 8px;"></i>
-                    <span style="color: #1976d2;">
-                        当前显示相关性最高的组合。点击上方"高相关性基金组合"列表中的其他组合可查看详情。
-                        共 ${combinationCount} 个组合。
-                    </span>
-                </div>
-            `;
-            container.querySelector('.section-body').insertBefore(hint, container.querySelector('.section-body').firstChild);
         }
         
         // 更新激活的组合状态
@@ -1225,6 +1204,7 @@
     <script src="{{ url_for('static', filename='js/chart-toolbox.js') }}"></script>
     <!-- 模块化核心组件 -->
     <script src="{{ url_for('static', filename='js/modules/correlation-core.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chart-sampling.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modules/chart-renderers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modules/chart-instance-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fund-correlation-charts.js') }}"></script>

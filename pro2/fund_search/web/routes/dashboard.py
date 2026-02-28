@@ -513,6 +513,20 @@ def get_profit_trend():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@cached(ttl=3600, key_prefix='fear_greed')  # 缓存1小时，每日计算一次即可
+def get_fear_greed():
+    """获取 A 股市场情绪指数（基于 Tushare 真实数据计算）"""
+    try:
+        from web.real_data_fetcher import RealDataFetcher
+        result = RealDataFetcher.get_fear_greed_index(days=7)
+        if not result:
+            return jsonify({'success': False, 'error': '情绪指数计算失败，请检查 Tushare 配置'}), 500
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        logger.error(f"获取恐贪指数失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @cached(ttl=30, key_prefix='market_index')  # 缓存30秒，市场数据较实时
 def get_market_index():
     """获取市场指数实时数据（沪深300）"""
@@ -811,6 +825,7 @@ def register_routes(app, **kwargs):
     app.route('/api/dashboard/stats', methods=['GET'])(get_dashboard_stats)
     app.route('/api/dashboard/profit-trend', methods=['GET'])(get_profit_trend)
     app.route('/api/market/index', methods=['GET'])(get_market_index)
+    app.route('/api/market/fear-greed', methods=['GET'])(get_fear_greed)
     app.route('/api/dashboard/allocation', methods=['GET'])(get_allocation)
     app.route('/api/dashboard/holding-stocks', methods=['GET'])(get_holding_stocks)
     app.route('/api/dashboard/recent-activities', methods=['GET'])(lambda: jsonify({'success': True, 'data': get_recent_activities()}))

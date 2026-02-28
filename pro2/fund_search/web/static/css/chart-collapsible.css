@@ -95,7 +95,7 @@
     padding: 1.5rem;
     overflow: hidden;
     transition: all 0.3s ease;
-    max-height: 500px;
+    max-height: 600px;
     opacity: 1;
 }
 
@@ -109,7 +109,7 @@
 /* 图表画布 */
 .chart-canvas {
     width: 100% !important;
-    height: 300px !important;
+    height: 400px !important;
 }
 
 /* 全屏模式 */
@@ -272,11 +272,11 @@
     }
     
     .chart-body {
-        max-height: 400px;
+        max-height: 500px;
     }
     
     .chart-canvas {
-        height: 250px !important;
+        height: 320px !important;
     }
 }
 
@@ -291,11 +291,11 @@
     
     .chart-body {
         padding: 1rem;
-        max-height: 350px;
+        max-height: 420px;
     }
     
     .chart-canvas {
-        height: 220px !important;
+        height: 280px !important;
     }
     
     .chart-tool-btn {

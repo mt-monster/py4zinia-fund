@@ -3142,7 +3142,20 @@ def run_investment_advice_backtest():
         # 计算组合整体指标
         total_return = sum(weighted_returns)
         annualized_return = total_return / 365 * 252 if total_return else 0
-        
+
+        # 加权汇总最大回撤和夏普比率
+        weighted_max_dd = 0.0
+        weighted_sharpe = 0.0
+        weight_sum = 0.0
+        for fr in fund_results:
+            fw = weights.get(fr['fund_code'], 1.0 / len(portfolio_data))
+            weighted_max_dd += fr['max_drawdown'] * fw
+            weighted_sharpe += fr['sharpe_ratio'] * fw
+            weight_sum += fw
+        if weight_sum > 0:
+            weighted_max_dd = round(weighted_max_dd / weight_sum, 2)
+            weighted_sharpe = round(weighted_sharpe / weight_sum, 2)
+
         # 生成简化收益曲线
         chart_data = _generate_simple_return_curve(portfolio_data, weights, initial_capital)
         
@@ -3155,6 +3168,8 @@ def run_investment_advice_backtest():
             'portfolio_summary': {
                 'total_return': round(total_return, 2),
                 'annualized_return': round(annualized_return, 2),
+                'max_drawdown': weighted_max_dd,
+                'sharpe_ratio': weighted_sharpe,
                 'backtest_days': 365
             },
             'chart_data': chart_data

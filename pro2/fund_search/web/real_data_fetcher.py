@@ -462,5 +462,225 @@ class RealDataFetcher:
             traceback.print_exc()
             return pd.DataFrame()
 
+    @staticmethod
+    def get_fear_greed_index(days: int = 7) -> Dict:
+        """
+        计算 A 股市场情绪指数（恐贪指数）
+        
+        综合以下因子（均来自 Tushare，akshare 作为兜底）：
+          1. 涨跌家数比        (40%) —— 当日上涨股票数 / 总股票数
+          2. 量能变化          (20%) —— 今日成交量 / 20日均量
+          3. 北向资金净流入    (20%) —— 沪深港通北向当日净流入
+          4. 沪深300偏离均线  (20%) —— 收盘价偏离 20 日均线幅度
+
+        参数：
+            days: 返回最近 N 天的历史数据（用于迷你图）
+
+        返回：
+            {
+              "value": 65,          # 今日指数 0-100
+              "classification": "Greed",
+              "history": [          # 最近 N 天列表（含今日，倒序）
+                {"date": "2026-02-27", "value": 65, "classification": "Greed"},
+                ...
+              ]
+            }
+        """
+        import tushare as ts
+        from shared.enhanced_config import DATA_SOURCE_CONFIG
+
+        tushare_token = DATA_SOURCE_CONFIG.get('tushare', {}).get('token')
+        ts.set_token(tushare_token)
+        pro = ts.pro_api()
+
+        today = datetime.now()
+        # 取 60 个交易日以便计算均线
+        start_60 = (today - timedelta(days=90)).strftime('%Y%m%d')
+        end_today = today.strftime('%Y%m%d')
+
+        # ── 因子1：涨跌家数 ─────────────────────────────────────────────
+        def get_advance_decline(trade_date: str) -> Optional[float]:
+            """返回上涨股票占比 0-1，失败返回 None"""
+            try:
+                df = pro.daily_basic(trade_date=trade_date,
+                                     fields='ts_code,change,pct_chg')
+                if df is None or df.empty:
+                    return None
+                total = len(df)
+                up = (df['pct_chg'] > 0).sum()
+                return up / total if total > 0 else None
+            except Exception as e:
+                logger.warning(f"涨跌家数获取失败 {trade_date}: {e}")
+                return None
+
+        # ── 因子2：量能变化 ─────────────────────────────────────────────
+        def get_volume_ratio(trade_date: str, hist_df: pd.DataFrame) -> Optional[float]:
+            """返回成交量相对 20 日均量的倍数（取 0-2 区间归一化），失败返回 None"""
+            try:
+                if hist_df is None or hist_df.empty:
+                    return None
+                row = hist_df[hist_df['trade_date'] == trade_date]
+                if row.empty:
+                    return None
+                idx = hist_df.index[hist_df['trade_date'] == trade_date].tolist()
+                if not idx:
+                    return None
+                pos = hist_df.index.get_loc(idx[0])
+                if pos < 19:
+                    return None
+                window = hist_df.iloc[max(0, pos - 19): pos + 1]
+                ma20_vol = window['amount'].mean()
+                today_vol = float(row.iloc[0]['amount'])
+                ratio = today_vol / ma20_vol if ma20_vol > 0 else 1.0
+                # 归一化：ratio=1 → 0.5，ratio>2 → 1，ratio<0.5 → 0
+                normalized = min(max((ratio - 0.5) / 1.5, 0.0), 1.0)
+                return normalized
+            except Exception as e:
+                logger.warning(f"量能变化计算失败 {trade_date}: {e}")
+                return None
+
+        # ── 因子3：北向资金 ─────────────────────────────────────────────
+        def get_north_flow(trade_date: str, flow_df: pd.DataFrame) -> Optional[float]:
+            """北向净流入归一化 0-1。失败返回 None"""
+            try:
+                if flow_df is None or flow_df.empty:
+                    return None
+                col_date = 'trade_date' if 'trade_date' in flow_df.columns else flow_df.columns[0]
+                row = flow_df[flow_df[col_date] == trade_date]
+                if row.empty:
+                    return None
+                # 尝试获取北向合计净流入（hk2sh_north_money 或 north_money）
+                net_col = None
+                for c in ['north_money', 'hgt_buy_elg', 'net_buy_value']:
+                    if c in flow_df.columns:
+                        net_col = c
+                        break
+                if net_col is None:
+                    return None
+                net = float(row.iloc[0][net_col])
+                # 用 ±40亿 作归一化边界
+                normalized = min(max((net / 4_000_000_000 + 1) / 2, 0.0), 1.0)
+                return normalized
+            except Exception as e:
+                logger.warning(f"北向资金获取失败 {trade_date}: {e}")
+                return None
+
+        # ── 因子4：沪深300偏离均线 ──────────────────────────────────────
+        def get_ma_deviation(trade_date: str, idx_df: pd.DataFrame) -> Optional[float]:
+            """收盘价偏离 20 日均线归一化 0-1。失败返回 None"""
+            try:
+                if idx_df is None or idx_df.empty:
+                    return None
+                row_idx = idx_df.index[idx_df['trade_date'] == trade_date].tolist()
+                if not row_idx:
+                    return None
+                pos = idx_df.index.get_loc(row_idx[0])
+                if pos < 19:
+                    return None
+                window = idx_df.iloc[max(0, pos - 19): pos + 1]
+                ma20 = window['close'].mean()
+                close = float(idx_df.iloc[pos]['close'])
+                deviation = (close - ma20) / ma20  # -0.1 ~ +0.1 典型区间
+                normalized = min(max((deviation / 0.1 + 1) / 2, 0.0), 1.0)
+                return normalized
+            except Exception as e:
+                logger.warning(f"均线偏离计算失败 {trade_date}: {e}")
+                return None
+
+        # ── 分类 ────────────────────────────────────────────────────────
+        def classify(score: float) -> str:
+            if score >= 75:
+                return 'Extreme Greed'
+            elif score >= 55:
+                return 'Greed'
+            elif score >= 45:
+                return 'Neutral'
+            elif score >= 25:
+                return 'Fear'
+            else:
+                return 'Extreme Fear'
+
+        # ── 获取基础数据 ─────────────────────────────────────────────────
+        logger.info("开始获取 A 股情绪指数基础数据...")
+
+        # 获取 60 日沪深300指数数据
+        try:
+            idx_df = pro.index_daily(ts_code='000300.SH',
+                                     start_date=start_60, end_date=end_today,
+                                     fields='trade_date,close')
+            if idx_df is not None and not idx_df.empty:
+                idx_df = idx_df.sort_values('trade_date').reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"沪深300历史数据获取失败: {e}")
+            idx_df = pd.DataFrame()
+
+        # 获取 60 日全市场日线（用于量能）
+        # 使用上证指数成交量代替（pro.daily 全市场太慢，用index_daily沪深300成交量作为代理）
+        try:
+            mkt_vol_df = pro.index_daily(ts_code='000001.SH',
+                                         start_date=start_60, end_date=end_today,
+                                         fields='trade_date,amount')
+            if mkt_vol_df is not None and not mkt_vol_df.empty:
+                mkt_vol_df = mkt_vol_df.sort_values('trade_date').reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"市场成交量数据获取失败: {e}")
+            mkt_vol_df = pd.DataFrame()
+
+        # 获取北向资金
+        try:
+            flow_df = pro.moneyflow_hsgt(start_date=start_60, end_date=end_today)
+            if flow_df is not None and not flow_df.empty:
+                flow_df = flow_df.sort_values('trade_date').reset_index(drop=True)
+        except Exception as e:
+            logger.warning(f"北向资金数据获取失败: {e}")
+            flow_df = pd.DataFrame()
+
+        # ── 取最近 N 个交易日 ────────────────────────────────────────────
+        # 以沪深300数据的交易日为基准
+        if idx_df is None or idx_df.empty:
+            logger.error("无法获取指数数据，情绪指数计算失败")
+            return {}
+
+        recent_trade_dates = idx_df['trade_date'].tolist()[-max(days, 1):]
+
+        history = []
+        for trade_date in reversed(recent_trade_dates):  # 最新在前
+            # 因子1：涨跌家数（每次单独调用，成本较高，放最后）
+            f1 = get_advance_decline(trade_date)
+            f2 = get_volume_ratio(trade_date, mkt_vol_df)
+            f3 = get_north_flow(trade_date, flow_df)
+            f4 = get_ma_deviation(trade_date, idx_df)
+
+            # 加权计算（跳过获取失败的因子并重新归一化）
+            weights = {'f1': 0.40, 'f2': 0.20, 'f3': 0.20, 'f4': 0.20}
+            factors = {'f1': f1, 'f2': f2, 'f3': f3, 'f4': f4}
+            total_w = sum(w for k, w in weights.items() if factors[k] is not None)
+            if total_w == 0:
+                score = 50.0
+            else:
+                score = sum(factors[k] * weights[k] for k in weights if factors[k] is not None)
+                score = score / total_w  # 归一化到 0-1
+                score = round(score * 100)
+
+            date_fmt = f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}"
+            classification = classify(score)
+            history.append({
+                'date': date_fmt,
+                'value': int(score),
+                'classification': classification
+            })
+
+        if not history:
+            return {}
+
+        latest = history[0]
+        return {
+            'value': latest['value'],
+            'classification': latest['classification'],
+            'date': latest['date'],
+            'history': history
+        }
+
+
 # 全局实例
 data_fetcher = RealDataFetcher()

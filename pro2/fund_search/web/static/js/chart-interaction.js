@@ -98,22 +98,6 @@ class ChartInteractionManager {
         chart.update('none');
     }
 
-    /**
-     * 高亮散点图
-     */
-    highlightScatterChart(fund1Code, fund2Code) {
-        const chart = correlationCharts.scatter;
-        if (!chart) return;
-
-        // 添加脉冲动画效果
-        const canvas = document.getElementById('scatter-correlation-chart');
-        if (canvas) {
-            canvas.style.animation = 'pulse 0.5s ease';
-            setTimeout(() => {
-                canvas.style.animation = '';
-            }, 500);
-        }
-    }
 
     /**
      * 更新分布图

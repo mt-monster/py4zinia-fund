@@ -131,7 +131,6 @@ const ChartControlButtons = {
         // 尝试从correlationCharts获取
         if (typeof correlationCharts !== 'undefined') {
             const chartMap = {
-                'scatter-correlation-chart': 'scatter',
                 'nav-comparison-chart': 'line',
                 'distribution-chart': 'distribution'
             };
