@@ -2,7 +2,10 @@
 数据检索模块单元测试
 """
 
+import sys
 import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'fund_search'))
+
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
@@ -14,7 +17,7 @@ class TestFundDataParser:
 
     def test_parse_fund_code_valid(self):
         """测试解析有效的基金代码"""
-        from data_retrieval.smart_fund_parser import parse_fund_code
+        from data_retrieval.parsers.smart_fund_parser import parse_fund_code
         
         # 测试标准6位数字代码
         assert parse_fund_code('000001') == '000001'
@@ -23,7 +26,7 @@ class TestFundDataParser:
 
     def test_parse_fund_code_invalid(self):
         """测试解析无效的基金代码"""
-        from data_retrieval.smart_fund_parser import parse_fund_code
+        from data_retrieval.parsers.smart_fund_parser import parse_fund_code
         
         # 测试无效代码
         assert parse_fund_code('') is None
@@ -33,7 +36,7 @@ class TestFundDataParser:
 
     def test_validate_fund_data_complete(self):
         """测试验证完整的数据"""
-        from data_retrieval.smart_fund_parser import validate_fund_data
+        from data_retrieval.parsers.smart_fund_parser import validate_fund_data
         
         data = {
             'fund_code': '000001',
@@ -48,7 +51,7 @@ class TestFundDataParser:
 
     def test_validate_fund_data_incomplete(self):
         """测试验证不完整的数据"""
-        from data_retrieval.smart_fund_parser import validate_fund_data
+        from data_retrieval.parsers.smart_fund_parser import validate_fund_data
         
         data = {
             'fund_code': '',
@@ -65,7 +68,7 @@ class TestFieldMapping:
 
     def test_standardize_field_names(self):
         """测试标准化字段名"""
-        from data_retrieval.field_mapping import standardize_field_names
+        from data_retrieval.utils.field_mapping import standardize_field_names
         
         raw_data = {
             '基金代码': '000001',
@@ -83,7 +86,7 @@ class TestFieldMapping:
 
     def test_calculate_derived_fields(self):
         """测试计算派生字段"""
-        from data_retrieval.field_mapping import calculate_derived_fields
+        from data_retrieval.utils.field_mapping import calculate_derived_fields
         
         data = {
             'fund_code': '000001',
@@ -116,7 +119,7 @@ class TestEnhancedDatabase:
 
     def test_build_connection_string(self, mock_db_config):
         """测试构建连接字符串"""
-        from data_retrieval.enhanced_database import build_connection_string
+        from data_access.enhanced_database import build_connection_string
         
         conn_str = build_connection_string(mock_db_config)
         
@@ -126,7 +129,7 @@ class TestEnhancedDatabase:
 
     def test_sanitize_fund_code(self):
         """测试清理基金代码"""
-        from data_retrieval.enhanced_database import sanitize_fund_code
+        from data_access.enhanced_database import sanitize_fund_code
         
         assert sanitize_fund_code('000001') == '000001'
         assert sanitize_fund_code(' 000001 ') == '000001'
@@ -181,7 +184,7 @@ class TestPortfolioImporter:
 
     def test_parse_excel_file(self, tmp_path):
         """测试解析Excel文件"""
-        from data_retrieval.portfolio_importer import parse_excel_file
+        from services.portfolio_importer import parse_excel_file
         
         # 创建测试Excel文件
         test_file = tmp_path / 'test_holdings.xlsx'
@@ -200,7 +203,7 @@ class TestPortfolioImporter:
 
     def test_validate_holding_data(self):
         """测试验证持仓数据"""
-        from data_retrieval.portfolio_importer import validate_holding_data
+        from services.portfolio_importer import validate_holding_data
         
         valid_data = {
             'fund_code': '000001',

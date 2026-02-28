@@ -175,7 +175,7 @@ class TestPerformanceCalculator:
         fund_search_path = os.path.join(project_root, 'fund_search')
         
         # 加载 performance_metrics.py
-        pm_path = os.path.join(fund_search_path, 'backtesting', 'performance_metrics.py')
+        pm_path = os.path.join(fund_search_path, 'backtesting', 'analysis', 'performance_metrics.py')
         spec = importlib.util.spec_from_file_location("backtesting.performance_metrics", pm_path)
         pm_module = importlib.util.module_from_spec(spec)
         

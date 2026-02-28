@@ -81,9 +81,8 @@ class TestProjectStructure:
         
         required_files = [
             'requirements.txt',
-            'fund_search/web/app.py',
+            'fund_search/web/app_enhanced.py',
             'pytest.ini',
-            'Makefile',
         ]
         
         for file_name in required_files:

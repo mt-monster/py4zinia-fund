@@ -1,8 +1,12 @@
 """关键绩效指标系统测试"""
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'fund_search'))
+
 import numpy as np
 
-from backtesting.performance_metrics import (
+from backtesting.analysis.performance_metrics import (
     calculate_metrics_report,
     MetricsInput,
     MetricRuleSet
