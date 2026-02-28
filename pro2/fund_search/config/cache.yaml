@@ -1,0 +1,34 @@
+# =============================================================================
+# 缓存配置
+# =============================================================================
+
+# Redis 配置
+redis_host: localhost
+redis_port: 6379
+redis_db: 0
+redis_password: null
+
+# 默认缓存 TTL（秒）
+default_ttl: 900  # 15分钟
+
+# 内存缓存大小限制
+memory_cache_size: 1000
+
+# 内存缓存 TTL 配置（秒）
+memory_ttl_latest_nav: 900        # 最新净值 - 15分钟
+memory_ttl_nav_history: 3600      # 净值历史 - 1小时
+memory_ttl_fund_basic: 86400      # 基金基本信息 - 1天
+memory_ttl_performance: 3600      # 绩效指标 - 1小时
+
+# 数据库缓存 TTL 配置（秒）
+db_ttl_latest_nav: 1800           # 最新净值 - 30分钟
+db_ttl_nav_history: 86400         # 净值历史 - 1天
+db_ttl_fund_basic: 604800         # 基金基本信息 - 7天
+
+# 环境变量覆盖:
+#   FUND_CACHE_REDIS_HOST          - Redis 主机
+#   FUND_CACHE_REDIS_PORT          - Redis 端口
+#   FUND_CACHE_REDIS_DB            - Redis 数据库
+#   FUND_CACHE_REDIS_PASSWORD      - Redis 密码
+#   FUND_CACHE_DEFAULT_TTL         - 默认 TTL
+#   FUND_CACHE_MEMORY_CACHE_SIZE   - 内存缓存大小

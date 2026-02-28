@@ -1,0 +1,27 @@
+# =============================================================================
+# 通知配置
+# =============================================================================
+
+# 微信通知配置
+wechat:
+  enabled: true
+  token: ""  # 在环境变量中设置: FUND_WECHAT_TOKEN
+  template: html
+
+# 邮件通知配置
+email:
+  enabled: false
+  smtp_host: smtp.qq.com
+  smtp_port: 465
+  smtp_user: ""
+  smtp_password: ""
+  smtp_receivers: []
+
+# 失败回退配置
+fallback_enabled: true
+
+# 环境变量覆盖:
+#   FUND_WECHAT_TOKEN    - 微信通知 Token
+#   FUND_EMAIL_ENABLED   - 是否启用邮件
+#   FUND_EMAIL_SMTP_USER - SMTP 用户名
+#   FUND_EMAIL_SMTP_PASSWORD - SMTP 密码

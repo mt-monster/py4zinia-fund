@@ -1,0 +1,49 @@
+# =============================================================================
+# 投资策略配置
+# =============================================================================
+
+# 买入倍数配置
+buy_multipliers:
+  strong_buy: 2.5      # 强烈买入（大跌时）
+  buy: 1.5             # 正常买入（下跌时）
+  weak_buy: 1.2        # 谨慎买入
+  hold: 0.0            # 持有
+  sell: 0.0            # 卖出
+  weak_sell: 0.0       # 弱卖出
+  stop_loss: 0.0       # 止损
+
+# 止损配置
+stop_loss:
+  warning_threshold: -0.08        # 警告阈值
+  stop_loss_threshold: -0.12      # 止损阈值
+  full_redeem: false              # 是否全部赎回
+  redeem_ratio: 0.3               # 赎回比例
+  stop_loss_label: "🛑 **止损触发**"
+  warning_label: "⚠️ **亏损警告**"
+
+# 波动率配置
+volatility:
+  high_threshold: 0.25            # 高波动阈值
+  low_threshold: 0.10             # 低波动阈值
+  high_adjustment: 0.5            # 高波动调整系数
+  low_adjustment: 1.2             # 低波动调整系数
+  normal_adjustment: 1.0          # 正常波动调整系数
+  lookback_days: 20               # 回溯天数
+
+# 趋势配置
+trend:
+  ma_short_period: 5              # 短期均线周期
+  ma_long_period: 10              # 长期均线周期
+  uptrend_adjustment: 1.2         # 上升趋势调整系数
+  downtrend_adjustment: 0.7       # 下降趋势调整系数
+  sideways_adjustment: 1.0        # 横盘调整系数
+
+# 风险指标配置
+risk_free_rate: 0.03              # 无风险收益率
+trading_days_per_year: 252        # 每年交易日数
+historical_days: 365              # 历史数据天数
+
+# 环境变量覆盖:
+#   FUND_STRATEGY_RISK_FREE_RATE      - 无风险收益率
+#   FUND_STRATEGY_TRADING_DAYS        - 交易日数
+#   FUND_STRATEGY_HISTORICAL_DAYS     - 历史数据天数

@@ -8,7 +8,6 @@
 
 import os
 import sys
-import json
 import logging
 import numpy as np
 from datetime import datetime, timedelta
@@ -19,7 +18,8 @@ from flask import Flask, jsonify, request
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
+from config import settings  # 使用统一配置管理
+# 使用方式: settings.database (替代 DATABASE_CONFIG), settings.notification (替代 NOTIFICATION_CONFIG)
 from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine

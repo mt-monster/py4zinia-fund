@@ -1419,10 +1419,10 @@ if __name__ == "__main__":
     parent_dir = os.path.dirname(current_dir)
     sys.path.append(parent_dir)
     
-    from shared.enhanced_config import NOTIFICATION_CONFIG
+    from config import settings  # 使用统一配置管理
     
     # 创建通知管理器
-    notification_manager = EnhancedNotificationManager(NOTIFICATION_CONFIG)
+    notification_manager = EnhancedNotificationManager(settings.notification)
     
     # 创建测试数据
     test_fund_data = pd.DataFrame({

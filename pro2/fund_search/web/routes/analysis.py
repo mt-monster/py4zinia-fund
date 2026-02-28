@@ -23,7 +23,6 @@ import requests
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
 from shared.fund_helpers import get_fund_name_from_db as _get_fund_name_from_db_helper  # noqa
 

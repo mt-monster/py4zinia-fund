@@ -1,0 +1,31 @@
+# =============================================================================
+# 系统配置
+# =============================================================================
+
+# 文件路径（为空时使用默认路径）
+fund_position_file: ""   # 默认: fund_search/京东金融.xlsx
+report_dir: ""          # 默认: pro2/reports
+
+# 投资策略配置
+default_base_investment: 1000.0  # 默认投资金额
+max_positions: 10                # 最大持仓数量
+risk_tolerance: 0.05             # 风险容忍度
+
+# 性能配置
+max_concurrent_requests: 5       # 最大并发请求数
+request_timeout: 30              # 请求超时时间（秒）
+batch_size: 100                  # 批处理大小
+
+# 图表配置
+chart_dpi: 350
+chart_style: seaborn-v0_8
+
+# 环境变量覆盖:
+#   FUND_POSITION_FILE        - 基金持仓文件路径
+#   FUND_REPORT_DIR           - 报告输出目录
+#   FUND_BASE_INVESTMENT      - 默认投资金额
+#   FUND_MAX_POSITIONS        - 最大持仓数量
+#   FUND_RISK_TOLERANCE       - 风险容忍度
+#   FUND_MAX_CONCURRENT       - 最大并发请求
+#   FUND_REQUEST_TIMEOUT      - 请求超时时间
+#   FUND_BATCH_SIZE           - 批处理大小

@@ -15,7 +15,6 @@ import pandas as pd
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from scipy import stats
-import json
 import matplotlib
 matplotlib.use('Agg')  # 设置matplotlib后端为非GUI模式
 import matplotlib.pyplot as plt
