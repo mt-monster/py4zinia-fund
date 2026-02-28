@@ -867,6 +867,9 @@
                 // 加载基金列表实时涨跌数据
                 loadFundListChanges();
 
+                // 加载基金类型分布数据
+                loadAllocationData();
+
                 console.log('[统一加载] 渲染完成');
                 
             } catch (error) {
@@ -1232,24 +1235,6 @@
             
             html += `</div>`;
             
-            // 底部统计
-            html += `
-                <div style="margin-top: 16px; padding: 12px; background: #f8f9fa; border-radius: 8px; display: flex; justify-content: space-around; text-align: center;">
-                    <div>
-                        <div style="font-size: 18px; font-weight: 700; color: #2c3e50;">${data.totalCount}</div>
-                        <div style="font-size: 11px; color: #7f8c8d;">持仓基金</div>
-                    </div>
-                    <div style="border-left: 1px solid #e0e0e0; padding-left: 20px;">
-                        <div style="font-size: 18px; font-weight: 700; color: #2c3e50;">${formatCurrency(data.totalAmount)}</div>
-                        <div style="font-size: 11px; color: #7f8c8d;">持仓金额</div>
-                    </div>
-                    <div style="border-left: 1px solid #e0e0e0; padding-left: 20px;">
-                        <div style="font-size: 18px; font-weight: 700; color: #2c3e50;">${data.distribution.length}</div>
-                        <div style="font-size: 11px; color: #7f8c8d;">基金类型</div>
-                    </div>
-                </div>
-            `;
-            
             container.innerHTML = html;
         }
 
@@ -1528,6 +1513,34 @@
             }
             
             console.log(`[实时更新] 已更新基金涨跌显示: ${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}% (${fundCount}只基金)`);
+        }
+
+        // 加载基金类型分布数据
+        async function loadAllocationData() {
+            try {
+                console.log('[基金类型分布] 开始获取数据');
+                
+                const response = await fetch('/api/dashboard/allocation');
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    updateFundTypeDistribution(result.data);
+                    console.log('[基金类型分布] 数据加载成功');
+                } else {
+                    console.warn('[基金类型分布] 数据加载失败:', result.message);
+                    const container = document.getElementById('fundTypeDistribution');
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="text-align: center; padding: 30px 20px; color: #7f8c8d;">
+                                <i class="bi bi-exclamation-triangle" style="font-size: 32px; display: block; margin-bottom: 10px; opacity: 0.5;"></i>
+                                <p>加载失败: ${result.message || '未知错误'}</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('[基金类型分布] 请求失败:', error);
+            }
         }
 
         // 自动刷新
