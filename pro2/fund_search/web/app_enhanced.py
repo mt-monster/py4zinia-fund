@@ -220,6 +220,21 @@ def init_components():
             preloader = get_preloader()
             components['preloader'] = preloader
             logger.info("预加载服务已初始化")
+
+            # 启动时预加载数据（后台线程，不阻塞启动）
+            import threading
+            def background_preload():
+                try:
+                    logger.info("开始后台预加载基金数据...")
+                    preloader.preload_all(async_mode=False)
+                    logger.info("预加载完成，数据已缓存")
+                except Exception as preload_err:
+                    logger.warning(f"预加载失败: {preload_err}")
+
+            preload_thread = threading.Thread(target=background_preload, daemon=True)
+            preload_thread.start()
+            logger.info("预加载任务已启动（后台运行）")
+
         except Exception as e:
             logger.error(f"预加载服务初始化失败: {e}")
 
