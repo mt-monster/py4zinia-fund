@@ -7,7 +7,6 @@ ETF 相关 API 路由
 
 import os
 import sys
-import json
 import logging
 import traceback
 from datetime import datetime, timedelta
@@ -15,17 +14,14 @@ from datetime import datetime, timedelta
 import pandas as pd
 import akshare as ak
 from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-from data_retrieval.parsers.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 from data_retrieval.fetchers.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 

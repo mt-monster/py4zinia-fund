@@ -19,7 +19,8 @@ from typing import Dict, List, Optional
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
-from shared.enhanced_config import BASE_CONFIG, DATABASE_CONFIG, NOTIFICATION_CONFIG
+from config import settings  # 使用统一配置管理
+# 使用方式: settings.system (替代 BASE_CONFIG), settings.database (替代 DATABASE_CONFIG), settings.notification (替代 NOTIFICATION_CONFIG)
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
 from backtesting import EnhancedInvestmentStrategy
 from backtesting import get_all_advanced_strategies  # 导入高级策略
@@ -47,7 +48,7 @@ class EnhancedFundAnalysisSystem:
         self.fund_data_manager = MultiSourceDataAdapter()
         self.strategy_engine = EnhancedInvestmentStrategy()
         self.analytics_engine = EnhancedFundAnalytics()
-        self.db_manager = EnhancedDatabaseManager(DATABASE_CONFIG)
+        self.db_manager = EnhancedDatabaseManager(settings.database)
         self.notification_manager = EnhancedNotificationManager(NOTIFICATION_CONFIG)
         
         # 配置中文字体显示

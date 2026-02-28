@@ -6,7 +6,6 @@
 提供策略基本信息的获取功能
 """
 
-import json
 import logging
 
 # 设置日志

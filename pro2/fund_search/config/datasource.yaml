@@ -1,0 +1,35 @@
+# =============================================================================
+# 数据源配置
+# =============================================================================
+
+# Tushare 配置
+tushare:
+  token: ""  # 在环境变量中设置: TUSHARE_TOKEN
+  timeout: 30
+  max_retries: 3
+
+# Akshare 配置
+akshare:
+  timeout: 30
+  max_retries: 3
+  delay_between_requests: 1.0
+
+# 备用数据源配置
+fallback:
+  sina_enabled: true
+  eastmoney_enabled: true
+  request_timeout: 10
+
+# 数据源优先级配置
+priority:
+  primary: tushare      # 主数据源
+  backup_1: akshare     # 第一备用
+  backup_2:            # 第二备用（按顺序尝试）
+    - sina
+    - eastmoney
+
+# 环境变量覆盖:
+#   TUSHARE_TOKEN              - Tushare Token
+#   FUND_DS_TUSHARE_TIMEOUT    - Tushare 超时时间
+#   FUND_DS_AKSHARE_TIMEOUT    - Akshare 超时时间
+#   FUND_DS_FALLBACK_SINA_ENABLED - 是否启用新浪数据源

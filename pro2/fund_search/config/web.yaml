@@ -1,0 +1,25 @@
+# =============================================================================
+# Web 应用配置
+# =============================================================================
+
+# 调试模式
+debug: false
+
+# 安全密钥（生产环境必须修改）
+secret_key: "your-secret-key-change-in-production"
+
+# 服务器配置
+host: 0.0.0.0
+port: 5001
+
+# 时区
+timezone: Asia/Shanghai
+
+# 请求大小限制
+max_content_length: 16777216  # 16MB
+
+# 环境变量覆盖:
+#   FUND_WEB_DEBUG       - 调试模式
+#   FUND_WEB_SECRET_KEY  - 安全密钥
+#   FUND_WEB_HOST        - 主机地址
+#   FUND_WEB_PORT        - 端口

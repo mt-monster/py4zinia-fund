@@ -7,7 +7,6 @@
 
 import os
 import sys
-import json
 import math
 import logging
 import traceback
@@ -18,7 +17,6 @@ from flask import jsonify, request
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine

@@ -10,7 +10,6 @@
 import pandas as pd
 import akshare as ak
 import time
-import requests
 from typing import List, Dict, Optional
 
 

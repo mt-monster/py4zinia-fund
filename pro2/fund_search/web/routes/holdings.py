@@ -21,7 +21,6 @@ import numpy as np
 import akshare as ak
 import requests
 from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

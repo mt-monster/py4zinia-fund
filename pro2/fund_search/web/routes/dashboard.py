@@ -7,9 +7,7 @@ Dashboard 相关 API 路由
 
 import os
 import sys
-import json
 from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
 import pandas as pd
 from datetime import datetime, timedelta
 import logging
@@ -17,13 +15,11 @@ import logging
 # 添加父目录到 Python 路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
 from backtesting.analysis.strategy_evaluator import StrategyEvaluator
 from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
-from data_retrieval.parsers.fund_screenshot_ocr import recognize_fund_screenshot, validate_recognized_fund
 from data_retrieval.fetchers.heavyweight_stocks_fetcher import fetch_heavyweight_stocks, get_fetcher
 from services.fund_type_service import (
     FundTypeService, classify_fund, get_fund_type_display, 
@@ -776,6 +772,181 @@ def get_holding_stocks():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def get_dashboard_summary():
+    """
+    聚合接口：一次请求返回 stats + allocation + recent-activities
+    减少前端并发请求数，降低总体页面加载时间
+    TTL = 60s（与 stats 对齐，取最短）
+    """
+    from flask import jsonify as _jsonify
+    import time
+
+    t0 = time.time()
+    result = {}
+
+    # --- stats ---
+    try:
+        user_id = request.args.get('user_id', 'default_user')
+        sql = """
+        SELECT h.*, far.today_return, far.prev_day_return, far.sharpe_ratio,
+               far.current_estimate as current_nav, far.yesterday_nav as previous_nav
+        FROM user_holdings h
+        LEFT JOIN (
+            SELECT * FROM fund_analysis_results
+            WHERE (fund_code, analysis_date) IN (
+                SELECT fund_code, MAX(analysis_date) as max_date
+                FROM fund_analysis_results
+                GROUP BY fund_code
+            )
+        ) far ON h.fund_code = far.fund_code
+        WHERE h.user_id = :user_id
+        """
+        df = db_manager.execute_query(sql, {'user_id': user_id})
+
+        total_assets = 0
+        today_profit = 0
+        yesterday_profit = 0
+        total_sharpe = 0
+        sharpe_count = 0
+        new_fund_count = 0
+        today = datetime.now()
+        first_day_of_month = today.replace(day=1).date()
+
+        if not df.empty:
+            for _, row in df.iterrows():
+                holding_shares = float(row['holding_shares']) if pd.notna(row['holding_shares']) else 0
+                cost_price = float(row['cost_price']) if pd.notna(row['cost_price']) else 0
+                current_nav = float(row['current_nav']) if pd.notna(row['current_nav']) else None
+                previous_nav = float(row['previous_nav']) if pd.notna(row['previous_nav']) else None
+                today_return = float(row['today_return']) if pd.notna(row['today_return']) else None
+                prev_day_return = float(row['prev_day_return']) if pd.notna(row['prev_day_return']) else None
+                sharpe = float(row['sharpe_ratio']) if pd.notna(row['sharpe_ratio']) else None
+                holding_amount = holding_shares * cost_price
+                total_assets += holding_amount
+                if current_nav is not None and previous_nav is not None and current_nav != previous_nav:
+                    today_profit += holding_shares * current_nav - holding_shares * previous_nav
+                    if prev_day_return is not None:
+                        yesterday_profit += holding_shares * previous_nav * (prev_day_return / 100)
+                elif today_return is not None and holding_amount > 0:
+                    today_profit += holding_amount * (today_return / 100)
+                    if prev_day_return is not None:
+                        yesterday_profit += holding_amount * (prev_day_return / 100)
+                if sharpe is not None and sharpe != 0:
+                    total_sharpe += sharpe
+                    sharpe_count += 1
+                buy_date = row.get('buy_date')
+                if buy_date:
+                    try:
+                        if isinstance(buy_date, str):
+                            bd = datetime.strptime(buy_date.split()[0], '%Y-%m-%d').date()
+                        else:
+                            bd = buy_date.date() if hasattr(buy_date, 'date') else buy_date
+                        if bd >= first_day_of_month:
+                            new_fund_count += 1
+                    except Exception:
+                        pass
+
+        assets_change = (today_profit / total_assets * 100) if total_assets > 0 else 0
+        if yesterday_profit != 0:
+            profit_change = ((today_profit - yesterday_profit) / abs(yesterday_profit)) * 100
+        elif today_profit != 0:
+            profit_change = 100.0 if today_profit > 0 else -100.0
+        else:
+            profit_change = 0
+        avg_sharpe = total_sharpe / sharpe_count if sharpe_count > 0 else 0
+
+        try:
+            lu_df = db_manager.execute_query("SELECT MAX(analysis_date) as last_date FROM fund_analysis_results")
+            last_update = lu_df.iloc[0]['last_date'].strftime('%Y-%m-%d %H:%M') if not lu_df.empty and lu_df.iloc[0]['last_date'] else today.strftime('%Y-%m-%d %H:%M')
+        except Exception:
+            last_update = today.strftime('%Y-%m-%d %H:%M')
+
+        result['stats'] = {
+            'totalAssets': total_assets,
+            'assetsChange': assets_change,
+            'todayProfit': today_profit,
+            'profitChange': profit_change,
+            'holdingCount': len(df) if not df.empty else 0,
+            'newFundCount': new_fund_count,
+            'sharpeRatio': avg_sharpe,
+            'system': {
+                'lastUpdate': last_update,
+                'apiResponseTime': str(round((time.time() - t0) * 1000)),
+                'load': 35
+            },
+            'activities': get_recent_activities(user_id),
+            'distribution': get_real_holding_distribution(user_id)
+        }
+    except Exception as e:
+        logger.error(f"[summary] stats 失败: {e}")
+        result['stats'] = None
+        result['stats_error'] = str(e)
+
+    # --- allocation (复用 get_allocation 缓存逻辑的核心计算) ---
+    try:
+        sql_h = "SELECT fund_code, holding_shares, cost_price FROM user_holdings WHERE user_id = :user_id"
+        df_h = db_manager.execute_query(sql_h, {'user_id': request.args.get('user_id', 'default_user')})
+        if df_h.empty:
+            result['allocation'] = {'distribution': [], 'totalCount': 0, 'totalAmount': 0}
+        else:
+            from services.fund_type_service import FUND_TYPE_COLORS
+            color_map = {
+                'stock': '#28a745', 'bond': '#17a2b8', 'hybrid': '#ffc107',
+                'money': '#6c757d', 'index': '#007bff', 'qdii': '#9b59b6',
+                'etf': '#e74c3c', 'fof': '#fd7e14', 'unknown': '#adb5bd'
+            }
+            cn_name_map = {
+                'stock': '股票型', 'bond': '债券型', 'hybrid': '混合型',
+                'money': '货币型', 'index': '指数型', 'qdii': 'QDII',
+                'etf': 'ETF', 'fof': 'FOF', 'unknown': '其他'
+            }
+            type_amounts = {}
+            type_count = {}
+            total_amount = 0
+            for _, row in df_h.iterrows():
+                fc = row['fund_code']
+                ft = get_fund_type_for_allocation(fc)
+                amt = float(row['holding_shares']) * float(row['cost_price'])
+                type_amounts[ft] = type_amounts.get(ft, 0) + amt
+                type_count[ft] = type_count.get(ft, 0) + 1
+                total_amount += amt
+            distribution = []
+            for ft, amt in sorted(type_amounts.items(), key=lambda x: x[1], reverse=True):
+                pct = round((amt / total_amount) * 100, 1) if total_amount > 0 else 0
+                distribution.append({
+                    'name': f'{cn_name_map.get(ft, ft)}基金',
+                    'type_code': ft,
+                    'percentage': pct,
+                    'count': type_count.get(ft, 0),
+                    'amount': round(amt, 2),
+                    'color': color_map.get(ft, '#adb5bd')
+                })
+            result['allocation'] = {
+                'distribution': distribution,
+                'totalCount': len(df_h),
+                'totalAmount': round(total_amount, 2),
+                'labels': list(type_amounts.keys()),
+                'values': list(type_amounts.values())
+            }
+    except Exception as e:
+        logger.error(f"[summary] allocation 失败: {e}")
+        result['allocation'] = None
+        result['allocation_error'] = str(e)
+
+    result['_meta'] = {
+        'server_time_ms': round((time.time() - t0) * 1000, 1),
+        'cached': False
+    }
+    return _jsonify({'success': True, 'data': result})
+
+
+# ---- 带缓存的聚合接口包装 ----
+@cached(ttl=60, key_prefix='dashboard_summary')
+def get_dashboard_summary_cached():
+    """带服务端缓存的聚合接口（TTL=60s）"""
+    return get_dashboard_summary()
+
+
 def register_routes(app, **kwargs):
     """注册 Dashboard 相关路由到 Flask 应用"""
     global db_manager, strategy_engine, unified_strategy_engine, strategy_evaluator, fund_data_manager
@@ -829,12 +1000,74 @@ def register_routes(app, **kwargs):
     app.route('/api/dashboard/allocation', methods=['GET'])(get_allocation)
     app.route('/api/dashboard/holding-stocks', methods=['GET'])(get_holding_stocks)
     app.route('/api/dashboard/recent-activities', methods=['GET'])(lambda: jsonify({'success': True, 'data': get_recent_activities()}))
-    
+
+    # ---- 新增：聚合接口（stats + allocation，减少前端请求往返） ----
+    app.route('/api/dashboard/summary', methods=['GET'])(get_dashboard_summary_cached)
+
+    # ---- 新增：性能审计接口 ----
+    @app.route('/api/dashboard/perf-audit', methods=['GET'])
+    def perf_audit():
+        """
+        性能基准测试端点
+        逐一计时各 dashboard 子接口，返回耗时报告（仅供开发/调试使用）
+        """
+        import time
+        import threading
+        from flask import jsonify as _jsonify
+
+        results = {}
+
+        def _time_call(name, fn, *args, **kwargs):
+            t = time.time()
+            try:
+                fn(*args, **kwargs)
+                results[name] = {'status': 'ok', 'ms': round((time.time() - t) * 1000, 1)}
+            except Exception as e:
+                results[name] = {'status': 'error', 'ms': round((time.time() - t) * 1000, 1), 'error': str(e)}
+
+        # 顺序执行（避免并发干扰计时）
+        _time_call('stats', get_dashboard_stats)
+        _time_call('profit_trend', get_profit_trend)
+        _time_call('allocation', get_allocation)
+        _time_call('holding_stocks', get_holding_stocks)
+        _time_call('fear_greed', get_fear_greed)
+        _time_call('market_index', get_market_index)
+        _time_call('summary_aggregated', get_dashboard_summary)
+
+        total_sequential = sum(v['ms'] for v in results.values() if 'ms' in v)
+        # 并行预估 = 最慢的单个接口（近似）
+        critical_path = max((v['ms'] for v in results.values() if 'ms' in v), default=0)
+
+        return _jsonify({
+            'success': True,
+            'data': {
+                'endpoints': results,
+                'analysis': {
+                    'total_sequential_ms': round(total_sequential, 1),
+                    'estimated_parallel_ms': round(critical_path, 1),
+                    'parallelism_speedup': round(total_sequential / critical_path, 1) if critical_path > 0 else 1,
+                    'recommendation': (
+                        '建议优先优化耗时最长的接口，并使用 /api/dashboard/summary 合并请求'
+                    )
+                },
+                'optimization_hints': {
+                    'summary_api': '/api/dashboard/summary 一次性返回 stats+allocation，减少 RTT',
+                    'cache_ttls': {
+                        'stats': '60s', 'profit_trend': '300s', 'allocation': '120s',
+                        'holding_stocks': '600s', 'fear_greed': '3600s', 'market_index': '30s'
+                    },
+                    'realtime_data': ['market_index(30s)'],
+                    'near_realtime': ['stats(60s)', 'allocation(120s)'],
+                    'slow_data': ['profit_trend(300s)', 'holding_stocks(600s)', 'fear_greed(3600s)']
+                }
+            }
+        })
+
     # 验证路由是否注册成功
     logger.info(f"应用路由数量: {len(app.url_map._rules)}")
     dashboard_routes = [rule.rule for rule in app.url_map._rules if 'dashboard' in rule.rule]
     logger.info(f"已注册的dashboard路由: {dashboard_routes}")
-    
+
     logger.info("Dashboard 路由注册完成")
 
     # 清除缓存的端点（仅用于调试）

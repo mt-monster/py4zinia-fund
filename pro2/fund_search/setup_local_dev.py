@@ -5,7 +5,6 @@
 """
 
 import os
-import sys
 from pathlib import Path
 
 def setup_local_mysql_env():
