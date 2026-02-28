@@ -423,6 +423,18 @@
 
         <!-- 导航标签 -->
         <div class="nav-tabs" role="tablist" aria-label="策略管理功能导航">
+            <button class="nav-tab" data-tab="dashboard" role="tab" aria-selected="false" aria-controls="dashboard" id="tab-dashboard" tabindex="0">
+                <i class="bi bi-house" aria-hidden="true"></i>
+                <span>首页</span>
+            </button>
+            <button class="nav-tab" data-tab="strategy-analysis" role="tab" aria-selected="false" aria-controls="strategy-analysis" id="tab-strategy-analysis" tabindex="-1">
+                <i class="bi bi-lightbulb" aria-hidden="true"></i>
+                <span>策略分析</span>
+            </button>
+            <button class="nav-tab" data-tab="strategy-editor" role="tab" aria-selected="false" aria-controls="strategy-editor" id="tab-strategy-editor" tabindex="-1">
+                <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                <span>编写策略</span>
+            </button>
             <button class="nav-tab active" data-tab="overview" role="tab" aria-selected="true" aria-controls="overview" id="tab-overview" tabindex="0">
                 <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
                 <span>概览</span>
@@ -443,6 +455,21 @@
                 <i class="bi bi-cpu" aria-hidden="true"></i>
                 <span>ML策略</span>
             </button>
+        </div>
+
+        <!-- 首页标签页 -->
+        <div class="tab-content" id="dashboard" role="tabpanel" aria-labelledby="tab-dashboard" tabindex="0">
+            <iframe src="/" frameborder="0" style="width: 100%; min-height: 600px;" id="dashboard-frame"></iframe>
+        </div>
+
+        <!-- 策略分析标签页 -->
+        <div class="tab-content" id="strategy-analysis" role="tabpanel" aria-labelledby="tab-strategy-analysis" tabindex="0">
+            <iframe src="/strategy" frameborder="0" style="width: 100%; min-height: 600px;" id="strategy-analysis-frame"></iframe>
+        </div>
+
+        <!-- 编写策略标签页 -->
+        <div class="tab-content" id="strategy-editor" role="tabpanel" aria-labelledby="tab-strategy-editor" tabindex="0">
+            <iframe src="/strategy-editor" frameborder="0" style="width: 100%; min-height: 600px;" id="strategy-editor-frame"></iframe>
         </div>
 
         <!-- 概览标签页 -->
