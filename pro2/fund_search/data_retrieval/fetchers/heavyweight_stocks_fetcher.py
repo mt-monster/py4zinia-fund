@@ -3,11 +3,10 @@
 
 """
 重仓股数据获取模块
-通过akshare API获取基金重仓股数据，支持错误处理和备用数据源
+通过 Tushare API 获取基金重仓股数据，支持错误处理和备用数据源
 支持数据库存储，当接口获取太慢时从数据库读取
 """
 
-import akshare as ak
 import pandas as pd
 import logging
 import time
@@ -74,11 +73,11 @@ class HeavyweightStocksFetcher:
         self._cache_timestamps = {}
         self._db_manager = db_manager  # 数据库管理器
         
-        # 备用数据源配置
+        # 备用数据源配置（akshare 优先，因对QDII基金覆盖更好）
         self._fallback_sources = [
             self._fetch_from_akshare,
-            self._fetch_from_eastmoney,
-            self._fetch_from_sina
+            self._fetch_from_eastmoney_js,  # 东方财富JS接口（免费、覆盖QDII）
+            self._fetch_from_tushare,        # Tushare对QDII覆盖不足，作为备用
         ]
         
         # 数据库缓存有效期（天）
@@ -110,67 +109,164 @@ class HeavyweightStocksFetcher:
         logger.info(f"数据已缓存: {cache_key}")
     
     @retry_on_error(max_retries=3, delay=1)
-    def _fetch_from_akshare(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
+    def _fetch_from_tushare(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
         """
-        从akshare获取重仓股数据
-        
+        从 Tushare 获取重仓股数据（主要数据源）
+
+        Tushare fund_portfolio 接口字段：
+        - symbol: 股票代码 (如 000333.SZ)
+        - mkv: 持仓市值
+        - amount: 持股数
+        - stk_mkv_ratio: 占净值比例
+
         Args:
             fund_code: 基金代码
             date: 报告期日期（可选）
-            
+
         Returns:
             List[Dict]: 重仓股数据列表
         """
         try:
-            logger.info(f"从akshare获取基金 {fund_code} 的重仓股数据...")
-            
-            # 使用akshare获取基金持仓数据
-            df = ak.fund_portfolio_hold_em(symbol=fund_code, date=date)
-            
+            import tushare as ts
+
+            logger.info(f"从 Tushare 获取基金 {fund_code} 的重仓股数据...")
+
+            # 获取 token
+            token = None
+            try:
+                from shared.enhanced_config import DATA_SOURCE_CONFIG
+                token = DATA_SOURCE_CONFIG.get('tushare', {}).get('token')
+            except ImportError:
+                token = '5ff19facae0e5b26a407d491d33707a9884a39a714a0d76b6495725b'
+
+            ts_pro = ts.pro_api(token)
+
+            # Tushare 需要 .OF 后缀
+            ts_code = fund_code if fund_code.endswith('.OF') else f"{fund_code}.OF"
+
+            # 获取基金持仓数据
+            df = ts_pro.fund_portfolio(ts_code=ts_code)
+
             if df is None or df.empty:
-                raise AkshareAPIError(f"akshare返回空数据: {fund_code}")
-            
-            # 验证数据
-            required_columns = ['股票名称', '股票代码', '占净值比例', '持仓市值']
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                raise DataValidationError(f"数据缺少必要字段: {missing_columns}")
-            
+                raise DataSourceError(f"Tushare 返回空数据: {fund_code}")
+
+            # 批量获取股票名称（可选）
+            stock_names = {}
+            try:
+                symbols = df['symbol'].tolist()
+                # 简化：从 symbol 提取代码，名称后续通过其他接口补全或显示代码
+            except Exception:
+                pass
+
             # 转换为标准格式
             stocks = []
-            for _, row in df.head(10).iterrows():  # 只取前10
+            for _, row in df.head(10).iterrows():
+                symbol = str(row.get('symbol', ''))
+                # 从 symbol 提取纯代码（去掉 .SZ/.SH 后缀）
+                code = symbol.split('.')[0] if '.' in symbol else symbol
+
                 stock = {
-                    'name': str(row['股票名称']).strip(),
-                    'code': str(row['股票代码']).strip(),
-                    'holding_ratio': self._parse_percentage(row['占净值比例']),
-                    'market_value': self._parse_market_value(row['持仓市值']),
-                    'change_percent': self._parse_change_percent(row.get('涨跌幅', '--'))
+                    'name': '',  # Tushare 不返回股票名称，由前端通过代码查询或显示代码
+                    'code': code,
+                    'holding_ratio': self._parse_percentage(row.get('stk_mkv_ratio', '--')),
+                    'market_value': self._parse_market_value(row.get('mkv', '--')),
+                    'change_percent': '--'
                 }
                 stocks.append(stock)
-            
-            logger.info(f"成功从akshare获取 {len(stocks)} 条重仓股数据")
+
+            logger.info(f"成功从 Tushare 获取 {len(stocks)} 条重仓股数据")
             return stocks
-            
+
         except Exception as e:
-            logger.error(f"从akshare获取数据失败: {e}")
-            raise AkshareAPIError(f"akshare数据获取失败: {e}")
-    
-    @retry_on_error(max_retries=2, delay=2)
-    def _fetch_from_eastmoney(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
+            logger.error(f"从 Tushare 获取数据失败: {e}")
+            raise DataSourceError(f"Tushare 数据获取失败: {e}")
+
+    @retry_on_error(max_retries=3, delay=1)
+    def _fetch_from_akshare(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
         """
-        从东方财富备用接口获取数据
-        
+        从 akshare 获取重仓股数据（备用数据源）
+
         Args:
             fund_code: 基金代码
             date: 报告期日期（可选）
-            
+
         Returns:
             List[Dict]: 重仓股数据列表
         """
         try:
-            logger.info(f"从东方财富备用接口获取基金 {fund_code} 的重仓股数据...")
+            import akshare as ak
+
+            logger.info(f"从 akshare 获取基金 {fund_code} 的重仓股数据...")
+
+            # 使用 akshare 获取基金持仓数据
+            df = ak.fund_portfolio_hold_em(symbol=fund_code, date=date)
+
+            if df is None or df.empty:
+                raise DataSourceError(f"akshare 返回空数据: {fund_code}")
+
+            # 列名映射（兼容新旧版本）
+            col_map = {
+                '股票名称': ['股票名称', '名称', 'stk_name'],
+                '股票代码': ['股票代码', '代码', 'stk_code'],
+                '占净值比例': ['占净值比例', '持仓比例', 'proportion', '占比'],
+                '持仓市值': ['持仓市值', '市值', 'amount', '持仓金额']
+            }
+
+            def find_col(df, keys):
+                for k in keys:
+                    if k in df.columns:
+                        return k
+                return None
+
+            name_col = find_col(df, col_map['股票名称'])
+            code_col = find_col(df, col_map['股票代码'])
+            ratio_col = find_col(df, col_map['占净值比例'])
+            value_col = find_col(df, col_map['持仓市值'])
+
+            if not all([name_col, code_col, ratio_col]):
+                raise DataSourceError(f"akshare 数据缺少必要字段，现有列: {list(df.columns)}")
+
+            # 转换为标准格式
+            stocks = []
+            for _, row in df.head(10).iterrows():
+                stock = {
+                    'name': str(row[name_col]).strip(),
+                    'code': str(row[code_col]).strip(),
+                    'holding_ratio': self._parse_percentage(row[ratio_col]),
+                    'market_value': self._parse_market_value(row[value_col]) if value_col else '--',
+                    'change_percent': '--'
+                }
+                stocks.append(stock)
+
+            logger.info(f"成功从 akshare 获取 {len(stocks)} 条重仓股数据")
+            return stocks
+
+        except Exception as e:
+            logger.error(f"从 akshare 获取数据失败: {e}")
+            raise DataSourceError(f"akshare 数据获取失败: {e}")
+    
+    @retry_on_error(max_retries=2, delay=2)
+    def _fetch_from_eastmoney_js(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
+        """
+        从东方财富JS接口获取重仓股数据（免费、覆盖QDII基金）
+        
+        接口返回的JS变量：
+        - stockCodes: 持仓股票代码列表
+        - stockNames: 持仓股票名称列表
+        - stockNewRatio: 持仓占比列表
+        
+        Args:
+            fund_code: 基金代码
+            date: 报告期日期（可选，此接口不支持指定日期）
             
-            # 东方财富API接口
+        Returns:
+            List[Dict]: 重仓股数据列表
+        """
+        import re
+        
+        try:
+            logger.info(f"从东方财富JS接口获取基金 {fund_code} 的重仓股数据...")
+            
             url = f"http://fund.eastmoney.com/pingzhongdata/{fund_code}.js"
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -179,18 +275,95 @@ class HeavyweightStocksFetcher:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             
-            # 解析JavaScript数据
             content = response.text
             
-            # 提取持仓数据（简化处理，实际需要更复杂的解析）
-            # 这里作为备用方案，如果akshare失败才使用
+            # 检查是否返回有效数据
+            if len(content) < 1000 or 'fS_code' not in content:
+                raise DataSourceError(f"东方财富JS接口返回数据异常: {fund_code}")
             
-            logger.warning("东方财富备用接口暂未实现完整解析逻辑")
-            raise DataSourceError("东方财富备用接口数据解析未完成")
+            # 解析JS变量
+            def extract_array(text: str, var_name: str) -> List[str]:
+                """提取JS数组变量"""
+                # 匹配 var name = [...] 或 var name=[...]
+                pattern = rf'var\s+{var_name}\s*=\s*(\[[^\]]*\])'
+                match = re.search(pattern, text)
+                if match:
+                    try:
+                        # 安全解析JS数组
+                        array_str = match.group(1)
+                        # 处理JS数组字符串
+                        items = re.findall(r'"([^"]*)"', array_str)
+                        return items
+                    except Exception:
+                        pass
+                return []
             
+            def extract_float_array(text: str, var_name: str) -> List[float]:
+                """提取JS浮点数组变量"""
+                pattern = rf'var\s+{var_name}\s*=\s*(\[[^\]]*\])'
+                match = re.search(pattern, text)
+                if match:
+                    try:
+                        array_str = match.group(1)
+                        # 提取数字
+                        numbers = re.findall(r'[-\d.]+', array_str)
+                        return [float(n) for n in numbers]
+                    except Exception:
+                        pass
+                return []
+            
+            # 提取持仓数据
+            stock_codes = extract_array(content, 'stockCodes')
+            stock_names = extract_array(content, 'stockNames')
+            stock_ratios = extract_float_array(content, 'stockNewRatio')
+            
+            if not stock_codes:
+                # 可能是FOF基金，无股票持仓
+                logger.info(f"基金 {fund_code} 无股票持仓数据（可能是FOF或债券基金）")
+                raise DataSourceError(f"基金 {fund_code} 无股票持仓数据")
+            
+            # 组合数据
+            stocks = []
+            count = min(len(stock_codes), 10)  # 最多取前10只
+            
+            for i in range(count):
+                code = stock_codes[i] if i < len(stock_codes) else ''
+                name = stock_names[i] if i < len(stock_names) else ''
+                ratio = stock_ratios[i] if i < len(stock_ratios) else 0
+                
+                # 清理股票代码（去掉市场后缀如105、116等）
+                # GOOGL105 -> GOOGL, 02259116 -> 02259
+                clean_code = re.sub(r'\d+$', '', code) if code else ''
+                if not clean_code:
+                    clean_code = code
+                
+                stock = {
+                    'name': name,
+                    'code': clean_code,
+                    'holding_ratio': f"{ratio:.2f}%" if ratio else '--',
+                    'market_value': '--',  # JS接口不提供市值
+                    'change_percent': '--'
+                }
+                stocks.append(stock)
+            
+            if not stocks:
+                raise DataSourceError(f"东方财富JS接口解析失败: {fund_code}")
+            
+            logger.info(f"成功从东方财富JS接口获取 {len(stocks)} 条重仓股数据")
+            return stocks
+            
+        except DataSourceError:
+            raise
         except Exception as e:
-            logger.error(f"从东方财富获取数据失败: {e}")
-            raise DataSourceError(f"东方财富数据获取失败: {e}")
+            logger.error(f"从东方财富JS接口获取数据失败: {e}")
+            raise DataSourceError(f"东方财富JS数据获取失败: {e}")
+    
+    def _fetch_from_eastmoney(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:
+        """
+        从东方财富备用接口获取数据（已弃用，使用_fetch_from_eastmoney_js代替）
+        """
+        # 保留此方法以兼容，实际调用新的JS接口
+        return self._fetch_from_eastmoney_js(fund_code, date)
     
     @retry_on_error(max_retries=2, delay=2)
     def _fetch_from_sina(self, fund_code: str, date: Optional[str] = None) -> List[Dict]:

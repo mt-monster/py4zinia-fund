@@ -184,7 +184,6 @@ const CHART_CONFIG = {
 
 // 图表实例存储
 const correlationCharts = {
-    scatter: null,
     line: null,
     distribution: null
 };
@@ -339,12 +338,6 @@ function initCorrelationCharts(container, chartData) {
     if (!scatterData && !lineData && !rollingData && !distributionData) {
         console.error('❌ 没有任何有效的图表数据');
         return;
-    }
-    
-    if (scatterData) {
-        const scatterWrapper = createChartWrapper('scatter-correlation-chart', '日收益率散点图');
-        container.appendChild(scatterWrapper);
-        initScatterChart(scatterData);
     }
     
     if (lineData) {
@@ -606,129 +599,6 @@ function injectChartStyles() {
 }
 
 /**
- * 初始化散点图
- */
-function initScatterChart(scatterData) {
-    const canvas = document.getElementById('scatter-correlation-chart');
-    if (!canvas) {
-        console.error('散点图Canvas元素未找到');
-        return;
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
-    // 销毁旧图表
-    if (correlationCharts.scatter) {
-        correlationCharts.scatter.destroy();
-    }
-    
-    correlationCharts.scatter = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [{
-                label: '收益率对比',
-                data: scatterData.points.map(p => ({x: p.x, y: p.y})),
-                backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                borderColor: 'rgba(59, 130, 246, 0.8)',
-                pointRadius: 4,
-                pointHoverRadius: 6
-            }]
-        },
-        plugins: [{
-            id: 'registerChart',
-            afterInit: (chart) => {
-                collapsibleChartManager.registerChart('scatter-correlation-chart', chart);
-                collapsibleChartManager.updateCounter('scatter-correlation-chart', `${scatterData.points.length} 个数据点`);
-            }
-        }],
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: {
-                padding: {
-                    left: 80,
-                    right: 40,
-                    top: 20,
-                    bottom: 80
-                }
-            },
-            plugins: {
-                title: {
-                    display: false
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    bodyFont: {
-                        size: 14
-                    },
-                    titleFont: {
-                        size: 14
-                    },
-                    callbacks: {
-                        label: function(context) {
-                            const fund1Name = formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code});
-                            const fund2Name = formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code});
-                            return [
-                                `${fund1Name}: ${(context.parsed.x * 100).toFixed(2)}%`,
-                                `${fund2Name}: ${(context.parsed.y * 100).toFixed(2)}%`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: formatFundName({fund_name: scatterData.fund1_name, fund_code: scatterData.fund1_code}) + ' 日收益率 (%)',
-                        font: {
-                            size: 15,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            top: 20
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            size: 13
-                        },
-                        callback: function(value) {
-                            return (value * 100).toFixed(2);
-                        }
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: formatFundName({fund_name: scatterData.fund2_name, fund_code: scatterData.fund2_code}) + ' 日收益率 (%)',
-                        font: {
-                            size: 15,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            bottom: 20
-                        }
-                    },
-                    ticks: {
-                        font: {
-                            size: 13
-                        },
-                        callback: function(value) {
-                            return (value * 100).toFixed(2);
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-/**
  * 格式化基金名称显示
  * 优先使用基金名称，如果名称无效则使用代码
  */
@@ -917,10 +787,10 @@ function initLineChart(lineData) {
             maintainAspectRatio: false,
             layout: {
                 padding: {
-                    left: 80,
-                    right: 40,
-                    top: 20,
-                    bottom: 80
+                    left: 60,
+                    right: 30,
+                    top: 10,
+                    bottom: 60
                 }
             },
             plugins: {
@@ -930,15 +800,16 @@ function initLineChart(lineData) {
                 legend: {
                     display: true,
                     position: 'top',
+                    align: 'start',  // 左对齐，节省空间
                     labels: {
                         font: {
-                            size: 12
+                            size: 11
                         },
-                        padding: 12,
+                        padding: 8,
                         usePointStyle: true,
                         pointStyle: 'circle',
-                        boxWidth: 6,
-                        boxHeight: 6
+                        boxWidth: 5,
+                        boxHeight: 5
                     }
                 },
                 tooltip: {
@@ -1260,9 +1131,7 @@ function initDistributionChart(distributionData) {
  */
 function resetZoom(canvasId) {
     let chart = null;
-    if (canvasId === 'scatter-correlation-chart') {
-        chart = correlationCharts.scatter;
-    } else if (canvasId === 'nav-comparison-chart') {
+    if (canvasId === 'nav-comparison-chart') {
         chart = correlationCharts.line;
     } else if (canvasId === 'rolling-correlation-chart') {
         chart = correlationCharts.rolling;
@@ -1299,9 +1168,7 @@ function toggleFullscreen(wrapper) {
     if (canvas) {
         const chartId = canvas.id;
         let chart = null;
-        if (chartId === 'scatter-correlation-chart') {
-            chart = correlationCharts.scatter;
-        } else if (chartId === 'nav-comparison-chart') {
+        if (chartId === 'nav-comparison-chart') {
             chart = correlationCharts.line;
         } else if (chartId === 'rolling-correlation-chart') {
             chart = correlationCharts.rolling;

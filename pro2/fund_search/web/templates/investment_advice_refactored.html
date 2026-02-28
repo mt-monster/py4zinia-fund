@@ -1663,8 +1663,9 @@
             annualReturnEl.textContent = (summary.annualized_return ? summary.annualized_return.toFixed(2) : '--') + '%';
             annualReturnEl.className = 'metric-value ' + (summary.annualized_return >= 0 ? 'positive' : 'negative');
             
-            maxDrawdownEl.textContent = '--%'; // 需要计算
-            sharpeEl.textContent = '--'; // 需要计算
+            maxDrawdownEl.textContent = (summary.max_drawdown != null ? summary.max_drawdown.toFixed(2) : '--') + '%';
+            maxDrawdownEl.className = 'metric-value negative';
+            sharpeEl.textContent = summary.sharpe_ratio != null ? summary.sharpe_ratio.toFixed(2) : '--';
             
             // 渲染基金绩效表
             const tbody = document.getElementById('performance-tbody');

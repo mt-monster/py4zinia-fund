@@ -586,18 +586,26 @@
                 </div>
             </div>
 
-            <!-- 资产配置图 -->
-            <div class="chart-card">
+            <!-- 市场恐贪指数 -->
+            <div class="chart-card" id="fear-greed-card">
                 <div class="header">
-                    <h3><i class="bi bi-pie-chart-fill"></i> 资产配置</h3>
+                    <h3><i class="bi bi-speedometer2"></i> 市场恐贪指数</h3>
                     <div class="actions">
-                        <button class="btn-icon" onclick="refreshChart('allocation')" title="刷新">
+                        <button class="btn-icon" onclick="refreshChart('fear-greed')" title="刷新">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="allocationChart"></canvas>
+                <div class="chart-container" id="fearGreedContainer" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                    <div id="fearGreedGauge" style="width:100%; max-width:320px; position:relative;">
+                        <!-- 仪表盘由JS渲染 -->
+                    </div>
+                    <div id="fearGreedInfo" style="margin-top:12px; text-align:center;">
+                        <div id="fearGreedValue" style="font-size:2rem; font-weight:700; color:#aaa;">--</div>
+                        <div id="fearGreedLabel" style="font-size:1rem; color:#666; margin-top:4px;">加载中...</div>
+                        <div id="fearGreedDate" style="font-size:0.75rem; color:#aaa; margin-top:4px;"></div>
+                    </div>
+                    <div id="fearGreedHistory" style="width:100%; margin-top:16px;"></div>
                 </div>
             </div>
         </div>
@@ -695,7 +703,6 @@
     <script>
         // 全局图表实例
         let profitChart = null;
-        let allocationChart = null;
         let isInitialLoad = true; // 标记是否为首次加载
 
         // 颜色处理辅助函数
@@ -834,10 +841,9 @@
                 console.log('[统一加载] 开始并行加载所有数据...');
 
                 // 并行发起所有请求
-                const [statsResult, profitResult, allocationResult, holdingStocksResult] = await Promise.all([
+                const [statsResult, profitResult, holdingStocksResult] = await Promise.all([
                     cachedFetch('/api/dashboard/stats', 'dashboard_stats', 60).catch(e => ({ success: false, error: e })),
                     cachedFetch('/api/dashboard/profit-trend?days=90&user_id=default_user', 'profit_trend_90', 300).catch(e => ({ success: false, error: e })),
-                    cachedFetch('/api/dashboard/allocation', 'allocation', 120).catch(e => ({ success: false, error: e })),
                     cachedFetch('/api/dashboard/holding-stocks?top=10', 'holding_stocks', 300).catch(e => ({ success: false, error: e }))
                 ]);
 
@@ -852,10 +858,6 @@
 
                 if (profitResult.success && profitChart) {
                     updateProfitChart(profitResult.data);
-                }
-
-                if (allocationResult.success && allocationChart) {
-                    updateAllocationChart(allocationResult.data);
                 }
 
                 if (holdingStocksResult.success) {
@@ -902,23 +904,10 @@
             }
         }
 
-        // 更新资产配置图表
+        // 更新资产配置图表（含基金类型分布）
         function updateAllocationChart(data) {
-            if (!allocationChart || !data) return;
-
-            if (data.distribution && data.distribution.length > 0) {
-                const labels = data.distribution.map(item => item.name);
-                const values = data.distribution.map(item => item.percentage);
-                const colors = data.distribution.map(item => item.color);
-
-                allocationChart.data.labels = labels;
-                allocationChart.data.datasets[0].data = values;
-                allocationChart.data.datasets[0].backgroundColor = colors;
-                allocationChart.update('active');
-            }
-
-            // 更新基金类型分布列表
-            if (data.distribution) {
+            // 仅更新基金类型分布列表，不再渲染饼图
+            if (data && data.distribution) {
                 updateFundTypeDistribution(data);
             }
         }
@@ -961,7 +950,7 @@
         // 初始化图表
         function initCharts() {
             initProfitChart();
-            initAllocationChart();
+            loadFearGreedIndex();
         }
 
         // 收益趋势图 - 仅初始化图表实例，不加载数据
@@ -1019,69 +1008,133 @@
             });
         }
 
-        // 资产配置图 - 仅初始化图表实例，不加载数据
-        function initAllocationChart() {
-            const canvas = document.getElementById('allocationChart');
-            const ctx = canvas.getContext('2d');
-            
-            // 确保Canvas有正确的尺寸
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-            
-            allocationChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            '#e74c3c',
-                            '#3498db',
-                            '#27ae60',
-                            '#f39c12',
-                            '#9b59b6',
-                            '#1abc9c'
-                        ],
-                        borderWidth: 2,
-                        borderColor: '#ffffff',
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                        animateRotate: true,
-                        animateScale: true,
-                        duration: 1000
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                usePointStyle: true,
-                                padding: 15,
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.parsed;
-                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                    const percentage = Math.round((value / total) * 100);
-                                    return `${label}: ¥${value.toLocaleString()} (${percentage}%)`;
-                                }
-                            }
-                        }
-                    },
-                    cutout: '60%',
-                    radius: '90%'
-                }
-            });
+        // ==================== 市场恐贪指数 ====================
+
+        /**
+         * 加载并渲染 A 股市场情绪指数（来自后端 Tushare 真实计算）
+         */
+        async function loadFearGreedIndex() {
+            const colorMap = {
+                'Extreme Fear': '#e74c3c',
+                'Fear':         '#e67e22',
+                'Neutral':      '#f1c40f',
+                'Greed':        '#2ecc71',
+                'Extreme Greed':'#27ae60'
+            };
+            const labelMap = {
+                'Extreme Fear': '极度恐慌',
+                'Fear':         '恐慌',
+                'Neutral':      '中性',
+                'Greed':        '贪婪',
+                'Extreme Greed':'极度贪婪'
+            };
+            try {
+                const res  = await fetch('/api/market/fear-greed');
+                const json = await res.json();
+                if (!json.success || !json.data) throw new Error(json.error || '接口返回异常');
+
+                const data  = json.data;
+                const value = data.value;
+                const classification = data.classification;
+                const dateStr = data.date || new Date().toLocaleDateString('zh-CN');
+                const color = colorMap[classification] || '#aaa';
+                const label = labelMap[classification] || classification;
+
+                // 渲染仪表盘（SVG半圆）
+                renderFearGreedGauge(value, color);
+
+                // 更新数字和文字
+                const valueEl = document.getElementById('fearGreedValue');
+                const labelEl = document.getElementById('fearGreedLabel');
+                const dateEl  = document.getElementById('fearGreedDate');
+                if (valueEl) { valueEl.textContent = value; valueEl.style.color = color; }
+                if (labelEl) { labelEl.textContent = label; labelEl.style.color = color; }
+                if (dateEl)  { dateEl.textContent = `更新于 ${dateStr}`; }
+
+                // 渲染7日历史小条（history 已是倒序，最新在前）
+                const histList = (data.history || []).slice(0, 7);
+                renderFearGreedHistory([...histList].reverse(), colorMap, labelMap);
+
+            } catch (e) {
+                const labelEl = document.getElementById('fearGreedLabel');
+                if (labelEl) labelEl.textContent = '数据加载失败';
+                console.warn('A股恐贪指数加载失败:', e);
+            }
+        }
+
+        /**
+         * 绘制半圆仪表盘
+         */
+        function renderFearGreedGauge(value, color) {
+            const container = document.getElementById('fearGreedGauge');
+            if (!container) return;
+
+            // 角度：从左 (-180°) 到右 (0°)，value 0-100
+            const angle = -180 + (value / 100) * 180;
+            const rad = (angle * Math.PI) / 180;
+            const cx = 160, cy = 130, r = 110;
+            const nx = cx + r * Math.cos(rad);
+            const ny = cy + r * Math.sin(rad);
+
+            // 渐变段色（极恐->恐->中->贪->极贪）
+            const stops = [
+                { offset: '0%',   color: '#e74c3c' },
+                { offset: '25%',  color: '#e67e22' },
+                { offset: '50%',  color: '#f1c40f' },
+                { offset: '75%',  color: '#2ecc71' },
+                { offset: '100%', color: '#27ae60' }
+            ];
+
+            container.innerHTML = `
+                <svg viewBox="0 0 320 150" xmlns="http://www.w3.org/2000/svg" style="width:100%; overflow:visible;">
+                    <defs>
+                        <linearGradient id="fgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            ${stops.map(s => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('')}
+                        </linearGradient>
+                    </defs>
+                    <!-- 背景弧 -->
+                    <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="#f0f0f0" stroke-width="18" stroke-linecap="round"/>
+                    <!-- 彩色弧 -->
+                    <path d="M 50 130 A 110 110 0 0 1 270 130" fill="none" stroke="url(#fgGrad)" stroke-width="18" stroke-linecap="round" opacity="0.85"/>
+                    <!-- 指针 -->
+                    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}"
+                          stroke="${color}" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="${cx}" cy="${cy}" r="6" fill="${color}"/>
+                    <!-- 刻度标签 -->
+                    <text x="44"  y="148" font-size="11" fill="#e74c3c" text-anchor="middle">0</text>
+                    <text x="160" y="20"  font-size="11" fill="#f1c40f" text-anchor="middle">50</text>
+                    <text x="276" y="148" font-size="11" fill="#27ae60" text-anchor="middle">100</text>
+                </svg>`;
+        }
+
+        /**
+         * 渲染7日历史迷你条形图
+         * list 中每项结构: { value, classification, date }
+         */
+        function renderFearGreedHistory(list, colorMap, labelMap) {
+            const container = document.getElementById('fearGreedHistory');
+            if (!container || !list.length) return;
+
+            const max = 100;
+            const html = `
+                <div style="font-size:11px; color:#999; margin-bottom:6px; text-align:center;">近7日走势</div>
+                <div style="display:flex; gap:4px; align-items:flex-end; justify-content:center; height:50px;">
+                    ${list.map(item => {
+                        const v = parseInt(item.value);
+                        const c = colorMap[item.classification] || '#aaa';
+                        const l = labelMap[item.classification] || item.classification;
+                        // date 格式为 "YYYY-MM-DD"
+                        const parts = (item.date || '').split('-');
+                        const d = parts.length >= 3 ? `${parseInt(parts[1])}/${parseInt(parts[2])}` : item.date;
+                        const h = Math.max(8, (v / max) * 44);
+                        return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;" title="${d}: ${v} ${l}">
+                            <div style="font-size:9px; color:${c}; font-weight:600;">${v}</div>
+                            <div style="width:100%; height:${h}px; background:${c}; border-radius:3px 3px 0 0; opacity:0.85;"></div>
+                            <div style="font-size:9px; color:#bbb;">${d}</div>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+            container.innerHTML = html;
         }
 
         // 显示无持仓数据提示
@@ -1317,11 +1370,8 @@
                     if (data.success) {
                         updateProfitChart(data.data);
                     }
-                } else if (type === 'allocation') {
-                    const data = await cachedFetch('/api/dashboard/allocation', 'allocation', 0);
-                    if (data.success) {
-                        updateAllocationChart(data.data);
-                    }
+                } else if (type === 'fear-greed') {
+                    await loadFearGreedIndex();
                 }
                 showNotification('图表已刷新', 'success');
             } catch (error) {
