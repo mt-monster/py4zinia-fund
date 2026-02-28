@@ -930,11 +930,7 @@ def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.02) ->
         保留此函数以维持向后兼容性
     """
     # 使用 PerformanceCalculator 的实现
-<<<<<<< HEAD
     from ..analysis.performance_metrics import PerformanceCalculator
-=======
-    from .performance_metrics import PerformanceCalculator
->>>>>>> e7314991467ef81fa7ebe96d0b2fafdd7a30d714
     
     calculator = PerformanceCalculator(risk_free_rate=risk_free_rate)
     return calculator.calculate_sharpe_ratio(returns)
