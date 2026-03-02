@@ -1202,7 +1202,6 @@
             document.getElementById('strategy-description').value = '';
             document.getElementById('strategy-preview').style.display = 'none';
 
-            // 重置表单
             document.getElementById('filter-field').value = '';
             document.getElementById('filter-operator').value = '>';
             document.getElementById('filter-value').value = '';
@@ -1213,10 +1212,12 @@
             document.getElementById('holding-count').value = '5';
             document.getElementById('weight-mode').value = 'equal';
 
-            // 更新策略列表选中状态
             document.querySelectorAll('.strategy-item').forEach(item => {
                 item.classList.remove('active');
             });
+            
+            document.getElementById('strategy-name').focus();
+            document.getElementById('strategy-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         function saveStrategy() {
