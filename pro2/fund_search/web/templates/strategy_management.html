@@ -1381,6 +1381,20 @@
                 return;
             }
 
+            const startDate = new Date(document.getElementById('backtest-start').value);
+            const endDate = new Date(document.getElementById('backtest-end').value);
+            const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            
+            const allowedDays = [30, 60, 90, 180, 365];
+            let days = 90;
+            for (const d of allowedDays) {
+                if (daysDiff <= d) {
+                    days = d;
+                    break;
+                }
+            }
+            if (daysDiff > 365) days = 365;
+
             const params = {
                 fund_code: fundCode,
                 strategy_id: strategyId,
@@ -1389,6 +1403,8 @@
                 end_date: document.getElementById('backtest-end').value,
                 initial_amount: parseFloat(document.getElementById('backtest-initial').value),
                 monthly_invest: parseFloat(document.getElementById('backtest-monthly').value),
+                base_invest: parseFloat(document.getElementById('backtest-monthly').value),
+                days: days,
                 benchmark: document.getElementById('backtest-benchmark').value
             };
 
