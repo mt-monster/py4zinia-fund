@@ -49,6 +49,31 @@ def load_strategy_config():
         }
 
 
+def get_fund_name_from_api(fund_code: str) -> str:
+    """从akshare获取基金名称"""
+    try:
+        import akshare as ak
+        try:
+            fund_info = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            if fund_info is not None and not fund_info.empty:
+                for _, row in fund_info.iterrows():
+                    if row.get('item') == '基金简称':
+                        return row.get('value', '')
+        except Exception:
+            pass
+        try:
+            fund_list = ak.fund_name_em()
+            if '基金代码' in fund_list.columns and '基金简称' in fund_list.columns:
+                row = fund_list[fund_list['基金代码'] == fund_code]
+                if not row.empty:
+                    return row.iloc[0]['基金简称']
+        except Exception:
+            pass
+    except Exception as e:
+        logger.debug(f"获取基金名称失败 {fund_code}: {e}")
+    return None
+
+
 def enhance_investment_advice_professional(fund_codes, advice_result, initial_capital, db_manager):
     """
     增强投资建议的专业性（基金经理视角）
@@ -85,26 +110,26 @@ def enhance_single_fund_advice(fund, initial_capital, db_manager):
     """增强单只基金建议的专业性（参考策略配置）"""
     fund_code = fund.get('fund_code', '')
     fund_name = fund.get('fund_name', fund_code)
+    
+    if fund_name == fund_code:
+        fund_name = get_fund_name_from_api(fund_code) or fund_code
+    
     advice = fund.get('advice', {})
     action = advice.get('action', 'hold')
     today_return = fund.get('today_return', 0)
     prev_day_return = fund.get('prev_day_return', 0)
     
-    # 加载策略配置
     config = load_strategy_config()
     
-    # 获取当前持仓信息
     holding_info = get_holding_info(fund_code, db_manager)
     current_shares = holding_info.get('shares', 0)
     current_nav = holding_info.get('nav', 0)
     current_market_value = current_shares * current_nav if current_nav > 0 else 0
     
-    # 计算今日预估收益变化
     today_profit = current_market_value * today_return / 100 if today_return else 0
     prev_profit = current_market_value * prev_day_return / 100 if prev_day_return else 0
     profit_change = today_profit - prev_profit
     
-    # 根据策略配置确定具体的操作建议
     strategy_info = determine_strategy_by_config(today_return, prev_day_return, config)
     strategy_label = strategy_info.get('label', '')
     strategy_desc = strategy_info.get('description', '')
@@ -173,6 +198,7 @@ def enhance_single_fund_advice(fund, initial_capital, db_manager):
         'execution_plan': buy_reasons['execution_plan']
     }
     
+    fund['fund_name'] = fund_name
     fund['profit_analysis'] = profit_analysis
     fund['professional_summary'] = generate_professional_summary(fund, profit_analysis, action)
     
