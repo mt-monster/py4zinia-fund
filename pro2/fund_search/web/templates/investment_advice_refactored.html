@@ -1109,17 +1109,26 @@
             // 设置选中的基金
             AppState.selectedFunds = [...fundCodes];
             
-            // 获取基金的详细信息（优先从持仓中查找，否则使用代码）
+            // 获取基金的详细信息（优先从持仓中查找，否则通过API获取）
             const fundsWithInfo = [];
+            const missingInfoCodes = [];
+            
             for (const code of fundCodes) {
                 const holding = AppState.holdings.find(h => h.fund_code === code);
                 if (holding) {
                     fundsWithInfo.push(holding);
                 } else {
-                    // 如果不在持仓中，创建一个基本信息对象
+                    missingInfoCodes.push(code);
+                }
+            }
+            
+            // 对于不在持仓中的基金，通过API获取基金名称
+            if (missingInfoCodes.length > 0) {
+                const fundNames = await batchGetFundNames(missingInfoCodes);
+                for (const code of missingInfoCodes) {
                     fundsWithInfo.push({
                         fund_code: code,
-                        fund_name: code,  // 使用代码作为名称，后续可以通过API获取完整信息
+                        fund_name: fundNames[code] || code,
                         shares: 0,
                         market_value: 0,
                         cost_price: 0,
@@ -1148,6 +1157,24 @@
             updateSelectedSummary();
             
             showNotification(`已自动带入 ${fundCodes.length} 只基金，可直接进入选择策略`, 'success');
+        }
+        
+        // 批量获取基金名称
+        async function batchGetFundNames(fundCodes) {
+            const fundNames = {};
+            const promises = fundCodes.map(async (code) => {
+                try {
+                    const response = await fetch(`/api/fund/${code}/info`);
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        fundNames[code] = result.data.raw_info?.基金简称 || result.data.raw_info?.基金名称 || code;
+                    }
+                } catch (e) {
+                    console.warn(`获取基金 ${code} 名称失败:`, e);
+                }
+            });
+            await Promise.all(promises);
+            return fundNames;
         }
 
         // 渲染传递过来的基金列表
