@@ -12,6 +12,7 @@ import logging
 import traceback
 from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 from flask import jsonify, request
 
@@ -247,9 +248,8 @@ def backtest_strategy():
             from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
             hist_df = fetch_fund_history_from_akshare(fund_code, days=days)
             if hist_df is not None and not hist_df.empty:
-                hist_df = hist_df.sort_values('date', ascending=True)
+                hist_df = hist_df.sort_values('analysis_date', ascending=True)
                 hist_df['today_return'] = hist_df['nav'].pct_change() * 100
-                hist_df['analysis_date'] = hist_df['date']
                 df = hist_df[['analysis_date', 'today_return', 'nav']].copy()
                 df['prev_day_return'] = df['today_return'].shift(1)
                 df = df.dropna(subset=['today_return'])
@@ -265,32 +265,61 @@ def backtest_strategy():
         
         df = df.sort_values('analysis_date', ascending=True)
         
-        # 准备历史收益率序列
         returns_history = []
         balance = initial_amount
         holdings = 0
         trades = []
         cumulative_pnl = 0.0
+        equity_curve = []
+        benchmark_curve = []
+        daily_returns = []
+        dates = []
+        drawdown_curve = []
+        
+        peak = initial_amount
+        max_drawdown = 0.0
+        
+        prev_benchmark_value = initial_amount
+        
+        first_iteration = True
+        holdings_cost = 0
+        observation_days = 5
         
         for idx, row in df.iterrows():
             today_return = float(row.get('today_return', 0)) if pd.notna(row.get('today_return', 0)) else 0
-            sharpe_ratio = float(row.get('sharpe_ratio', 0)) if pd.notna(row.get('sharpe_ratio', 0)) else 0
-            max_drawdown = float(row.get('max_drawdown', 0)) if pd.notna(row.get('max_drawdown', 0)) else 0
-            volatility = float(row.get('volatility', 0)) if pd.notna(row.get('volatility', 0)) else 0
-            annualized_return = float(row.get('annualized_return', 0)) if pd.notna(row.get('annualized_return', 0)) else 0
-            calmar_ratio = float(row.get('calmar_ratio', 0)) if pd.notna(row.get('calmar_ratio', 0)) else 0
-            sortino_ratio = float(row.get('sortino_ratio', 0)) if pd.notna(row.get('sortino_ratio', 0)) else 0
-            composite_score = float(row.get('composite_score', 0)) if pd.notna(row.get('composite_score', 0)) else 0
             prev_day_return = float(row.get('prev_day_return', 0)) if pd.notna(row.get('prev_day_return', 0)) else 0
             
-            # 更新历史收益率
-            returns_history.append(today_return / 100)  # 转换为小数
+            dates.append(str(row['analysis_date']))
+            returns_history.append(today_return / 100)
+            daily_returns.append(today_return / 100)
             
-            # 计算累计盈亏率
-            if holdings > 0:
-                cumulative_pnl = (holdings - initial_amount + balance) / initial_amount - 1
+            if first_iteration and holdings == 0 and balance >= base_invest:
+                buy_amount = base_invest
+                balance -= buy_amount
+                holdings += buy_amount
+                holdings_cost = buy_amount
+                trades.append({
+                    'date': str(row['analysis_date']),
+                    'action': 'buy',
+                    'amount': buy_amount,
+                    'balance': round(balance, 2),
+                    'holdings': round(holdings, 2),
+                    'profit': 0,
+                    'multiplier': 1,
+                    'trend': 'initial',
+                    'volatility_adj': 1.0,
+                    'fund_code': fund_code,
+                    'cumulative_return': 0
+                })
+                first_iteration = False
             
-            # 使用统一策略引擎分析
+            if holdings > 0 and holdings_cost > 0:
+                cumulative_pnl = (holdings - holdings_cost) / holdings_cost
+                if len(dates) <= observation_days:
+                    cumulative_pnl = max(cumulative_pnl, 0)
+            else:
+                cumulative_pnl = 0
+            
             result = unified_strategy_engine.analyze(
                 today_return=today_return,
                 prev_day_return=prev_day_return,
@@ -298,7 +327,6 @@ def backtest_strategy():
                 cumulative_pnl=cumulative_pnl if holdings > 0 else None
             )
             
-            # 检查止损
             if result.stop_loss_triggered:
                 if holdings > 0:
                     balance += holdings
@@ -309,12 +337,16 @@ def backtest_strategy():
                         'balance': round(balance, 2),
                         'holdings': 0,
                         'profit': holdings - (initial_amount - balance),
-                        'reason': result.stop_loss_label
+                        'reason': result.stop_loss_label,
+                        'fund_code': fund_code,
+                        'cumulative_return': ((balance + 0) / initial_amount - 1) * 100
                     })
                     holdings = 0
+                equity_curve.append(balance)
+                prev_benchmark_value = prev_benchmark_value * (1 + today_return / 100)
+                benchmark_curve.append(prev_benchmark_value)
                 continue
             
-            # 执行买入
             buy_multiplier = result.final_buy_multiplier
             if buy_multiplier > 0:
                 buy_amount = base_invest * buy_multiplier
@@ -330,44 +362,101 @@ def backtest_strategy():
                         'profit': 0,
                         'multiplier': buy_multiplier,
                         'trend': result.trend,
-                        'volatility_adj': result.volatility_adjustment
+                        'volatility_adj': result.volatility_adjustment,
+                        'fund_code': fund_code,
+                        'cumulative_return': ((balance + holdings) / initial_amount - 1) * 100
                     })
             
-            # 执行赎回
             redeem_amount = result.redeem_amount
-            if redeem_amount > 0 and holdings >= redeem_amount:
-                holdings -= redeem_amount
-                balance += redeem_amount
+            if redeem_amount > 0 and holdings > 0:
+                sell_amount = min(redeem_amount, holdings * 0.5)
+                holdings -= sell_amount
+                balance += sell_amount
                 trades.append({
                     'date': str(row['analysis_date']),
                     'action': 'sell',
-                    'amount': redeem_amount,
+                    'amount': sell_amount,
                     'balance': round(balance, 2),
                     'holdings': round(holdings, 2),
-                    'profit': 0
+                    'profit': 0,
+                    'fund_code': fund_code,
+                    'cumulative_return': ((balance + holdings) / initial_amount - 1) * 100
                 })
             
-            # 更新持仓价值
             holdings *= (1 + today_return / 100)
+            equity_curve.append(round(balance + holdings, 2))
+            prev_benchmark_value = prev_benchmark_value * (1 + today_return / 100)
+            benchmark_curve.append(round(prev_benchmark_value, 2))
         
-        # 计算最终结果
         total_value = balance + holdings
         total_return = (total_value - initial_amount) / initial_amount * 100
         
-        # 计算交易盈亏
         for i, trade in enumerate(trades):
             if trade['action'] == 'sell' or trade['action'] == 'stop_loss':
-                # 简化计算：假设卖出时的盈亏
                 trade['profit'] = trade['amount'] * (total_return / 100) / len([t for t in trades if t['action'] in ['sell', 'stop_loss']] or [1])
         
-        # 使用策略评估器评估
         evaluation = strategy_evaluator.evaluate(trades)
         evaluation_dict = strategy_evaluator.to_dict(evaluation)
         
-        # 清理 Infinity 值（JSON 不支持）
         for key, value in evaluation_dict.items():
             if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
                 evaluation_dict[key] = None
+        
+        strategy_returns = []
+        for i in range(1, len(equity_curve)):
+            if equity_curve[i-1] > 0:
+                ret = (equity_curve[i] - equity_curve[i-1]) / equity_curve[i-1]
+                strategy_returns.append(ret)
+        
+        if len(strategy_returns) > 1:
+            strategy_returns_arr = np.array(strategy_returns)
+            volatility = float(np.std(strategy_returns_arr) * np.sqrt(252) * 100)
+            mean_return = np.mean(strategy_returns_arr)
+            if np.std(strategy_returns_arr) > 0:
+                sharpe_ratio = float(mean_return / np.std(strategy_returns_arr) * np.sqrt(252))
+            else:
+                sharpe_ratio = 0.0
+        else:
+            volatility = 0.0
+            sharpe_ratio = 0.0
+        
+        if len(strategy_returns) > 0 and total_value != initial_amount:
+            trading_days = len(strategy_returns)
+            annual_return = float(((total_value / initial_amount) ** (252 / trading_days) - 1) * 100)
+        else:
+            annual_return = 0.0
+        
+        peak = initial_amount
+        max_drawdown = 0.0
+        for value in equity_curve:
+            if value > peak:
+                peak = value
+            if peak > 0:
+                drawdown = (peak - value) / peak * 100
+                drawdown_curve.append(drawdown)
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+        
+        monthly_returns = {}
+        if len(dates) > 0 and len(daily_returns) > 0:
+            for i, date_str in enumerate(dates):
+                try:
+                    dt = pd.to_datetime(date_str)
+                    month_key = f"{dt.year}-{dt.month:02d}"
+                    if month_key not in monthly_returns:
+                        monthly_returns[month_key] = []
+                    if i < len(daily_returns):
+                        monthly_returns[month_key].append(daily_returns[i])
+                except:
+                    pass
+        
+        monthly_return_data = {}
+        for month_key, returns in monthly_returns.items():
+            if returns:
+                cum_ret = 1.0
+                for r in returns:
+                    cum_ret *= (1 + r)
+                monthly_return_data[month_key] = (cum_ret - 1) * 100
         
         return jsonify({
             'success': True,
@@ -378,10 +467,20 @@ def backtest_strategy():
                 'final_holdings': round(holdings, 2),
                 'total_value': round(total_value, 2),
                 'total_return': round(total_return, 2),
+                'annual_return': round(annual_return, 2),
+                'sharpe_ratio': round(sharpe_ratio, 2),
+                'max_drawdown': round(max_drawdown, 2),
+                'volatility': round(volatility, 2),
+                'profit_factor': evaluation_dict.get('profit_factor', 0),
                 'trades_count': len(trades),
                 'trades': trades,
                 'backtest_days': days,
                 'data_count': len(df),
+                'dates': dates,
+                'equity_curve': equity_curve,
+                'benchmark_curve': benchmark_curve,
+                'drawdown_curve': drawdown_curve,
+                'monthly_returns': monthly_return_data,
                 'evaluation': evaluation_dict
             }
         })

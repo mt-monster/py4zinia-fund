@@ -903,6 +903,22 @@
             <canvas id="backtest-chart" height="100"></canvas>
         </div>
 
+        <!-- 回撤曲线 -->
+        <div class="card" id="drawdown-chart-section" style="display:none;">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-graph-down"></i> 回撤曲线</div>
+            </div>
+            <canvas id="drawdown-chart" height="100"></canvas>
+        </div>
+
+        <!-- 月度收益热力图 -->
+        <div class="card" id="monthly-heatmap-section" style="display:none;">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-calendar-month"></i> 月度收益热力图</div>
+            </div>
+            <div id="monthly-heatmap" style="padding: 20px;"></div>
+        </div>
+
         <!-- 回测详情 -->
         <div class="card" id="backtest-detail-section" style="display:none;">
             <div class="card-header">
@@ -1055,7 +1071,8 @@
     <script>
         // 全局变量
         let currentStrategyId = null;
-        let backtestChart = null;
+        // 回测图表实例，初始化为 null
+        window.backtestChart = window.backtestChart || null;
         let evaluationData = [];
 
         // ==================== 标签切换 ====================
@@ -1426,6 +1443,9 @@
             })
             .then(res => res.json())
             .then(data => {
+                // 调试日志
+                console.log('Backtest result:', data);
+                
                 // 更新步骤指示器
                 document.getElementById('step-2').classList.add('completed');
                 document.getElementById('step-2').classList.remove('active');
@@ -1480,7 +1500,19 @@
             // 显示图表
             if (result.equity_curve) {
                 document.getElementById('backtest-chart-section').style.display = 'block';
-                drawBacktestChart(result.equity_curve, result.benchmark_curve);
+                drawBacktestChart(result.equity_curve, result.benchmark_curve, result.dates);
+            }
+
+            // 显示回撤曲线
+            if (result.drawdown_curve) {
+                document.getElementById('drawdown-chart-section').style.display = 'block';
+                drawDrawdownChart(result.drawdown_curve, result.dates);
+            }
+
+            // 显示月度收益热力图
+            if (result.monthly_returns) {
+                document.getElementById('monthly-heatmap-section').style.display = 'block';
+                drawMonthlyHeatmap(result.monthly_returns);
             }
 
             // 显示详情
@@ -1501,27 +1533,35 @@
             }
         }
 
-        function drawBacktestChart(equityCurve, benchmarkCurve) {
+        let drawdownChart;
+
+        function drawBacktestChart(equityCurve, benchmarkCurve, dates) {
             const ctx = document.getElementById('backtest-chart').getContext('2d');
 
-            if (backtestChart) {
-                backtestChart.destroy();
+            if (window.backtestChart) {
+                window.backtestChart.destroy();
             }
 
-            backtestChart = new Chart(ctx, {
+            const initialValue = equityCurve[0];
+            const strategyReturns = equityCurve.map(v => ((v - initialValue) / initialValue) * 100);
+            const benchmarkReturns = benchmarkCurve.map(v => ((v - initialValue) / initialValue) * 100);
+
+            const labels = dates ? dates.map(d => d.substring(5)) : equityCurve.map((_, i) => i);
+
+            window.backtestChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: equityCurve.map((_, i) => i),
+                    labels: labels,
                     datasets: [{
                         label: '策略收益',
-                        data: equityCurve,
+                        data: strategyReturns,
                         borderColor: '#667eea',
                         backgroundColor: 'rgba(102, 126, 234, 0.1)',
                         fill: true,
                         tension: 0.4
                     }, {
                         label: '基准收益',
-                        data: benchmarkCurve,
+                        data: benchmarkReturns,
                         borderColor: '#999',
                         backgroundColor: 'transparent',
                         borderDash: [5, 5],
@@ -1540,10 +1580,103 @@
                             ticks: {
                                 callback: value => value.toFixed(2) + '%'
                             }
+                        },
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 10
+                            }
                         }
                     }
                 }
             });
+        }
+
+        function drawDrawdownChart(drawdownCurve, dates) {
+            const ctx = document.getElementById('drawdown-chart').getContext('2d');
+
+            if (drawdownChart) {
+                drawdownChart.destroy();
+            }
+
+            const labels = dates ? dates.map(d => d.substring(5)) : drawdownCurve.map((_, i) => i);
+
+            drawdownChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '回撤',
+                        data: drawdownCurve,
+                        borderColor: '#f5576c',
+                        backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                callback: value => value.toFixed(2) + '%'
+                            },
+                            reverse: true
+                        },
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 10
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawMonthlyHeatmap(monthlyReturns) {
+            const container = document.getElementById('monthly-heatmap');
+            
+            const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            const years = [...new Set(Object.keys(monthlyReturns).map(k => k.split('-')[0]))].sort();
+
+            let html = '<div style="display: grid; grid-template-columns: 60px repeat(12, 1fr); gap: 4px;">';
+            html += '<div style="padding: 8px; font-weight: bold;"></div>';
+            months.forEach(m => {
+                html += `<div style="padding: 8px; font-weight: bold; text-align: center; font-size: 12px;">${m}</div>`;
+            });
+
+            years.forEach(year => {
+                html += `<div style="padding: 8px; font-weight: bold;">${year}</div>`;
+                for (let month = 1; month <= 12; month++) {
+                    const key = `${year}-${month.toString().padStart(2, '0')}`;
+                    const value = monthlyReturns[key];
+                    let bgColor = '#f0f0f0';
+                    let textColor = '#333';
+                    let displayValue = '-';
+
+                    if (value !== undefined) {
+                        displayValue = value.toFixed(2) + '%';
+                        if (value > 0) {
+                            const intensity = Math.min(value / 10, 1);
+                            bgColor = `rgba(17, 153, 142, ${0.2 + intensity * 0.6})`;
+                            textColor = '#fff';
+                        } else if (value < 0) {
+                            const intensity = Math.min(Math.abs(value) / 10, 1);
+                            bgColor = `rgba(245, 87, 108, ${0.2 + intensity * 0.6})`;
+                            textColor = '#fff';
+                        }
+                    }
+
+                    html += `<div style="padding: 8px; background: ${bgColor}; color: ${textColor}; text-align: center; font-size: 11px; border-radius: 4px;">${displayValue}</div>`;
+                }
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
         }
 
         function compareWithBenchmark() {
