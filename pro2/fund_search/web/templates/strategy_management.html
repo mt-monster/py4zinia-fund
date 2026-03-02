@@ -782,6 +782,12 @@
                     <div class="card-title"><i class="bi bi-sliders"></i> 回测配置</div>
                 </div>
 
+                <!-- 基金代码 -->
+                <div class="form-group">
+                    <label class="form-label">基金代码</label>
+                    <input type="text" class="form-control" id="backtest-fund-code" placeholder="输入6位基金代码" maxlength="6">
+                </div>
+
                 <!-- 选择策略 -->
                 <div class="form-group">
                     <label class="form-label">选择策略</label>
@@ -1363,6 +1369,12 @@
         }
 
         function runBacktest() {
+            const fundCode = document.getElementById('backtest-fund-code').value.trim();
+            if (!fundCode) {
+                alert('请输入基金代码');
+                return;
+            }
+            
             const strategyId = document.getElementById('backtest-strategy').value;
             if (!strategyId) {
                 alert('请选择策略');
@@ -1370,6 +1382,7 @@
             }
 
             const params = {
+                fund_code: fundCode,
                 strategy_id: strategyId,
                 period: document.getElementById('backtest-period').value,
                 start_date: document.getElementById('backtest-start').value,
