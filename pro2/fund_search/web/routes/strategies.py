@@ -243,32 +243,25 @@ def backtest_strategy():
                 'error': '; '.join(validation_errors)
             }), 400
         
-        sql = f"""
-        SELECT analysis_date, today_return, prev_day_return,
-               status_label, operation_suggestion, buy_multiplier, redeem_amount,
-               current_estimate as current_nav, yesterday_nav as previous_nav
-        FROM fund_analysis_results WHERE fund_code = '{fund_code}'
-        ORDER BY analysis_date DESC LIMIT {days}
-        """
-        df = db_manager.execute_query(sql)
+        try:
+            from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
+            hist_df = fetch_fund_history_from_akshare(fund_code, days=days)
+            if hist_df is not None and not hist_df.empty:
+                hist_df = hist_df.sort_values('date', ascending=True)
+                hist_df['today_return'] = hist_df['nav'].pct_change() * 100
+                hist_df['analysis_date'] = hist_df['date']
+                df = hist_df[['analysis_date', 'today_return', 'nav']].copy()
+                df['prev_day_return'] = df['today_return'].shift(1)
+                df = df.dropna(subset=['today_return'])
+                df = df.sort_values('analysis_date', ascending=False).head(days)
+            else:
+                df = pd.DataFrame()
+        except Exception as e:
+            logger.warning(f"从akshare获取历史数据失败: {e}")
+            df = pd.DataFrame()
         
         if df.empty:
-            try:
-                from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
-                hist_df = fetch_fund_history_from_akshare(fund_code, days=days)
-                if hist_df is not None and not hist_df.empty:
-                    hist_df = hist_df.sort_values('date', ascending=True)
-                    hist_df['today_return'] = hist_df['nav'].pct_change() * 100
-                    hist_df['analysis_date'] = hist_df['date']
-                    df = hist_df[['analysis_date', 'today_return', 'nav']].copy()
-                    df['prev_day_return'] = df['today_return'].shift(1)
-                    df = df.dropna(subset=['today_return'])
-                    df = df.sort_values('analysis_date', ascending=False).head(days)
-            except Exception as e:
-                logger.warning(f"从akshare获取历史数据失败: {e}")
-        
-        if df.empty:
-            return jsonify({'success': False, 'error': f'没有找到基金 {fund_code} 的历史数据，请先添加该基金到持仓或进行基金分析'})
+            return jsonify({'success': False, 'error': f'没有找到基金 {fund_code} 的历史数据，请确认基金代码是否正确'})
         
         df = df.sort_values('analysis_date', ascending=True)
         
