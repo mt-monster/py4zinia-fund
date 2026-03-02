@@ -1890,11 +1890,7 @@
                 const profitAnalysis = fund.profit_analysis || {};
                 const detailed = fund.detailed_advice || {};
                 
-                // 今日收益展示
                 const todayReturn = fund.today_return || 0;
-                const todayProfit = profitAnalysis.today_profit || 0;
-                const prevProfit = profitAnalysis.prev_profit || 0;
-                const profitChange = profitAnalysis.profit_change || 0;
                 const hasPosition = profitAnalysis.current_shares > 0;
                 
                 return `
@@ -1914,108 +1910,24 @@
                             </div>
                         </div>
                         
-                        <!-- 今日收益展示 -->
-                        <div style="background: #f8f9fa; border-radius: 8px; padding: 12px 15px; margin: 15px 0;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <!-- 核心操作建议 -->
+                        <div class="advice-section" style="background: ${actionClass === 'buy' ? '#d4edda' : actionClass === 'sell' ? '#f8d7da' : '#fff3cd'}; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <span style="font-size: 13px; color: #6c757d;">今日涨跌</span>
-                                    <span style="font-size: 20px; font-weight: 600; margin-left: 8px; color: ${todayReturn >= 0 ? '#dc3545' : '#28a745'};">
-                                        ${todayReturn >= 0 ? '+' : ''}${todayReturn}%
-                                    </span>
+                                    <div style="font-size: 13px; color: #6c757d; margin-bottom: 4px;">
+                                        今日涨跌 <span style="font-weight: 600; color: ${todayReturn >= 0 ? '#dc3545' : '#28a745'};">${todayReturn >= 0 ? '+' : ''}${todayReturn}%</span>
+                                    </div>
+                                    <div style="font-size: 15px; color: #212529; font-weight: 500;">
+                                        ${detailed.operation_detail || '建议持有观望'}
+                                    </div>
                                 </div>
                                 ${hasPosition ? `
-                                <div style="text-align: right;">
-                                    <div style="font-size: 13px; color: #6c757d;">今日预估${todayProfit >= 0 ? '盈利' : '亏损'}</div>
-                                    <div style="font-size: 18px; font-weight: 600; color: ${todayProfit >= 0 ? '#dc3545' : '#28a745'};">
-                                        ${todayProfit >= 0 ? '+' : ''}¥${todayProfit.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                    </div>
-                                    <div style="font-size: 12px; color: ${profitChange >= 0 ? '#dc3545' : '#28a745'};">
-                                        较昨日${profitChange >= 0 ? '改善' : '恶化'} ¥${Math.abs(profitChange).toFixed(2)}
-                                    </div>
+                                <div style="text-align: right; font-size: 12px; color: #6c757d;">
+                                    已持有 ${profitAnalysis.current_shares.toFixed(2)} 份
                                 </div>
-                                ` : '<div style="font-size: 13px; color: #6c757d;">当前未持有</div>'}
+                                ` : ''}
                             </div>
                         </div>
-                        
-                        <div class="advice-content">
-                            <!-- 操作建议 -->
-                            <div class="advice-section" style="background: #fff3cd; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                                <div class="advice-section-title" style="color: #856404;">
-                                    <i class="bi bi-cash-coin"></i> 操作建议
-                                </div>
-                                <div class="advice-text" style="color: #856404; font-size: 15px;">
-                                    ${detailed.operation_detail || '建议持有观望'}
-                                </div>
-                            </div>
-                            
-                            <!-- 建议理由 -->
-                            <div class="advice-section">
-                                <div class="advice-section-title">
-                                    <i class="bi bi-info-circle"></i> 建议理由
-                                </div>
-                                <div class="advice-text">
-                                    ${detailed.adjustment || fund.advice?.reason || '暂无分析'}
-                                </div>
-                            </div>
-                            
-                            <!-- 市场评估 -->
-                            ${detailed.valuation_comment ? `
-                            <div class="advice-section">
-                                <div class="advice-section-title">
-                                    <i class="bi bi-graph-up-arrow"></i> 市场评估
-                                </div>
-                                <div class="advice-text">
-                                    ${detailed.valuation_comment}
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            <!-- 风险评估 -->
-                            ${detailed.risk_assessment ? `
-                            <div class="advice-section">
-                                <div class="advice-section-title">
-                                    <i class="bi bi-shield-exclamation"></i> 风险评估
-                                </div>
-                                <div class="advice-text">
-                                    ${detailed.risk_assessment}
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            <!-- 组合影响 -->
-                            ${detailed.portfolio_impact ? `
-                            <div class="advice-section">
-                                <div class="advice-section-title">
-                                    <i class="bi bi-pie-chart"></i> 组合影响
-                                </div>
-                                <div class="advice-text">
-                                    ${detailed.portfolio_impact}
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            <!-- 执行计划 -->
-                            ${detailed.execution_plan ? `
-                            <div class="advice-section" style="background: #e7f3ff; border-radius: 8px; padding: 12px;">
-                                <div class="advice-section-title" style="color: #004085;">
-                                    <i class="bi bi-calendar-check"></i> 执行计划
-                                </div>
-                                <div class="advice-text" style="color: #004085;">
-                                    ${detailed.execution_plan}
-                                </div>
-                            </div>
-                            ` : ''}
-                        </div>
-                        
-                        <!-- 持仓信息汇总 -->
-                        ${hasPosition ? `
-                        <div style="margin-top: 15px; padding: 12px 15px; background: #f8f9fa; border-radius: 8px;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 13px; color: #495057;">
-                                <span><i class="bi bi-wallet2"></i> 持有<strong>${profitAnalysis.current_shares.toFixed(2)}</strong>份</span>
-                                <span><i class="bi bi-currency-yen"></i> 市值<strong>¥${profitAnalysis.current_market_value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></span>
-                            </div>
-                        </div>
-                        ` : ''}
                     </div>
                 `;
             }).join('');
