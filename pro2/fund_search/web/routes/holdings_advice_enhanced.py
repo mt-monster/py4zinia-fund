@@ -119,39 +119,33 @@ def enhance_single_fund_advice(fund, initial_capital, db_manager):
     sell_ratio = 0
     operation_detail = ""
     
-    # 根据策略配置生成具体操作
     if strategy_action in ['strong_buy', 'buy']:
-        # 买入策略
         suggested_amount = base_amount * buy_multiplier
         operation_detail = f"<strong>{strategy_label}</strong><br>"
-        operation_detail += f"建议买入 <strong>¥{int(suggested_amount):,}</strong>"
-        if current_shares > 0:
-            operation_detail += f"<br>当前持有 {current_shares:.2f} 份，市值 ¥{current_market_value:,.2f}"
+        if buy_multiplier > 1:
+            operation_detail += f"建议定投 <strong>¥{int(suggested_amount):,}</strong>（基准{buy_multiplier:.1f}倍）"
         else:
-            operation_detail += "<br>当前未持有该基金"
+            operation_detail += f"建议定投 <strong>¥{int(suggested_amount):,}</strong>"
+        if current_shares > 0:
+            operation_detail += f"<br>已持有 {current_shares:.2f} 份"
         buy_reasons = generate_strategy_buy_reason(fund, today_return, prev_day_return, strategy_info, config)
     elif strategy_action in ['sell', 'weak_sell']:
-        # 卖出/止盈策略
         sell_ratio = redeem_amount
         if sell_ratio > 0 and current_shares > 0:
             suggested_sell_value = current_market_value * sell_ratio
             suggested_sell_shares = current_shares * sell_ratio
             operation_detail = f"<strong>{strategy_label}</strong><br>"
-            operation_detail += f"建议赎回 <strong>{sell_ratio*100:.0f}%</strong> 持仓"
-            operation_detail += f"<br>相当于 <strong>{suggested_sell_shares:.2f} 份</strong>，约 <strong>¥{suggested_sell_value:,.2f}</strong>"
+            operation_detail += f"建议赎回 <strong>{sell_ratio*100:.0f}%</strong>（约 ¥{suggested_sell_value:,.0f}）"
         elif current_shares > 0:
             operation_detail = f"<strong>{strategy_label}</strong><br>建议部分止盈"
-            operation_detail += f"<br>当前持有 {current_shares:.2f} 份，市值 ¥{current_market_value:,.2f}"
         else:
-            operation_detail = f"<strong>{strategy_label}</strong><br>当前未持有该基金，无法执行卖出操作"
+            operation_detail = f"<strong>{strategy_label}</strong><br>暂无持仓可赎回"
         buy_reasons = generate_strategy_sell_reason(fund, today_return, prev_day_return, strategy_info, config)
     else:
-        # 持有策略
         suggested_amount = 0
-        operation_detail = f"<strong>{strategy_label}</strong><br>"
-        operation_detail += "建议持有观望"
+        operation_detail = f"<strong>{strategy_label}</strong><br>建议持有观望"
         if current_shares > 0:
-            operation_detail += f"<br>当前持有 {current_shares:.2f} 份，市值 ¥{current_market_value:,.2f}"
+            operation_detail += f"<br>已持有 {current_shares:.2f} 份"
         buy_reasons = generate_strategy_hold_reason(fund, today_return, prev_day_return, strategy_info, config)
     
     # 构建专业的收益分析
