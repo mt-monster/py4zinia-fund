@@ -1299,7 +1299,10 @@
         }
 
         function duplicateStrategy(id) {
-            fetch(`/api/user-strategies/${id}/copy`, {method: 'POST'})
+            fetch(`/api/user-strategies/${id}/copy`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
                 .then(res => res.json())
                 .then(result => {
                     if (result.success) {

@@ -2017,7 +2017,8 @@
         async function copyStrategy(id) {
             try {
                 const response = await fetch(`/api/user-strategies/${id}/copy`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
                 });
                 
                 const result = await response.json();
