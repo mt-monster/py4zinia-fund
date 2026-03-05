@@ -276,10 +276,15 @@ class MultiSourceDataAdapter(OptimizedFundData):
             float: 昨日收益率（百分比）
         """
         try:
-            from datetime import timedelta
+            from datetime import datetime, timedelta
             
-            # 获取最近3天的历史数据
-            df = self.get_fund_nav_history(fund_code, days=5)
+            # 计算日期范围
+            today = datetime.now()
+            end_date = today.strftime('%Y-%m-%d')
+            start_date = (today - timedelta(days=10)).strftime('%Y-%m-%d')
+            
+            # 获取最近10天的历史数据
+            df = self.get_fund_nav_history(fund_code, source='akshare', start_date=start_date, end_date=end_date)
             
             if df is None or df.empty or len(df) < 2:
                 logger.debug(f"基金 {fund_code} 历史数据不足，无法计算昨日收益率")
