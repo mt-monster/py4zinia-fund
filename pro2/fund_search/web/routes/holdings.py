@@ -442,8 +442,25 @@ def get_holdings():
                 ]
             
             # 从 fund_analysis_results 补充绩效数据（holding_service 可能缺失）
+            # 注意：不再从 fund_analysis_results 获取昨日盈亏率（prev_day_return），改为实时计算
             fund_codes = [h.get('fund_code') for h in holdings_data]
             analysis_data_map = {}
+            prev_day_return_map = {}  # 存储批量获取的昨日盈亏率
+            
+            # 批量获取昨日盈亏率（实时计算，与日涨跌幅模式一致）
+            if fund_codes:
+                try:
+                    from data_retrieval.adapters.multi_source_adapter import MultiSourceDataAdapter
+                    adapter = MultiSourceDataAdapter()
+                    for code in fund_codes:
+                        try:
+                            realtime_result = adapter.get_realtime_data(code)
+                            prev_day_return_map[code] = realtime_result.get('prev_day_return', 0) if realtime_result else 0
+                        except Exception as e:
+                            logger.warning(f"实时获取 {code} 昨日盈亏率失败: {e}")
+                except Exception as e:
+                    logger.warning(f"批量获取昨日盈亏率失败: {e}")
+            
             if fund_codes:
                 try:
                     placeholders = ','.join([f':code{i}' for i in range(len(fund_codes))])
@@ -480,7 +497,14 @@ def get_holdings():
                 
                 # 使用 fund_analysis_results 的数据优先（如果 holding_service 数据缺失）
                 today_return = data.get('today_return') if data.get('today_return') is not None else analysis_data.get('today_return')
-                prev_day_return = data.get('yesterday_return') if data.get('yesterday_return') is not None else analysis_data.get('prev_day_return')
+                
+                # 昨日盈亏率：优先使用 holding_service 的实时数据，其次使用批量实时计算的数据
+                prev_day_return = data.get('yesterday_return') if data.get('yesterday_return') is not None else None
+                
+                # 如果 holding_service 没有提供昨日盈亏率，使用批量实时计算的数据
+                if prev_day_return is None:
+                    prev_day_return = prev_day_return_map.get(fund_code)
+                
                 current_nav = data.get('current_nav') if data.get('current_nav') is not None else analysis_data.get('current_nav')
                 
                 # 昨日盈亏率数据时效性标记 - 优先使用 holding_service 的数据
