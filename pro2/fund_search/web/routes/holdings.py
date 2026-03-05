@@ -1227,6 +1227,15 @@ def clear_holdings():
         success = db_manager.execute_sql(sql, {'user_id': user_id})
         
         if success:
+            # 清理持仓相关的缓存数据
+            try:
+                if holding_service and hasattr(holding_service, 'cache'):
+                    # 清理所有持仓的缓存
+                    holding_service.cache.clear()
+                    logger.info(f"已清理持仓缓存: user_id={user_id}")
+            except Exception as cache_err:
+                logger.warning(f"清理持仓缓存失败: {cache_err}")
+            
             return jsonify({'success': True, 'message': '持仓已清空'})
         else:
             return jsonify({'success': False, 'error': '清空失败'})
