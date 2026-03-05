@@ -498,12 +498,10 @@ def get_holdings():
                 # 使用 fund_analysis_results 的数据优先（如果 holding_service 数据缺失）
                 today_return = data.get('today_return') if data.get('today_return') is not None else analysis_data.get('today_return')
                 
-                # 昨日盈亏率：优先使用 holding_service 的实时数据，其次使用批量实时计算的数据
-                prev_day_return = data.get('yesterday_return') if data.get('yesterday_return') is not None else None
-                
-                # 如果 holding_service 没有提供昨日盈亏率，使用批量实时计算的数据
-                if prev_day_return is None:
-                    prev_day_return = prev_day_return_map.get(fund_code)
+                # 昨日盈亏率：强制使用实时计算数据（与日涨跌幅模式一致）
+                # 忽略 holding_service 返回的数据，因为可能来自数据库缓存（不实时）
+                # 优先使用批量实时计算的数据
+                prev_day_return = prev_day_return_map.get(fund_code)
                 
                 current_nav = data.get('current_nav') if data.get('current_nav') is not None else analysis_data.get('current_nav')
                 
