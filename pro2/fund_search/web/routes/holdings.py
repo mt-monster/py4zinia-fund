@@ -1236,6 +1236,18 @@ def clear_holdings():
             except Exception as cache_err:
                 logger.warning(f"清理持仓缓存失败: {cache_err}")
             
+            # 清理仪表盘相关的服务端缓存
+            try:
+                from flask import current_app
+                from cache import cache
+                # 清理仪表盘相关的缓存键
+                cache.delete('dashboard_summary')
+                cache.delete('dashboard_stats')
+                cache.delete('allocation')
+                logger.info(f"已清理仪表盘缓存: user_id={user_id}")
+            except Exception as cache_err:
+                logger.warning(f"清理仪表盘缓存失败: {cache_err}")
+            
             return jsonify({'success': True, 'message': '持仓已清空'})
         else:
             return jsonify({'success': False, 'error': '清空失败'})
