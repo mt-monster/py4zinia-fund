@@ -203,12 +203,15 @@ def backtest_strategy():
     try:
         data = request.get_json()
         fund_code = data.get('fund_code')
+        strategy_id = data.get('strategy_id', 'enhanced_rule_based')
         initial_amount = data.get('initial_amount', 10000)
         days = data.get('days', 90)
-        base_invest = data.get('base_invest', 100)  # 基准定投金额
+        base_invest = data.get('base_invest', 100)
         
         if not fund_code:
             return jsonify({'success': False, 'error': '请输入基金代码'}), 400
+        
+        logger.info(f"回测请求: fund_code={fund_code}, strategy_id={strategy_id}, days={days}")
         
         # Validate parameters according to requirements 10.4
         validation_errors = []
@@ -244,245 +247,18 @@ def backtest_strategy():
                 'error': '; '.join(validation_errors)
             }), 400
         
-        try:
-            from backtesting.core.akshare_data_fetcher import fetch_fund_history_from_akshare
-            hist_df = fetch_fund_history_from_akshare(fund_code, days=days)
-            if hist_df is not None and not hist_df.empty:
-                hist_df = hist_df.sort_values('analysis_date', ascending=True)
-                hist_df['today_return'] = hist_df['nav'].pct_change() * 100
-                df = hist_df[['analysis_date', 'today_return', 'nav']].copy()
-                df['prev_day_return'] = df['today_return'].shift(1)
-                df = df.dropna(subset=['today_return'])
-                df = df.sort_values('analysis_date', ascending=False).head(days)
-            else:
-                df = pd.DataFrame()
-        except Exception as e:
-            logger.warning(f"从akshare获取历史数据失败: {e}")
-            df = pd.DataFrame()
+        # 使用 _execute_single_fund_backtest 函数执行回测（支持策略选择）
+        result = _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_invest, days)
         
-        if df.empty:
-            return jsonify({'success': False, 'error': f'没有找到基金 {fund_code} 的历史数据，请确认基金代码是否正确'})
-        
-        df = df.sort_values('analysis_date', ascending=True)
-        
-        returns_history = []
-        balance = initial_amount
-        holdings = 0
-        trades = []
-        cumulative_pnl = 0.0
-        equity_curve = []
-        benchmark_curve = []
-        daily_returns = []
-        dates = []
-        drawdown_curve = []
-        
-        peak = initial_amount
-        max_drawdown = 0.0
-        
-        prev_benchmark_value = initial_amount
-        
-        first_iteration = True
-        holdings_cost = 0
-        observation_days = 5
-        
-        for idx, row in df.iterrows():
-            today_return = float(row.get('today_return', 0)) if pd.notna(row.get('today_return', 0)) else 0
-            prev_day_return = float(row.get('prev_day_return', 0)) if pd.notna(row.get('prev_day_return', 0)) else 0
-            
-            dates.append(str(row['analysis_date']))
-            returns_history.append(today_return / 100)
-            daily_returns.append(today_return / 100)
-            
-            if first_iteration and holdings == 0 and balance >= base_invest:
-                buy_amount = base_invest
-                balance -= buy_amount
-                holdings += buy_amount
-                holdings_cost = buy_amount
-                trades.append({
-                    'date': str(row['analysis_date']),
-                    'action': 'buy',
-                    'amount': buy_amount,
-                    'balance': round(balance, 2),
-                    'holdings': round(holdings, 2),
-                    'profit': 0,
-                    'multiplier': 1,
-                    'trend': 'initial',
-                    'volatility_adj': 1.0,
-                    'fund_code': fund_code,
-                    'cumulative_return': 0
-                })
-                first_iteration = False
-            
-            if holdings > 0 and holdings_cost > 0:
-                cumulative_pnl = (holdings - holdings_cost) / holdings_cost
-                if len(dates) <= observation_days:
-                    cumulative_pnl = max(cumulative_pnl, 0)
-            else:
-                cumulative_pnl = 0
-            
-            result = unified_strategy_engine.analyze(
-                today_return=today_return,
-                prev_day_return=prev_day_return,
-                returns_history=returns_history[-30:] if len(returns_history) > 30 else returns_history,
-                cumulative_pnl=cumulative_pnl if holdings > 0 else None
-            )
-            
-            if result.stop_loss_triggered:
-                if holdings > 0:
-                    balance += holdings
-                    trades.append({
-                        'date': str(row['analysis_date']),
-                        'action': 'stop_loss',
-                        'amount': holdings,
-                        'balance': round(balance, 2),
-                        'holdings': 0,
-                        'profit': holdings - (initial_amount - balance),
-                        'reason': result.stop_loss_label,
-                        'fund_code': fund_code,
-                        'cumulative_return': ((balance + 0) / initial_amount - 1) * 100
-                    })
-                    holdings = 0
-                equity_curve.append(balance)
-                prev_benchmark_value = prev_benchmark_value * (1 + today_return / 100)
-                benchmark_curve.append(prev_benchmark_value)
-                continue
-            
-            buy_multiplier = result.final_buy_multiplier
-            if buy_multiplier > 0:
-                buy_amount = base_invest * buy_multiplier
-                if balance >= buy_amount:
-                    balance -= buy_amount
-                    holdings += buy_amount
-                    trades.append({
-                        'date': str(row['analysis_date']),
-                        'action': 'buy',
-                        'amount': buy_amount,
-                        'balance': round(balance, 2),
-                        'holdings': round(holdings, 2),
-                        'profit': 0,
-                        'multiplier': buy_multiplier,
-                        'trend': result.trend,
-                        'volatility_adj': result.volatility_adjustment,
-                        'fund_code': fund_code,
-                        'cumulative_return': ((balance + holdings) / initial_amount - 1) * 100
-                    })
-            
-            redeem_amount = result.redeem_amount
-            if redeem_amount > 0 and holdings > 0:
-                sell_amount = min(redeem_amount, holdings * 0.5)
-                holdings -= sell_amount
-                balance += sell_amount
-                trades.append({
-                    'date': str(row['analysis_date']),
-                    'action': 'sell',
-                    'amount': sell_amount,
-                    'balance': round(balance, 2),
-                    'holdings': round(holdings, 2),
-                    'profit': 0,
-                    'fund_code': fund_code,
-                    'cumulative_return': ((balance + holdings) / initial_amount - 1) * 100
-                })
-            
-            holdings *= (1 + today_return / 100)
-            equity_curve.append(round(balance + holdings, 2))
-            prev_benchmark_value = prev_benchmark_value * (1 + today_return / 100)
-            benchmark_curve.append(round(prev_benchmark_value, 2))
-        
-        total_value = balance + holdings
-        total_return = (total_value - initial_amount) / initial_amount * 100
-        
-        for i, trade in enumerate(trades):
-            if trade['action'] == 'sell' or trade['action'] == 'stop_loss':
-                trade['profit'] = trade['amount'] * (total_return / 100) / len([t for t in trades if t['action'] in ['sell', 'stop_loss']] or [1])
-        
-        evaluation = strategy_evaluator.evaluate(trades)
-        evaluation_dict = strategy_evaluator.to_dict(evaluation)
-        
-        for key, value in evaluation_dict.items():
-            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
-                evaluation_dict[key] = None
-        
-        strategy_returns = []
-        for i in range(1, len(equity_curve)):
-            if equity_curve[i-1] > 0:
-                ret = (equity_curve[i] - equity_curve[i-1]) / equity_curve[i-1]
-                strategy_returns.append(ret)
-        
-        if len(strategy_returns) > 1:
-            strategy_returns_arr = np.array(strategy_returns)
-            volatility = float(np.std(strategy_returns_arr) * np.sqrt(252) * 100)
-            mean_return = np.mean(strategy_returns_arr)
-            if np.std(strategy_returns_arr) > 0:
-                sharpe_ratio = float(mean_return / np.std(strategy_returns_arr) * np.sqrt(252))
-            else:
-                sharpe_ratio = 0.0
-        else:
-            volatility = 0.0
-            sharpe_ratio = 0.0
-        
-        if len(strategy_returns) > 0 and total_value != initial_amount:
-            trading_days = len(strategy_returns)
-            annual_return = float(((total_value / initial_amount) ** (252 / trading_days) - 1) * 100)
-        else:
-            annual_return = 0.0
-        
-        peak = initial_amount
-        max_drawdown = 0.0
-        for value in equity_curve:
-            if value > peak:
-                peak = value
-            if peak > 0:
-                drawdown = (peak - value) / peak * 100
-                drawdown_curve.append(drawdown)
-                if drawdown > max_drawdown:
-                    max_drawdown = drawdown
-        
-        monthly_returns = {}
-        if len(dates) > 0 and len(daily_returns) > 0:
-            for i, date_str in enumerate(dates):
-                try:
-                    dt = pd.to_datetime(date_str)
-                    month_key = f"{dt.year}-{dt.month:02d}"
-                    if month_key not in monthly_returns:
-                        monthly_returns[month_key] = []
-                    if i < len(daily_returns):
-                        monthly_returns[month_key].append(daily_returns[i])
-                except:
-                    pass
-        
-        monthly_return_data = {}
-        for month_key, returns in monthly_returns.items():
-            if returns:
-                cum_ret = 1.0
-                for r in returns:
-                    cum_ret *= (1 + r)
-                monthly_return_data[month_key] = (cum_ret - 1) * 100
+        if result is None:
+            return jsonify({
+                'success': False,
+                'error': f'没有找到基金 {fund_code} 的历史数据，请确认基金代码是否正确'
+            })
         
         return jsonify({
             'success': True,
-            'data': {
-                'fund_code': fund_code,
-                'initial_amount': initial_amount,
-                'final_balance': round(balance, 2),
-                'final_holdings': round(holdings, 2),
-                'total_value': round(total_value, 2),
-                'total_return': round(total_return, 2),
-                'annual_return': round(annual_return, 2),
-                'sharpe_ratio': round(sharpe_ratio, 2),
-                'max_drawdown': round(max_drawdown, 2),
-                'volatility': round(volatility, 2),
-                'profit_factor': evaluation_dict.get('profit_factor', 0),
-                'trades_count': len(trades),
-                'trades': trades,
-                'backtest_days': days,
-                'data_count': len(df),
-                'dates': dates,
-                'equity_curve': equity_curve,
-                'benchmark_curve': benchmark_curve,
-                'drawdown_curve': drawdown_curve,
-                'monthly_returns': monthly_return_data,
-                'evaluation': evaluation_dict
-            }
+            'data': result
         })
     except Exception as e:
         logger.error(f"策略回测失败: {str(e)}")
@@ -498,11 +274,9 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
     Requirements: 4.1, 4.2, 4.3, 4.4
     """
     try:
-        # 导入 AkShare 数据获取模块
         from backtesting.core.akshare_data_fetcher import fetch_fund_history_with_fallback
         from backtesting.strategies.strategy_adapter import get_strategy_adapter
         
-        # 获取历史数据（优先数据库，不足时从 AkShare 获取）
         df = fetch_fund_history_with_fallback(fund_code, days, db_manager)
         
         if df.empty:
@@ -513,62 +287,51 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
         
         df = df.sort_values('analysis_date', ascending=True)
         
-        # 检查是否为高级策略（dual_ma, mean_reversion, target_value, grid, enhanced_rule_based）
         strategy_adapter = get_strategy_adapter()
-        use_advanced_strategy = strategy_adapter.is_advanced_strategy(strategy_id)
         
-        if not use_advanced_strategy:
+        if isinstance(strategy_id, int) or (isinstance(strategy_id, str) and strategy_id.isdigit()):
+            logger.info(f"策略类型: 用户自定义策略 ID={strategy_id}，使用 enhanced_rule_based 策略执行")
+            actual_strategy_id = 'enhanced_rule_based'
+        elif strategy_adapter.is_advanced_strategy(strategy_id):
+            logger.info(f"策略类型: 内置高级策略 - {strategy_id}")
+            actual_strategy_id = strategy_id
+        else:
             logger.warning(f"未知的策略ID: {strategy_id}，将使用默认策略")
-            strategy_id = 'enhanced_rule_based'
-            use_advanced_strategy = True
+            actual_strategy_id = 'enhanced_rule_based'
         
-        logger.info(f"策略类型: 高级策略 - {strategy_id}")
-        
-        # Initialize backtest variables
         balance = initial_amount
         holdings = 0
         trades = []
         returns_history = []
         cumulative_pnl = 0.0
         equity_curve = []
-
         
-        # 为高级策略准备DataFrame（需要包含nav列）
-        if use_advanced_strategy:
-            # 创建包含nav列的DataFrame
-            backtest_df = df.copy()
-            if 'nav' not in backtest_df.columns:
-                # 从current_estimate或yesterday_nav计算nav
-                if 'current_estimate' in backtest_df.columns:
-                    backtest_df['nav'] = backtest_df['current_estimate']
-                elif 'yesterday_nav' in backtest_df.columns:
-                    backtest_df['nav'] = backtest_df['yesterday_nav']
-                else:
-                    # 使用today_return反推nav
-                    backtest_df['nav'] = 1.0
-                    for i in range(1, len(backtest_df)):
-                        prev_nav = backtest_df.iloc[i-1]['nav']
-                        today_ret = backtest_df.iloc[i]['today_return'] / 100 if pd.notna(backtest_df.iloc[i]['today_return']) else 0
-                        backtest_df.iloc[i, backtest_df.columns.get_loc('nav')] = prev_nav * (1 + today_ret)
+        backtest_df = df.copy()
+        if 'nav' not in backtest_df.columns:
+            if 'current_estimate' in backtest_df.columns:
+                backtest_df['nav'] = backtest_df['current_estimate']
+            elif 'yesterday_nav' in backtest_df.columns:
+                backtest_df['nav'] = backtest_df['yesterday_nav']
+            else:
+                backtest_df['nav'] = 1.0
+                for i in range(1, len(backtest_df)):
+                    prev_nav = backtest_df.iloc[i-1]['nav']
+                    today_ret = backtest_df.iloc[i]['today_return'] / 100 if pd.notna(backtest_df.iloc[i]['today_return']) else 0
+                    backtest_df.iloc[i, backtest_df.columns.get_loc('nav')] = prev_nav * (1 + today_ret)
         
-        # Run backtest simulation (Requirement 4.3 - Apply selected strategy rules)
-        # 所有策略都使用高级策略实现
-        strategy_returns = []  # Track strategy-specific returns for Sharpe ratio calculation
+        strategy_returns = []
         
         for idx, (df_idx, row) in enumerate(df.iterrows()):
             today_return = float(row['today_return']) if pd.notna(row['today_return']) else 0
             
-            # Calculate total portfolio value before applying today's return
             total_value_before = balance + holdings
             
-            # Calculate cumulative P&L
             if holdings > 0:
                 cumulative_pnl = (holdings - initial_amount + balance) / initial_amount - 1
             
-            # 使用高级策略
             try:
                 signal = strategy_adapter.generate_signal(
-                    strategy_id=strategy_id,
+                    strategy_id=actual_strategy_id,
                     history_df=backtest_df,
                     current_index=idx,
                     current_holdings=holdings,
