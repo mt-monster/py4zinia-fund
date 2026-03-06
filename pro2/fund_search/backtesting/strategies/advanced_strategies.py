@@ -21,6 +21,21 @@ class StrategySignal:
     reason: str = ""
     description: str = ""
     suggestion: str = ""
+    
+    # 兼容性属性，用于策略适配器
+    @property
+    def buy_multiplier(self):
+        """买入倍数（兼容性属性）"""
+        if self.action == 'buy':
+            return self.amount_multiplier
+        return 0.0
+    
+    @property
+    def redeem_amount(self):
+        """赎回金额/比例（兼容性属性）"""
+        if self.action == 'sell':
+            return self.amount_multiplier
+        return 0.0
 
 class BaseStrategy(ABC):
     """策略基类"""
