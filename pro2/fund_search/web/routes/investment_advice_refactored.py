@@ -67,18 +67,18 @@ def get_my_holdings():
         SELECT 
             h.fund_code,
             h.fund_name,
-            h.shares,
+            h.holding_shares as shares,
             h.cost_price,
-            h.total_cost,
+            h.holding_amount as total_cost,
             h.notes,
-            h.last_updated,
+            h.buy_date as last_updated,
             COALESCE(f.latest_nav, 0) as latest_nav,
             COALESCE(f.nav_date, '') as nav_date,
             COALESCE(f.today_return, 0) as today_return
         FROM user_holdings h
         LEFT JOIN fund_nav f ON h.fund_code = f.fund_code
         WHERE h.user_id = :user_id
-        ORDER BY h.total_cost DESC
+        ORDER BY h.holding_amount DESC
         """
         
         df = db_manager.execute_query(sql, {'user_id': user_id})
