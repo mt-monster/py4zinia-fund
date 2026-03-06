@@ -1162,7 +1162,26 @@
         // 批量获取基金名称
         async function batchGetFundNames(fundCodes) {
             const fundNames = {};
-            const promises = fundCodes.map(async (code) => {
+            
+            // 首先尝试从持仓API获取基金名称
+            try {
+                const holdingsResponse = await fetch('/api/holdings?user_id=default_user');
+                const holdingsResult = await holdingsResponse.json();
+                if (holdingsResult.success && holdingsResult.data) {
+                    for (const code of fundCodes) {
+                        const holding = holdingsResult.data.find(h => h.fund_code === code);
+                        if (holding && holding.fund_name) {
+                            fundNames[code] = holding.fund_name;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('从持仓API获取基金名称失败:', e);
+            }
+            
+            // 对于仍未获取到名称的基金，尝试从基金信息API获取
+            const missingCodes = fundCodes.filter(code => !fundNames[code]);
+            const promises = missingCodes.map(async (code) => {
                 try {
                     const response = await fetch(`/api/fund/${code}/info`);
                     const result = await response.json();
