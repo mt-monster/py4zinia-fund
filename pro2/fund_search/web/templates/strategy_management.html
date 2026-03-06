@@ -1547,17 +1547,21 @@
             if (result.trades && result.trades.length > 0) {
                 document.getElementById('backtest-detail-section').style.display = 'block';
                 const tbody = document.querySelector('#backtest-detail-table tbody');
-                tbody.innerHTML = result.trades.map(t => `
+                tbody.innerHTML = result.trades.map(t => {
+                    const amount = t.amount !== undefined ? t.amount.toFixed(2) : '0.00';
+                    const cumulativeReturn = t.cumulative_return !== undefined ? t.cumulative_return : 0;
+                    const fundCode = t.fund_code || result.fund_code || '--';
+                    return `
                     <tr>
-                        <td>${t.date}</td>
-                        <td>${t.action}</td>
-                        <td>${t.fund_code}</td>
-                        <td>${t.amount.toFixed(2)}</td>
-                        <td class="${t.cumulative_return >= 0 ? 'positive' : 'negative'}">
-                            ${t.cumulative_return >= 0 ? '+' : ''}${t.cumulative_return.toFixed(2)}%
+                        <td>${t.date || '--'}</td>
+                        <td>${t.action || '--'}</td>
+                        <td>${fundCode}</td>
+                        <td>${amount}</td>
+                        <td class="${cumulativeReturn >= 0 ? 'positive' : 'negative'}">
+                            ${cumulativeReturn >= 0 ? '+' : ''}${cumulativeReturn.toFixed(2)}%
                         </td>
                     </tr>
-                `).join('');
+                `}).join('');
             }
         }
 

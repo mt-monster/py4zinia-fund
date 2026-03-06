@@ -351,13 +351,16 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
                     if balance >= buy_amount:
                         balance -= buy_amount
                         holdings += buy_amount
+                        cumulative_return = ((balance + holdings) - initial_amount) / initial_amount * 100
                         trades.append({
                             'date': str(row['analysis_date']),
                             'action': 'buy',
+                            'fund_code': fund_code,
                             'amount': buy_amount,
                             'balance': round(balance, 2),
                             'holdings': round(holdings, 2),
                             'profit': 0,
+                            'cumulative_return': round(cumulative_return, 2),
                             'multiplier': signal.buy_multiplier,
                             'reason': signal.reason,
                             'description': signal.description
@@ -374,13 +377,16 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
                     if sell_amount > 0:
                         holdings -= sell_amount
                         balance += sell_amount
+                        cumulative_return = ((balance + holdings) - initial_amount) / initial_amount * 100
                         trades.append({
                             'date': str(row['analysis_date']),
                             'action': 'sell',
+                            'fund_code': fund_code,
                             'amount': sell_amount,
                             'balance': round(balance, 2),
                             'holdings': round(holdings, 2),
                             'profit': 0,
+                            'cumulative_return': round(cumulative_return, 2),
                             'reason': signal.reason,
                             'description': signal.description
                         })
