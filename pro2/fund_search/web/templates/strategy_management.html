@@ -725,8 +725,8 @@
                             <option value="risk_adjusted_return">风险调整收益</option>
                         </select>
                         <select class="form-control" id="sort-order">
-                            <option value="desc">降序 (从高到低)</option>
-                            <option value="asc">升序 (从低到高)</option>
+                            <option value="DESC">降序 (从高到低)</option>
+                            <option value="ASC">升序 (从低到高)</option>
                         </select>
                     </div>
                 </div>
@@ -1296,7 +1296,16 @@
                         currentStrategyId = result.data?.id;
                     }
                 } else {
-                    alert(result.error || '保存失败');
+                    // 显示详细错误信息
+                    let errorMsg = result.error || '保存失败';
+                    if (result.validation_errors && result.validation_errors.length > 0) {
+                        errorMsg += '\n\n详细错误:\n';
+                        result.validation_errors.forEach(err => {
+                            errorMsg += `- ${err.field}: ${err.message}\n`;
+                        });
+                    }
+                    alert(errorMsg);
+                    console.error('策略验证失败:', result);
                 }
             })
             .catch(err => {

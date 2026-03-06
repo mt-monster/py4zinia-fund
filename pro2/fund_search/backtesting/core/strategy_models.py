@@ -67,7 +67,8 @@ SUPPORTED_FILTER_FIELDS = {
 # 支持的排序字段
 SUPPORTED_SORT_FIELDS = [
     'composite_score', 'sharpe_ratio', 'annualized_return', 
-    'max_drawdown', 'volatility', 'market_cap', 'pe_ttm', 'pb'
+    'max_drawdown', 'volatility', 'market_cap', 'pe_ttm', 'pb',
+    'return_3m', 'return_6m', 'return_1y', 'risk_adjusted_return'
 ]
 
 
