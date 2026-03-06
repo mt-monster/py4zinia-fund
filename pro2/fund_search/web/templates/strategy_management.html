@@ -1483,11 +1483,30 @@
         }
 
         function displayBacktestResult(result) {
+            // 空值检查
+            if (!result) {
+                document.getElementById('backtest-result').innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <p>回测结果数据为空</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 确保所有数值字段都有默认值
+            const totalReturn = result.total_return !== undefined ? result.total_return : 0;
+            const annualReturn = result.annual_return !== undefined ? result.annual_return : 0;
+            const sharpeRatio = result.sharpe_ratio !== undefined ? result.sharpe_ratio : 0;
+            const maxDrawdown = result.max_drawdown !== undefined ? result.max_drawdown : 0;
+            const volatility = result.volatility !== undefined ? result.volatility : 0;
+            const profitFactor = result.profit_factor !== undefined ? result.profit_factor : 0;
+
             const container = document.getElementById('backtest-result');
             container.innerHTML = `
                 <div style="text-align:center;margin-bottom:20px;">
-                    <div style="font-size:36px;font-weight:700;color:${result.total_return >= 0 ? '#11998e' : '#f5576c'};">
-                        ${result.total_return >= 0 ? '+' : ''}${result.total_return.toFixed(2)}%
+                    <div style="font-size:36px;font-weight:700;color:${totalReturn >= 0 ? '#11998e' : '#f5576c'};">
+                        ${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%
                     </div>
                     <div style="color:#666;">总收益率</div>
                 </div>
@@ -1495,16 +1514,16 @@
 
             // 显示绩效指标
             document.getElementById('performance-metrics').style.display = 'block';
-            document.getElementById('metric-total-return').textContent = (result.total_return >= 0 ? '+' : '') + result.total_return.toFixed(2) + '%';
-            document.getElementById('metric-total-return').className = 'result-value ' + (result.total_return >= 0 ? 'positive' : 'negative');
+            document.getElementById('metric-total-return').textContent = (totalReturn >= 0 ? '+' : '') + totalReturn.toFixed(2) + '%';
+            document.getElementById('metric-total-return').className = 'result-value ' + (totalReturn >= 0 ? 'positive' : 'negative');
 
-            document.getElementById('metric-annual-return').textContent = (result.annual_return >= 0 ? '+' : '') + result.annual_return.toFixed(2) + '%';
-            document.getElementById('metric-annual-return').className = 'result-value ' + (result.annual_return >= 0 ? 'positive' : 'negative');
+            document.getElementById('metric-annual-return').textContent = (annualReturn >= 0 ? '+' : '') + annualReturn.toFixed(2) + '%';
+            document.getElementById('metric-annual-return').className = 'result-value ' + (annualReturn >= 0 ? 'positive' : 'negative');
 
-            document.getElementById('metric-sharpe').textContent = result.sharpe_ratio?.toFixed(2) || '--';
-            document.getElementById('metric-max-drawdown').textContent = (result.max_drawdown || 0).toFixed(2) + '%';
-            document.getElementById('metric-volatility').textContent = (result.volatility || 0).toFixed(2) + '%';
-            document.getElementById('metric-profit-factor').textContent = result.profit_factor?.toFixed(2) || '--';
+            document.getElementById('metric-sharpe').textContent = sharpeRatio.toFixed(2);
+            document.getElementById('metric-max-drawdown').textContent = maxDrawdown.toFixed(2) + '%';
+            document.getElementById('metric-volatility').textContent = volatility.toFixed(2) + '%';
+            document.getElementById('metric-profit-factor').textContent = profitFactor.toFixed(2);
 
             // 显示图表
             if (result.equity_curve) {
