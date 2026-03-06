@@ -811,7 +811,7 @@
             _whenChartJsReady(initProfitChart);
 
             // 并行加载首屏关键数据
-            await loadAllDashboardData();
+            await loadAllDashboardData(true);  // 强制刷新数据
 
             // 移除骨架屏
             removeAllSkeletons();
