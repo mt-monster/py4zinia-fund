@@ -304,7 +304,13 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
         trades = []
         returns_history = []
         cumulative_pnl = 0.0
-        equity_curve = []
+        
+        dates = []
+        equity_curve_values = []
+        benchmark_values = []
+        drawdown_values = []
+        benchmark_value = initial_amount
+        peak = initial_amount
         
         backtest_df = df.copy()
         if 'nav' not in backtest_df.columns:
@@ -380,84 +386,109 @@ def _execute_single_fund_backtest(fund_code, strategy_id, initial_amount, base_i
                         })
             
             except Exception as e:
-                logger.error(f"策略 {strategy_id} 执行失败: {str(e)}")
-                # 策略执行失败时，默认持有
+                logger.error(f"策略 {actual_strategy_id} 执行失败: {str(e)}")
                 pass
             
-            # Update holdings value based on daily return
             holdings *= (1 + today_return / 100)
             
-            # Calculate total portfolio value after applying today's return
             total_value_after = balance + holdings
             
-            # Calculate daily return for strategy performance
             if total_value_before > 0:
                 daily_strategy_return = (total_value_after - total_value_before) / total_value_before
                 strategy_returns.append(daily_strategy_return)
             
-            # Record equity curve
-            # 确保日期格式为 YYYY-MM-DD
-            date_str = str(row['analysis_date'])[:10]  # 截取前10个字符，保证格式为YYYY-MM-DD
-            equity_curve.append({
-                'date': date_str,
-                'value': round(total_value_after, 2)
-            })
+            date_str = str(row['analysis_date'])[:10]
+            dates.append(date_str)
+            equity_curve_values.append(round(total_value_after, 2))
+            
+            benchmark_values.append(round(benchmark_value * (1 + today_return / 100), 2))
+            benchmark_value = benchmark_values[-1]
+            
+            if peak > 0:
+                dd = (peak - total_value_after) / peak * 100
+            else:
+                dd = 0
+            drawdown_values.append(round(dd, 2))
+            
+            if total_value_after > peak:
+                peak = total_value_after
 
-        
-        # Calculate final results (Requirement 4.4)
         final_value = balance + holdings
         total_return = (final_value - initial_amount) / initial_amount * 100
         
-        # Calculate annualized return
         years = days / 365.0
-        annualized_return = ((final_value / initial_amount) ** (1 / years) - 1) * 100 if years > 0 else 0
+        annual_return = ((final_value / initial_amount) ** (1 / years) - 1) * 100 if years > 0 else 0
         
-        # Calculate max drawdown - FIXED: 基于每日权益曲线计算，而非仅交易点
-        # 这对于交易频率较低的策略（如 enhanced_rule_based）至关重要
         peak = initial_amount
         max_dd = 0
-        for point in equity_curve:
-            current_value = point['value']
-            if current_value > peak:
-                peak = current_value
-            drawdown = (peak - current_value) / peak * 100 if peak > 0 else 0
-            if drawdown > max_dd:
-                max_dd = drawdown
+        for v in equity_curve_values:
+            if v > peak:
+                peak = v
+            dd = (peak - v) / peak * 100 if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
         
-        # Calculate Sharpe ratio (simplified) - now based on strategy performance
         if len(strategy_returns) > 1:
             import numpy as np
             returns_array = np.array(strategy_returns)
             mean_return = np.mean(returns_array)
             std_return = np.std(returns_array)
             sharpe_ratio = (mean_return / std_return * np.sqrt(252)) if std_return > 0 else 0
+            volatility = float(np.std(returns_array) * np.sqrt(252) * 100)
         else:
             sharpe_ratio = 0
+            volatility = 0
         
-        # Evaluate strategy performance (Requirement 4.4)
         evaluation = strategy_evaluator.evaluate(trades)
         evaluation_dict = strategy_evaluator.to_dict(evaluation)
         
-        # Clean up Infinity and NaN values
         for key, value in evaluation_dict.items():
             if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
                 evaluation_dict[key] = None
         
-        logger.info(f"回测完成: 策略={strategy_id}, 最终价值={final_value:.2f}, 总收益率={total_return:.2f}%, 交易次数={len(trades)}")
+        profit_factor = evaluation_dict.get('profit_factor', 0)
         
-        # Return complete backtest results
+        monthly_returns = {}
+        if len(dates) > 0 and len(strategy_returns) > 0:
+            for i, date_str in enumerate(dates):
+                try:
+                    dt = pd.to_datetime(date_str)
+                    month_key = f"{dt.year}-{dt.month:02d}"
+                    if month_key not in monthly_returns:
+                        monthly_returns[month_key] = []
+                    if i < len(strategy_returns):
+                        monthly_returns[month_key].append(strategy_returns[i])
+                except:
+                    pass
+        
+        monthly_return_data = {}
+        for month_key, returns in monthly_returns.items():
+            if returns:
+                cum_ret = 1.0
+                for r in returns:
+                    cum_ret *= (1 + r)
+                monthly_return_data[month_key] = round((cum_ret - 1) * 100, 2)
+        
+        logger.info(f"回测完成: 策略={actual_strategy_id}, 最终价值={final_value:.2f}, 总收益率={total_return:.2f}%, 交易次数={len(trades)}")
+        
         return {
             'fund_code': fund_code,
-            'strategy_id': strategy_id,
+            'strategy_id': actual_strategy_id,
             'initial_amount': initial_amount,
             'final_value': round(final_value, 2),
             'total_return': round(total_return, 2),
-            'annualized_return': round(annualized_return, 2),
+            'annual_return': round(annual_return, 2),
             'max_drawdown': round(max_dd, 2),
-            'sharpe_ratio': round(sharpe_ratio, 4),
+            'sharpe_ratio': round(sharpe_ratio, 2),
+            'volatility': round(volatility, 2),
+            'profit_factor': profit_factor,
             'trades_count': len(trades),
             'trades': trades,
-            'equity_curve': equity_curve,
+            'dates': dates,
+            'equity_curve': equity_curve_values,
+            'benchmark_curve': benchmark_values,
+            'drawdown_curve': drawdown_values,
+            'monthly_returns': monthly_return_data,
             'evaluation': evaluation_dict
         }
 
