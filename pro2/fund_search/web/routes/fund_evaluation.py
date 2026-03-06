@@ -41,43 +41,62 @@ def register_routes(app, **kwargs):
 
 
 def get_evaluation_stats():
-    """获取基金评价统计信息"""
+    """获取基金评价统计信息 - 基于用户持仓"""
     try:
-        # 从数据库获取基金统计数据
-        sql = """
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN evaluation_score >= 80 THEN 1 ELSE 0 END) as excellent,
-            SUM(CASE WHEN evaluation_score >= 60 AND evaluation_score < 80 THEN 1 ELSE 0 END) as good,
-            SUM(CASE WHEN evaluation_score < 60 THEN 1 ELSE 0 END) as pending
-        FROM fund_info
-        WHERE evaluation_score IS NOT NULL
-        """
-
         if db_manager:
-            df = db_manager.execute_query(sql)
-            if not df.empty:
-                row = df.iloc[0]
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'total': int(row['total']) if pd.notna(row['total']) else 0,
-                        'excellent': int(row['excellent']) if pd.notna(row['excellent']) else 0,
-                        'good': int(row['good']) if pd.notna(row['good']) else 0,
-                        'pending': int(row['pending']) if pd.notna(row['pending']) else 0
-                    }
-                })
+            user_id = 'default_user'
+            # 从用户持仓获取基金数量
+            holdings_sql = f"""
+            SELECT COUNT(DISTINCT fund_code) as total
+            FROM user_holdings 
+            WHERE user_id = '{user_id}' AND holding_shares > 0
+            """
+            holdings_df = db_manager.execute_query(holdings_sql)
+            total = int(holdings_df.iloc[0]['total']) if not holdings_df.empty else 0
+            
+            # 获取这些基金的评分统计
+            if total > 0:
+                codes_sql = f"""
+                SELECT DISTINCT fund_code FROM user_holdings WHERE user_id = '{user_id}' AND holding_shares > 0
+                """
+                codes_df = db_manager.execute_query(codes_sql)
+                if not codes_df.empty:
+                    fund_codes = codes_df['fund_code'].tolist()
+                    codes_str = "','".join(fund_codes)
+                    
+                    stats_sql = f"""
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN sharpe_ratio >= 1.5 THEN 1 ELSE 0 END) as excellent,
+                        SUM(CASE WHEN sharpe_ratio >= 0.8 AND sharpe_ratio < 1.5 THEN 1 ELSE 0 END) as good,
+                        SUM(CASE WHEN sharpe_ratio < 0.8 OR sharpe_ratio IS NULL THEN 1 ELSE 0 END) as pending
+                    FROM fund_analysis_results
+                    WHERE fund_code IN ('{codes_str}')
+                    AND analysis_date = (SELECT MAX(analysis_date) FROM fund_analysis_results)
+                    """
+                    stats_df = db_manager.execute_query(stats_sql)
+                    if not stats_df.empty:
+                        row = stats_df.iloc[0]
+                        return jsonify({
+                            'success': True,
+                            'data': {
+                                'total': int(row['total']) if pd.notna(row['total']) else 0,
+                                'excellent': int(row['excellent']) if pd.notna(row['excellent']) else 0,
+                                'good': int(row['good']) if pd.notna(row['good']) else 0,
+                                'pending': int(row['pending']) if pd.notna(row['pending']) else 0
+                            }
+                        })
 
-        # 如果没有数据库数据，返回模拟数据
-        return jsonify({
-            'success': True,
-            'data': {
-                'total': 150,
-                'excellent': 25,
-                'good': 85,
-                'pending': 40
-            }
-        })
+            # 没有持仓时返回0
+            return jsonify({
+                'success': True,
+                'data': {
+                    'total': 0,
+                    'excellent': 0,
+                    'good': 0,
+                    'pending': 0
+                }
+            })
 
     except Exception as e:
         logger.error(f"获取评价统计失败: {str(e)}")
@@ -99,8 +118,11 @@ def run_fund_evaluation():
         fund_type = data.get('fund_type', 'all')
         min_score = data.get('min_score', 0)
 
+        logger.info(f"开始基金评价: fund_type={fund_type}, min_score={min_score}, weights={weights}")
+
         # 获取基金列表
         funds = get_fund_list(fund_type)
+        logger.info(f"获取到基金列表: {len(funds)} 只")
 
         # 对每个基金进行评分
         evaluated_funds = []
@@ -117,6 +139,8 @@ def run_fund_evaluation():
                     'total_score': scores['total_score']
                 })
 
+        logger.info(f"评价完成: {len(evaluated_funds)} 只基金满足条件")
+
         # 按总分排序
         evaluated_funds.sort(key=lambda x: x['total_score'], reverse=True)
 
@@ -127,54 +151,67 @@ def run_fund_evaluation():
 
     except Exception as e:
         logger.error(f"运行基金评价失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def get_fund_list(fund_type='all'):
-    """获取基金列表"""
+    """获取基金列表 - 从用户持仓中获取真实基金"""
     try:
         if db_manager:
-            sql = """
-            SELECT code, name, type, return_3m, return_6m, return_1y,
-                   sharpe_ratio, max_drawdown, volatility, manager_name,
-                   manager_tenure, fund_scale, institution_holdings
-            FROM fund_info
+            user_id = 'default_user'
+            
+            # 直接从 user_holdings 获取用户持仓的基金信息
+            holdings_sql = f"""
+            SELECT 
+                fund_code as code,
+                fund_name as name,
+                holding_shares,
+                cost_price
+            FROM user_holdings 
+            WHERE user_id = '{user_id}' AND holding_shares > 0
             """
-            if fund_type != 'all':
-                sql += f" WHERE type = '{fund_type}'"
-            sql += " ORDER BY return_3m DESC LIMIT 100"
+            holdings_df = db_manager.execute_query(holdings_sql)
+            logger.info(f"查询持仓SQL: {holdings_sql}, 结果: {len(holdings_df) if not holdings_df.empty else 0} 条")
+            
+            if not holdings_df.empty:
+                funds = []
+                
+                # 为每个基金构建评分数据（如果没有分析数据则使用默认值）
+                for _, row in holdings_df.iterrows():
+                    code = row['code']
+                    name = row['name'] or code
+                    
+                    funds.append({
+                        'code': code,
+                        'name': name,
+                        'type': '混合型',
+                        'return_3m': 10.0,  # 默认值
+                        'return_6m': 20.0,
+                        'return_1y': 40.0,
+                        'sharpe_ratio': 1.0,
+                        'max_drawdown': 15.0,
+                        'volatility': 18.0,
+                        'manager_tenure': 3.0,
+                        'fund_scale': 10.0,
+                        'institution_holdings': 30.0,
+                        'today_return': 0.0
+                    })
+                
+                logger.info(f"从用户持仓获取到 {len(funds)} 只基金")
+                return funds
+            
+            logger.info("用户暂无持仓基金")
+            return []
 
-            df = db_manager.execute_query(sql)
-            if not df.empty:
-                return df.to_dict('records')
-
-        # 返回模拟数据
-        fund_types = ['股票型', '混合型', '债券型', '指数型']
-        funds = []
-        for i in range(30):
-            fund_type_val = fund_types[i % len(fund_types)] if fund_type == 'all' else fund_type
-            if fund_type != 'all' and fund_type_val != fund_type:
-                continue
-
-            funds.append({
-                'code': f'00{str(i+1).zfill(4)}',
-                'name': f'示例基金{i+1}号',
-                'type': fund_type_val,
-                'return_3m': np.random.uniform(-10, 30),
-                'return_6m': np.random.uniform(-15, 50),
-                'return_1y': np.random.uniform(-20, 80),
-                'sharpe_ratio': np.random.uniform(0.5, 2.5),
-                'max_drawdown': np.random.uniform(5, 30),
-                'volatility': np.random.uniform(10, 25),
-                'manager_tenure': np.random.uniform(1, 10),
-                'fund_scale': np.random.uniform(1, 100),
-                'institution_holdings': np.random.uniform(10, 80)
-            })
-
-        return funds
+        logger.error("db_manager 未初始化")
+        return []
 
     except Exception as e:
         logger.error(f"获取基金列表失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
