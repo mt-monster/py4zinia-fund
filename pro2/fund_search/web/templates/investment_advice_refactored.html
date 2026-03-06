@@ -1933,7 +1933,7 @@
                 const detailed = fund.detailed_advice || {};
                 
                 return `
-                    <div class="advice-card">
+                    <div class="advice-card" data-fund-code="${fund.fund_code}">
                         <div class="advice-card-header">
                             <div class="advice-fund-info">
                                 <div class="advice-fund-icon">
@@ -1944,11 +1944,17 @@
                                     <div class="advice-fund-code">${fund.fund_code}</div>
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
                                 <span style="font-size: 13px; color: ${todayReturn >= 0 ? '#c92a2a' : '#2b8a3e'}; font-weight: 500;">
                                     ${todayReturn >= 0 ? '+' : ''}${todayReturn}%
                                 </span>
                                 <span class="advice-action-badge ${actionClass}">${actionName}</span>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="cancelFundAdvice('${fund.fund_code}')" title="取消">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                <button class="btn btn-sm btn-primary" onclick="saveFundAdvice('${fund.fund_code}')" title="保存">
+                                    <i class="bi bi-check"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2028,6 +2034,60 @@
                 'watch': '观望'
             };
             return names[action] || '持有';
+        }
+
+        function saveFundAdvice(fundCode) {
+            const funds = AppState.adviceResult?.funds || [];
+            const fund = funds.find(f => f.fund_code === fundCode);
+            if (!fund) {
+                showNotification('未找到基金信息', 'error');
+                return;
+            }
+            
+            const adviceData = {
+                fund_code: fund.fund_code,
+                fund_name: fund.fund_name,
+                action: fund.advice?.action || 'hold',
+                action_name: fund.detailed_advice?.action_name || getActionName(fund.advice?.action || 'hold'),
+                today_return: fund.today_return || 0,
+                saved_at: new Date().toISOString()
+            };
+            
+            let savedAdvices = JSON.parse(localStorage.getItem('savedFundAdvices') || '[]');
+            const existingIndex = savedAdvices.findIndex(a => a.fund_code === fundCode);
+            if (existingIndex >= 0) {
+                savedAdvices[existingIndex] = adviceData;
+            } else {
+                savedAdvices.push(adviceData);
+            }
+            localStorage.setItem('savedFundAdvices', JSON.stringify(savedAdvices));
+            
+            const card = document.querySelector(`.advice-card[data-fund-code="${fundCode}"]`);
+            if (card) {
+                card.style.background = '#d4edda';
+                setTimeout(() => {
+                    card.style.background = '';
+                }, 1000);
+            }
+            
+            showNotification(`${fund.fund_name} 建议已保存`, 'success');
+        }
+
+        function cancelFundAdvice(fundCode) {
+            const card = document.querySelector(`.advice-card[data-fund-code="${fundCode}"]`);
+            if (card) {
+                card.style.opacity = '0.5';
+                card.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    card.remove();
+                }, 300);
+            }
+            
+            let savedAdvices = JSON.parse(localStorage.getItem('savedFundAdvices') || '[]');
+            savedAdvices = savedAdvices.filter(a => a.fund_code !== fundCode);
+            localStorage.setItem('savedFundAdvices', JSON.stringify(savedAdvices));
+            
+            showNotification('已取消该建议', 'info');
         }
 
         // ==================== 工具函数 ====================

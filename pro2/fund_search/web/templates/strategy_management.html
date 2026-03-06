@@ -1253,13 +1253,22 @@
             }
 
             const config = {
-                filters: [],  // 从表单收集筛选条件
-                sort: {
-                    field: document.getElementById('sort-field').value,
-                    order: document.getElementById('sort-order').value
-                },
-                holding_count: parseInt(document.getElementById('holding-count').value),
-                weight_mode: document.getElementById('weight-mode').value
+                name: name,
+                description: description,
+                strategy_type: 'custom',
+                filter_conditions: [],
+                filter_logic: 'AND',
+                sort_field: document.getElementById('sort-field').value || 'composite_score',
+                sort_order: document.getElementById('sort-order').value || 'DESC',
+                select_count: parseInt(document.getElementById('holding-count').value) || 10,
+                weight_mode: document.getElementById('weight-mode').value || 'equal',
+                max_positions: parseInt(document.getElementById('holding-count').value) || 10,
+                custom_weights: [],
+                daily_stop_loss: -0.05,
+                daily_take_profit: 0.10,
+                total_stop_loss: -0.15,
+                trailing_stop: 0.0,
+                volatility_adjustment: false
             };
 
             const data = {
