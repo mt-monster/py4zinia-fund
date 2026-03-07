@@ -265,6 +265,7 @@ def register_routes(app, **kwargs):
     app.route('/api/holdings/analyze/correlation', methods=['POST'])(analyze_fund_correlation)
     app.route('/api/holdings/analyze/comprehensive', methods=['POST'])(analyze_comprehensive)
     app.route('/api/holdings/analyze/personalized-advice', methods=['POST'])(analyze_personalized_advice)
+    app.route('/api/holdings/analyze/portfolio-metrics', methods=['POST'])(get_portfolio_metrics)
     app.route('/api/analysis', methods=['POST'])(start_analysis)
     app.route('/api/holdings/<fund_code>', methods=['DELETE'])(delete_holding)
     
@@ -807,6 +808,206 @@ def get_best_ocr_engine():
             'best_engine': 'baidu',
             'message': '使用默认引擎'
         })
+
+
+def get_portfolio_metrics():
+    """获取基金组合在指定时间段的绩效指标"""
+    try:
+        data = request.get_json()
+        fund_codes = data.get('fund_codes', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if not fund_codes:
+            return jsonify({'success': False, 'error': '请提供基金代码列表'}), 400
+
+        if not start_date or not end_date:
+            return jsonify({'success': False, 'error': '请提供开始和结束日期'}), 400
+
+        # 获取基金持仓信息（用于计算权重）
+        user_id = data.get('user_id', 'default_user')
+        holdings_sql = """
+            SELECT fund_code, holding_amount
+            FROM user_holdings
+            WHERE user_id = :user_id AND fund_code IN :fund_codes
+        """
+        holdings_df = db_manager.execute_query(holdings_sql, {
+            'user_id': user_id,
+            'fund_codes': tuple(fund_codes)
+        })
+
+        # 计算权重
+        total_amount = holdings_df['holding_amount'].sum() if not holdings_df.empty else 0
+        weights = {}
+        if total_amount > 0:
+            for _, row in holdings_df.iterrows():
+                weights[row['fund_code']] = row['holding_amount'] / total_amount
+        else:
+            # 如果没有持仓数据，平均分配权重
+            for code in fund_codes:
+                weights[code] = 1.0 / len(fund_codes)
+
+        # 获取各基金的绩效数据
+        import numpy as np
+        from datetime import datetime, timedelta
+
+        # 安全处理 NaN 值的辅助函数
+        def safe_round(val, decimals=2):
+            if val is None:
+                return 0
+            try:
+                v = float(val)
+                if np.isnan(v) or np.isinf(v):
+                    return 0
+                return round(v, decimals)
+            except:
+                return 0
+        
+        def safe_float(val, default=0):
+            if val is None:
+                return default
+            try:
+                v = float(val)
+                return 0 if np.isnan(v) or np.isinf(v) else v
+            except:
+                return default
+        
+        def safe_sum(values):
+            total = 0
+            for v in values:
+                try:
+                    if v is not None and not np.isnan(v) and not np.isinf(v):
+                        total += v
+                except:
+                    pass
+            return total
+
+        # 计算交易日天数
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        trading_days = (end_dt - start_dt).days * 0.6  # 估算交易日
+
+        # 获取基金收益率数据
+        portfolio_returns = []
+        fund_metrics = []
+
+        for fund_code in fund_codes:
+            # 获取基金历史净值数据
+            nav_sql = """
+                SELECT nav, nav_date FROM fund_nav
+                WHERE fund_code = :fund_code
+                AND nav_date >= :start_date
+                AND nav_date <= :end_date
+                ORDER BY nav_date
+            """
+            nav_df = db_manager.execute_query(nav_sql, {
+                'fund_code': fund_code,
+                'start_date': start_date,
+                'end_date': end_date
+            })
+
+            if not nav_df.empty:
+                # 计算收益率
+                nav_df['return'] = nav_df['nav'].pct_change()
+                returns = nav_df['return'].dropna().values
+
+                if len(returns) > 1:
+                    # 计算各项指标
+                    avg_daily_return = np.mean(returns) * 100  # 转换为百分比
+                    std_daily_return = np.std(returns) * 100
+
+                    # 年化收益率（假设252个交易日）
+                    annualized_return = avg_daily_return * 252
+
+                    # 夏普比率（假设无风险利率为2%）
+                    risk_free_rate = 2.0
+                    if std_daily_return > 0:
+                        sharpe_ratio = (annualized_return - risk_free_rate) / (std_daily_return * np.sqrt(252))
+                    else:
+                        sharpe_ratio = 0
+
+                    # 最大回撤
+                    cumulative = (1 + returns).cumprod()
+                    running_max = np.maximum.accumulate(cumulative)
+                    drawdown = (cumulative - running_max) / running_max
+                    max_drawdown = abs(np.min(drawdown)) * 100
+
+                    # 月度收益
+                    nav_df['month'] = nav_df['nav_date'].dt.to_period('M')
+                    monthly_returns = nav_df.groupby('month')['nav'].last().pct_change().dropna() * 100
+                    
+                    monthly_stats = {
+                        'best_month': safe_float(monthly_returns.max()) if len(monthly_returns) > 0 else 0,
+                        'worst_month': safe_float(monthly_returns.min()) if len(monthly_returns) > 0 else 0,
+                        'avg_monthly': safe_float(monthly_returns.mean()) if len(monthly_returns) > 0 else 0,
+                        'positive_months': int((monthly_returns > 0).sum()) if len(monthly_returns) > 0 else 0,
+                        'total_months': len(monthly_returns)
+                    }
+
+                    # 胜率
+                    win_rate = (returns > 0).sum() / len(returns) * 100 if len(returns) > 0 else 0
+
+                    fund_metrics.append({
+                        'fund_code': fund_code,
+                        'weight': weights.get(fund_code, 0),
+                        'annualized_return': safe_round(annualized_return),
+                        'sharpe_ratio': safe_round(sharpe_ratio),
+                        'max_drawdown': safe_round(max_drawdown),
+                        'win_rate': safe_round(win_rate),
+                        'volatility': safe_round(std_daily_return * np.sqrt(252)),
+                        'monthly_stats': monthly_stats
+                    })
+
+                    # 累加收益率用于组合计算
+                    if len(portfolio_returns) == 0:
+                        portfolio_returns = returns
+                    else:
+                        portfolio_returns = np.concatenate([portfolio_returns, returns])
+
+        # 计算组合加权指标
+        # 安全处理组合指标
+        def safe_sum(values):
+            return sum(v for v in values if v is not None and not np.isnan(v) and not np.isinf(v))
+        
+        portfolio_annualized_return = safe_sum(m['annualized_return'] * m['weight'] for m in fund_metrics)
+        portfolio_sharpe = safe_sum(m['sharpe_ratio'] * m['weight'] for m in fund_metrics)
+        portfolio_max_drawdown = safe_sum(m['max_drawdown'] * m['weight'] for m in fund_metrics)
+        portfolio_volatility = safe_sum(m['volatility'] * m['weight'] for m in fund_metrics)
+
+        # 归因分析 - 各基金对组合收益的贡献
+        attribution = []
+        for m in fund_metrics:
+            attribution.append({
+                'fund_code': m['fund_code'],
+                'contribution': safe_round(m['annualized_return'] * m['weight']),
+                'weight': safe_round(m['weight'] * 100)
+            })
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'period': {
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'trading_days': int(trading_days)
+                },
+                'portfolio': {
+                    'annualized_return': safe_round(portfolio_annualized_return),
+                    'sharpe_ratio': safe_round(portfolio_sharpe),
+                    'max_drawdown': safe_round(portfolio_max_drawdown),
+                    'volatility': safe_round(portfolio_volatility),
+                    'win_rate': safe_round(safe_sum(m['win_rate'] * m['weight'] for m in fund_metrics))
+                },
+                'funds': fund_metrics,
+                'attribution': attribution
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"获取组合绩效指标失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def import_holding_screenshot():
