@@ -802,13 +802,13 @@ def import_holding_confirm():
         data = request.get_json()
         user_id = data.get('user_id', 'default_user')
         funds = data.get('funds', [])
-        
+
         if not funds:
             return jsonify({'success': False, 'error': '没有提供基金数据'}), 400
-            
+
         imported_count = 0
         errors = []
-        
+
         for fund_data in funds:
             try:
                 fund_code = fund_data.get('fund_code')
@@ -820,28 +820,31 @@ def import_holding_confirm():
                 if buy_date is None or buy_date == '' or buy_date.lower() in ['none', 'null']:
                     buy_date = None
                 notes = fund_data.get('notes', '手工导入')
-                
+                # 获取盈亏金额（持仓盈亏）
+                holding_profit = fund_data.get('profit_amount')
+
                 # 计算持有金额
                 holding_amount = holding_shares * cost_price
-                
+
                 # 检查基金是否已存在
                 check_sql = "SELECT COUNT(*) FROM user_holdings WHERE user_id = :user_id AND fund_code = :fund_code"
                 existing_result = db_manager.fetch_one(check_sql, {
                     'user_id': user_id,
                     'fund_code': fund_code
                 })
-                
+
                 existing_count = existing_result[0] if existing_result else 0
-                
+
                 if existing_count > 0:
                     # 基金已存在，更新持仓
                     update_sql = """
-                    UPDATE user_holdings 
-                    SET holding_shares = :holding_shares, 
-                        cost_price = :cost_price, 
+                    UPDATE user_holdings
+                    SET holding_shares = :holding_shares,
+                        cost_price = :cost_price,
                         holding_amount = :holding_amount,
                         buy_date = :buy_date,
-                        notes = :notes
+                        notes = :notes,
+                        holding_profit = :holding_profit
                     WHERE user_id = :user_id AND fund_code = :fund_code
                     """
                     success = db_manager.execute_sql(update_sql, {
@@ -851,17 +854,18 @@ def import_holding_confirm():
                         'cost_price': cost_price,
                         'holding_amount': holding_amount,
                         'buy_date': buy_date,
-                        'notes': notes
+                        'notes': notes,
+                        'holding_profit': holding_profit
                     })
-                    logger.info(f"更新基金 {fund_code} 持仓成功")
+                    logger.info(f"更新基金 {fund_code} 持仓成功，盈亏: {holding_profit}")
                 else:
                     # 基金不存在，插入新记录
                     sql = """
-                    INSERT INTO user_holdings 
-                    (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
-                    VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
+                    INSERT INTO user_holdings
+                    (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes, holding_profit)
+                    VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes, :holding_profit)
                     """
-                    
+
                     success = db_manager.execute_sql(sql, {
                         'user_id': user_id,
                         'fund_code': fund_code,
@@ -870,10 +874,11 @@ def import_holding_confirm():
                         'cost_price': cost_price,
                         'holding_amount': holding_amount,
                         'buy_date': buy_date,
-                        'notes': notes
+                        'notes': notes,
+                        'holding_profit': holding_profit
                     })
-                    logger.info(f"插入基金 {fund_code} 持仓成功")
-                
+                    logger.info(f"插入基金 {fund_code} 持仓成功，盈亏: {holding_profit}")
+
                 if success:
                     imported_count += 1
                     # 导入成功后立即计算并更新绩效指标
@@ -883,29 +888,29 @@ def import_holding_confirm():
                         logger.warning(f"基金 {fund_code} 绩效指标计算失败: {e}")
                 else:
                     errors.append(f"基金 {fund_code} 导入失败")
-                    
+
             except Exception as e:
                 error_msg = f"基金 {fund_data.get('fund_code', 'unknown')} 处理异常: {str(e)}"
                 logger.error(error_msg)
                 errors.append(error_msg)
-        
+
         if imported_count > 0:
             message = f"成功导入 {imported_count} 只基金"
             if errors:
                 message += f"，{len(errors)} 只基金导入失败"
             return jsonify({
-                'success': True, 
+                'success': True,
                 'message': message,
                 'imported_count': imported_count,
                 'errors': errors
             })
         else:
             return jsonify({
-                'success': False, 
+                'success': False,
                 'error': '所有基金导入失败',
                 'errors': errors
             }), 500
-            
+
     except Exception as e:
         logger.error(f"导入持仓失败: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -36,25 +36,27 @@ class PortfolioImporter:
     def extract_portfolio_from_ocr(self, ocr_texts: List[str]) -> List[Dict]:
         """
         从OCR文本中提取持仓信息
-        
+
         参数：
             ocr_texts: OCR识别的文本列表
-            
+
         返回：
             list: 提取的持仓信息列表
         """
         holdings = []
-        
+
         # 正则表达式模式
         nav_pattern = re.compile(r'\b(\d+\.\d{2})\b')  # 净值格式
         change_amount_pattern = re.compile(r'[+\-](\d+\.\d{2})')  # 涨跌金额
         change_percent_pattern = re.compile(r'[+\-](\d+\.\d{2})%')  # 涨跌百分比
-        
+        # 匹配盈亏金额，支持如 "2.69万" 或 "26,900.00" 格式
+        profit_pattern = re.compile(r'(\d+\.?\d*)(万|亿)?')
+
         def is_fund_name(text):
             """判断是否为基金名称"""
             if not re.search(r'[\u4e00-\u9fa5]', text):
                 return False
-            
+
             exclude_patterns = [
                 r'^\d+\.\d+$',  # 纯数字
                 r'^[+\-]\d+',   # 涨跌幅
@@ -64,18 +66,24 @@ class PortfolioImporter:
                 r'^基金',       # 基金持仓
                 r'^交易',       # 交易相关
                 r'^\d+笔',      # 交易笔数
+                r'最新净值',     # 表头
+                r'日涨跌幅',     # 表头
+                r'持有金额',     # 表头
+                r'持仓占比',     # 表头
+                r'盈亏金额',     # 表头
+                r'持仓盈亏',     # 表头
             ]
-            
+
             for pattern in exclude_patterns:
                 if re.search(pattern, text):
                     return False
-            
+
             return len(text) > 3  # 基金名称通常较长
-        
+
         i = 0
         while i < len(ocr_texts):
             text = ocr_texts[i].strip()
-            
+
             # 查找基金名称
             if is_fund_name(text):
                 holding = {
@@ -84,21 +92,22 @@ class PortfolioImporter:
                     'change_amount': None,
                     'change_percent': None,
                     'fund_code': None,
-                    'position_value': None,  # 持仓金额
+                    'position_value': None,  # 持有金额
                     'shares': None,          # 持有份额
+                    'holding_profit': None,  # 盈亏金额（持仓盈亏）
                 }
-                
+
                 # 查找后续的数值信息
-                for j in range(i + 1, min(i + 5, len(ocr_texts))):
+                for j in range(i + 1, min(i + 8, len(ocr_texts))):
                     next_text = ocr_texts[j].strip()
-                    
+
                     # 净值
                     if holding['nav_value'] is None:
                         nav_match = nav_pattern.search(next_text)
                         if nav_match and not re.search(r'[+\-%]', next_text):
                             holding['nav_value'] = float(nav_match.group(1))
                             continue
-                    
+
                     # 涨跌金额
                     if holding['change_amount'] is None:
                         change_match = change_amount_pattern.search(next_text)
@@ -107,7 +116,7 @@ class PortfolioImporter:
                             if next_text.startswith('-'):
                                 holding['change_amount'] *= -1
                             continue
-                    
+
                     # 涨跌百分比
                     if holding['change_percent'] is None:
                         percent_match = change_percent_pattern.search(next_text)
@@ -116,7 +125,34 @@ class PortfolioImporter:
                             if next_text.startswith('-'):
                                 holding['change_percent'] *= -1
                             continue
-                
+
+                    # 盈亏金额（持仓盈亏）- 匹配 "2.69万" 或纯数字格式
+                    if holding['holding_profit'] is None:
+                        # 尝试匹配包含"万"或"亿"的盈亏金额
+                        profit_match = re.search(r'([+\-]?\d+\.?\d*)(万|亿)?', next_text)
+                        if profit_match:
+                            profit_val = profit_match.group(1)
+                            unit = profit_match.group(2)
+                            # 判断是否为盈亏金额（通常较大，且可能带万/亿单位）
+                            if profit_val and profit_val not in ['+', '-']:
+                                try:
+                                    profit_num = float(profit_val)
+                                    if unit == '万':
+                                        profit_num *= 10000
+                                    elif unit == '亿':
+                                        profit_num *= 100000000
+                                    # 判断正负（通过上下文或正负号）
+                                    if next_text.startswith('-'):
+                                        profit_num = -abs(profit_num)
+                                    elif next_text.startswith('+'):
+                                        profit_num = abs(profit_num)
+                                    # 只有当金额较大时才认为是盈亏（避免误识别为净值）
+                                    if abs(profit_num) > 100 or unit:
+                                        holding['holding_profit'] = profit_num
+                                        continue
+                                except ValueError:
+                                    pass
+
                 # 通过akshare查找基金代码
                 try:
                     fund_info = lookup_fund_info(text)
@@ -128,53 +164,53 @@ class PortfolioImporter:
                         logger.warning(f"未找到基金代码: {text}")
                 except Exception as e:
                     logger.error(f"查找基金代码时出错: {e}")
-                
+
                 # 计算持仓金额（如果有净值和涨跌金额）
                 if holding['nav_value'] and holding['change_amount']:
                     # 根据涨跌金额反推持仓金额
                     if holding['change_percent']:
                         # 持仓金额 = 涨跌金额 / (涨跌百分比 / 100)
                         holding['position_value'] = abs(holding['change_amount']) / (abs(holding['change_percent']) / 100)
-                
+
                 holdings.append(holding)
-                logger.info(f"提取持仓: {holding['fund_name']} - 净值: {holding['nav_value']}")
-            
+                logger.info(f"提取持仓: {holding['fund_name']} - 净值: {holding['nav_value']}, 盈亏: {holding['holding_profit']}")
+
             i += 1
-        
+
         return holdings
     
     def import_to_database(self, holdings: List[Dict], user_id: str = "default") -> bool:
         """
         将持仓信息导入到MySQL数据库
-        
+
         参数：
             holdings: 持仓信息列表
             user_id: 用户ID
-            
+
         返回：
             bool: 是否成功
         """
         if not holdings:
             logger.warning("没有持仓数据需要导入")
             return False
-        
+
         try:
             import_time = datetime.now()
             success_count = 0
-            
+
             for holding in holdings:
                 if not holding.get('fund_code'):
                     logger.warning(f"跳过没有基金代码的持仓: {holding.get('fund_name', '未知')}")
                     continue
-                
+
                 try:
                     # 检查是否已存在该基金的持仓
                     check_sql = """
-                        SELECT id FROM user_portfolio 
+                        SELECT id FROM user_portfolio
                         WHERE user_id = %s AND fund_code = %s
                     """
                     result = self.db.execute_query(check_sql, (user_id, holding['fund_code']))
-                    
+
                     if not result.empty:
                         # 更新现有持仓
                         update_sql = """
@@ -185,6 +221,7 @@ class PortfolioImporter:
                                 change_percent = %s,
                                 position_value = %s,
                                 shares = %s,
+                                holding_profit = %s,
                                 last_updated = %s
                             WHERE user_id = %s AND fund_code = %s
                         """
@@ -195,20 +232,21 @@ class PortfolioImporter:
                             holding.get('change_percent'),
                             holding.get('position_value'),
                             holding.get('shares'),
+                            holding.get('holding_profit'),
                             import_time,
                             user_id,
                             holding['fund_code']
                         )
                         self.db.execute_sql(update_sql, params)
-                        logger.info(f"更新持仓: {holding['fund_code']}")
+                        logger.info(f"更新持仓: {holding['fund_code']}, 盈亏: {holding.get('holding_profit')}")
                     else:
                         # 插入新持仓
                         insert_sql = """
                             INSERT INTO user_portfolio (
                                 user_id, fund_code, fund_name, nav_value,
                                 change_amount, change_percent, position_value,
-                                shares, created_at, last_updated
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                shares, holding_profit, created_at, last_updated
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """
                         params = (
                             user_id,
@@ -219,21 +257,22 @@ class PortfolioImporter:
                             holding.get('change_percent'),
                             holding.get('position_value'),
                             holding.get('shares'),
+                            holding.get('holding_profit'),
                             import_time,
                             import_time
                         )
                         self.db.execute_sql(insert_sql, params)
-                        logger.info(f"新增持仓: {holding['fund_code']}")
-                    
+                        logger.info(f"新增持仓: {holding['fund_code']}, 盈亏: {holding.get('holding_profit')}")
+
                     success_count += 1
-                    
+
                 except Exception as e:
                     logger.error(f"导入持仓失败 {holding.get('fund_code')}: {e}")
                     continue
-            
+
             logger.info(f"成功导入 {success_count}/{len(holdings)} 个持仓")
             return success_count > 0
-            
+
         except Exception as e:
             logger.error(f"导入持仓到数据库失败: {e}")
             return False
@@ -250,8 +289,9 @@ class PortfolioImporter:
                     nav_value DECIMAL(10,4) COMMENT '单位净值',
                     change_amount DECIMAL(10,2) COMMENT '涨跌金额',
                     change_percent DECIMAL(6,2) COMMENT '涨跌百分比',
-                    position_value DECIMAL(15,2) COMMENT '持仓金额',
+                    position_value DECIMAL(15,2) COMMENT '持有金额',
                     shares DECIMAL(15,4) COMMENT '持有份额',
+                    holding_profit DECIMAL(15,2) COMMENT '盈亏金额（持仓盈亏）',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间',
                     UNIQUE KEY uk_user_fund (user_id, fund_code),
@@ -262,6 +302,18 @@ class PortfolioImporter:
             """
             self.db.execute_sql(sql)
             logger.info("user_portfolio 表检查/创建成功")
+
+            # 检查并添加 holding_profit 列（如果不存在）
+            try:
+                check_sql = "SHOW COLUMNS FROM user_portfolio LIKE 'holding_profit'"
+                result = self.db.execute_query(check_sql)
+                if result.empty:
+                    alter_sql = "ALTER TABLE user_portfolio ADD COLUMN holding_profit DECIMAL(15,2) COMMENT '盈亏金额（持仓盈亏）' AFTER shares"
+                    self.db.execute_sql(alter_sql)
+                    logger.info("添加 holding_profit 列成功")
+            except Exception as col_err:
+                logger.warning(f"检查/添加 holding_profit 列失败: {col_err}")
+
         except Exception as e:
             logger.error(f"创建 user_portfolio 表失败: {e}")
     

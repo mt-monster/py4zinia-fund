@@ -367,7 +367,7 @@ class SmartFundParser:
     def _parse_value_text(self, text: str) -> Optional[Dict]:
         """解析数值文本，返回类型和值"""
         text = text.strip()
-        
+
         # 持仓金额格式（正数，如283.37, 228.32, 321.03）
         amount_match = re.match(r'^(\d{2,5}\.\d{2})$', text)
         if amount_match:
@@ -375,21 +375,34 @@ class SmartFundParser:
             # 持仓金额通常在50-100000之间
             if 50 <= value <= 100000:
                 return {'type': 'amount', 'value': value, 'text': text}
-        
+
         # 带符号的金额（如+0.75, -1.57, -14.91, -15.80）- 盈亏金额
         profit_match = re.match(r'^([+\-])(\d+\.\d{2})$', text)
         if profit_match:
             sign = 1 if profit_match.group(1) == '+' else -1
             value = sign * float(profit_match.group(2))
             return {'type': 'profit_amount', 'value': value, 'text': text}
-        
+
+        # 带符号的金额带单位（如+2.69万, -1.57万, +26.90万）
+        profit_unit_match = re.match(r'^([+\-])(\d+\.?\d{0,2})(万|亿)$', text)
+        if profit_unit_match:
+            sign = 1 if profit_unit_match.group(1) == '+' else -1
+            value = float(profit_unit_match.group(2))
+            unit = profit_unit_match.group(3)
+            if unit == '万':
+                value *= 10000
+            elif unit == '亿':
+                value *= 100000000
+            value = sign * value
+            return {'type': 'profit_amount', 'value': value, 'text': text}
+
         # 百分比格式（如-5.17%, -6.94%, +3.20%）- 盈亏率
         rate_match = re.match(r'^([+\-])?(\d+\.\d{1,2})%$', text)
         if rate_match:
             sign = 1 if rate_match.group(1) != '-' else -1
             value = sign * float(rate_match.group(2))
             return {'type': 'profit_rate', 'value': value, 'text': text}
-        
+
         return None
     
     def _assign_values_to_fields(self, values: List[Dict], holding_info: Dict):

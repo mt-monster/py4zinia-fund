@@ -297,7 +297,8 @@ const FundScreenshot = {
                     holding_shares: holding_shares,
                     cost_price: cost_price,
                     buy_date: fund.buy_date || new Date().toISOString().split('T')[0],
-                    confidence: fund.confidence || 0
+                    confidence: fund.confidence || 0,
+                    profit_amount: profit_amount  // 盈亏金额
                 };
             }).filter(fund => fund.fund_code && fund.holding_shares > 0);
 
