@@ -66,20 +66,30 @@ class HoldingDataDTO:
     holding_profit_rate: Optional[float] = field(default=None, init=False)
     today_profit: Optional[float] = field(default=None, init=False)
     
+    def _is_valid_number(self, value):
+        """检查值是否为有效数字（不是 None 也不是 NaN）"""
+        if value is None:
+            return False
+        try:
+            import math
+            return not math.isnan(float(value))
+        except (ValueError, TypeError):
+            return False
+    
     def calculate(self):
         """计算衍生指标"""
         # 当前市值
         if self.holding_shares and self.current_nav:
             self.current_market_value = round(self.holding_shares * self.current_nav, 2)
         
-        # 持仓盈亏 - 优先使用导入的值
-        if self.holding_profit_imported is not None:
+        # 持仓盈亏 - 优先使用导入的值（检查是否为有效数字）
+        if self._is_valid_number(self.holding_profit_imported):
             # 使用导入的持仓收益值
-            self.holding_profit = self.holding_profit_imported
+            self.holding_profit = round(float(self.holding_profit_imported), 2)
             # 计算收益率
             if self.holding_amount and self.holding_amount > 0:
                 self.holding_profit_rate = round(
-                    self.holding_profit_imported / self.holding_amount * 100, 2
+                    float(self.holding_profit_imported) / self.holding_amount * 100, 2
                 )
         elif self.current_market_value is not None and self.holding_amount:
             # 计算持仓盈亏
