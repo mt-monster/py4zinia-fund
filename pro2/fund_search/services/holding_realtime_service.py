@@ -23,6 +23,56 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+# 交易日缓存
+_trading_dates_cache = None
+_trading_dates_cache_expiry = None
+
+def is_trading_day(check_date: datetime = None) -> bool:
+    """
+    判断指定日期是否是A股交易日
+    
+    Args:
+        check_date: 要检查的日期，默认为今天
+        
+    Returns:
+        bool: True表示是交易日，False表示不是
+    """
+    global _trading_dates_cache, _trading_dates_cache_expiry
+    
+    if check_date is None:
+        check_date = datetime.now()
+    
+    check_date_str = check_date.strftime('%Y-%m-%d')
+    
+    # 先判断是否是周末
+    weekday = check_date.weekday()
+    if weekday >= 5:  # 周六或周日
+        return False
+    
+    # 尝试使用akshare获取交易日历（缓存1天）
+    try:
+        now = datetime.now()
+        if (_trading_dates_cache is None or 
+            _trading_dates_cache_expiry is None or 
+            now > _trading_dates_cache_expiry):
+            
+            import akshare as ak
+            # 获取最近几年的交易日历
+            start_year = now.year - 1
+            end_year = now.year + 1
+            df = ak.tool_trade_date_hist_sina()
+            # 转换日期格式
+            df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y-%m-%d')
+            _trading_dates_cache = set(df['trade_date'].tolist())
+            _trading_dates_cache_expiry = datetime(now.year, now.month, now.day) + timedelta(days=1)
+        
+        return check_date_str in _trading_dates_cache
+        
+    except Exception as e:
+        logger.warning(f"获取交易日历失败，使用简单判断: {e}")
+        # 如果akshare失败，默认工作日为交易日（周末已排除）
+        return True
+
 
 @dataclass
 class HoldingDataDTO:
@@ -532,6 +582,12 @@ class HoldingRealtimeService:
             dto.estimate_nav = rt.get('estimate_nav')
             dto.today_return = rt.get('today_return')
             
+            # 判断是否是交易日（非交易日强制显示零）
+            if not is_trading_day():
+                dto.today_return = 0.0
+                dto.estimate_nav = 0.0
+                logger.debug(f"基金 {fund_code} 非交易日，强制日涨跌幅和实时估值为0")
+            
             # 填充昨日数据
             yd = yesterday_data.get(fund_code, {})
             dto.yesterday_nav = yd.get('yesterday_nav')
@@ -679,20 +735,20 @@ class HoldingRealtimeService:
                                     if 'date' in df.columns:
                                         df = df.sort_values('date', ascending=False)
                                     
-                                    # 计算昨日收益率：使用第1条（前一天）和第2条（再前一天）的数据
-                                    # 第0条是最新净值，第1条是前一天净值，第2条是再前一天净值
+                                    # 计算昨日收益率：使用第0条（最新）和第1条（前一天）的数据
+                                    # 第0条是最新净值（昨日），第1条是前一天净值
+                                    latest_nav = float(df.iloc[0]['nav'])  # 最新净值（昨日）
                                     prev_nav = float(df.iloc[1]['nav'])  # 前一天净值
-                                    prev_prev_nav = float(df.iloc[2]['nav'])  # 再前一天净值
-                                    prev_date = str(df.iloc[1].get('date', ''))  # 前一天日期
+                                    latest_date = str(df.iloc[0].get('date', ''))  # 最新日期
                                     
-                                    if prev_prev_nav > 0:
-                                        yesterday_return = (prev_nav - prev_prev_nav) / prev_prev_nav * 100
+                                    if prev_nav > 0:
+                                        yesterday_return = (latest_nav - prev_nav) / prev_nav * 100
                                         yesterday_return = round(yesterday_return, 2)
                                         
                                         batch_results[code] = {
-                                            'yesterday_nav': prev_nav,
+                                            'yesterday_nav': latest_nav,
                                             'yesterday_return': yesterday_return,
-                                            'yesterday_return_date': prev_date,
+                                            'yesterday_return_date': latest_date,
                                             'yesterday_return_days_diff': 1,
                                             'yesterday_return_is_stale': False
                                         }

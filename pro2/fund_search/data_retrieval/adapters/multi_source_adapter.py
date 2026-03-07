@@ -540,22 +540,22 @@ class MultiSourceDataAdapter(OptimizedFundData):
             except:
                 latest_date_obj = datetime.now()
             
-            # 计算昨日收益率：使用第1条（前一天）和第2条（再前一天）的数据
-            # 第0条是最新净值，第1条是前一天净值，第2条是再前一天净值
+            # 计算昨日收益率：使用第0条（最新）和第1条（前一天）的数据
+            # 第0条是最新净值（昨日），第1条是前一天净值
+            latest_nav = float(df.iloc[0]['nav'])  # 最新净值（昨日）
             prev_nav = float(df.iloc[1]['nav'])  # 前一天净值
-            prev_prev_nav = float(df.iloc[2]['nav'])  # 再前一天净值
-            prev_date = str(df.iloc[1].get('date', ''))  # 前一天日期
+            latest_date = str(df.iloc[0].get('date', ''))  # 最新日期
             
-            logger.debug(f"基金 {fund_code} 计算昨日收益率: 前一天净值={prev_nav}({prev_date}), 再前一天净值={prev_prev_nav}")
+            logger.debug(f"基金 {fund_code} 计算昨日收益率: 最新净值={latest_nav}({latest_date}), 前一天净值={prev_nav}")
             
             # 计算日期差（与最新净值日期的差）
             days_diff = 1  # 默认为T-1
             try:
-                if prev_date:
-                    if len(prev_date) == 8:
-                        y_date_obj = datetime.strptime(prev_date, '%Y%m%d')
-                    elif '-' in prev_date:
-                        y_date_obj = datetime.strptime(prev_date, '%Y-%m-%d')
+                if latest_date:
+                    if len(latest_date) == 8:
+                        y_date_obj = datetime.strptime(latest_date, '%Y%m%d')
+                    elif '-' in latest_date:
+                        y_date_obj = datetime.strptime(latest_date, '%Y-%m-%d')
                     else:
                         y_date_obj = latest_date_obj - timedelta(days=1)
                     
@@ -565,11 +565,11 @@ class MultiSourceDataAdapter(OptimizedFundData):
             except:
                 days_diff = 1
             
-            # 计算收益率: (前一天 - 再前一天) / 再前一天 * 100
-            if prev_prev_nav > 0:
-                yesterday_return = (prev_nav - prev_prev_nav) / prev_prev_nav * 100
+            # 计算收益率: (最新 - 前一天) / 前一天 * 100
+            if prev_nav > 0:
+                yesterday_return = (latest_nav - prev_nav) / prev_nav * 100
                 result_value = round(yesterday_return, 2)
-                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result_value}%, 使用日期: {prev_date}, 日期差: T-{days_diff}")
+                logger.debug(f"基金 {fund_code} 直接计算昨日收益率: {result_value}%, 使用日期: {latest_date}, 日期差: T-{days_diff}")
                 
                 # 如果计算结果为0，且是QDII基金，则进行前向追溯
                 if result_value == 0.0 and self.is_qdii_fund(fund_code):
@@ -581,12 +581,12 @@ class MultiSourceDataAdapter(OptimizedFundData):
                 
                 return {
                     'value': result_value,
-                    'date': prev_date,
+                    'date': latest_date,
                     'days_diff': days_diff,
                     'is_stale': days_diff > 1
                 }
             else:
-                logger.warning(f"基金 {fund_code} 再前一天净值为0或负数: {prev_prev_nav}")
+                logger.warning(f"基金 {fund_code} 前一天净值为0或负数: {prev_nav}")
                 # 尝试前向追溯获取有效数据
                 traced_result = self._get_previous_nonzero_return_with_date(df, fund_code, latest_date_obj)
                 if traced_result['value'] != 0.0:
