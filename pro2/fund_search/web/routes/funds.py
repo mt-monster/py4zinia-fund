@@ -1066,8 +1066,30 @@ def _register_fund_routes(app):
             logger.info(f"批量获取 {len(fund_codes)} 只基金的实时估值")
             
             results = {}
+            
+            # 判断是否是交易日（非交易日强制显示零）
+            from datetime import datetime
+            today = datetime.now()
+            weekday = today.weekday()
+            is_trading = weekday < 5  # 周一到周五是交易日
+            logger.info(f"[实时估值API] 今天: {today.strftime('%Y-%m-%d')}, 星期: {weekday}, 是否交易日: {is_trading}")
+            
             for fund_code in fund_codes:
                 try:
+                    if not is_trading:
+                        # 非交易日，直接返回零
+                        results[fund_code] = {
+                            'fund_code': fund_code,
+                            'estimate_nav': 0.0,
+                            'current_nav': 0.0,
+                            'previous_nav': None,
+                            'today_return': 0.0,
+                            'estimate_return': 0.0,
+                            'data_source': 'non_trading_day',
+                            'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                        continue
+                    
                     # 获取实时数据
                     realtime_data = fund_data_manager.get_realtime_data(fund_code, '')
                     

@@ -583,10 +583,15 @@ class HoldingRealtimeService:
             dto.today_return = rt.get('today_return')
             
             # 判断是否是交易日（非交易日强制显示零）
-            if not is_trading_day():
+            from datetime import datetime
+            today = datetime.now()
+            weekday = today.weekday()
+            logger.debug(f"[交易日判断] 今天: {today.strftime('%Y-%m-%d')}, 星期: {weekday} (0=周一)")
+            
+            if weekday >= 5:  # 周六或周日
                 dto.today_return = 0.0
                 dto.estimate_nav = 0.0
-                logger.debug(f"基金 {fund_code} 非交易日，强制日涨跌幅和实时估值为0")
+                logger.debug(f"基金 {fund_code} 周末，强制日涨跌幅和实时估值为0")
             
             # 填充昨日数据
             yd = yesterday_data.get(fund_code, {})

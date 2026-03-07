@@ -123,21 +123,23 @@ const FundApp = {
             if (result.success && result.data) {
                 const updateFund = (fund) => {
                     const estimate = result.data[fund.fund_code];
-                    if (!estimate || !estimate.estimate_nav) return;
+                    if (!estimate || typeof estimate.estimate_nav === 'undefined' || estimate.estimate_nav === null) return;
                     const newNav = parseFloat(estimate.estimate_nav);
                     fund.current_nav = newNav;
+                    
                     // 优先使用接口返回的 today_return
                     if (estimate.today_return != null && !isNaN(parseFloat(estimate.today_return))) {
-                        const rt = parseFloat(estimate.today_return);
-                        if (rt !== 0) {
-                            fund.today_return = parseFloat(rt.toFixed(2));
-                        }
+                        fund.today_return = parseFloat(parseFloat(estimate.today_return).toFixed(2));
                     }
-                    // 接口没有涨跌幅或为0，用净值差计算
-                    if (!fund.today_return || fund.today_return === 0) {
-                        const prevNav = parseFloat(estimate.previous_nav || fund.previous_nav);
-                        if (!isNaN(newNav) && !isNaN(prevNav) && prevNav > 0 && newNav > 0) {
-                            fund.today_return = parseFloat(((newNav - prevNav) / prevNav * 100).toFixed(2));
+                    
+                    // 如果数据源是 non_trading_day，就不要再计算了
+                    if (estimate.data_source !== 'non_trading_day') {
+                        // 接口没有涨跌幅或为0，用净值差计算
+                        if (!fund.today_return || fund.today_return === 0) {
+                            const prevNav = parseFloat(estimate.previous_nav || fund.previous_nav);
+                            if (!isNaN(newNav) && !isNaN(prevNav) && prevNav > 0 && newNav > 0) {
+                                fund.today_return = parseFloat(((newNav - prevNav) / prevNav * 100).toFixed(2));
+                            }
                         }
                     }
                 };

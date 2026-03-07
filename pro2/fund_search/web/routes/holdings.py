@@ -533,6 +533,14 @@ def get_holdings():
             
             # 转换格式以兼容前端
             holdings = []
+            
+            # 判断是否是交易日（非交易日强制显示零）
+            from datetime import datetime
+            today = datetime.now()
+            weekday = today.weekday()
+            is_trading = weekday < 5  # 周一到周五是交易日
+            logger.info(f"[持仓API] 今天: {today.strftime('%Y-%m-%d')}, 星期: {weekday}, 是否交易日: {is_trading}")
+            
             for data in holdings_data:
                 fund_code = data.get('fund_code', '')
                 fund_name = data.get('fund_name', '')
@@ -542,6 +550,12 @@ def get_holdings():
                 
                 # 使用 fund_analysis_results 的数据优先（如果 holding_service 数据缺失）
                 today_return = data.get('today_return') if data.get('today_return') is not None else analysis_data.get('today_return')
+                current_nav = data.get('current_nav') if data.get('current_nav') is not None else analysis_data.get('current_nav')
+                
+                # 非交易日强制显示零
+                if not is_trading:
+                    today_return = 0.0
+                    current_nav = 0.0
                 
                 # 昨日盈亏率：强制使用实时计算数据（与日涨跌幅模式一致）
                 # 忽略 holding_service 返回的数据，因为可能来自数据库缓存（不实时）

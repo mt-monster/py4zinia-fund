@@ -125,6 +125,42 @@
             overflow: auto;
             position: relative;
         }
+        /* 分页控件样式 */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            background: #fafafa;
+            gap: 10px;
+        }
+        .pagination .page-btn {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .pagination .page-btn:hover:not(:disabled) {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+        .pagination .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .pagination .page-info {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .pagination select {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
         .etf-table {
             width: 100%;
             border-collapse: collapse;
@@ -361,6 +397,20 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- 分页控件 -->
+            <div class="pagination" id="pagination">
+                <button class="page-btn" id="prev-page" onclick="changePage(-1)" disabled>上一页</button>
+                <span class="page-info">
+                    第 <span id="current-page">1</span> / <span id="total-pages">1</span> 页
+                </span>
+                <button class="page-btn" id="next-page" onclick="changePage(1)" disabled>下一页</button>
+                <select id="page-size" onchange="changePageSize()" style="margin-left: 10px;">
+                    <option value="50">50条/页</option>
+                    <option value="100" selected>100条/页</option>
+                    <option value="200">200条/页</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -435,7 +485,8 @@
 
     <script>
         let currentPage = 1;
-        const perPage = 100;
+        let perPage = 100;
+        let totalETFs = 0;
         let allETFs = [];
         let selectedETF = null;
         let etfChart = null;
@@ -478,8 +529,10 @@
                 
                 if (result.success) {
                     allETFs = result.data;
+                    totalETFs = result.total;
                     document.getElementById('total-count').textContent = result.total;
                     renderETFTable(allETFs);
+                    updatePagination();
                 } else {
                     console.error('获取ETF列表失败:', result.error);
                     document.getElementById('etf-table-body').innerHTML = 
@@ -494,6 +547,36 @@
             }
         }
 
+        // 更新分页控件
+        function updatePagination() {
+            const totalPages = Math.ceil(totalETFs / perPage) || 1;
+            document.getElementById('current-page').textContent = currentPage;
+            document.getElementById('total-pages').textContent = totalPages;
+            
+            document.getElementById('prev-page').disabled = currentPage <= 1;
+            document.getElementById('next-page').disabled = currentPage >= totalPages;
+            
+            document.getElementById('pagination').style.display = totalETFs > perPage ? 'flex' : 'none';
+        }
+        
+        // 切换页码
+        function changePage(delta) {
+            const totalPages = Math.ceil(totalETFs / perPage) || 1;
+            const newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                loadETFs();
+            }
+        }
+        
+        // 改变每页数量
+        function changePageSize() {
+            const select = document.getElementById('page-size');
+            perPage = parseInt(select.value);
+            currentPage = 1;
+            loadETFs();
+        }
+        
         // 渲染ETF表格
         function renderETFTable(etfs) {
             const tbody = document.getElementById('etf-table-body');
