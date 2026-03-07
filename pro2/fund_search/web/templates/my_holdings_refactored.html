@@ -134,7 +134,12 @@
                 </div>
                 
                 <div id="preview-section" style="display: none; margin-top: var(--space-4);">
-                    <img id="image-preview" style="max-width: 100%; border-radius: var(--border-radius-md);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2);">
+                        <img id="image-preview" style="max-width: 100%; max-height: 300px; border-radius: var(--border-radius-md);">
+                        <button class="btn btn-secondary" onclick="FundScreenshot.resetImage()" style="padding: 6px 12px; font-size: 12px;">
+                            <i class="bi bi-arrow-counterclockwise"></i> 重新选择
+                        </button>
+                    </div>
                     <div id="recognition-result" style="margin-top: var(--space-4);"></div>
                 </div>
             </div>
@@ -226,13 +231,19 @@
                     
                     <div class="form-group">
                         <label class="form-label">持有金额 (元)</label>
-                        <input type="number" class="form-control" id="holding-amount" 
+                        <input type="number" class="form-control" id="holding-amount"
                                placeholder="输入持有金额" step="0.01" min="0">
                     </div>
-                    
+
+                    <div class="form-group">
+                        <label class="form-label">盈亏金额 (元) <span style="color: var(--text-tertiary); font-weight: normal;">可选</span></label>
+                        <input type="number" class="form-control" id="holding-profit"
+                               placeholder="输入盈亏金额（正数盈利，负数亏损）" step="0.01">
+                    </div>
+
                     <div class="form-group">
                         <label class="form-label">购买日期</label>
-                        <input type="date" class="form-control" id="buy-date" 
+                        <input type="date" class="form-control" id="buy-date"
                                value="{{ today | default('', true) }}">
                     </div>
                     

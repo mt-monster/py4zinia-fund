@@ -51,6 +51,29 @@ const FundScreenshot = {
     },
 
     /**
+     * 重置图片选择（重新选择图片）
+     */
+    resetImage() {
+        this.currentImage = null;
+        this.recognizedFunds = [];
+
+        const screenshotInput = document.getElementById('screenshot-input');
+        const uploadArea = document.getElementById('upload-area');
+        const previewSection = document.getElementById('preview-section');
+        const importBtn = document.getElementById('import-btn');
+        const recognitionResult = document.getElementById('recognition-result');
+
+        if (screenshotInput) screenshotInput.value = '';
+        if (uploadArea) uploadArea.style.display = 'block';
+        if (previewSection) previewSection.style.display = 'none';
+        if (importBtn) {
+            importBtn.disabled = true;
+            importBtn.textContent = '确认导入';
+        }
+        if (recognitionResult) recognitionResult.innerHTML = '';
+    },
+
+    /**
      * 处理文件选择
      */
     handleFileSelect(event) {
@@ -91,7 +114,7 @@ const FundScreenshot = {
     },
 
     /**
-     * 识别基金 - 调用真实API
+     * 识别基金 - 调用真实API，自动选择最佳OCR引擎
      */
     async recognizeFunds() {
         if (!this.currentImage) return;
@@ -103,10 +126,13 @@ const FundScreenshot = {
             resultDiv.innerHTML = `
                 <div class="loading-state" style="text-align: center; padding: var(--space-6);">
                     <i class="bi bi-hourglass-split" style="font-size: 32px; color: var(--primary);"></i>
-                    <p style="margin-top: var(--space-3); color: var(--text-secondary);">正在识别基金持仓信息...</p>
+                    <p style="margin-top: var(--space-3); color: var(--text-secondary);">正在识别基金持仓信息（自动选择最佳识别方案）...</p>
                 </div>
             `;
         }
+
+        // 自动选择最佳OCR引擎
+        const bestEngine = await this.selectBestOCREngine();
 
         try {
             // 调用真实的OCR识别API
@@ -118,7 +144,7 @@ const FundScreenshot = {
                 body: JSON.stringify({
                     image: this.currentImage,
                     use_gpu: false,
-                    ocr_engine: 'baidu'  // 默认使用百度OCR
+                    ocr_engine: bestEngine
                 })
             });
 
@@ -139,6 +165,31 @@ const FundScreenshot = {
             console.error('识别失败:', error);
             this.renderRecognitionError('网络错误，请重试');
         }
+    },
+
+    /**
+     * 自动选择最佳OCR引擎
+     */
+    async selectBestOCREngine() {
+        try {
+            const response = await fetch('/api/holdings/ocr/engines', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.best_engine) {
+                    console.log('自动选择最佳OCR引擎:', data.best_engine);
+                    return data.best_engine;
+                }
+            }
+        } catch (e) {
+            console.warn('获取OCR引擎信息失败，使用默认:', e);
+        }
+
+        // 默认使用百度OCR
+        return 'baidu';
     },
 
     /**

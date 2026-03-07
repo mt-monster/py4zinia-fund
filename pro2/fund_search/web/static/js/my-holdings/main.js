@@ -500,6 +500,7 @@ const FundManualImport = {
     resetForm() {
         document.getElementById('fund-search-input').value = '';
         document.getElementById('holding-amount').value = '';
+        document.getElementById('holding-profit').value = '';
         document.getElementById('buy-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('fund-search-results').style.display = 'none';
         document.getElementById('fund-info').style.display = 'none';
@@ -576,24 +577,35 @@ const FundManualImport = {
      */
     async confirmImport() {
         const holdingAmount = parseFloat(document.getElementById('holding-amount').value);
+        const holdingProfit = document.getElementById('holding-profit').value;
         const buyDate = document.getElementById('buy-date').value;
-        
+
         // 验证输入
         if (!this.selectedFund) {
             FundUtils.showNotification('请先选择基金', 'error');
             return;
         }
-        
+
         if (isNaN(holdingAmount) || holdingAmount <= 0) {
             FundUtils.showNotification('请输入有效的持有金额', 'error');
             return;
         }
-        
+
         if (!buyDate) {
             FundUtils.showNotification('请选择购买日期', 'error');
             return;
         }
-        
+
+        // 处理盈亏金额（可选）
+        let profitAmount = null;
+        if (holdingProfit && holdingProfit.trim() !== '') {
+            profitAmount = parseFloat(holdingProfit);
+            if (isNaN(profitAmount)) {
+                FundUtils.showNotification('请输入有效的盈亏金额', 'error');
+                return;
+            }
+        }
+
         try {
             // 准备导入数据
             const fundData = {
@@ -602,7 +614,8 @@ const FundManualImport = {
                 holding_shares: holdingAmount / (this.selectedFund.nav_value || 1),
                 cost_price: this.selectedFund.nav_value || 1,
                 buy_date: buyDate,
-                confidence: 1.0
+                confidence: 1.0,
+                holding_profit: profitAmount
             };
             
             // 调用API导入基金

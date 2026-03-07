@@ -257,6 +257,7 @@ def register_routes(app, **kwargs):
     app.route('/api/holdings/list', methods=['GET'])(get_holdings)  # 兼容 dashboard.html 的调用
     app.route('/api/holdings/import/screenshot', methods=['POST'])(import_holding_screenshot)
     app.route('/api/holdings/import/confirm', methods=['POST'])(import_holding_confirm)
+    app.route('/api/holdings/ocr/engines', methods=['GET'])(get_best_ocr_engine)
     app.route('/api/holdings', methods=['POST'])(add_holding)
     app.route('/api/holdings/<fund_code>', methods=['PUT'])(update_holding)
     app.route('/api/holdings/clear', methods=['DELETE'])(clear_holdings)
@@ -762,6 +763,52 @@ def get_holdings():
         return safe_jsonify({'success': False, 'error': str(e)}), 500
 
 
+def get_best_ocr_engine():
+    """获取最佳OCR引擎"""
+    try:
+        from data_retrieval.utils.ocr_config import get_ocr_engine, validate_engine_config
+
+        # 获取配置的默认引擎
+        configured_engine = get_ocr_engine()
+
+        # 验证配置的引擎是否可用
+        is_valid, error_msg = validate_engine_config(configured_engine)
+
+        if is_valid:
+            return jsonify({
+                'success': True,
+                'best_engine': configured_engine,
+                'message': f'使用 {configured_engine} OCR引擎'
+            })
+
+        # 如果配置的引擎不可用，尝试备用引擎
+        available_engines = ['baidu', 'easyocr', 'paddleocr']
+        for engine in available_engines:
+            if engine != configured_engine:
+                is_valid, _ = validate_engine_config(engine)
+                if is_valid:
+                    return jsonify({
+                        'success': True,
+                        'best_engine': engine,
+                        'message': f'配置的引擎不可用，切换到 {engine}'
+                    })
+
+        # 都没有可用引擎
+        return jsonify({
+            'success': False,
+            'error': '没有可用的OCR引擎',
+            'best_engine': 'baidu'
+        }), 500
+
+    except Exception as e:
+        logger.error(f"获取最佳OCR引擎失败: {e}")
+        return jsonify({
+            'success': True,
+            'best_engine': 'baidu',
+            'message': '使用默认引擎'
+        })
+
+
 def import_holding_screenshot():
     """通过截图导入基金持仓"""
     try:
@@ -821,7 +868,7 @@ def import_holding_confirm():
                     buy_date = None
                 notes = fund_data.get('notes', '手工导入')
                 # 获取盈亏金额（持仓盈亏）
-                holding_profit = fund_data.get('profit_amount')
+                holding_profit = fund_data.get('holding_profit')
 
                 # 计算持有金额
                 holding_amount = holding_shares * cost_price
