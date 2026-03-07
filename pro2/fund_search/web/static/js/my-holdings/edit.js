@@ -65,24 +65,16 @@ const FundEdit = {
                 <input type="text" id="edit-fund-name" value="${fundName}" class="form-control" placeholder="请输入基金名称">
             </div>
             <div class="form-group">
-                <label for="edit-holding-shares">持有份额</label>
-                <input type="number" id="edit-holding-shares" value="${this.currentFund.holding_shares || 0}" step="0.0001" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="edit-cost-price">成本价</label>
-                <input type="number" id="edit-cost-price" value="${this.currentFund.cost_price || 0}" step="0.0001" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="edit-holding-amount">持仓金额</label>
+                <label for="edit-holding-amount">持有金额 (元)</label>
                 <input type="number" id="edit-holding-amount" value="${this.currentFund.holding_amount || 0}" step="0.01" class="form-control">
+            </div>
+            <div class="form-group">
+                <label for="edit-holding-profit">持有收益 (元) <span style="color: var(--text-tertiary); font-weight: normal;">可选</span></label>
+                <input type="number" id="edit-holding-profit" value="${this.currentFund.holding_profit || ''}" step="0.01" class="form-control" placeholder="正数盈利，负数亏损">
             </div>
             <div class="form-group">
                 <label for="edit-buy-date">买入日期</label>
                 <input type="date" id="edit-buy-date" value="${this.currentFund.buy_date || ''}" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="edit-notes">备注</label>
-                <textarea id="edit-notes" rows="3" class="form-control">${this.currentFund.notes || ''}</textarea>
             </div>
         `;
 
@@ -220,11 +212,10 @@ const FundEdit = {
         const fundNameInput = document.getElementById('edit-fund-name');
         const fundCode = fundCodeInput?.value;
         const fundName = fundNameInput?.value;
-        const holdingShares = parseFloat(document.getElementById('edit-holding-shares')?.value) || 0;
-        const costPrice = parseFloat(document.getElementById('edit-cost-price')?.value) || 0;
         const holdingAmount = parseFloat(document.getElementById('edit-holding-amount')?.value) || 0;
+        const holdingProfitInput = document.getElementById('edit-holding-profit')?.value;
+        const holdingProfit = holdingProfitInput ? parseFloat(holdingProfitInput) : null;
         const buyDate = document.getElementById('edit-buy-date')?.value;
-        const notes = document.getElementById('edit-notes')?.value;
 
         // 验证基金代码
         if (!fundCode) {
@@ -265,11 +256,9 @@ const FundEdit = {
                     user_id: 'default_user',
                     fund_code: fundCode,
                     fund_name: fundName,
-                    holding_shares: holdingShares,
-                    cost_price: costPrice,
                     holding_amount: holdingAmount,
-                    buy_date: buyDate,
-                    notes: notes
+                    holding_profit: holdingProfit,
+                    buy_date: buyDate
                 })
             });
 
