@@ -24,7 +24,7 @@ from flask import Flask, render_template, jsonify, request
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG
+from shared.enhanced_config import DATABASE_CONFIG, NOTIFICATION_CONFIG, DATA_SOURCE_CONFIG
 from data_access.enhanced_database import EnhancedDatabaseManager
 from backtesting.strategies.enhanced_strategy import EnhancedInvestmentStrategy
 from backtesting.core.unified_strategy_engine import UnifiedStrategyEngine
@@ -41,6 +41,48 @@ from shared.fund_helpers import (
     get_fund_name_from_db as _get_fund_name_from_db_helper,
     get_fund_type_for_allocation as _get_fund_type_for_allocation_helper,
 )
+from backtesting.analysis.optimization import (
+    PortfolioOptimizer,
+    calculate_portfolio_performance,
+    calculate_portfolio_nav_series,
+    get_fund_returns_matrix
+)
+
+# 添加 tushare 支持
+try:
+    import tushare as ts
+    from shared.enhanced_config import DATA_SOURCE_CONFIG
+    ts.set_token(DATA_SOURCE_CONFIG.get('tushare', {}).get('token', ''))
+    tushare_pro = ts.pro_api() if DATA_SOURCE_CONFIG.get('tushare', {}).get('token') else None
+except:
+    tushare_pro = None
+
+
+def fetch_nav_from_tushare_realtime(fund_code, start_date, end_date):
+    """从 tushare 实时获取基金净值数据"""
+    if not tushare_pro:
+        logger.warning(f"[Tushare] tushare 未初始化")
+        return pd.DataFrame()
+    
+    try:
+        ts_code = f"{fund_code}.OF"
+        df = tushare_pro.fund_nav(ts_code=ts_code, start_date=start_date.replace('-', ''), end_date=end_date.replace('-', ''))
+        
+        if df is not None and not df.empty:
+            df = df.rename(columns={
+                'nav_date': 'nav_date',
+                'unit_nav': 'nav',
+                'accum_nav': 'accum_nav',
+                'daily_profit': 'daily_return'
+            })
+            df['nav_date'] = pd.to_datetime(df['nav_date'])
+            df = df.sort_values('nav_date')
+            logger.info(f"[Tushare] 获取 {fund_code} 数据成功: {len(df)} 条")
+            return df[['nav', 'nav_date']]
+    except Exception as e:
+        logger.warning(f"[Tushare] 获取 {fund_code} 数据失败: {e}")
+    
+    return pd.DataFrame()
 
 
 # 添加安全的浮点数处理函数
@@ -266,6 +308,7 @@ def register_routes(app, **kwargs):
     app.route('/api/holdings/analyze/comprehensive', methods=['POST'])(analyze_comprehensive)
     app.route('/api/holdings/analyze/personalized-advice', methods=['POST'])(analyze_personalized_advice)
     app.route('/api/holdings/analyze/portfolio-metrics', methods=['POST'])(get_portfolio_metrics)
+    app.route('/api/holdings/analyze/portfolio-optimization', methods=['POST'])(get_portfolio_optimization)
     app.route('/api/analysis', methods=['POST'])(start_analysis)
     app.route('/api/holdings/<fund_code>', methods=['DELETE'])(delete_holding)
     
@@ -894,7 +937,7 @@ def get_portfolio_metrics():
         for fund_code in fund_codes:
             # 获取基金历史净值数据
             nav_sql = """
-                SELECT nav, nav_date FROM fund_nav
+                SELECT nav_value as nav, nav_date FROM fund_nav_cache
                 WHERE fund_code = :fund_code
                 AND nav_date >= :start_date
                 AND nav_date <= :end_date
@@ -905,6 +948,11 @@ def get_portfolio_metrics():
                 'start_date': start_date,
                 'end_date': end_date
             })
+
+            # 如果 fund_nav_cache 为空，尝试实时从 tushare 获取
+            if nav_df.empty:
+                logger.info(f"[Portfolio Metrics] fund_nav_cache 无数据，尝试从 tushare 实时获取 {fund_code}")
+                nav_df = fetch_nav_from_tushare_realtime(fund_code, start_date, end_date)
 
             if not nav_df.empty:
                 # 计算收益率
@@ -1005,6 +1053,182 @@ def get_portfolio_metrics():
 
     except Exception as e:
         logger.error(f"获取组合绩效指标失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def get_portfolio_optimization():
+    """获取基金组合优化分析（风险平价、等权重、最大夏普）"""
+    try:
+        data = request.get_json()
+        fund_codes = data.get('fund_codes', [])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        optimization_methods = data.get('optimization_methods', ['risk_parity', 'equal_weight', 'maximum_sharpe'])
+
+        if not fund_codes:
+            return jsonify({'success': False, 'error': '请提供基金代码列表'}), 400
+
+        if not start_date or not end_date:
+            return jsonify({'success': False, 'error': '请提供开始和结束日期'}), 400
+
+        # 获取用户持仓权重（用于基准对比）
+        user_id = data.get('user_id', 'default_user')
+        holdings_sql = """
+            SELECT fund_code, holding_amount
+            FROM user_holdings
+            WHERE user_id = :user_id AND fund_code IN :fund_codes
+        """
+        holdings_df = db_manager.execute_query(holdings_sql, {
+            'user_id': user_id,
+            'fund_codes': tuple(fund_codes)
+        })
+
+        # 计算用户持仓权重
+        total_amount = holdings_df['holding_amount'].sum() if not holdings_df.empty else 0
+        user_weights = {}
+        if total_amount > 0:
+            for _, row in holdings_df.iterrows():
+                user_weights[row['fund_code']] = row['holding_amount'] / total_amount
+        else:
+            # 如果没有持仓数据，平均分配权重
+            for code in fund_codes:
+                user_weights[code] = 1.0 / len(fund_codes)
+
+        # 获取基金收益率数据
+        returns_dict = {}
+        fund_navs = {}
+
+        for fund_code in fund_codes:
+            # 先尝试从 tushare 实时获取
+            nav_df = fetch_nav_from_tushare_realtime(fund_code, start_date, end_date)
+            
+            # 如果 tushare 无数据，再从 fund_nav_cache 获取
+            if nav_df.empty:
+                nav_sql = """
+                    SELECT nav_value as nav, nav_date FROM fund_nav_cache
+                    WHERE fund_code = :fund_code
+                    AND nav_date >= :start_date
+                    AND nav_date <= :end_date
+                    ORDER BY nav_date
+                """
+                nav_df = db_manager.execute_query(nav_sql, {
+                    'fund_code': fund_code,
+                    'start_date': start_date,
+                    'end_date': end_date
+                })
+
+            if not nav_df.empty:
+                nav_df = nav_df.sort_values('nav_date')
+                nav_df['return'] = nav_df['nav'].pct_change()
+                returns = nav_df['return'].dropna().values
+                if len(returns) > 0:
+                    returns_dict[fund_code] = returns
+                    fund_navs[fund_code] = nav_df
+
+        if not returns_dict:
+            funds_with_data = list(returns_dict.keys())
+            funds_without_data = [code for code in fund_codes if code not in funds_with_data]
+            error_msg = f'基金历史数据不足，仅获取到 {len(funds_with_data)}/{len(fund_codes)} 只基金的数据'
+            if funds_without_data:
+                error_msg += f'，缺少数据的基金: {", ".join(funds_without_data[:5])}'
+                if len(funds_without_data) > 5:
+                    error_msg += f' 等{len(funds_without_data)}只'
+                error_msg += '。原因：这些基金可能是新成立的基金（成立不满半年），或已下架，或 tushare 未收录。'
+            logger.warning(f"[Portfolio Optimization] {error_msg}")
+            return jsonify({'success': False, 'error': error_msg}), 400
+
+        # 获取协方差矩阵和预期收益率
+        returns_df, cov_matrix, expected_returns = get_fund_returns_matrix(
+            fund_codes, start_date, end_date, db_manager
+        )
+
+        if returns_df.empty or cov_matrix.empty:
+            return jsonify({'success': False, 'error': '数据不足以进行优化分析'}), 400
+
+        # 初始化优化器
+        optimizer = PortfolioOptimizer()
+
+        # 存储所有优化结果
+        results = {}
+
+        # 计算各优化方式的净值序列
+        def calc_nav_for_weights(weights_dict, name):
+            nav_series = calculate_portfolio_nav_series(returns_df, weights_dict)
+            return {
+                'dates': nav_series.index.strftime('%Y-%m-%d').tolist(),
+                'values': nav_series.round(4).tolist()
+            }
+
+        # 1. 用户持仓（基准）
+        user_performance = calculate_portfolio_performance(returns_dict, user_weights)
+        results['holding'] = {
+            'name': '当前持仓',
+            'weights': user_weights,
+            'metrics': user_performance,
+            'nav_series': calc_nav_for_weights(user_weights, '当前持仓')
+        }
+
+        # 2. 风险平价
+        if 'risk_parity' in optimization_methods:
+            try:
+                rp_result = optimizer.risk_parity_optimization(cov_matrix)
+                rp_weights = rp_result.optimal_weights.to_dict()
+                rp_performance = calculate_portfolio_performance(returns_dict, rp_weights)
+                results['risk_parity'] = {
+                    'name': '风险平价',
+                    'weights': rp_weights,
+                    'metrics': rp_performance,
+                    'nav_series': calc_nav_for_weights(rp_weights, '风险平价')
+                }
+            except Exception as e:
+                logger.warning(f"风险平价优化失败: {e}")
+
+        # 3. 等权重
+        if 'equal_weight' in optimization_methods:
+            try:
+                ew_result = optimizer.equal_weight_optimization(cov_matrix, expected_returns)
+                ew_weights = ew_result.optimal_weights.to_dict()
+                ew_performance = calculate_portfolio_performance(returns_dict, ew_weights)
+                results['equal_weight'] = {
+                    'name': '等权重',
+                    'weights': ew_weights,
+                    'metrics': ew_performance,
+                    'nav_series': calc_nav_for_weights(ew_weights, '等权重')
+                }
+            except Exception as e:
+                logger.warning(f"等权重优化失败: {e}")
+
+        # 4. 最大化夏普
+        if 'maximum_sharpe' in optimization_methods:
+            try:
+                ms_result = optimizer.maximum_sharpe_optimization(expected_returns, cov_matrix)
+                ms_weights = ms_result.optimal_weights.to_dict()
+                ms_performance = calculate_portfolio_performance(returns_dict, ms_weights)
+                results['maximum_sharpe'] = {
+                    'name': '最大化夏普',
+                    'weights': ms_weights,
+                    'metrics': ms_performance,
+                    'nav_series': calc_nav_for_weights(ms_weights, '最大化夏普')
+                }
+            except Exception as e:
+                logger.warning(f"最大化夏普优化失败: {e}")
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'period': {
+                    'start_date': start_date,
+                    'end_date': end_date
+                },
+                'funds': fund_codes,
+                'results': results
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"组合优化分析失败: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500

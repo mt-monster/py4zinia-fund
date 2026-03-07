@@ -6,6 +6,7 @@
     <title>基金相关性分析</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/correlation_analysis.css') }}">
@@ -39,7 +40,7 @@
             </div>
         </div>
 
-        <main class="main-container" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <main class="main-container" style="max-width: 1200px; margin: 0 auto; padding: 0;">
             <!-- 简单Tab切换 -->
             <div style="display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 10px;">
                 <button onclick="switchAnalysisTab('correlation')" id="tab-btn-correlation"
@@ -57,6 +58,37 @@
 
             <!-- 相关性系数分析内容 -->
             <div id="tab-correlation">
+                <!-- 概览卡片 -->
+                <div class="cards-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                    <div class="info-card">
+                        <div class="card-icon blue">
+                            <i class="bi bi-collection"></i>
+                        </div>
+                        <div class="card-content">
+                            <span class="card-label">基金数量</span>
+                            <span class="card-value" id="fund-count">-</span>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="card-icon orange">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                        <div class="card-content">
+                            <span class="card-label">高相关性组合</span>
+                            <span class="card-value" id="high-correlation-count">-</span>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="card-icon green">
+                            <i class="bi bi-pie-chart"></i>
+                        </div>
+                        <div class="card-content">
+                            <span class="card-label">分散度评分</span>
+                            <span class="card-value" id="diversification-score">-</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 简单状态提示 -->
                 <div id="correlation-status" style="background: #f8f9fa; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; display: none;">
                     <span id="status-text" style="color: #666;">已选择 <strong id="selected-count">0</strong> 只基金</span>
@@ -84,12 +116,6 @@
                         <div id="top-pairs-content" style="font-size: 13px; color: #856404;"></div>
                     </div>
                 </div>
-            </div>
-                    <div class="legend-item">
-                        <span class="legend-color low"></span>
-                        <span class="legend-label">低相关 (<0.3)</span>
-                    </div>
-                </div>
             </section>
 
             <!-- 交互式相关性图表 -->
@@ -109,25 +135,12 @@
                     </div>
                 </div>
             </section>
-
-            <!-- 空状态提示 -->
-            <section class="empty-state" id="empty-state">
-                <div class="empty-icon">
-                    <i class="bi bi-diagram-3"></i>
-                </div>
-                <h3>暂无分析数据</h3>
-                <p>请从基金持仓页面选择至少2只基金进行相关性分析</p>
-                <a href="/my-holdings-new" class="btn btn-primary">
-                    <i class="bi bi-arrow-left"></i>
-                    前往持仓页面
-                </a>
-            </section>
             </div> <!-- 关闭相关性分析tab -->
 
             <!-- 量化分析tab内容 -->
             <div id="tab-quantitative" style="display: none;">
                 <!-- 时间段选择 -->
-                <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: 0;">
                     <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                         <input type="date" id="quant-start-date" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
                         <span style="color: #999;">至</span>
@@ -139,21 +152,41 @@
                         <button onclick="setQuickPeriod('ytd')" style="padding: 8px 12px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 6px; cursor: pointer; font-size: 13px;">今年来</button>
                         <button onclick="analyzePortfolioMetrics()" style="padding: 8px 20px; background: #0d6efd; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">分析</button>
                     </div>
+                    <!-- 优化方法选择 -->
+                    <div style="display: flex; gap: 20px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                        <span style="color: #666; font-size: 14px;">优化方式：</span>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="opt-risk-parity" checked style="cursor: pointer;"> 风险平价
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="opt-equal-weight" checked style="cursor: pointer;"> 等权重
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="opt-max-sharpe" checked style="cursor: pointer;"> 最大化夏普
+                        </label>
+                    </div>
                 </div>
 
                 <!-- 量化分析结果 -->
                 <div id="quant-results" style="display: none;">
-                    <!-- 绩效指标 -->
+                    <!-- 净值曲线对比图 -->
                     <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">组合绩效指标</h3>
-                        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; text-align: center;">
-                            <div><div style="color: #999; font-size: 12px;">年化收益</div><div id="quant-annualized-return" style="font-size: 20px; font-weight: 600; color: #28a745;">-%</div></div>
-                            <div><div style="color: #999; font-size: 12px;">夏普比率</div><div id="quant-sharpe-ratio" style="font-size: 20px; font-weight: 600;">-</div></div>
-                            <div><div style="color: #999; font-size: 12px;">最大回撤</div><div id="quant-max-drawdown" style="font-size: 20px; font-weight: 600; color: #dc3545;">-%</div></div>
-                            <div><div style="color: #999; font-size: 12px;">波动率</div><div id="quant-volatility" style="font-size: 20px; font-weight: 600;">-%</div></div>
-                            <div><div style="color: #999; font-size: 12px;">胜率</div><div id="quant-win-rate" style="font-size: 20px; font-weight: 600;">-%</div></div>
+                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">净值曲线对比</h3>
+                        <div id="nav-chart-container-v2" style="height: 350px; width: 100%;">
+                            <div id="nav-comparison-chart-v2" style="width: 100%; height: 100%;"></div>
                         </div>
                     </div>
+
+                    <!-- 绩效指标对比图 -->
+                    <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">组合绩效对比</h3>
+                        <div style="height: 300px;">
+                            <canvas id="optimization-comparison-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 各优化方式绩效指标 -->
+                    <div id="optimization-results-container"></div>
 
                     <!-- 各基金详情 -->
                     <div style="background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -182,10 +215,7 @@
             </div>
         </main>
 
-        <!-- 页脚 -->
-        <footer class="page-footer">
-            <p>基金相关性分析 &copy; 2024</p>
-        </footer>
+
     </div>
 
     <script>
@@ -198,7 +228,7 @@
         function switchAnalysisTab(tabName) {
             // 更新tab按钮样式
             document.getElementById('tab-btn-correlation').style.color = tabName === 'correlation' ? '#0d6efd' : '#666';
-            document.getElementById('tab-btn-correlation').style.borderBottomColor = tabName === 'correlation' ? '#0' : 'transparentd6efd';
+            document.getElementById('tab-btn-correlation').style.borderBottomColor = tabName === 'correlation' ? '#0d6efd' : 'transparent';
             document.getElementById('tab-btn-quantitative').style.color = tabName === 'quantitative' ? '#0d6efd' : '#666';
             document.getElementById('tab-btn-quantitative').style.borderBottomColor = tabName === 'quantitative' ? '#0d6efd' : 'transparent';
 
@@ -209,6 +239,15 @@
             // 如果切换到量化分析tab，初始化日期选择器
             if (tabName === 'quantitative') {
                 initQuantitativeTab();
+                // 如果已有量化分析结果，重新渲染净值曲线图
+                if (quantitativeData && quantitativeData.results) {
+                    setTimeout(() => {
+                        const results = quantitativeData.results;
+                        const order = ['holding', 'risk_parity', 'equal_weight', 'maximum_sharpe'];
+                        const keys = order.filter(k => results[k]);
+                        renderNavComparisonChart(results, keys);
+                    }, 300);
+                }
             }
         }
 
@@ -271,24 +310,36 @@
                 return;
             }
 
+            // 获取选中的优化方法
+            const optimizationMethods = [];
+            if (document.getElementById('opt-risk-parity').checked) optimizationMethods.push('risk_parity');
+            if (document.getElementById('opt-equal-weight').checked) optimizationMethods.push('equal_weight');
+            if (document.getElementById('opt-max-sharpe').checked) optimizationMethods.push('maximum_sharpe');
+
+            if (optimizationMethods.length === 0) {
+                alert('请至少选择一种优化方式');
+                return;
+            }
+
             // 显示加载状态
-            document.getElementById('quant-empty-state').style.display = 'none';
-            document.getElementById('quant-results-section').innerHTML = `
-                <div class="loading-state" style="text-align: center; padding: 60px;">
-                    <i class="bi bi-arrow-repeat spinning" style="font-size: 32px;"></i>
+            document.getElementById('quant-empty-state').innerHTML = `
+                <div style="text-align: center; padding: 60px;"><i class="bi bi-arrow-repeat"
+                     style="font-size: 32px; animation: spin 1s linear infinite;"></i>
                     <p style="margin-top: 10px;">正在分析...</p>
                 </div>
+                <style>@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }</style>
             `;
-            document.getElementById('quant-results-section').style.display = 'block';
 
             try {
-                const response = await fetch('/api/holdings/analyze/portfolio-metrics', {
+                // 调用新的组合优化API
+                const response = await fetch('/api/holdings/analyze/portfolio-optimization', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         fund_codes: currentFundCodes,
                         start_date: startDate,
-                        end_date: endDate
+                        end_date: endDate,
+                        optimization_methods: optimizationMethods
                     })
                 });
 
@@ -298,8 +349,8 @@
                     quantitativeData = result.data;
                     renderQuantitativeResults(result.data);
                 } else {
-                    document.getElementById('quant-results-section').innerHTML = `
-                        <div class="error-state" style="text-align: center; padding: 60px; color: #dc3545;">
+                    document.getElementById('quant-empty-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px; color: #dc3545;">
                             <i class="bi bi-exclamation-circle" style="font-size: 32px;"></i>
                             <p style="margin-top: 10px;">${result.error || '分析失败'}</p>
                         </div>
@@ -307,7 +358,7 @@
                 }
             } catch (error) {
                 console.error('量化分析失败:', error);
-                document.getElementById('quant-results-section').innerHTML = `
+                document.getElementById('quant-empty-state').innerHTML = `
                     <div class="error-state" style="text-align: center; padding: 60px; color: #dc3545;">
                         <i class="bi bi-exclamation-circle" style="font-size: 32px;"></i>
                         <p style="margin-top: 10px;">网络错误，请重试</p>
@@ -318,73 +369,376 @@
 
         // 渲染量化分析结果
         function renderQuantitativeResults(data) {
-            const portfolio = data.portfolio;
-            const funds = data.funds;
-            const attribution = data.attribution;
+            // 检查是否是新格式（包含results字段）
+            if (data.results) {
+                // 新格式：组合优化结果
+                renderOptimizationResults(data);
+            } else {
+                // 旧格式：原有持仓绩效
+                const portfolio = data.portfolio;
+                const funds = data.funds;
+                const attribution = data.attribution;
 
-            // 更新绩效概览卡片
-            document.getElementById('quant-annualized-return').textContent = portfolio.annualized_return + '%';
-            document.getElementById('quant-sharpe-ratio').textContent = portfolio.sharpe_ratio;
-            document.getElementById('quant-max-drawdown').textContent = '-' + portfolio.max_drawdown + '%';
-            document.getElementById('quant-volatility').textContent = portfolio.volatility + '%';
-            document.getElementById('quant-win-rate').textContent = portfolio.win_rate + '%';
+                // 更新绩效概览卡片
+                document.getElementById('quant-annualized-return').textContent = portfolio.annualized_return + '%';
+                document.getElementById('quant-sharpe-ratio').textContent = portfolio.sharpe_ratio;
+                document.getElementById('quant-max-drawdown').textContent = '-' + portfolio.max_drawdown + '%';
+                document.getElementById('quant-volatility').textContent = portfolio.volatility + '%';
+                document.getElementById('quant-win-rate').textContent = portfolio.win_rate + '%';
 
-            // 渲染月度收益分析
-            let monthlyHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">';
-            funds.forEach(fund => {
-                const ms = fund.monthly_stats;
-                monthlyHtml += `
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
-                        <div style="font-weight: 600; margin-bottom: 10px;">${fund.fund_code}</div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
-                            <div>最佳月份:</div><div style="color: #28a745;">${ms.best_month.toFixed(2)}%</div>
-                            <div>最差月份:</div><div style="color: #dc3545;">${ms.worst_month.toFixed(2)}%</div>
-                            <div>月均收益:</div><div>${ms.avg_monthly.toFixed(2)}%</div>
-                            <div>正收益月:</div><div>${ms.positive_months}/${ms.total_months}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            monthlyHtml += '</div>';
-            document.getElementById('monthly-returns-content').innerHTML = monthlyHtml;
+                // 渲染月度收益分析
+                if (funds && funds.length > 0) {
+                    let monthlyHtml = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">';
+                    funds.forEach(fund => {
+                        if (fund.monthly_stats) {
+                            const ms = fund.monthly_stats;
+                            monthlyHtml += `
+                                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                    <div style="font-weight: 600; margin-bottom: 10px;">${fund.fund_code}</div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+                                        <div>最佳月份:</div><div style="color: #28a745;">${ms.best_month.toFixed(2)}%</div>
+                                        <div>最差月份:</div><div style="color: #dc3545;">${ms.worst_month.toFixed(2)}%</div>
+                                        <div>月均收益:</div><div>${ms.avg_monthly.toFixed(2)}%</div>
+                                        <div>正收益月:</div><div>${ms.positive_months}/${ms.total_months}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+                    monthlyHtml += '</div>';
+                    document.getElementById('monthly-returns-content').innerHTML = monthlyHtml;
+                }
 
-            // 渲染归因分析
-            let attrHtml = '<table class="fund-table" style="width: 100%;"><thead><tr><th>基金代码</th><th>权重</th><th>收益贡献</th></tr></thead><tbody>';
-            attribution.forEach(item => {
-                attrHtml += `
-                    <tr>
-                        <td>${item.fund_code}</td>
-                        <td>${item.weight.toFixed(2)}%</td>
-                        <td style="color: ${item.contribution >= 0 ? '#28a745' : '#dc3545'};">
-                            ${item.contribution >= 0 ? '+' : ''}${item.contribution.toFixed(2)}%
-                        </td>
-                    </tr>
-                `;
-            });
-            attrHtml += '</tbody></table>';
-            document.getElementById('attribution-content').innerHTML = attrHtml;
+                // 渲染归因分析
+                if (attribution && attribution.length > 0) {
+                    let attrHtml = '<table class="fund-table" style="width: 100%;"><thead><tr><th>基金代码</th><th>权重</th><th>收益贡献</th></tr></thead><tbody>';
+                    attribution.forEach(item => {
+                        attrHtml += `
+                            <tr>
+                                <td>${item.fund_code}</td>
+                                <td>${item.weight.toFixed(2)}%</td>
+                                <td style="color: ${item.contribution >= 0 ? '#28a745' : '#dc3545'};">
+                                    ${item.contribution >= 0 ? '+' : ''}${item.contribution.toFixed(2)}%
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    attrHtml += '</tbody></table>';
+                    document.getElementById('attribution-content').innerHTML = attrHtml;
+                }
 
-            // 渲染各基金详情
-            let fundDetailHtml = '<table class="fund-table" style="width: 100%;"><thead><tr><th>基金代码</th><th>权重</th><th>年化收益</th><th>夏普比率</th><th>最大回撤</th><th>波动率</th><th>胜率</th></tr></thead><tbody>';
-            funds.forEach(fund => {
-                fundDetailHtml += `
-                    <tr>
-                        <td>${fund.fund_code}</td>
-                        <td>${(fund.weight * 100).toFixed(2)}%</td>
-                        <td style="color: ${fund.annualized_return >= 0 ? '#28a745' : '#dc3545'};">${fund.annualized_return}%</td>
-                        <td>${fund.sharpe_ratio}</td>
-                        <td style="color: #dc3545;">-${fund.max_drawdown}%</td>
-                        <td>${fund.volatility}%</td>
-                        <td>${fund.win_rate}%</td>
-                    </tr>
-                `;
-            });
-            fundDetailHtml += '</tbody></table>';
-            document.getElementById('fund-details-content').innerHTML = fundDetailHtml;
+                // 渲染各基金详情
+                if (funds && funds.length > 0) {
+                    let fundDetailHtml = '<table class="fund-table" style="width: 100%;"><thead><tr><th>基金代码</th><th>权重</th><th>年化收益</th><th>夏普比率</th><th>最大回撤</th><th>波动率</th><th>胜率</th></tr></thead><tbody>';
+                    funds.forEach(fund => {
+                        fundDetailHtml += `
+                            <tr>
+                                <td>${fund.fund_code}</td>
+                                <td>${(fund.weight * 100).toFixed(2)}%</td>
+                                <td style="color: ${fund.annualized_return >= 0 ? '#28a745' : '#dc3545'};">${fund.annualized_return}%</td>
+                                <td>${fund.sharpe_ratio}</td>
+                                <td style="color: #dc3545;">-${fund.max_drawdown}%</td>
+                                <td>${fund.volatility}%</td>
+                                <td>${fund.win_rate}%</td>
+                            </tr>
+                        `;
+                    });
+                    fundDetailHtml += '</tbody></table>';
+                    document.getElementById('fund-details-content').innerHTML = fundDetailHtml;
+                }
+            }
 
             // 显示结果区域
             document.getElementById('quant-results').style.display = 'block';
             document.getElementById('quant-empty-state').style.display = 'none';
+        }
+
+        // 渲染组合优化结果
+        function renderOptimizationResults(data) {
+            const results = data.results;
+            const container = document.getElementById('optimization-results-container');
+            
+            // 先显示结果区域，确保容器有尺寸
+            document.getElementById('quant-results').style.display = 'block';
+            document.getElementById('quant-empty-state').style.display = 'none';
+
+            // 渲染各优化方式的绩效卡片
+            let html = '';
+
+            // 定义颜色
+            const colors = {
+                'holding': '#6c757d',
+                'risk_parity': '#0d6efd',
+                'equal_weight': '#198754',
+                'maximum_sharpe': '#dc3545'
+            };
+
+            // 定义优化方式的显示顺序
+            const order = ['holding', 'risk_parity', 'equal_weight', 'maximum_sharpe'];
+
+            order.forEach(key => {
+                if (results[key]) {
+                    const r = results[key];
+                    const m = r.metrics;
+                    html += `
+                        <div style="background: white; border-radius: 8px; padding: 20px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid ${colors[key]};">
+                            <h4 style="margin: 0 0 15px 0; font-size: 16px; color: ${colors[key]};">${r.name}</h4>
+                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; text-align: center;">
+                                <div><div style="color: #999; font-size: 12px;">年化收益</div><div style="font-size: 20px; font-weight: 600; color: ${m.annualized_return >= 0 ? '#28a745' : '#dc3545'};">${m.annualized_return}%</div></div>
+                                <div><div style="color: #999; font-size: 12px;">夏普比率</div><div style="font-size: 20px; font-weight: 600;">${m.sharpe_ratio}</div></div>
+                                <div><div style="color: #999; font-size: 12px;">最大回撤</div><div style="font-size: 20px; font-weight: 600; color: #dc3545;">-${m.max_drawdown}%</div></div>
+                                <div><div style="color: #999; font-size: 12px;">波动率</div><div style="font-size: 20px; font-weight: 600;">${m.volatility}%</div></div>
+                                <div><div style="color: #999; font-size: 12px;">胜率</div><div style="font-size: 20px; font-weight: 600;">${m.win_rate}%</div></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            container.innerHTML = html;
+
+            // 更新当前持仓绩效卡片
+            if (results.holding) {
+                const m = results.holding.metrics;
+                document.getElementById('quant-annualized-return').textContent = m.annualized_return + '%';
+                document.getElementById('quant-sharpe-ratio').textContent = m.sharpe_ratio;
+                document.getElementById('quant-max-drawdown').textContent = '-' + m.max_drawdown + '%';
+                document.getElementById('quant-volatility').textContent = m.volatility + '%';
+                document.getElementById('quant-win-rate').textContent = m.win_rate + '%';
+            }
+
+            // 渲染对比柱状图
+            renderOptimizationChart(results, order.filter(k => results[k]));
+
+            // 延迟渲染净值曲线图，确保容器尺寸正确
+            setTimeout(() => {
+                // 确保所有容器可见
+                document.getElementById('quant-results').style.display = 'block';
+                document.getElementById('quant-empty-state').style.display = 'none';
+                
+                renderNavComparisonChart(results, order.filter(k => results[k]));
+            }, 300);
+
+            // 隐藏原有的月度收益和归因分析区域（因为新API不返回这些数据）
+            document.getElementById('monthly-returns-content').parentElement.style.display = 'none';
+            document.getElementById('attribution-content').parentElement.style.display = 'none';
+            document.getElementById('fund-details-content').parentElement.style.display = 'none';
+        }
+
+        // 渲染优化对比柱状图
+        function renderOptimizationChart(results, keys) {
+            const canvasId = 'optimization-comparison-chart';
+            const canvas = document.getElementById(canvasId);
+
+            if (!canvas) return;
+
+            // 使用 Chart.getChart 获取并销毁现有图表
+            const existingChart = Chart.getChart(canvas);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            const labels = keys.map(k => results[k].name);
+            const annualReturns = keys.map(k => results[k].metrics.annualized_return);
+            const sharpeRatios = keys.map(k => results[k].metrics.sharpe_ratio);
+            const maxDrawdowns = keys.map(k => results[k].metrics.max_drawdown);
+            const volatilities = keys.map(k => results[k].metrics.volatility);
+
+            const colors = {
+                'holding': 'rgba(108, 117, 125, 0.8)',
+                'risk_parity': 'rgba(13, 110, 253, 0.8)',
+                'equal_weight': 'rgba(25, 135, 84, 0.8)',
+                'maximum_sharpe': 'rgba(220, 53, 69, 0.8)'
+            };
+
+            const backgroundColors = keys.map(k => colors[k] || 'rgba(108, 117, 125, 0.8)');
+
+            const ctx = canvas.getContext('2d');
+            window.optimizationChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '年化收益(%)',
+                            data: annualReturns,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(c => c.replace('0.8', '1')),
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: false,
+                            text: '各优化方式绩效对比'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 渲染净值曲线对比图 (ECharts版本，数据标准化)
+        function renderNavComparisonChart(results, keys) {
+            console.log('[净值图表] 开始渲染, keys:', keys);
+            
+            // 等待 ECharts 加载
+            if (typeof echarts === 'undefined') {
+                console.warn('[净值图表] ECharts 未加载，等待中...');
+                setTimeout(() => renderNavComparisonChart(results, keys), 500);
+                return;
+            }
+            
+            const chartDom = document.getElementById('nav-comparison-chart-v2');
+            console.log('[净值图表] chartDom:', chartDom);
+
+            if (!chartDom) {
+                console.error('[净值图表] Chart元素不存在');
+                return;
+            }
+
+            // 销毁旧图表
+            if (window.navComparisonChartInstance) {
+                window.navComparisonChartInstance.dispose();
+            }
+
+            const colors = {
+                'holding': '#6c757d',
+                'risk_parity': '#0d6efd',
+                'equal_weight': '#198754',
+                'maximum_sharpe': '#dc3545',
+                'hs300': '#ff7f0e'
+            };
+
+            // 构建数据集并标准化数据（初始净值设为1.0）
+            const series = keys.map(key => {
+                const navData = results[key].nav_series;
+                console.log(`[净值图表] ${key} nav_series:`, navData);
+                if (!navData || !navData.values) {
+                    console.error(`[净值图表] ${key} 缺少 nav_series 或 values`);
+                    return null;
+                }
+                
+                // 标准化数据：第一个值为1.0，其余值按比例计算
+                const firstValue = navData.values[0];
+                const normalizedValues = firstValue !== 0 
+                    ? navData.values.map(v => v / firstValue)
+                    : navData.values.map(v => 1.0);
+                
+                return {
+                    name: results[key].name,
+                    type: 'line',
+                    data: normalizedValues,
+                    symbol: 'circle',
+                    symbolSize: 4,
+                    showSymbol: false,
+                    smooth: true,
+                    lineStyle: {
+                        width: 2,
+                        color: colors[key]
+                    },
+                    itemStyle: {
+                        color: colors[key]
+                    }
+                };
+            }).filter(d => d !== null);
+
+            // 获取日期标签
+            let labels = [];
+            for (const key of keys) {
+                if (results[key].nav_series && results[key].nav_series.dates) {
+                    labels = results[key].nav_series.dates;
+                    break;
+                }
+            }
+
+            console.log('[净值图表] labels数量:', labels.length);
+            console.log('[净值图表] series数量:', series.length);
+
+            if (series.length === 0 || labels.length === 0) {
+                console.error('[净值图表] 数据不足，无法绘制');
+                return;
+            }
+
+            // 确保容器可见
+            const quantResults = document.getElementById('quant-results');
+            const quantitativeTab = document.getElementById('tab-quantitative');
+            
+            if (quantResults) quantResults.style.display = 'block';
+            if (quantitativeTab) quantitativeTab.style.display = 'block';
+
+            // 直接初始化ECharts
+            setTimeout(() => {
+                console.log('[净值图表] 初始化ECharts...');
+                
+                // 强制设置尺寸
+                chartDom.style.width = '100%';
+                chartDom.style.height = '350px';
+                
+                try {
+                    window.navComparisonChartInstance = echarts.init(chartDom);
+                    console.log('[净值图表] ECharts实例创建成功');
+
+                    const option = {
+                        title: {
+                            text: '累计净值曲线对比',
+                            left: 'center'
+                        },
+                        tooltip: {
+                            trigger: 'axis'
+                        },
+                        legend: {
+                            top: 30
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            top: 70,
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: labels,
+                            boundaryGap: false
+                        },
+                        yAxis: {
+                            type: 'value',
+                            min: 0.8
+                        },
+                        series: series
+                    };
+
+                    window.navComparisonChartInstance.setOption(option);
+                    console.log('[净值图表] 图表绘制完成');
+                    
+                    setTimeout(() => {
+                        window.navComparisonChartInstance.resize();
+                    }, 100);
+                    
+                    window.addEventListener('resize', () => {
+                        window.navComparisonChartInstance.resize();
+                    });
+                } catch (error) {
+                    console.error('[净值图表] 初始化失败:', error);
+                }
+            }, 100);
         }
 
         // ==================== 初始化 ====================
@@ -639,7 +993,8 @@
         
         // 从组合摘要更新概览
         function updateOverviewFromCombinations(combinations, fundCount) {
-            document.getElementById('fund-count').textContent = fundCount;
+            const fundCountEl = document.getElementById('fund-count');
+            if (fundCountEl) fundCountEl.textContent = fundCount;
             
             // 计算高相关性组合数量
             let highCorrCount = 0;
@@ -648,7 +1003,8 @@
                     highCorrCount++;
                 }
             });
-            document.getElementById('high-correlation-count').textContent = highCorrCount;
+            const highCorrEl = document.getElementById('high-correlation-count');
+            if (highCorrEl) highCorrEl.textContent = highCorrCount;
             
             // 计算分散度评分
             let diversificationScore = '优秀';
@@ -659,7 +1015,8 @@
                 else if (ratio > 0.3) diversificationScore = '一般';
                 else if (ratio > 0.1) diversificationScore = '良好';
             }
-            document.getElementById('diversification-score').textContent = diversificationScore;
+            const diversEl = document.getElementById('diversification-score');
+            if (diversEl) diversEl.textContent = diversificationScore;
         }
         
         // 从组合摘要渲染相关性矩阵
@@ -797,12 +1154,9 @@
 
         // ==================== 页面状态控制 ====================
         function showEmptyState() {
-            document.getElementById('empty-state').style.display = 'flex';
-            document.getElementById('fund-status-bar').style.display = 'none';
-            document.getElementById('overview-cards').style.display = 'none';
+            document.getElementById('correlation-status').style.display = 'none';
             document.getElementById('top-pairs-section').style.display = 'none';
             document.getElementById('matrix-section').style.display = 'none';
-            document.getElementById('interactive-charts-section').style.display = 'none';
         }
 
         function showAnalysisContent() {
@@ -854,7 +1208,9 @@
             // 更新基金数量（优先使用 fund_codes，其次使用 fund_names）
             const fundCount = data.fund_codes ? data.fund_codes.length : 
                              (data.fund_names ? data.fund_names.length : 0);
-            document.getElementById('fund-count').textContent = fundCount;
+            
+            const fundCountEl = document.getElementById('fund-count');
+            if (fundCountEl) fundCountEl.textContent = fundCount;
             
             // 计算高相关性组合数量
             let highCorrCount = 0;
@@ -867,7 +1223,9 @@
                     }
                 }
             }
-            document.getElementById('high-correlation-count').textContent = highCorrCount;
+            
+            const highCorrEl = document.getElementById('high-correlation-count');
+            if (highCorrEl) highCorrEl.textContent = highCorrCount;
             
             // 计算分散度评分 (简单的算法)
             let diversificationScore = '优秀';
@@ -878,7 +1236,9 @@
                 else if (ratio > 0.3) diversificationScore = '一般';
                 else if (ratio > 0.1) diversificationScore = '良好';
             }
-            document.getElementById('diversification-score').textContent = diversificationScore;
+            
+            const diversEl = document.getElementById('diversification-score');
+            if (diversEl) diversEl.textContent = diversificationScore;
         }
 
         // 在获取增强分析数据后更新所有组件
@@ -897,7 +1257,8 @@
             
             if (fundCodes && fundCodes.length > 0) {
                 const fundCount = fundCodes.length;
-                document.getElementById('fund-count').textContent = fundCount;
+                const fundCountEl = document.getElementById('fund-count');
+                if (fundCountEl) fundCountEl.textContent = fundCount;
                 
                 // 计算高相关性组合数量（从矩阵数据）
                 let highCorrCount = 0;
@@ -910,7 +1271,8 @@
                         }
                     }
                 }
-                document.getElementById('high-correlation-count').textContent = highCorrCount;
+                const highCorrEl = document.getElementById('high-correlation-count');
+                if (highCorrEl) highCorrEl.textContent = highCorrCount;
                 
                 // 计算分散度评分
                 let diversificationScore = '优秀';
@@ -921,7 +1283,8 @@
                     else if (ratio > 0.3) diversificationScore = '一般';
                     else if (ratio > 0.1) diversificationScore = '良好';
                 }
-                document.getElementById('diversification-score').textContent = diversificationScore;
+                const diversEl = document.getElementById('diversification-score');
+                if (diversEl) diversEl.textContent = diversificationScore;
                 
                 // 更新高相关性组合和相关性矩阵（使用增强分析的数据）
                 if (correlationMatrix && fundNames) {
