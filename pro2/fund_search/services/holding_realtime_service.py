@@ -36,6 +36,7 @@ class HoldingDataDTO:
     holding_shares: float = 0.0
     cost_price: float = 0.0
     holding_amount: float = 0.0
+    holding_profit_imported: Optional[float] = None  # 导入的持仓收益（优先使用）
     
     # 实时数据（外部API）
     current_nav: Optional[float] = None
@@ -71,8 +72,17 @@ class HoldingDataDTO:
         if self.holding_shares and self.current_nav:
             self.current_market_value = round(self.holding_shares * self.current_nav, 2)
         
-        # 持仓盈亏
-        if self.current_market_value is not None and self.holding_amount:
+        # 持仓盈亏 - 优先使用导入的值
+        if self.holding_profit_imported is not None:
+            # 使用导入的持仓收益值
+            self.holding_profit = self.holding_profit_imported
+            # 计算收益率
+            if self.holding_amount and self.holding_amount > 0:
+                self.holding_profit_rate = round(
+                    self.holding_profit_imported / self.holding_amount * 100, 2
+                )
+        elif self.current_market_value is not None and self.holding_amount:
+            # 计算持仓盈亏
             self.holding_profit = round(self.current_market_value - self.holding_amount, 2)
             self.holding_profit_rate = round(
                 self.holding_profit / self.holding_amount * 100, 2
@@ -502,7 +512,8 @@ class HoldingRealtimeService:
                 fund_type=holding.get('fund_type', ''),
                 holding_shares=holding.get('holding_shares', 0),
                 cost_price=holding.get('cost_price', 0),
-                holding_amount=holding.get('holding_amount', 0)
+                holding_amount=holding.get('holding_amount', 0),
+                holding_profit_imported=holding.get('holding_profit')  # 导入的持仓收益
             )
             
             # 填充实时数据
@@ -546,6 +557,7 @@ class HoldingRealtimeService:
                     h.holding_shares, 
                     h.cost_price, 
                     h.holding_amount,
+                    h.holding_profit,
                     COALESCE(bi.fund_type, '未知') as fund_type
                 FROM user_holdings h
                 LEFT JOIN fund_basic_info bi ON h.fund_code = bi.fund_code

@@ -927,13 +927,21 @@ def add_holding():
         
         notes = data.get('notes', '')
         
+        # 持仓收益（用户导入的实际收益值）
+        holding_profit = data.get('holding_profit')
+        if holding_profit is not None:
+            try:
+                holding_profit = float(holding_profit)
+            except (ValueError, TypeError):
+                holding_profit = None
+        
         # 计算持有金额
         holding_amount = holding_shares * cost_price
         
         sql = """
         INSERT INTO user_holdings 
-        (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, buy_date, notes)
-        VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :buy_date, :notes)
+        (user_id, fund_code, fund_name, holding_shares, cost_price, holding_amount, holding_profit, buy_date, notes)
+        VALUES (:user_id, :fund_code, :fund_name, :holding_shares, :cost_price, :holding_amount, :holding_profit, :buy_date, :notes)
         """
         
         success = db_manager.execute_sql(sql, {
@@ -943,6 +951,7 @@ def add_holding():
             'holding_shares': holding_shares,
             'cost_price': cost_price,
             'holding_amount': holding_amount,
+            'holding_profit': holding_profit,
             'buy_date': buy_date,
             'notes': notes
         })
@@ -1079,6 +1088,15 @@ def update_holding(fund_code):
             if 'notes' in data:
                 update_fields.append('notes = :notes')
                 params['notes'] = data['notes']
+            
+            if 'holding_profit' in data:
+                profit_val = data['holding_profit']
+                if profit_val is not None and profit_val != '':
+                    try:
+                        params['holding_profit'] = float(profit_val)
+                        update_fields.append('holding_profit = :holding_profit')
+                    except (ValueError, TypeError):
+                        pass
             
             if not update_fields:
                 return jsonify({'success': False, 'error': '没有要更新的字段'}), 400

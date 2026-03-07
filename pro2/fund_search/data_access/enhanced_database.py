@@ -341,6 +341,7 @@ class EnhancedDatabaseManager:
             holding_shares FLOAT DEFAULT 0 COMMENT '持仓份额',
             cost_price FLOAT DEFAULT 0 COMMENT '成本价',
             holding_amount FLOAT DEFAULT 0 COMMENT '持有金额（份额×成本价）',
+            holding_profit FLOAT DEFAULT NULL COMMENT '持仓收益（导入的实际收益值）',
             buy_date DATE DEFAULT NULL COMMENT '买入日期',
             notes TEXT COMMENT '备注信息',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
@@ -367,6 +368,19 @@ class EnhancedDatabaseManager:
                 logger.info("user_holdings表notes列已存在")
         except Exception as e:
             logger.warning(f"处理notes列失败: {e}")
+
+        # 为现有表添加holding_profit列（如果不存在）
+        try:
+            check_sql = "SHOW COLUMNS FROM user_holdings LIKE 'holding_profit'"
+            result = self.execute_query(check_sql)
+            if result.empty:
+                alter_sql = "ALTER TABLE user_holdings ADD COLUMN holding_profit FLOAT DEFAULT NULL COMMENT '持仓收益（导入的实际收益值）'"
+                self.execute_sql(alter_sql)
+                logger.info("user_holdings表holding_profit列添加完成")
+            else:
+                logger.info("user_holdings表holding_profit列已存在")
+        except Exception as e:
+            logger.warning(f"处理holding_profit列失败: {e}")
 
     def _create_user_strategies_table(self):
         """
